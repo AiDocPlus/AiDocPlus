@@ -1,0 +1,18 @@
+{
+  "title": "文档翻译",
+  "description": "AI 翻译文档内容为多种语言",
+  "generate": "翻译",
+  "generating": "翻译中...",
+  "regenerate": "重新翻译",
+  "copy": "复制",
+  "copied": "已复制",
+  "copiedToClipboard": "已复制到剪贴板",
+  "emptyContent": "❌ 文档内容为空，无法翻译。",
+  "generateFailed": "❌ 翻译失败：{{error}}",
+  "generateSuccess": "翻译完成",
+  "promptPlaceholder": "描述翻译要求...",
+  "defaultPrompt": "将文档内容翻译为英文",
+  "welcome": "文档翻译",
+  "welcomeDesc": "AI 将文档内容翻译为目标语言，支持多种语言。",
+  "systemPrompt": "你是一个专业的翻译助手。请将以下内容翻译为目标语言，保持原文格式和语义。"
+}

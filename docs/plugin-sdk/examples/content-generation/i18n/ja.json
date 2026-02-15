@@ -1,0 +1,5 @@
+{
+  "generateButton": "要約を生成",
+  "clearButton": "クリア",
+  "promptPlaceholder": "例：100字程度の要約を生成してください"
+}

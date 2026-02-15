@@ -1,0 +1,19 @@
+{
+  "title": "教案生成",
+  "description": "AIがドキュメント内容から教案を生成",
+  "generate": "教案生成",
+  "generating": "生成中...",
+  "regenerate": "再生成",
+  "copy": "コピー",
+  "copied": "コピー済み",
+  "copiedToClipboard": "クリップボードにコピーしました",
+  "emptyContent": "❌ ドキュメント内容が空のため、教案を生成できません。",
+  "generateFailed": "❌ 教案生成に失敗しました：{{error}}",
+  "generateSuccess": "教案を生成しました",
+  "promptPlaceholder": "必要な教案を記述...",
+  "defaultPrompt": "ドキュメント内容から完全な教案を生成",
+  "welcome": "教案生成",
+  "welcomeDesc": "AIがドキュメント内容を分析し、構造化された教案を自動生成します。",
+  "systemPrompt": "あなたはプロの教育設計アシスタントです。教学目標、重要ポイント、教学プロセスなどを含む構造化された教案を生成してください。",
+  "export": "エクスポート"
+}

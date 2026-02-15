@@ -1,0 +1,23 @@
+{
+  "name": "aidocplus-root",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AiDocPlus - AI Document Editor",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "turbo": "^2.8.9",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@10.29.1"
+}

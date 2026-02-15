@@ -1,0 +1,356 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+
+@layer base {
+  html, body, #root {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Markdown Preview Styles — 使用 CSS 变量适配主题 */
+@layer components {
+  .markdown-preview {
+    padding: 1rem;
+    color: hsl(var(--foreground));
+  }
+
+  .markdown-preview h1,
+  .markdown-preview h2,
+  .markdown-preview h3,
+  .markdown-preview h4,
+  .markdown-preview h5,
+  .markdown-preview h6 {
+    color: inherit;
+    font-weight: 600;
+    line-height: 1.25;
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+  }
+
+  .markdown-preview h1 { font-size: 2.25rem; }
+  .markdown-preview h2 { font-size: 1.875rem; border-bottom: 1px solid hsl(var(--border)); padding-bottom: 0.3em; }
+  .markdown-preview h3 { font-size: 1.5rem; }
+  .markdown-preview h4 { font-size: 1.25rem; }
+  .markdown-preview h5 { font-size: 1.125rem; }
+  .markdown-preview h6 { font-size: 1rem; color: hsl(var(--muted-foreground)); }
+
+  .markdown-preview p {
+    margin-bottom: 0.75em;
+    color: inherit;
+  }
+
+  .markdown-preview strong {
+    font-weight: 700;
+    color: inherit;
+  }
+
+  .markdown-preview em {
+    font-style: italic;
+    color: inherit;
+  }
+
+  .markdown-preview del {
+    text-decoration: line-through;
+    opacity: 0.6;
+  }
+
+  .markdown-preview a {
+    color: hsl(var(--primary));
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .markdown-preview a:hover {
+    opacity: 0.8;
+  }
+
+  .markdown-preview ul {
+    list-style-type: disc;
+    padding-left: 1.5em;
+    margin: 0.5em 0;
+    color: inherit;
+  }
+
+  .markdown-preview ul ul { list-style-type: circle; }
+  .markdown-preview ul ul ul { list-style-type: square; }
+
+  .markdown-preview ol {
+    list-style-type: decimal;
+    padding-left: 1.5em;
+    margin: 0.5em 0;
+    color: inherit;
+  }
+
+  .markdown-preview ol ol { list-style-type: lower-alpha; }
+  .markdown-preview ol ol ol { list-style-type: lower-roman; }
+
+  .markdown-preview li {
+    margin-bottom: 0.25em;
+    color: inherit;
+  }
+
+  .markdown-preview li > p {
+    margin-bottom: 0.25em;
+  }
+
+  /* 任务列表 */
+  .markdown-preview .task-list-item {
+    list-style-type: none;
+    margin-left: -1.5em;
+    padding-left: 0;
+  }
+
+  .markdown-preview input[type="checkbox"] {
+    margin-right: 0.5em;
+    vertical-align: middle;
+    accent-color: hsl(var(--primary));
+  }
+
+  .markdown-preview blockquote {
+    border-left: 3px solid hsl(var(--border));
+    padding-left: 1rem;
+    margin: 1em 0;
+    color: hsl(var(--muted-foreground));
+    font-style: italic;
+  }
+
+  .markdown-preview code {
+    background-color: hsl(var(--muted));
+    color: inherit;
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+    font-size: 0.875em;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Consolas', monospace;
+  }
+
+  .markdown-preview pre {
+    background-color: hsl(var(--muted));
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.375rem;
+    padding: 1rem;
+    margin: 1em 0;
+    overflow-x: auto;
+  }
+
+  .markdown-preview pre code {
+    background-color: transparent;
+    padding: 0;
+  }
+
+  .markdown-preview table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1em 0;
+    color: inherit;
+  }
+
+  .markdown-preview th,
+  .markdown-preview td {
+    border: 1px solid hsl(var(--border));
+    padding: 0.5em 1em;
+    color: inherit;
+  }
+
+  .markdown-preview th {
+    background-color: hsl(var(--muted));
+    font-weight: 600;
+  }
+
+  .markdown-preview img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.375rem;
+    margin: 1em 0;
+  }
+
+  .markdown-preview hr {
+    border: none;
+    border-top: 2px solid hsl(var(--border));
+    margin: 2em 0;
+  }
+
+  /* 脚注 */
+  .markdown-preview .footnotes {
+    margin-top: 2em;
+    padding-top: 1em;
+    border-top: 1px solid hsl(var(--border));
+    font-size: 0.875em;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .markdown-preview sup a {
+    color: hsl(var(--primary));
+    text-decoration: none;
+    font-weight: 600;
+  }
+}
+
+/* CodeMirror 撑满父容器高度 */
+.cm-font-override .cm-editor {
+  height: 100%;
+  font-size: var(--cm-font-size, 14px);
+  font-family: var(--cm-font-family, inherit);
+}
+
+.cm-font-override .cm-scroller {
+  overflow: auto;
+}
+
+.cm-font-override .cm-content {
+  font-family: var(--cm-font-family, inherit);
+  line-height: var(--cm-line-height, 1.6);
+}
+
+.cm-font-override .cm-gutters {
+  font-size: var(--cm-font-size, 14px);
+  font-family: var(--cm-font-family, inherit);
+}
+
+/* Syntax highlighting for code blocks */
+@layer components {
+  .hljs {
+    background: hsl(var(--muted)) !important;
+    color: hsl(var(--foreground)) !important;
+  }
+}
+
+/* DropdownMenu item hover highlight - more prominent */
+[data-highlighted]:not([data-disabled]) {
+  background-color: hsl(210 100% 90%) !important;
+  color: hsl(210 100% 20%) !important;
+}
+
+.dark [data-highlighted]:not([data-disabled]) {
+  background-color: hsl(210 60% 30%) !important;
+  color: hsl(210 100% 90%) !important;
+}
+
+/* Fix DropdownMenu transparency issue - force opaque background */
+[data-radix-popper-content-wrapper] > div {
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Radix UI Dropdown Menu Content - force solid background */
+div[data-state="open"][role="menu"] {
+  opacity: 1 !important;
+  background-color: hsl(var(--popover)) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Radix UI Popover Content - force solid background */
+div[data-radix-popper-content-wrapper] > div {
+  opacity: 1 !important;
+  background-color: hsl(var(--popover)) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Radix UI Dialog Content - force solid background with theme colors */
+div[role="dialog"] {
+  opacity: 1 !important;
+  background-color: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Fix prose min-height issue - allow editors to shrink properly */
+.prose {
+  min-height: 0 !important;
+}
+
+.prose > * {
+  min-height: 0 !important;
+}
+
+.ProseMirror {
+  min-height: 0 !important;
+}
+
+/* 按钮呼吸灯动画 — 使用 box-shadow 脉冲，避免与 transition-all 冲突 */
+@keyframes plugin-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 currentColor; }
+  50% { box-shadow: 0 0 8px 2px currentColor; }
+}
+
+.animate-plugin-breathe {
+  animation: plugin-breathe 2s ease-in-out infinite !important;
+}
+
+.animate-composer-breathe {
+  animation: plugin-breathe 2s ease-in-out infinite !important;
+}
+
+.animate-editor-breathe {
+  animation: plugin-breathe 2s ease-in-out infinite !important;
+}
+
+/* 隐藏滚动条但保留滚动功能 */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

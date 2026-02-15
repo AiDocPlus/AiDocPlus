@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(*:*)",
+      "mcp__*",
+      "Bash(pnpm doctor:*)",
+      "Bash(pnpm --version)",
+      "Bash(node:*)",
+      "Bash(pnpm tauri build:*)",
+      "Bash(pnpm tauri dev:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm --version)",
+      "Bash(rustc:*)",
+      "Bash(cargo:*)",
+      "Bash(pnpm outdated:*)",
+      "Bash(npm view:*)",
+      "Bash(pnpm add:*)",
+      "Bash(corepack enable:*)",
+      "Bash(corepack prepare:*)",
+      "Bash(npm install:*)",
+      "Bash(pnpm update:*)",
+      "Bash(pnpm exec tsc:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)",
+      "Bash(open:*)"
+    ]
+  }
+}

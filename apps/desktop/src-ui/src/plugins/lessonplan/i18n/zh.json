@@ -1,0 +1,19 @@
+{
+  "title": "教案生成",
+  "description": "AI 根据文档内容生成教学教案",
+  "generate": "生成教案",
+  "generating": "生成中...",
+  "regenerate": "重新生成",
+  "copy": "复制",
+  "copied": "已复制",
+  "copiedToClipboard": "已复制到剪贴板",
+  "emptyContent": "❌ 文档内容为空，无法生成教案。",
+  "generateFailed": "❌ 教案生成失败：{{error}}",
+  "generateSuccess": "教案已生成",
+  "promptPlaceholder": "描述你需要的教案...",
+  "defaultPrompt": "根据文档内容生成一份完整的教学教案",
+  "welcome": "教案生成",
+  "welcomeDesc": "AI 分析文档内容，自动生成结构化的教学教案。",
+  "systemPrompt": "你是一个专业的教学设计助手，擅长根据教学内容生成结构化的教案。请包含教学目标、教学重难点、教学过程等环节。",
+  "export": "导出"
+}

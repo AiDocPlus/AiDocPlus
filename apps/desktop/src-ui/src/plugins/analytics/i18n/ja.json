@@ -1,0 +1,16 @@
+{
+  "title": "ドキュメント統計",
+  "description": "文字数、段落数、読了時間などの統計情報",
+  "analyze": "分析",
+  "analyzing": "分析中...",
+  "reanalyze": "再分析",
+  "wordCount": "単語数",
+  "charCount": "文字数",
+  "paragraphCount": "段落数",
+  "sentenceCount": "文数",
+  "readingTime": "推定読了時間",
+  "minutes": "分",
+  "welcome": "ドキュメント統計",
+  "welcomeDesc": "文字数、段落数、読了時間などの詳細統計情報。",
+  "noContent": "ドキュメント内容がありません"
+}

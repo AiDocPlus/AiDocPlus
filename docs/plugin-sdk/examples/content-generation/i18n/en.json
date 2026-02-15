@@ -1,0 +1,5 @@
+{
+  "generateButton": "Generate Summary",
+  "clearButton": "Clear",
+  "promptPlaceholder": "e.g., Generate a summary in about 100 words"
+}

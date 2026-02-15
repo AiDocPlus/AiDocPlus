@@ -1,0 +1,27 @@
+{
+  "title": "文档摘要",
+  "description": "AI 分析文档内容，生成多种风格的摘要。\n支持一句话摘要、要点提炼、结构化大纲、学术摘要。",
+  "defaultPrompt": "请用一句话概括以下文档的核心内容，不超过50字",
+  "styles": {
+    "oneline": "一句话摘要",
+    "keypoints": "要点提炼",
+    "outline": "结构化大纲",
+    "abstract": "学术摘要"
+  },
+  "promptPlaceholder": "描述你需要的摘要风格...",
+  "generate": "生成摘要",
+  "aiGenerate": "AI 生成摘要",
+  "generating": "生成中...",
+  "regenerate": "重新生成",
+  "copy": "复制",
+  "copied": "已复制",
+  "copiedToClipboard": "已复制到剪贴板",
+  "emptyContent": "❌ 文档内容为空，无法生成摘要。",
+  "generateSuccess": "已生成「{{style}}」摘要",
+  "generateFailed": "❌ 摘要生成失败：{{error}}",
+  "selectStyleHint": "点击上方风格按钮后生成摘要",
+  "systemPrompt": "你是一个专业的文档分析助手，擅长提炼和总结文档内容。请直接输出结果，不要添加额外的解释或前缀。",
+  "promptBuilderTitle": "生成摘要提示词",
+  "promptBuilderDesc": "选择摘要风格，自动生成对应的提示词",
+  "styleLabel": "摘要风格"
+}
