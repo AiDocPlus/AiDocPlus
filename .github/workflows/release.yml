@@ -14,7 +14,11 @@ permissions:
   contents: write
 
 env:
-  CARGO_INCREMENTAL: 0
+  # Rust 编译优化
+  CARGO_INCREMENTAL: 1
+  CARGO_TERM_COLOR: always
+  # 减少二进制大小
+  RUSTFLAGS: "-C debuginfo=0"
 
 jobs:
   build:
@@ -42,29 +46,45 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ── 系统依赖 ──
-
-
-      # ── 工具链 ──
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      # ── 缓存配置 ──
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "PNPM_STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+        id: pnpm-store
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.PNPM_STORE_PATH }}
+          key: pnpm-store-${{ matrix.platform }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ matrix.platform }}-
+            pnpm-store-
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
 
-      - name: Rust cache
+      - name: Cache Rust
         uses: swatinem/rust-cache@v2
         with:
           workspaces: apps/desktop/src-tauri -> target
           key: ${{ matrix.target }}
+          shared-key: tauri-${{ matrix.target }}
+          cache-on-failure: true
+          cache-all-crates: true
 
       # ── 构建 ──
 
@@ -77,7 +97,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: apps/desktop
-          tauriScript: npx tauri
+          tauriScript: pnpm tauri
           args: --target ${{ matrix.target }}
           tagName: ${{ github.ref_name }}
           releaseName: 'AiDocPlus ${{ github.ref_name }}'
@@ -86,7 +106,7 @@ jobs:
 
             ## 下载
             - **macOS (Apple Silicon)**: .dmg (arm64)
-            - **Windows (x64)**: .msi / .exe
-            - **Windows (ARM64)**: .msi / .exe
+            - **Windows (x64)**: .exe
+            - **Windows (ARM64)**: .exe
           releaseDraft: true
           prerelease: false
