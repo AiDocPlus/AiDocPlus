@@ -11,10 +11,12 @@ import { invoke } from '@tauri-apps/api/core';
 
 // ── 自动发现并加载所有插件（排除 _framework 目录） ──
 // eager: true → 模块在 import 时立即执行，触发各插件的 registerPlugin()
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _pluginModules = import.meta.glob(
   ['./**/index.ts', '!./_framework/**'],
   { eager: true }
 );
+void _pluginModules;
 
 // ── 自动发现所有插件的 manifest.json ──
 const _manifestModules = import.meta.glob(

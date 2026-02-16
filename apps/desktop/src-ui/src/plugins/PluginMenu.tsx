@@ -25,6 +25,7 @@ export function PluginMenu({ pluginAreaOpen, onToggle, document }: PluginMenuPro
   const docPlugins = useMemo(() => document ? getPluginsForDocument(document) : [], [document]);
   const hasPluginData = !!document?.pluginData &&
     docPlugins.some(p => document.pluginData?.[p.id] != null);
+  void hasPluginData;
 
   // 样式：展开（蓝色） > 有数据（蓝色呼吸灯） > 未激活（蓝色边框+呼吸灯）
   const className = pluginAreaOpen
