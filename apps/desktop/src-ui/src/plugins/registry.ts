@@ -1,43 +1,19 @@
 import './_framework'; // 注册插件框架层翻译
+import './loader'; // 自动发现并加载所有插件（触发 registerPlugin 自注册）
 
 import type { DocumentPlugin } from './types';
 import type { PluginManifest, Document } from '@aidocplus/shared-types';
 import { DEFAULT_DOC_PLUGINS } from './constants';
+import { PLUGIN_MAP, registerPlugin } from './pluginStore';
 
-// ── 导入各插件的 DocumentPlugin 定义（side-effect: 注册 i18n） ──
-import { pptPlugin } from './ppt';
-import { quizPlugin } from './quiz';
-import { summaryPlugin } from './summary';
-import { mindmapPlugin } from './mindmap';
-import { translationPlugin } from './translation';
-import { diagramPlugin } from './diagram';
-import { analyticsPlugin } from './analytics';
-import { lessonplanPlugin } from './lessonplan';
-import { tablePlugin } from './table';
-import { emailPlugin } from './email';
+// 重新导出，供外部使用
+export { registerPlugin };
 
 /** 插件内容片段（toFragments 返回值） */
 export interface PluginFragment {
   title: string;
   markdown: string;
 }
-
-/**
- * 所有已注册插件（按 id 索引）
- * 每个插件通过自己的 index.ts 导出完整的 DocumentPlugin 定义
- */
-const PLUGIN_MAP: Record<string, DocumentPlugin> = {
-  [pptPlugin.id]: pptPlugin,
-  [quizPlugin.id]: quizPlugin,
-  [summaryPlugin.id]: summaryPlugin,
-  [mindmapPlugin.id]: mindmapPlugin,
-  [translationPlugin.id]: translationPlugin,
-  [diagramPlugin.id]: diagramPlugin,
-  [analyticsPlugin.id]: analyticsPlugin,
-  [lessonplanPlugin.id]: lessonplanPlugin,
-  [tablePlugin.id]: tablePlugin,
-  [emailPlugin.id]: emailPlugin,
-};
 
 /**
  * 从 manifest 列表构建运行时插件列表
@@ -47,7 +23,7 @@ export function buildPluginList(manifests: PluginManifest[]): DocumentPlugin[] {
   const result: DocumentPlugin[] = [];
   for (const m of manifests) {
     if (!m.enabled) continue;
-    const plugin = PLUGIN_MAP[m.id];
+    const plugin = PLUGIN_MAP.get(m.id);
     if (!plugin) continue;
     result.push(plugin);
   }

@@ -391,3 +391,86 @@ pub fn write_binary_file(path: String, data: Vec<u8>) -> Result<()> {
     std::fs::write(file_path, &data).map_err(|e| format!("写入文件失败: {}", e))?;
     Ok(())
 }
+
+/// 将文档移动到另一个项目
+#[tauri::command]
+pub fn move_document(
+    state: State<'_, AppState>,
+    documentId: String,
+    fromProjectId: String,
+    toProjectId: String,
+) -> Result<Document> {
+    let src_path = state.get_document_path(&fromProjectId, &documentId);
+    if !src_path.exists() {
+        return Err(format!("文档未找到: {}", documentId));
+    }
+
+    // 确保目标项目存在
+    let to_project_path = state.get_project_path(&toProjectId);
+    if !to_project_path.exists() {
+        return Err(format!("目标项目未找到: {}", toProjectId));
+    }
+
+    // 确保目标 documents 目录存在
+    let to_docs_dir = state.config.projects_dir.join(&toProjectId).join("documents");
+    std::fs::create_dir_all(&to_docs_dir).map_err(|e| e.to_string())?;
+
+    // 加载文档并更新 projectId
+    let mut document = Document::load(&src_path).map_err(|e| e.to_string())?;
+    document.project_id = toProjectId.clone();
+    document.metadata.updated_at = chrono::Utc::now().timestamp();
+
+    // 保存到目标位置
+    let dst_path = state.get_document_path(&toProjectId, &documentId);
+    document.save(&dst_path).map_err(|e| e.to_string())?;
+
+    // 删除源文件
+    std::fs::remove_file(&src_path).map_err(|e| e.to_string())?;
+
+    Ok(document)
+}
+
+/// 将文档复制到另一个项目（生成新 ID）
+#[tauri::command]
+pub fn copy_document(
+    state: State<'_, AppState>,
+    documentId: String,
+    fromProjectId: String,
+    toProjectId: String,
+) -> Result<Document> {
+    let src_path = state.get_document_path(&fromProjectId, &documentId);
+    if !src_path.exists() {
+        return Err(format!("文档未找到: {}", documentId));
+    }
+
+    // 确保目标项目存在
+    let to_project_path = state.get_project_path(&toProjectId);
+    if !to_project_path.exists() {
+        return Err(format!("目标项目未找到: {}", toProjectId));
+    }
+
+    // 确保目标 documents 目录存在
+    let to_docs_dir = state.config.projects_dir.join(&toProjectId).join("documents");
+    std::fs::create_dir_all(&to_docs_dir).map_err(|e| e.to_string())?;
+
+    // 加载源文档
+    let src_doc = Document::load(&src_path).map_err(|e| e.to_string())?;
+
+    // 创建新文档（新 ID）
+    let new_id = uuid::Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().timestamp();
+    let mut new_doc = src_doc;
+    new_doc.id = new_id.clone();
+    new_doc.project_id = toProjectId.clone();
+    new_doc.title = format!("{} (副本)", new_doc.title);
+    new_doc.metadata.created_at = now;
+    new_doc.metadata.updated_at = now;
+    new_doc.versions = Vec::new(); // 不复制版本历史
+    new_doc.current_version_id = String::new();
+
+    // 保存到目标位置
+    let dst_path = state.get_document_path(&toProjectId, &new_id);
+    new_doc.save(&dst_path).map_err(|e| e.to_string())?;
+
+    Ok(new_doc)
+}

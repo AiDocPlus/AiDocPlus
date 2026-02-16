@@ -1,8 +1,9 @@
 import { Presentation } from 'lucide-react';
 import type { DocumentPlugin } from '../types';
 import { registerPluginI18n } from '../i18n-loader';
+import { registerPlugin } from '../pluginStore';
 import { PptPluginPanel } from './PptPluginPanel';
-import { PLUGIN_ID_PPT } from '../constants';
+import manifest from './manifest.json';
 import type { Slide, SlidesDeck } from '@aidocplus/shared-types';
 import zh from './i18n/zh.json';
 import en from './i18n/en.json';
@@ -11,14 +12,14 @@ import ja from './i18n/ja.json';
 registerPluginI18n('plugin-ppt', { zh, en, ja });
 
 export const pptPlugin: DocumentPlugin = {
-  id: PLUGIN_ID_PPT,
+  id: manifest.id,
   name: '生成 PPT',
   icon: Presentation,
   description: '根据文档内容 AI 生成演示文稿',
   i18nNamespace: 'plugin-ppt',
   PanelComponent: PptPluginPanel,
   hasData: (doc) => {
-    const data = doc.pluginData?.[PLUGIN_ID_PPT];
+    const data = doc.pluginData?.[manifest.id];
     return data != null && typeof data === 'object' && 'slidesDeck' in (data as Record<string, unknown>);
   },
   toFragments: (pluginData) => {
@@ -35,3 +36,5 @@ export const pptPlugin: DocumentPlugin = {
     return [{ title: 'PPT 大纲', markdown: lines.join('\n\n') }];
   },
 };
+
+registerPlugin(pptPlugin);

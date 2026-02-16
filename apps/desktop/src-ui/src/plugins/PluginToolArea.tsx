@@ -6,7 +6,7 @@ import { useTranslation } from '@/i18n';
 import { Settings2, Maximize2, Minimize2, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Document } from '@aidocplus/shared-types';
 import { PluginManagerPanel } from './PluginManagerPanel';
-import { PluginHostContext, createPluginHostAPI } from './_framework/PluginHostAPI';
+import { PluginHostContext, ThinkingContext, createPluginHostAPI } from './_framework/PluginHostAPI';
 import type { CreatePluginHostAPIOptions } from './_framework/PluginHostAPI';
 
 /**
@@ -77,6 +77,9 @@ function PluginHostProvider({
     // 插件自行管理状态消息，此处为空实现
   }, []);
 
+  // AI 思考内容（由 SDK 自动过滤 <think> 标签后推送）
+  const [thinkingContent, setThinkingContent] = useState('');
+
   // 生命周期 Hook：onActivate / onDeactivate
   useEffect(() => {
     // 插件面板挂载时调用 onActivate
@@ -108,6 +111,7 @@ function PluginHostProvider({
       getLocale: () => useSettingsStore.getState().ui?.language || 'zh',
       getTheme: () => (useSettingsStore.getState().ui?.theme === 'dark' ? 'dark' : 'light'),
       i18nNamespace,
+      onThinkingUpdate: setThinkingContent,
     };
     // 内容生成类插件提供 docData 回调
     if (!isFunctional) {
@@ -119,11 +123,13 @@ function PluginHostProvider({
       };
     }
     return createPluginHostAPI(opts);
-  }, [pluginId, document, tabId, aiContent, isFunctional, i18nNamespace, handlePluginDataChange, handleRequestSave, showStatus, markTabAsDirty]);
+  }, [pluginId, document, tabId, aiContent, isFunctional, i18nNamespace, handlePluginDataChange, handleRequestSave, showStatus, markTabAsDirty, setThinkingContent]);
 
   return (
     <PluginHostContext.Provider value={hostAPI}>
-      {children}
+      <ThinkingContext.Provider value={thinkingContent}>
+        {children}
+      </ThinkingContext.Provider>
     </PluginHostContext.Provider>
   );
 }

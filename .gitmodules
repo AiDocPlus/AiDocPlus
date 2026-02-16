@@ -1,0 +1,3 @@
+[submodule "plugins-repo"]
+	path = plugins-repo
+	url = https://github.com/AiDocPlus/AiDocPlus-Plugins.git

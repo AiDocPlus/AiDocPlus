@@ -50,3 +50,7 @@ output.log
 
 # Bundler
 *.tsbuildinfo
+
+# 插件目录（由 AiDocPlus-Plugins 项目部署，不纳入主程序 Git）
+apps/desktop/src-ui/src/plugins/*/
+!apps/desktop/src-ui/src/plugins/_framework/

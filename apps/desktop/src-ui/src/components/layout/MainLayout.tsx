@@ -1,10 +1,14 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useAppStore } from '@/stores/useAppStore';
 import { useTranslation } from '@/i18n';
+import { useMenuEvents } from '@/hooks/useMenuEvents';
 import { FileTree } from '../file-tree/FileTree';
 import { TabArea } from '../tabs/TabArea';
 import { SettingsPanel } from '../settings/SettingsPanel';
 import { SearchPanel } from '../search/SearchPanel';
+import { ProjectPickerDialog } from '../dialogs/ProjectPickerDialog';
+import { ShortcutsDialog } from '../dialogs/ShortcutsDialog';
+import { AboutDialog } from '../dialogs/AboutDialog';
 import { cn } from '@/lib/utils';
 import { Menu, X } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -14,6 +18,30 @@ export function MainLayout() {
   const { t } = useTranslation();
   const { sidebarOpen, toggleSidebar, theme, sidebarWidth, setSidebarWidth } = useAppStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [docPickerMode, setDocPickerMode] = useState<'move' | 'copy' | null>(null);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+
+  // 监听原生系统菜单事件
+  useMenuEvents(useCallback(() => setSettingsOpen(true), []));
+
+  // 监听文档移动/复制和快捷键参考事件
+  useEffect(() => {
+    const onMoveTo = () => setDocPickerMode('move');
+    const onCopyTo = () => setDocPickerMode('copy');
+    const onShortcuts = () => setShortcutsOpen(true);
+    const onAbout = () => setAboutOpen(true);
+    window.addEventListener('menu-doc-move-to', onMoveTo);
+    window.addEventListener('menu-doc-copy-to', onCopyTo);
+    window.addEventListener('menu-shortcuts-ref', onShortcuts);
+    window.addEventListener('menu-about', onAbout);
+    return () => {
+      window.removeEventListener('menu-doc-move-to', onMoveTo);
+      window.removeEventListener('menu-doc-copy-to', onCopyTo);
+      window.removeEventListener('menu-shortcuts-ref', onShortcuts);
+      window.removeEventListener('menu-about', onAbout);
+    };
+  }, []);
 
   const handleSidebarResize = useCallback((delta: number) => {
     const newWidth = Math.min(480, Math.max(180, sidebarWidth + delta));
@@ -87,6 +115,19 @@ export function MainLayout() {
 
       {/* Search Panel */}
       <SearchPanel />
+
+      {/* 文档移动/复制对话框 */}
+      <ProjectPickerDialog
+        open={docPickerMode !== null}
+        mode={docPickerMode || 'move'}
+        onClose={() => setDocPickerMode(null)}
+      />
+
+      {/* 快捷键参考对话框 */}
+      <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+
+      {/* 关于对话框 */}
+      <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
     </div>
   );
 }

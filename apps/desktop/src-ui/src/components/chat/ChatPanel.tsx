@@ -9,6 +9,7 @@ import { timestampToDate } from '@aidocplus/shared-types';
 import type { PromptTemplate, Attachment, ChatContextMode } from '@aidocplus/shared-types';
 import { useTemplatesStore } from '@/stores/useTemplatesStore';
 import { useTranslation } from '@/i18n';
+import { parseThinkTags } from '@/utils/thinkTagParser';
 import { MarkdownPreview } from '../editor/MarkdownPreview';
 import {
   DropdownMenu,
@@ -389,17 +390,36 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
           contentForAI,
           (chunk) => {
             accumulatedContent += chunk;
-            // 节流更新编辑器：每 300ms 最多更新一次，避免 TipTap 频繁重建文档树导致卡顿
+
+            // 解析 <think> 标签：分离思考内容和正文内容
+            const parsed = parseThinkTags(accumulatedContent);
+
+            // 实时更新聊天区的思考状态
+            if (parsed.thinking) {
+              const thinkMsg = parsed.isThinking
+                ? `💭 **AI 正在思考...**\n\n${parsed.thinking}`
+                : `💭 **AI 思考过程：**\n\n${parsed.thinking}`;
+              const messages = useAppStore.getState().getAiMessages(effectiveTabId);
+              if (messages.length > 0) {
+                const lastMsg = messages[messages.length - 1];
+                if (lastMsg.role === 'assistant' && (lastMsg.content.startsWith('正在生成') || lastMsg.content.startsWith('💭'))) {
+                  useAppStore.getState().updateLastAiMessage(effectiveTabId, { content: thinkMsg });
+                }
+              }
+            }
+
+            // 节流更新编辑器：只写入正文内容（不含 <think> 部分）
             const now = Date.now();
             if (now - lastUpdateTime > 300) {
               lastUpdateTime = now;
               if (throttleTimer) { clearTimeout(throttleTimer); throttleTimer = null; }
-              useAppStore.getState().updateDocumentInMemory(docId, { aiGeneratedContent: accumulatedContent });
+              useAppStore.getState().updateDocumentInMemory(docId, { aiGeneratedContent: parsed.content });
             } else if (!throttleTimer) {
               throttleTimer = setTimeout(() => {
                 throttleTimer = null;
                 lastUpdateTime = Date.now();
-                useAppStore.getState().updateDocumentInMemory(docId, { aiGeneratedContent: accumulatedContent });
+                const latestParsed = parseThinkTags(accumulatedContent);
+                useAppStore.getState().updateDocumentInMemory(docId, { aiGeneratedContent: latestParsed.content });
               }, 300);
             }
           },
@@ -407,30 +427,40 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
           webSearch
         );
 
-        // 清除可能残留的定时器，确保最终内容更新到编辑器
+        // 清除可能残留的定时器
         if (throttleTimer) clearTimeout(throttleTimer);
-        useAppStore.getState().updateDocumentInMemory(docId, { aiGeneratedContent: accumulatedContent });
 
-        // 流式完成后保存到磁盘
-        await saveDocument({ ...latestDoc, authorNotes: notesToUse, aiGeneratedContent: accumulatedContent });
+        // 最终解析：分离思考内容和正文
+        const finalParsed = parseThinkTags(accumulatedContent);
+        const finalContent = finalParsed.content;
 
-        // Replace the streaming message with completion message
+        // 确保最终正文内容更新到编辑器
+        useAppStore.getState().updateDocumentInMemory(docId, { aiGeneratedContent: finalContent });
+
+        // 流式完成后保存到磁盘（只保存正文内容）
+        await saveDocument({ ...latestDoc, authorNotes: notesToUse, aiGeneratedContent: finalContent });
+
+        // Replace the streaming message with completion message（包含思考内容）
+        let completionContent = '已根据您的提示词生成内容。\n\n生成的内容已自动更新到编辑器的 AI 内容栏。';
+        if (finalParsed.thinking) {
+          completionContent = `💭 **AI 思考过程：**\n\n${finalParsed.thinking}\n\n---\n\n${completionContent}`;
+        }
         const completionMessage = {
           role: 'assistant' as const,
-          content: `已根据您的提示词生成内容。\n\n生成的内容已自动更新到编辑器的 AI 内容栏。`,
+          content: completionContent,
           timestamp: Date.now() / 1000
         };
         useAppStore.getState().addAiMessage(effectiveTabId, completionMessage);
 
-        // Auto-create version after generation
-        if (latestDoc && accumulatedContent) {
+        // Auto-create version after generation（使用过滤后的正文内容）
+        if (latestDoc && finalContent) {
           try {
             await createVersion(
               latestDoc.projectId,
               latestDoc.id,
               latestDoc.content,
               notesToUse,
-              accumulatedContent,
+              finalContent,
               'ai',
               'AI 生成内容',
               latestDoc.pluginData,
@@ -442,25 +472,33 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
         }
       } else {
         // Non-streaming mode
-        const generated = await generateContent(
+        const rawGenerated = await generateContent(
           notesToUse,
           contentForAI
         );
 
-        // 更新 AI 内容到 store 和磁盘
+        // 解析 <think> 标签：分离思考内容和正文内容
+        const parsed = parseThinkTags(rawGenerated);
+        const generated = parsed.content;
+
+        // 更新 AI 内容到 store 和磁盘（只保存正文内容）
         useAppStore.getState().updateDocumentInMemory(latestDoc.id, { aiGeneratedContent: generated });
         await saveDocument({ ...latestDoc, authorNotes: notesToUse, aiGeneratedContent: generated });
 
-        // Add confirmation message to chat
+        // Add confirmation message to chat（包含思考内容）
+        let msgContent = '已根据您的提示词生成内容。\n\n生成的内容已自动更新到编辑器的 AI 内容栏。';
+        if (parsed.thinking) {
+          msgContent = `💭 **AI 思考过程：**\n\n${parsed.thinking}\n\n---\n\n${msgContent}`;
+        }
         const assistantMessage = {
           role: 'assistant' as const,
-          content: `已根据您的提示词生成内容。\n\n生成的内容已自动更新到编辑器的${generated.length > 100 ? 'AI 内容栏' : 'AI 内容栏'}。`,
+          content: msgContent,
           timestamp: Date.now() / 1000
         };
 
         useAppStore.getState().addAiMessage(effectiveTabId, assistantMessage);
 
-        // Auto-create version after generation
+        // Auto-create version after generation（使用过滤后的正文内容）
         if (latestDoc && generated) {
           try {
             await createVersion(

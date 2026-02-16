@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Project, Document, DocumentVersion, AIMessage, ChatContextMode, WorkspaceState, EditorTab, PluginManifest } from '@aidocplus/shared-types';
 import { buildPluginList, setPlugins } from '@/plugins/registry';
+import { syncManifestsToBackend } from '@/plugins/loader';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useSettingsStore, getAIInvokeParams } from './useSettingsStore';
@@ -36,10 +37,9 @@ function ensureDocumentConsistency(
       console.warn('[Consistency] currentDocument not found in documents list, resetting to null');
       return { documents, currentDocument: null };
     }
-    // 确保 currentDocument 与列表中的版本同步
+    // 确保 currentDocument 与列表中的版本同步（引用比较即可，因为更新时已创建新对象）
     const syncedDoc = documents.find(d => d.id === currentDocument.id);
-    if (syncedDoc && JSON.stringify(syncedDoc) !== JSON.stringify(currentDocument)) {
-      // 使用列表中的版本
+    if (syncedDoc && syncedDoc !== currentDocument) {
       return { documents, currentDocument: syncedDoc };
     }
   }
@@ -95,6 +95,7 @@ interface AppState {
   getAiMessages: (tabId: string) => AIMessage[];
   setAiMessages: (tabId: string, messages: AIMessage[]) => void;
   addAiMessage: (tabId: string, message: AIMessage) => void;
+  updateLastAiMessage: (tabId: string, fields: Partial<AIMessage>) => void;
   clearAiMessages: (tabId: string) => void;
   setAiStreaming: (streaming: boolean, tabId?: string) => void;
   stopAiStreaming: () => void;
@@ -121,6 +122,14 @@ interface AppState {
   saveDocument: (document: Document) => Promise<void>;
   deleteDocument: (projectId: string, documentId: string) => Promise<void>;
   renameDocument: (projectId: string, documentId: string, newTitle: string) => Promise<void>;
+
+  // 项目导入/导出/备份
+  exportProjectZip: (projectId: string, outputPath: string) => Promise<string>;
+  importProjectZip: (zipPath: string) => Promise<Project>;
+
+  // 文档跨项目移动/复制
+  moveDocumentToProject: (documentId: string, fromProjectId: string, toProjectId: string) => Promise<Document>;
+  copyDocumentToProject: (documentId: string, fromProjectId: string, toProjectId: string) => Promise<Document>;
 
   loadVersions: (projectId: string, documentId: string) => Promise<DocumentVersion[]>;
   createVersion: (projectId: string, documentId: string, content: string, authorNotes: string, aiGeneratedContent: string, createdBy: string, changeDescription?: string, pluginData?: Record<string, unknown>, enabledPlugins?: string[], composedContent?: string) => Promise<string>;
@@ -427,6 +436,78 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  // 项目导出为 ZIP
+  exportProjectZip: async (projectId, outputPath) => {
+    try {
+      const result = await invoke<string>('export_project_zip', { projectId, outputPath });
+      return result;
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : '导出项目失败' });
+      throw error;
+    }
+  },
+
+  // 从 ZIP 导入项目
+  importProjectZip: async (zipPath) => {
+    try {
+      set({ isLoading: true, error: null });
+      const project = await invoke<Project>('import_project_zip', { zipPath });
+      // 刷新项目列表
+      const projects = await invoke<Project[]>('list_projects');
+      set({ projects, isLoading: false });
+      return project;
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : '导入项目失败', isLoading: false });
+      throw error;
+    }
+  },
+
+  // 移动文档到另一个项目
+  moveDocumentToProject: async (documentId, fromProjectId, toProjectId) => {
+    try {
+      set({ isLoading: true, error: null });
+      const movedDoc = await invoke<Document>('move_document', { documentId, fromProjectId, toProjectId });
+
+      // 关闭该文档的标签页（因为 projectId 已变）
+      const { tabs, closeTab } = get();
+      const tab = tabs.find(t => t.documentId === documentId);
+      if (tab) {
+        await closeTab(tab.id, false);
+      }
+
+      // 刷新两个项目的文档列表
+      const fromDocs = await invoke<Document[]>('list_documents', { projectId: fromProjectId });
+      const toDocs = await invoke<Document[]>('list_documents', { projectId: toProjectId });
+      set((state) => {
+        const otherDocs = state.documents.filter(d => d.projectId !== fromProjectId && d.projectId !== toProjectId);
+        return { documents: [...otherDocs, ...fromDocs, ...toDocs], isLoading: false };
+      });
+      return movedDoc;
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : '移动文档失败', isLoading: false });
+      throw error;
+    }
+  },
+
+  // 复制文档到另一个项目
+  copyDocumentToProject: async (documentId, fromProjectId, toProjectId) => {
+    try {
+      set({ isLoading: true, error: null });
+      const newDoc = await invoke<Document>('copy_document', { documentId, fromProjectId, toProjectId });
+
+      // 刷新目标项目的文档列表
+      const toDocs = await invoke<Document[]>('list_documents', { projectId: toProjectId });
+      set((state) => {
+        const otherDocs = state.documents.filter(d => d.projectId !== toProjectId);
+        return { documents: [...otherDocs, ...toDocs], isLoading: false };
+      });
+      return newDoc;
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : '复制文档失败', isLoading: false });
+      throw error;
+    }
+  },
+
   // Version API
   loadVersions: async (projectId, documentId) => {
     try {
@@ -515,6 +596,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   addAiMessage: (tabId, message) => set((state) => ({
     aiMessagesByTab: { ...state.aiMessagesByTab, [tabId]: [...(state.aiMessagesByTab[tabId] || []), message] }
   })),
+  updateLastAiMessage: (tabId, fields) => set((state) => {
+    const msgs = state.aiMessagesByTab[tabId] || [];
+    if (msgs.length === 0) return state;
+    const updated = [...msgs];
+    updated[updated.length - 1] = { ...updated[updated.length - 1], ...fields };
+    return { aiMessagesByTab: { ...state.aiMessagesByTab, [tabId]: updated } };
+  }),
   clearAiMessages: (tabId) => set((state) => ({
     aiMessagesByTab: { ...state.aiMessagesByTab, [tabId]: [] }
   })),
@@ -917,6 +1005,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Load plugin manifests from backend
   loadPlugins: async () => {
     try {
+      // 先将前端发现的 manifest 同步到后端磁盘
+      await syncManifestsToBackend();
       const manifests = await invoke<PluginManifest[]>('list_plugins');
       set({ pluginManifests: manifests });
       const plugins = buildPluginList(manifests);
@@ -1402,6 +1492,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   markTabAsDirty: (tabId) => {
+    const { tabs } = get();
+    const tab = tabs.find(t => t.id === tabId);
+    if (tab?.isDirty) return; // 已经是 dirty，跳过不必要的 store 更新
     set((state) => ({
       tabs: state.tabs.map(t =>
         t.id === tabId ? { ...t, isDirty: true } : t

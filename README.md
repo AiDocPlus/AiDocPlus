@@ -47,24 +47,27 @@ aidocplus/
 │       │   ├── src/
 │       │   │   ├── main.rs
 │       │   │   ├── commands/    # IPC command handlers
-│       │   │   ├── config.rs
+│       │   │   ├── ai.rs        # AI HTTP & streaming
 │       │   │   ├── document.rs
-│       │   │   ├── error.rs
-│       │   │   └── project.rs
+│       │   │   ├── plugin.rs    # Plugin manifest sync & management
+│       │   │   └── ...
 │       │   └── Cargo.toml
 │       └── src-ui/             # React frontend
 │           ├── src/
-│           │   ├── components/
-│           │   │   ├── layout/
-│           │   │   ├── editor/
-│           │   │   ├── file-tree/
-│           │   │   └── chat/
-│           │   ├── stores/
-│           │   └── App.tsx
+│           │   ├── components/  # UI components (editor, chat, file-tree, tabs, settings)
+│           │   ├── plugins/     # Plugin system (21 external plugins, auto-discovery)
+│           │   │   ├── _framework/  # Plugin SDK
+│           │   │   ├── pluginStore.ts  # Plugin registry (registerPlugin)
+│           │   │   ├── loader.ts       # Auto-discovery (import.meta.glob)
+│           │   │   └── {name}/         # Individual plugins (manifest.json + index.ts + Panel)
+│           │   ├── stores/      # State management (Zustand)
+│           │   └── i18n/        # Internationalization
 │           └── package.json
 ├── packages/
 │   ├── shared-types/           # Shared TypeScript types
 │   └── utils/                  # Utility functions
+├── docs/
+│   └── plugin-sdk/             # Plugin SDK documentation & examples
 └── turbo.json
 ```
 
@@ -89,44 +92,20 @@ pnpm build
 - **State Management**: Zustand
 - **Styling**: Tailwind CSS 4
 - **UI Components**: Radix UI
-- **Build Tool**: Vite 6 + Turborepo
+- **Build Tool**: Vite 7 + Turborepo
+- **Editor**: CodeMirror 6
+- **i18n**: i18next (zh/en/ja)
 
-### Next Steps
+### Completed Features
 
-To complete the MVP:
-
-1. **AI Integration**
-   - [ ] Set up LiteLLM proxy service
-   - [ ] Implement actual AI provider connections
-   - [ ] Add streaming response support
-   - [ ] Add prompt templates
-
-2. **Editor Enhancements**
-   - [ ] Implement rich text editor
-   - [ ] Add markdown preview
-   - [ ] Add syntax highlighting
-   - [ ] Implement autosave
-
-3. **Export Formats**
-   - [ ] Add DOCX export (docx.js)
-   - [ ] Add PDF export (Puppeteer)
-   - [ ] Add XLSX/PPTX export
-
-4. **Version Control**
-   - [ ] Implement version comparison view
-   - [ ] Add visual diff display
-   - [ ] Implement version restore
-
-5. **Plugin System**
-   - [ ] Design plugin API (VSCode-compatible)
-   - [ ] Implement plugin loader
-   - [ ] Add example plugins
-
-6. **Testing & Optimization**
-   - [ ] Add unit tests
-   - [ ] Performance optimization
-   - [ ] Memory profiling
-   - [ ] Cross-platform testing
+- ✅ AI streaming chat & content generation (OpenAI-compatible API, GLM, etc.)
+- ✅ CodeMirror 6 Markdown editor with syntax highlighting, folding, autocomplete
+- ✅ Multi-format export (Markdown, HTML, DOCX, TXT, native + Pandoc)
+- ✅ Version control with preview and restore
+- ✅ Plugin system — 21 external plugins with auto-discovery, self-registration, and manifest-driven architecture
+- ✅ Prompt templates
+- ✅ Workspace autosave
+- ✅ Attachment system
 
 ## License
 

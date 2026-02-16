@@ -1,16 +1,20 @@
 ---
-description: 创建 AiDocPlus 内置插件的完整流程和规范
+description: 创建 AiDocPlus 外部插件（已迁移到独立项目）
 ---
 
-# 创建内置插件 Skills
+# 创建外部插件 Skills
 
-本文档定义了在 AiDocPlus 中创建新内置插件必须遵循的规则和步骤。
+> **⚠️ 插件开发已迁移到独立项目 [AiDocPlus-Plugins](https://github.com/AiDocPlus/AiDocPlus-Plugins)。**
+> 请在插件项目中创建和修改插件，参考插件项目的 `CLAUDE.md` 和 `.windsurf/workflows/create-plugin.md`。
+> 本文件仅作为主程序侧的参考，完整的插件开发 Skills 请查看插件项目。
 
-> **⚠️ 双角色原则（强制）**：使用本文档创建/修改插件时，你是**外部插件开发者**角色，只能依据 `_framework/` SDK 导出的接口编写代码，不得直接 import 主程序内部模块（`@/stores`、`@tauri-apps`、`@/i18n` 等）。只有在完善 SDK 基础设施（`_framework/`、`PluginToolArea.tsx`、`registry.ts`）时才切换为**主程序构建者**角色。
+本文件保留了插件架构的核心规则供主程序开发者参考。如需创建新插件，请切换到 AiDocPlus-Plugins 项目。
+
+> **主程序构建者角色**：在本项目中，你只负责维护 SDK 基础设施（`_framework/`、`PluginToolArea.tsx`、`registry.ts`、`loader.ts`）。插件代码由独立项目管理。
 
 ---
 
-## 〇、插件体系架构（v2）
+## 〇、插件体系架构（v3 — 全外部插件）
 
 ### 两大类别
 
@@ -69,8 +73,6 @@ description: 创建 AiDocPlus 内置插件的完整流程和规范
 | `@tauri-apps/plugin-dialog` | 通过 `host.ui.showSaveDialog()` / `showOpenDialog()` |
 | `@/i18n` (`useTranslation`) | 通过 `host.platform.t(key, params)` |
 | `@/components/ui/*` | 通过 `../_framework/ui` re-export 访问 |
-
-> **注意**：现有 9 个生成类插件仍直接 import 主程序模块（历史代码），后续逐步迁移。新插件必须遵循 SDK 边界。
 
 ### PluginHostAPI（主程序公共 API）
 
@@ -310,25 +312,44 @@ interface PluginManifest {
 
 ## 一、插件文件结构
 
-每个内置插件由以下部分组成：
+每个外部插件完全自包含在 `src/plugins/{name}/` 目录下，无需修改任何核心文件：
 
-| 层级 | 文件 | 作用 |
+| 文件 | 作用 | 必需 |
 |------|------|------|
-| 前端常量 | `src/plugins/constants.ts` | 定义 `PLUGIN_ID_XXX` UUID 常量 |
-| 前端组件 | `src/plugins/{name}/{Name}PluginPanel.tsx` | 插件面板 UI |
-| 前端工具 | `src/plugins/{name}/{name}Utils.ts`（可选） | 辅助函数 |
-| 前端注册 | `src/plugins/registry.ts` | 注册到 `BUILTIN_COMPONENTS` |
-| 后端清单 | `src-tauri/src/plugin.rs` | `PluginManifest` 定义 |
+| `manifest.json` | 插件元数据（UUID、名称、分类、标签等） | ✅ |
+| `index.ts` | 插件定义 + 自注册（`registerPlugin()`） | ✅ |
+| `{Name}PluginPanel.tsx` | 插件面板 UI 组件 | ✅ |
+| `i18n/{zh,en,ja}.json` | 国际化翻译文件 | ✅ |
+| `{name}Utils.ts` | 辅助函数（可选） | ❌ |
+
+> **零改动核心代码**：`loader.ts` 通过 `import.meta.glob` 自动发现新插件，`manifest.json` 通过 `syncManifestsToBackend()` 自动同步到后端。无需修改 `registry.ts`、`constants.ts`、`plugin.rs` 或 `main.rs`。
 
 ---
 
 ## 二、必须遵循的规则
 
-### 规则 1：UUID 分配
+### 规则 1：UUID 分配与 manifest.json
 
-- 在 `constants.ts` 中新增 `PLUGIN_ID_XXX` 常量
+- 在插件目录下创建 `manifest.json`，包含唯一 UUID
 - UUID 格式：`550e8400-e29b-41d4-a716-4466554400XX`，递增末两位
-- 查看已有常量确定下一个可用编号
+- 查看已有插件的 `manifest.json` 确定下一个可用编号
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-4466554400XX",
+  "name": "插件中文名称",
+  "version": "1.0.0",
+  "description": "插件描述",
+  "icon": "LucideIconName",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "content-generation",
+  "subCategory": "ai-text",
+  "category": "ai-text",
+  "tags": ["标签1", "tag2"]
+}
+```
 
 ### 规则 2：插件面板 Props
 
@@ -669,7 +690,7 @@ const handleClearAll = () => {
 #### 5.1 内存更新（插件侧）
 
 - 通过 `onPluginDataChange(data)` 保存数据到内存，框架自动注入 `_version` 字段
-- 数据存储在 `document.pluginData[PLUGIN_ID_XXX]` 中
+- 数据存储在 `document.pluginData[manifest.id]` 中
 - 初始化时从 `pluginData` 恢复状态：`const data = (pluginData as MyPluginData) || {}`
 - 修改数据后调用 `markTabAsDirty(tabId)` 标记文档为未保存
 
@@ -770,54 +791,50 @@ await invoke('write_binary_file', { path: filePath, data });
 | 输入框背景 | 白色 | 深色 | `bg-background` |
 | 弹窗背景 | 白色 | 深色 | 由 `DialogContent` 自动处理 |
 
-### 规则 8：registry.ts 注册
+### 规则 8：index.ts 自注册（强制）
+
+每个插件的 `index.ts` 必须：
+1. 从 `manifest.json` 读取 UUID
+2. 定义 `DocumentPlugin` 对象
+3. 调用 `registerPlugin()` 自注册
 
 ```typescript
-// 1. 导入常量
-import { ..., PLUGIN_ID_XXX } from './constants';
-// 2. 导入面板组件
-import { XxxPluginPanel } from './xxx/XxxPluginPanel';
-// 3. 导入图标
-import { ..., IconName } from 'lucide-react';
+// index.ts 模板
+import { IconName } from 'lucide-react';
+import type { DocumentPlugin } from '../types';
+import { registerPluginI18n } from '../i18n-loader';
+import { registerPlugin } from '../pluginStore';
+import { XxxPluginPanel } from './XxxPluginPanel';
+import manifest from './manifest.json';
+import zh from './i18n/zh.json';
+import en from './i18n/en.json';
+import ja from './i18n/ja.json';
 
-// 4. 在 BUILTIN_COMPONENTS 中添加
-[PLUGIN_ID_XXX]: {
-  PanelComponent: XxxPluginPanel,
+// 注册插件 i18n
+registerPluginI18n('plugin-xxx', { zh, en, ja });
+
+export const xxxPlugin: DocumentPlugin = {
+  id: manifest.id,
+  name: manifest.name,
   icon: IconName,
+  description: manifest.description,
+  majorCategory: manifest.majorCategory,
+  subCategory: manifest.subCategory,
+  i18nNamespace: 'plugin-xxx',
+  PanelComponent: XxxPluginPanel,
   hasData: (doc) => {
-    const data = doc.pluginData?.[PLUGIN_ID_XXX];
+    const data = doc.pluginData?.[manifest.id];
     return data != null && typeof data === 'object'
       && 'someKey' in (data as Record<string, unknown>);
   },
-},
+};
+
+// 自注册（模块加载时自动执行）
+registerPlugin(xxxPlugin);
 ```
 
-### 规则 9：后端 manifest
-
-在 `src-tauri/src/plugin.rs` 的 `init_builtin_plugins()` 函数中添加：
-
-```rust
-// 1. 添加常量
-pub const PLUGIN_ID_XXX: &str = "550e8400-e29b-41d4-a716-4466554400XX";
-
-// 2. 在 builtin_plugins vec 中添加
-PluginManifest {
-    id: PLUGIN_ID_XXX.to_string(),
-    name: "插件名称".to_string(),
-    version: "1.0.0".to_string(),
-    description: "插件描述".to_string(),
-    icon: "LucideIconName".to_string(),
-    author: "AiDocPlus".to_string(),
-    plugin_type: "builtin".to_string(),
-    enabled: true,
-    created_at: now,
-    updated_at: now,
-    category: "ai-generation".to_string(),  // 可选: ai-generation, visualization, analysis, export
-    tags: vec!["tag1".into(), "标签".into()],
-    homepage: None, license: None, min_app_version: None,
-    permissions: None, dependencies: None, conflicts: None,
-},
-```
+> **注意**：`registerPlugin` 从 `../pluginStore` 导入（而非 `../registry`），避免循环依赖。
+> **无需修改 `registry.ts`、`constants.ts`、`plugin.rs` 或 `main.rs`**。`loader.ts` 会自动发现新插件。
 
 ### 规则 10：插件面板布局模式
 
@@ -846,23 +863,24 @@ PluginManifest {
 
 ### 内容生成类插件
 
-1. **`constants.ts`**：新增 `PLUGIN_ID_XXX` 常量（递增 UUID）
-2. **创建目录**：`src/plugins/{name}/`
-3. **创建面板组件**：`{Name}PluginPanel.tsx`，实现 `PluginPanelProps`，使用 `PluginPanelLayout`
-4. **创建工具文件**（可选）：`{name}Utils.ts`
-5. **`registry.ts`**：导入并注册到 `BUILTIN_COMPONENTS`（含 `toFragments`）
-6. **`plugin.rs`**：添加 UUID 常量 + `PluginManifest`（`major_category: "content-generation"`）
-7. **编译验证**：`npx tsc --noEmit`（前端）+ `cargo check`（后端）
+1. **创建目录**：`src/plugins/{name}/`
+2. **创建 `manifest.json`**：包含 UUID（递增）、名称、`majorCategory: "content-generation"`、`subCategory` 等
+3. **创建 `index.ts`**：定义 `DocumentPlugin`，从 `manifest.json` 读取 UUID，调用 `registerPlugin()` 自注册
+4. **创建面板组件**：`{Name}PluginPanel.tsx`，实现 `PluginPanelProps`，使用 `PluginPanelLayout`
+5. **创建 i18n 文件**：`i18n/{zh,en,ja}.json`
+6. **创建工具文件**（可选）：`{name}Utils.ts`
+7. **编译验证**：`npx tsc --noEmit`（前端）
 
 ### 功能执行类插件
 
-1. **`constants.ts`**：新增 `PLUGIN_ID_XXX` 常量（递增 UUID）
-2. **创建目录**：`src/plugins/{name}/`
-3. **创建面板组件**：`{Name}PluginPanel.tsx`，实现 `PluginPanelProps`，使用 `ToolPluginLayout` + `usePluginHost()`
-4. **`index.ts`**：导出 `DocumentPlugin`，设置 `majorCategory: 'functional'`、`subCategory`、`hasData: () => false`
-5. **`registry.ts`**：导入并注册到 `BUILTIN_COMPONENTS`（`hasData: () => false`，无 `toFragments`）
-6. **`plugin.rs`**：添加 UUID 常量 + `PluginManifest`（`major_category: "functional"`）
-7. **编译验证**：`npx tsc --noEmit`（前端）+ `cargo check`（后端）
+1. **创建目录**：`src/plugins/{name}/`
+2. **创建 `manifest.json`**：包含 UUID（递增）、名称、`majorCategory: "functional"`、`subCategory` 等
+3. **创建 `index.ts`**：定义 `DocumentPlugin`，设置 `hasData: () => false`，调用 `registerPlugin()` 自注册
+4. **创建面板组件**：`{Name}PluginPanel.tsx`，实现 `PluginPanelProps`，使用 `ToolPluginLayout` + `usePluginHost()`
+5. **创建 i18n 文件**：`i18n/{zh,en,ja}.json`
+6. **编译验证**：`npx tsc --noEmit`（前端）
+
+> **无需修改任何核心文件**（`registry.ts`、`constants.ts`、`plugin.rs`、`main.rs`）。`loader.ts` 自动发现新插件。
 
 **功能执行类插件关键区别**：
 - 使用 `ToolPluginLayout` 而非 `PluginPanelLayout`
@@ -873,7 +891,7 @@ PluginManifest {
 
 ---
 
-## 四、现有插件参考
+## 四、现有插件参考（21 个，全部为外部插件）
 
 ### 内容生成类插件（content-generation）
 
@@ -885,15 +903,26 @@ PluginManifest {
 | 表格 | `table/` | ✅ JSON + 提示词 | Excel/CSV/JSON | ✅ JSON | 完整数据编辑 + 多格式导出 |
 | PPT | `ppt/` | ✅ | PPTX | ✅ JSON | 文件导出（write_binary_file）|
 | 翻译 | `translation/` | ✅ 多语言 | - | ✅ | 多选项 AI |
+| 平行翻译 | `parallel-translation/` | ✅ 双语对照 | - | ✅ | 双语对照翻译 |
 | 图表 | `diagram/` | ✅ Mermaid | SVG | ✅ Mermaid | Mermaid 代码渲染 |
 | 统计 | `analytics/` | ❌ 纯前端 | - | ❌ | 非 AI 插件（generationZoneVisible=false） |
 | 教案 | `lessonplan/` | ✅ | - | ✅ | 结构化生成 |
+| 时间线 | `timeline/` | ✅ | - | ✅ | 时间线生成 |
+| 审阅 | `review/` | ✅ | - | ✅ | 文档审阅批注 |
+| 写作统计 | `writing-stats/` | ❌ 纯前端 | - | ❌ | 写作数据分析 |
 
 ### 功能执行类插件（functional）
 
 | 插件 | 目录 | 布局 | AI 功能 | 独立存储 | 参考价值 |
 |------|------|------|---------|----------|----------|
 | 邮件 | `email/` | `ToolPluginLayout` | `AIContentDialog` 弹窗 | ✅ `host.storage` | **新功能执行类插件首选参考** |
+| 文档对比 | `diff/` | `ToolPluginLayout` | - | ✅ | 文档版本对比 |
+| 加密 | `encrypt/` | `ToolPluginLayout` | - | ✅ | 文档加密保护 |
+| 水印 | `watermark/` | `ToolPluginLayout` | - | ✅ | 文档水印 |
+| TTS | `tts/` | `ToolPluginLayout` | - | ✅ | 文字转语音 |
+| Office 预览 | `officeviewer/` | `ToolPluginLayout` | - | ✅ | 文件预览 |
+| Pandoc 导出 | `pandoc/` | `ToolPluginLayout` | - | ✅ | 多格式导出 |
+| 发布 | `publish/` | `ToolPluginLayout` | - | ✅ | 外部发布 |
 
 **内容生成类**推荐以 `summary/SummaryPluginPanel.tsx` 作为起始模板。
 **功能执行类**推荐以 `email/EmailPluginPanel.tsx` 作为起始模板。

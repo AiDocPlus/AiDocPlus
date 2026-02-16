@@ -12,3 +12,8 @@ pub fn list_plugins() -> Result<Vec<PluginManifest>> {
 pub fn set_plugin_enabled(pluginId: String, enabled: bool) -> Result<()> {
     plugin::set_plugin_enabled(&pluginId, enabled)
 }
+
+#[tauri::command]
+pub fn sync_plugin_manifests(manifests: Vec<PluginManifest>) -> Result<()> {
+    plugin::sync_plugin_manifests(manifests)
+}

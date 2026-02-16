@@ -1,5 +1,21 @@
 import { useAppStore } from '@/stores/useAppStore';
-import { File, Folder, FolderOpen, Plus, Trash2, X, Check, Edit2, Download, CheckSquare, FilePlus, Copy, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { File, Folder, FolderOpen, Plus, Trash2, X, Check, Edit2, Download, FilePlus, Copy, ArrowUpDown, ArrowUp, ArrowDown, GripVertical, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { SortableItem } from './SortableItem';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -11,14 +27,13 @@ import { useState, useCallback, useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { confirm } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
-import { save } from '@tauri-apps/plugin-dialog';
 import { useTranslation } from '@/i18n';
 
 interface FileTreeProps {
   sidebarOpen?: boolean;
 }
 
-type SortField = 'name' | 'createdAt' | 'updatedAt';
+type SortField = 'custom' | 'name' | 'createdAt' | 'updatedAt';
 type SortDirection = 'asc' | 'desc';
 
 export function FileTree({ sidebarOpen }: FileTreeProps) {
@@ -33,15 +48,39 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
   const [renamingDocId, setRenamingDocId] = useState<string | null>(null);
   const [newDocTitle, setNewDocTitle] = useState('');
   const [isCreatingDoc, setIsCreatingDoc] = useState<string | null>(null); // 哪个项目正在创建文档
-  const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
-  const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
-  const [isBatchExporting, setIsBatchExporting] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
-  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortField, setSortField] = useState<SortField>('custom');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [projectOrder, setProjectOrder] = useState<string[]>([]);
+  const [docOrders, setDocOrders] = useState<Record<string, string[]>>({});
+
+  // 从 localStorage 加载自定义排序
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('aidoc-project-order');
+      if (saved) setProjectOrder(JSON.parse(saved));
+      const savedDoc = localStorage.getItem('aidoc-doc-orders');
+      if (savedDoc) setDocOrders(JSON.parse(savedDoc));
+    } catch { /* ignore */ }
+  }, []);
+
+  // dnd-kit sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const sortedProjects = useMemo(() => {
+    if (sortField === 'custom') {
+      // 按 projectOrder 排序，不在 order 中的排末尾
+      const orderMap = new Map(projectOrder.map((id, i) => [id, i]));
+      return [...projects].sort((a, b) => {
+        const ia = orderMap.get(a.id) ?? Infinity;
+        const ib = orderMap.get(b.id) ?? Infinity;
+        return ia - ib;
+      });
+    }
     return [...projects].sort((a, b) => {
       let cmp = 0;
       if (sortField === 'name') {
@@ -53,9 +92,18 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
       }
       return sortDirection === 'asc' ? cmp : -cmp;
     });
-  }, [projects, sortField, sortDirection]);
+  }, [projects, sortField, sortDirection, projectOrder]);
 
-  const sortDocuments = useCallback((docs: typeof documents) => {
+  const sortDocuments = useCallback((docs: typeof documents, projectId?: string) => {
+    if (sortField === 'custom' && projectId) {
+      const order = docOrders[projectId] || [];
+      const orderMap = new Map(order.map((id, i) => [id, i]));
+      return [...docs].sort((a, b) => {
+        const ia = orderMap.get(a.id) ?? Infinity;
+        const ib = orderMap.get(b.id) ?? Infinity;
+        return ia - ib;
+      });
+    }
     return [...docs].sort((a, b) => {
       let cmp = 0;
       if (sortField === 'name') {
@@ -67,7 +115,37 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
       }
       return sortDirection === 'asc' ? cmp : -cmp;
     });
-  }, [sortField, sortDirection]);
+  }, [sortField, sortDirection, docOrders]);
+
+  // 项目拖动排序结束
+  const handleProjectDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const currentIds = sortedProjects.map(p => p.id);
+    const oldIndex = currentIds.indexOf(active.id as string);
+    const newIndex = currentIds.indexOf(over.id as string);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const newOrder = arrayMove(currentIds, oldIndex, newIndex);
+    setProjectOrder(newOrder);
+    localStorage.setItem('aidoc-project-order', JSON.stringify(newOrder));
+    setSortField('custom');
+  }, [sortedProjects]);
+
+  // 文档拖动排序结束
+  const handleDocDragEnd = useCallback((projectId: string) => (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const projectDocs = sortDocuments(documents.filter(d => d.projectId === projectId), projectId);
+    const currentIds = projectDocs.map(d => d.id);
+    const oldIndex = currentIds.indexOf(active.id as string);
+    const newIndex = currentIds.indexOf(over.id as string);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const newOrder = arrayMove(currentIds, oldIndex, newIndex);
+    const updated = { ...docOrders, [projectId]: newOrder };
+    setDocOrders(updated);
+    localStorage.setItem('aidoc-doc-orders', JSON.stringify(updated));
+    setSortField('custom');
+  }, [documents, sortDocuments, docOrders]);
 
   const handleToggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -250,71 +328,6 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
     }
   };
 
-  // Multi-selection handlers
-  const handleDocumentClick = (e: React.MouseEvent, documentId: string, projectId: string) => {
-    // Check if Ctrl/Cmd key is pressed
-    if (e.ctrlKey || e.metaKey) {
-      e.preventDefault();
-      setSelectedDocIds(prev => {
-        const next = new Set(prev);
-        if (next.has(documentId)) {
-          next.delete(documentId);
-        } else {
-          next.add(documentId);
-        }
-        return next;
-      });
-      setLastSelectedId(documentId);
-    }
-    // Check if Shift key is pressed for range selection
-    else if (e.shiftKey && lastSelectedId) {
-      e.preventDefault();
-      const projectDocuments = documents.filter(d => d.projectId === projectId);
-      const lastIndex = projectDocuments.findIndex(d => d.id === lastSelectedId);
-      const currentIndex = projectDocuments.findIndex(d => d.id === documentId);
-
-      if (lastIndex !== -1 && currentIndex !== -1) {
-        const [start, end] = [Math.min(lastIndex, currentIndex), Math.max(lastIndex, currentIndex)];
-        const rangeIds = projectDocuments.slice(start, end + 1).map(d => d.id);
-        setSelectedDocIds(new Set(rangeIds));
-      }
-      setLastSelectedId(documentId);
-    }
-    // Normal click - open document, set as single selection
-    else {
-      setSelectedDocIds(new Set([documentId]));
-      setLastSelectedId(documentId);
-      handleSelectDocument(projectId, documentId);
-    }
-  };
-
-  const clearSelection = useCallback(() => {
-    setSelectedDocIds(new Set());
-    setLastSelectedId(null);
-  }, []);
-
-  const handleBatchDelete = async () => {
-    if (selectedDocIds.size === 0) return;
-
-    const confirmed = await confirm(
-      t('fileTree.batchDeleteConfirm', { count: selectedDocIds.size, defaultValue: `删除 ${selectedDocIds.size} 个选中的文档？` }),
-      { title: t('common.confirmDelete', { defaultValue: '确认删除' }), kind: 'warning' }
-    );
-
-    if (!confirmed) return;
-
-    try {
-      for (const docId of selectedDocIds) {
-        const doc = documents.find(d => d.id === docId);
-        if (doc && currentProject) {
-          await deleteDocument(currentProject.id, docId);
-        }
-      }
-      clearSelection();
-    } catch (err) {
-      console.error('Failed to delete documents:', err);
-    }
-  };
 
   const handleDeleteDocument = async (projectId: string, documentId: string, documentTitle: string) => {
     const confirmed = await confirm(
@@ -333,43 +346,14 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
     }
   };
 
-  const handleBatchExport = async () => {
-    if (selectedDocIds.size === 0 || !currentProject) return;
 
-    try {
-      setIsBatchExporting(true);
-      const selectedDocs = documents.filter(d => selectedDocIds.has(d.id));
 
-      // Ask user for output directory
-      const outputPath = await save({
-        defaultPath: `${currentProject.name}-export`,
-        title: t('fileTree.selectExportFolder', { defaultValue: 'Select export folder' }),
-      });
-
-      if (!outputPath) return;
-
-      // Export each document
-      for (const doc of selectedDocs) {
-        const fileName = `${doc.title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_')}.md`;
-        const docOutputPath = `${outputPath}/${fileName}`;
-
-        await invoke('export_document', {
-          documentId: doc.id,
-          projectId: doc.projectId,
-          format: 'md',
-          outputPath: docOutputPath
-        });
-      }
-
-      alert(t('fileTree.exportSuccess', { count: selectedDocs.length, defaultValue: `Exported ${selectedDocs.length} documents` }));
-    } catch (err) {
-      console.error('Failed to export documents:', err);
-    } finally {
-      setIsBatchExporting(false);
-    }
-  };
-
-  const selectedCount = selectedDocIds.size;
+  // 监听系统菜单的"新建项目"事件
+  useEffect(() => {
+    const handler = () => setIsCreating(true);
+    window.addEventListener('menu-new-project', handler);
+    return () => window.removeEventListener('menu-new-project', handler);
+  }, []);
 
   // Auto-expand project and highlight current document
   useEffect(() => {
@@ -377,12 +361,6 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
       if (currentDocument.projectId && !expandedProjects.has(currentDocument.projectId)) {
         setExpandedProjects(prev => new Set([...prev, currentDocument.projectId]));
       }
-      // 延迟设置选中状态，确保文档列表已渲染
-      const timer = setTimeout(() => {
-        setSelectedDocIds(new Set([currentDocument.id]));
-        setLastSelectedId(currentDocument.id);
-      }, 400);
-      return () => clearTimeout(timer);
     }
   }, [sidebarOpen, currentDocument?.id]);
 
@@ -472,45 +450,26 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <div className="flex items-center justify-between mb-2 px-2">
-        <span className="text-xs font-medium text-muted-foreground">
-          {selectedCount > 0
-            ? t('fileTree.selectedCount', { count: selectedCount, defaultValue: `${selectedCount} selected` })
-            : ''}
-        </span>
+      <div className="flex items-center justify-end mb-2 px-2">
         <div className="flex items-center gap-1">
-          {selectedCount > 0 && (
-            <>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={clearSelection}
-                className="h-6 w-6"
-                title={t('common.clearSelection', { defaultValue: '取消选择' })}
-              >
-                <X className="h-3 w-3" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleBatchExport}
-                className="h-6 w-6"
-                title={t('fileTree.batchExport', { defaultValue: '导出选中' })}
-                disabled={isBatchExporting}
-              >
-                <Download className="h-3 w-3" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleBatchDelete}
-                className="h-6 w-6 text-destructive"
-                title={t('fileTree.batchDelete', { defaultValue: '删除选中' })}
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            </>
-          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setExpandedProjects(new Set(projects.map(p => p.id)))}
+            className="h-6 w-6"
+            title="展开全部"
+          >
+            <ChevronsUpDown className="h-3 w-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setExpandedProjects(new Set())}
+            className="h-6 w-6"
+            title="折叠全部"
+          >
+            <ChevronsDownUp className="h-3 w-3" />
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -523,6 +482,10 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuItem onClick={() => setSortField('custom')}>
+                <span className="flex-1">自定义（拖动）</span>
+                {sortField === 'custom' && <GripVertical className="h-3 w-3 ml-2" />}
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleToggleSort('name')}>
                 <span className="flex-1">{t('fileTree.sortByName', { defaultValue: '按名称' })}</span>
                 {sortField === 'name' && (sortDirection === 'asc' ? <ArrowUp className="h-3 w-3 ml-2" /> : <ArrowDown className="h-3 w-3 ml-2" />)}
@@ -596,24 +559,31 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
       )}
 
       {/* Projects List */}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProjectDragEnd}>
+      <SortableContext items={sortedProjects.map(p => p.id)} strategy={verticalListSortingStrategy}>
       <div className="space-y-1">
         {sortedProjects.map(project => {
           const isExpanded = expandedProjects.has(project.id);
           const isActive = currentProject?.id === project.id;
-          const projectDocuments = sortDocuments(documents.filter(d => d.projectId === project.id));
+          const projectDocuments = sortDocuments(documents.filter(d => d.projectId === project.id), project.id);
 
           return (
-            <div key={project.id}>
+            <SortableItem key={project.id} id={project.id} disabled={sortField !== 'custom'} showHandle={sortField === 'custom'}>
               {/* Project Node */}
               <div
                 className={cn(
-                  "flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer group hover:bg-accent",
-                  isActive && "bg-accent"
+                  "flex items-center gap-1 px-1 py-1.5 rounded-md cursor-pointer group hover:bg-accent",
+                  isActive && "bg-primary/10 border-l-2 border-primary"
                 )}
                 onClick={() => {
                   if (renamingProjectId !== project.id) {
-                    toggleProject(project.id);
-                    openProject(project.id);
+                    if (isActive) {
+                      // 已选中，展开/收缩
+                      toggleProject(project.id);
+                    } else {
+                      // 未选中，先选中项目
+                      openProject(project.id);
+                    }
                   }
                 }}
               >
@@ -710,32 +680,27 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
 
               {/* Documents */}
               {isExpanded && (
-                <div className="ml-4">
+                <div className="ml-2">
                   {projectDocuments.length > 0 ? (
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDocDragEnd(project.id)}>
+                    <SortableContext items={projectDocuments.map(d => d.id)} strategy={verticalListSortingStrategy}>
                     <div className="space-y-0.5">
                       {projectDocuments.map(doc => {
                         const isRenaming = renamingDocId === doc.id;
-                        const isSelected = selectedDocIds.has(doc.id);
                         const isCurrent = currentDocument?.id === doc.id;
-                        const isMultiSelect = selectedCount > 1;
                         return (
+                          <SortableItem key={doc.id} id={doc.id} disabled={sortField !== 'custom'} showHandle={sortField === 'custom'}>
                           <div
-                            key={doc.id}
                             id={isCurrent ? `current-doc-${doc.id}` : undefined}
                             className={cn(
-                              "flex items-center gap-2 px-2 py-1 rounded-md group hover:bg-accent cursor-pointer",
-                              (isCurrent || isSelected) && "bg-accent font-medium",
-                              isCurrent && "bg-red-500/10 text-red-600 dark:text-red-400",
-                              isMultiSelect && isSelected && "ring-1 ring-primary"
+                              "flex items-center gap-1 px-1 py-1 rounded-md group hover:bg-accent cursor-pointer",
+                              isCurrent && "bg-accent font-medium",
+                              isCurrent && "bg-red-500/10 text-red-600 dark:text-red-400"
                             )}
-                            onClick={(e) => handleDocumentClick(e, doc.id, project.id)}
+                            onClick={() => handleSelectDocument(project.id, doc.id)}
                             title={doc.title}
                           >
-                            {isMultiSelect && isSelected ? (
-                              <CheckSquare className="h-3 w-3 text-primary ml-3" />
-                            ) : (
-                              <File className="h-3 w-3 text-muted-foreground ml-3" />
-                            )}
+                            <File className="h-3 w-3 text-muted-foreground ml-1" />
 
                             {isRenaming ? (
                               <div className="flex-1 flex items-center gap-1">
@@ -805,28 +770,17 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
                               </>
                             )}
                           </div>
+                          </SortableItem>
                         );
                       })}
                     </div>
+                    </SortableContext>
+                    </DndContext>
                   ) : (
                     <div className="px-2 py-1 text-xs text-muted-foreground">
                       {t('fileTree.noDocuments')}
                     </div>
                   )}
-
-                  {/* Create Document Button */}
-                  <div className="ml-5 mt-1">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsCreatingDoc(project.id);
-                      }}
-                      className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
-                    >
-                      <Plus className="h-3 w-3" />
-                      {t('fileTree.newDocument')}
-                    </button>
-                  </div>
 
                   {/* Create Document Input */}
                   {isCreatingDoc === project.id && (
@@ -883,9 +837,12 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
                   )}
                 </div>
               )}
-            </div>
+            </SortableItem>
           );
         })}
+      </div>
+      </SortableContext>
+      </DndContext>
 
         {/* Empty State */}
         {projects.length === 0 && !isCreating && (
@@ -893,7 +850,6 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
             {t('fileTree.noProjects')}
           </div>
         )}
-      </div>
 
       {/* Loading Indicator */}
       {isLoading && (

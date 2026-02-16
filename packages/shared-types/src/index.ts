@@ -742,7 +742,7 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
 };
 
 export const DEFAULT_UI_SETTINGS: UISettings = {
-  theme: 'dark',
+  theme: 'light',
   language: 'zh',
   layout: 'vertical',
   fontSize: 14,

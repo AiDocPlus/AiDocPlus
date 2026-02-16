@@ -26,12 +26,10 @@ export function PluginMenu({ pluginAreaOpen, onToggle, document }: PluginMenuPro
   const hasPluginData = !!document?.pluginData &&
     docPlugins.some(p => document.pluginData?.[p.id] != null);
 
-  // 样式：展开（蓝色） > 有数据（蓝色呼吸灯） > 默认
+  // 样式：展开（蓝色） > 有数据（蓝色呼吸灯） > 未激活（蓝色边框+呼吸灯）
   const className = pluginAreaOpen
     ? 'bg-blue-600 hover:bg-blue-700 text-white'
-    : hasPluginData
-      ? 'border-blue-500 text-blue-500 hover:bg-blue-500/10 animate-plugin-breathe'
-      : '';
+    : 'border-blue-500 text-blue-500 hover:bg-blue-500/10 animate-plugin-breathe';
 
   return (
     <Button

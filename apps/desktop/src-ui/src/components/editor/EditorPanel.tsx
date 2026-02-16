@@ -84,6 +84,20 @@ export function EditorPanel({
     if (isAiStreaming) setEditorViewState('ai-max');
   }, [isAiStreaming]);
 
+  // 监听系统菜单的视图切换事件
+  useEffect(() => {
+    const isActive = () => tabId === useAppStore.getState().activeTabId;
+    const handler = (e: Event) => {
+      if (!isActive()) return;
+      const detail = (e as CustomEvent).detail;
+      if (detail === 'editor' || detail === 'plugins' || detail === 'composer') {
+        setActiveView(detail);
+      }
+    };
+    window.addEventListener('menu-view-switch', handler);
+    return () => window.removeEventListener('menu-view-switch', handler);
+  }, [tabId]);
+
   const { ui } = useSettingsStore();
   const mod = navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘' : 'Ctrl+';
 
@@ -265,8 +279,23 @@ export function EditorPanel({
     }
   };
 
-  // 自动保存
+  // 自动保存（用 ref 存储频繁变化的值，避免每次按键都重建 interval）
   const { editor: editorSettings } = useSettingsStore();
+  const contentRef = useRef(content);
+  contentRef.current = content;
+  const aiContentRef = useRef(aiContent);
+  aiContentRef.current = aiContent;
+  const authorNotesRef = useRef(authorNotes);
+  authorNotesRef.current = authorNotes;
+  const isSavingRef = useRef(isSaving);
+  isSavingRef.current = isSaving;
+  const layoutModeRef = useRef(layoutMode);
+  layoutModeRef.current = layoutMode;
+  const handleSaveRef = useRef(handleSave);
+  handleSaveRef.current = handleSave;
+  const handleSaveAllRef = useRef(handleSaveAll);
+  handleSaveAllRef.current = handleSaveAll;
+
   useEffect(() => {
     if (!editorSettings.autoSave || !document || !tabId) return;
     const intervalMs = (editorSettings.autoSaveInterval || 60) * 1000;
@@ -274,26 +303,26 @@ export function EditorPanel({
       const { activeTabId, tabs: currentTabs } = useAppStore.getState();
       if (tabId === activeTabId && baselineRef.current) {
         const base = baselineRef.current;
-        const hasContentChanges = authorNotes !== base.authorNotes || content !== base.content || aiContent !== base.aiContent;
-        // 也检查 tab 是否被插件标记为 dirty（兜底保存插件数据变更）
+        const hasContentChanges = authorNotesRef.current !== base.authorNotes || contentRef.current !== base.content || aiContentRef.current !== base.aiContent;
         const currentTab = currentTabs.find(t => t.id === tabId);
         const tabIsDirty = currentTab?.isDirty ?? false;
-        if ((hasContentChanges || tabIsDirty) && !isSaving) {
-          handleSave();
+        if ((hasContentChanges || tabIsDirty) && !isSavingRef.current) {
+          handleSaveRef.current();
         }
       }
     }, intervalMs);
     return () => clearInterval(timer);
-  }, [document, tabId, authorNotes, content, aiContent, isSaving]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [document?.id, tabId, editorSettings.autoSave, editorSettings.autoSaveInterval]);
 
-  // 监听快捷键事件（仅活动标签响应）
+  // 监听快捷键事件（仅活动标签响应，用 ref 避免频繁重注册）
   useEffect(() => {
     const isActive = () => tabId === useAppStore.getState().activeTabId;
-    const onSave = () => { if (document && isActive()) handleSave(); };
-    const onSaveAll = () => { if (document && isActive()) handleSaveAll(); };
+    const onSave = () => { if (document && isActive()) handleSaveRef.current(); };
+    const onSaveAll = () => { if (document && isActive()) handleSaveAllRef.current(); };
     const onExport = () => { if (document && isActive()) handleExport('md'); };
     const onToggleLayout = () => {
-      if (isActive()) onLayoutModeChange(layoutMode === 'vertical' ? 'horizontal' : 'vertical');
+      if (isActive()) onLayoutModeChange(layoutModeRef.current === 'vertical' ? 'horizontal' : 'vertical');
     };
     const onVersionHistory = () => { if (isActive()) handleVersionHistoryToggle(true); };
     const onToggleChat = () => { if (isActive()) onChatToggle?.(); };
@@ -315,7 +344,8 @@ export function EditorPanel({
       window.removeEventListener('editor-toggle-chat', onToggleChat);
       window.removeEventListener('editor-new-document', onNewDocument);
     };
-  }, [document, tabId, authorNotes, content, aiContent, isSaving, layoutMode]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [document?.id, tabId]);
 
   // 基准内容 ref，用于判断是否有真正的用户编辑
   const baselineRef = useRef<{ authorNotes: string; content: string; aiContent: string; composedContent: string } | null>(null);
@@ -713,6 +743,7 @@ export function EditorPanel({
                     theme={effectiveTheme}
                     editable={!isAiStreaming}
                     editorId={`ai-content-${document.id}`}
+                    importSources={{ document }}
                   />
                 </div>
               )}
@@ -771,6 +802,7 @@ export function EditorPanel({
                     placeholder={t('editor.originalContentPlaceholder', { defaultValue: '在此输入素材内容... (支持 Markdown)' })}
                     theme={effectiveTheme}
                     editorId={`original-content-${document.id}`}
+                    importSources={{ aiContent, document }}
                   />
                 </div>
               )}

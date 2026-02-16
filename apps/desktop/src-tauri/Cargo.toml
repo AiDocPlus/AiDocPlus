@@ -18,7 +18,7 @@ thiserror = "2"
 uuid = { version = "1", features = ["v4", "serde"] }
 dirs = "5"
 chrono = { version = "0.4", features = ["serde"] }
-reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls"], default-features = false }
+reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls-native-roots"], default-features = false }
 eventsource-client = "0.12"
 futures-util = "0.3"
 regex = "1"

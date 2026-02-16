@@ -332,76 +332,13 @@ function TabShortcuts() {
     const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
     const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
 
-    // Cmd/Ctrl+S - 保存当前文档
-    if (cmdOrCtrl && e.key === 's' && !e.shiftKey) {
-      e.preventDefault();
-      window.dispatchEvent(new CustomEvent('save-active-tab'));
-      return;
-    }
+    // 注意：⌘+S, ⌘+Shift+S, ⌘+N, ⌘+W, ⌘+L, ⌘+H, ⌘+J, ⌘+F, ⌘+B 等
+    // 已由原生系统菜单处理，不再在此重复注册
 
-    // Cmd/Ctrl+Shift+S - 保存全部文档
-    if (cmdOrCtrl && e.shiftKey && e.key === 's') {
-      e.preventDefault();
-      window.dispatchEvent(new CustomEvent('save-all-tabs'));
-      return;
-    }
-
-    // Cmd/Ctrl+E - 导出
+    // Cmd/Ctrl+E - 导出（系统菜单未注册此快捷键）
     if (cmdOrCtrl && e.key === 'e' && !e.shiftKey) {
       e.preventDefault();
       window.dispatchEvent(new CustomEvent('editor-export'));
-      return;
-    }
-
-    // Cmd/Ctrl+L - 切换布局
-    if (cmdOrCtrl && e.key === 'l' && !e.shiftKey) {
-      e.preventDefault();
-      window.dispatchEvent(new CustomEvent('editor-toggle-layout'));
-      return;
-    }
-
-    // Cmd/Ctrl+H - 版本历史
-    if (cmdOrCtrl && e.key === 'h' && !e.shiftKey) {
-      e.preventDefault();
-      window.dispatchEvent(new CustomEvent('editor-version-history'));
-      return;
-    }
-
-    // Cmd/Ctrl+J - 切换 AI 助手
-    if (cmdOrCtrl && e.key === 'j' && !e.shiftKey) {
-      e.preventDefault();
-      window.dispatchEvent(new CustomEvent('editor-toggle-chat'));
-      return;
-    }
-
-    // Cmd/Ctrl+F - 全局搜索（仅当没有编辑器处理时）
-    if (cmdOrCtrl && e.key === 'f' && !e.shiftKey && !e.defaultPrevented) {
-      e.preventDefault();
-      window.dispatchEvent(new CustomEvent('open-search'));
-      return;
-    }
-
-    // Cmd/Ctrl+N - 新建文档
-    if (cmdOrCtrl && e.key === 'n' && !e.shiftKey) {
-      e.preventDefault();
-      window.dispatchEvent(new CustomEvent('editor-new-document'));
-      return;
-    }
-
-    // Cmd/Ctrl+W - 关闭当前标签（检查未保存状态）
-    if (cmdOrCtrl && e.key === 'w' && !e.shiftKey) {
-      e.preventDefault();
-      if (activeTabId) {
-        const tab = tabs.find(t => t.id === activeTabId);
-        if (tab && tab.isDirty) {
-          confirm(
-            `"${tab.title}" 有未保存的更改，是否保存后关闭？`,
-            { title: '未保存的更改', kind: 'warning', okLabel: '保存并关闭', cancelLabel: '不保存' }
-          ).then(shouldSave => closeTab(activeTabId, shouldSave));
-        } else {
-          closeTab(activeTabId, false);
-        }
-      }
       return;
     }
 

@@ -18,12 +18,16 @@ use commands::{
     export::*,
     file_system::*,
     import::*,
+    pandoc::*,
     plugin::*,
     project::*,
     search::*,
     workspace::*,
 };
-use tauri::Manager;
+use tauri::{Manager, Emitter};
+use tauri::menu::{
+    MenuBuilder, SubmenuBuilder, MenuItem,
+};
 
 fn main() {
     tauri::Builder::default()
@@ -35,8 +39,118 @@ fn main() {
             // Initialize app state
             app.manage(config::AppState::new());
 
-            // Initialize builtin plugins (idempotent)
-            plugin::init_builtin_plugins();
+            // Ensure plugins directory exists
+            plugin::ensure_plugins_dir();
+
+            // ── 构建原生系统菜单 ──
+            let handle = app.handle();
+
+            // macOS 应用菜单
+            let app_menu = SubmenuBuilder::new(handle, "AiDocPlus")
+                .about(None)
+                .separator()
+                .item(&MenuItem::with_id(handle, "settings", "设置...", true, Some("CmdOrCtrl+,"))?)
+                .separator()
+                .services()
+                .separator()
+                .hide()
+                .hide_others()
+                .show_all()
+                .separator()
+                .quit()
+                .build()?;
+
+            // 文件菜单
+            let export_sub = SubmenuBuilder::new(handle, "导出")
+                .item(&MenuItem::with_id(handle, "export_md", "Markdown (.md)", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "export_html", "HTML (.html)", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "export_docx", "Word (.docx)", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "export_pdf", "PDF (.pdf)", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "export_txt", "纯文本 (.txt)", true, None::<&str>)?)
+                .build()?;
+
+            let file_menu = SubmenuBuilder::new(handle, "文件")
+                // ── 新建 ──
+                .item(&MenuItem::with_id(handle, "new_project", "新建项目", true, Some("CmdOrCtrl+Shift+N"))?)
+                .item(&MenuItem::with_id(handle, "new_document", "新建文档", true, Some("CmdOrCtrl+N"))?)
+                .separator()
+                // ── 保存 ──
+                .item(&MenuItem::with_id(handle, "save", "保存", true, Some("CmdOrCtrl+S"))?)
+                .item(&MenuItem::with_id(handle, "save_all", "全部保存", true, Some("CmdOrCtrl+Shift+S"))?)
+                .separator()
+                // ── 导入/导出文件 ──
+                .item(&MenuItem::with_id(handle, "import_file", "导入文件...", true, Some("CmdOrCtrl+I"))?)
+                .item(&export_sub)
+                .separator()
+                // ── 项目管理 ──
+                .item(&MenuItem::with_id(handle, "project_rename", "重命名项目...", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "project_delete", "删除项目...", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "project_export_zip", "导出项目 (ZIP)...", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "project_import_zip", "导入项目 (ZIP)...", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "project_backup", "备份项目...", true, None::<&str>)?)
+                .separator()
+                // ── 文档管理 ──
+                .item(&MenuItem::with_id(handle, "doc_rename", "重命名文档...", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "doc_delete", "删除文档...", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "doc_duplicate", "复制文档", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "doc_move_to", "移动文档到...", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "doc_copy_to", "复制文档到...", true, None::<&str>)?)
+                .separator()
+                // ── 关闭 ──
+                .item(&MenuItem::with_id(handle, "close_tab", "关闭文档", true, Some("CmdOrCtrl+W"))?)
+                .build()?;
+
+            // 编辑菜单
+            let edit_menu = SubmenuBuilder::new(handle, "编辑")
+                .item(&MenuItem::with_id(handle, "undo", "撤销", true, Some("CmdOrCtrl+Z"))?)
+                .item(&MenuItem::with_id(handle, "redo", "重做", true, Some("CmdOrCtrl+Shift+Z"))?)
+                .separator()
+                .item(&MenuItem::with_id(handle, "cut", "剪切", true, Some("CmdOrCtrl+X"))?)
+                .item(&MenuItem::with_id(handle, "copy_text", "复制", true, Some("CmdOrCtrl+C"))?)
+                .item(&MenuItem::with_id(handle, "paste", "粘贴", true, Some("CmdOrCtrl+V"))?)
+                .item(&MenuItem::with_id(handle, "select_all", "全选", true, Some("CmdOrCtrl+A"))?)
+                .separator()
+                .item(&MenuItem::with_id(handle, "find", "查找...", true, Some("CmdOrCtrl+F"))?)
+                .build()?;
+
+            // 视图菜单
+            let view_menu = SubmenuBuilder::new(handle, "视图")
+                .item(&MenuItem::with_id(handle, "toggle_sidebar", "切换侧边栏", true, Some("CmdOrCtrl+B"))?)
+                .item(&MenuItem::with_id(handle, "toggle_chat", "切换 AI 助手", true, Some("CmdOrCtrl+J"))?)
+                .separator()
+                .item(&MenuItem::with_id(handle, "toggle_layout", "切换布局", true, Some("CmdOrCtrl+L"))?)
+                .item(&MenuItem::with_id(handle, "version_history", "版本历史", true, Some("CmdOrCtrl+H"))?)
+                .separator()
+                .item(&MenuItem::with_id(handle, "view_editor", "正文区", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "view_plugins", "插件区", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "view_composer", "合并区", true, None::<&str>)?)
+                .build()?;
+
+            // 帮助菜单
+            let help_menu = SubmenuBuilder::new(handle, "帮助")
+                .item(&MenuItem::with_id(handle, "shortcuts_ref", "快捷键参考", true, None::<&str>)?)
+                .separator()
+                .item(&MenuItem::with_id(handle, "about", "关于 AiDocPlus", true, None::<&str>)?)
+                .build()?;
+
+            let menu = MenuBuilder::new(handle)
+                .item(&app_menu)
+                .item(&file_menu)
+                .item(&edit_menu)
+                .item(&view_menu)
+                .item(&help_menu)
+                .build()?;
+
+            app.set_menu(menu)?;
+
+            // 监听菜单事件，转发到前端
+            app.on_menu_event(move |app_handle, event| {
+                let id = event.id().0.as_str();
+                // 将菜单事件作为自定义事件发送到前端
+                if let Some(window) = app_handle.get_webview_window("main") {
+                    let _ = window.emit("menu-event", id);
+                }
+            });
 
             #[cfg(debug_assertions)]
             {
@@ -62,6 +176,8 @@ fn main() {
             rename_project,
             delete_project,
             list_projects,
+            export_project_zip,
+            import_project_zip,
 
             // Document commands
             create_document,
@@ -70,6 +186,8 @@ fn main() {
             rename_document,
             get_document,
             list_documents,
+            move_document,
+            copy_document,
 
             // Version commands
             create_version,
@@ -108,10 +226,15 @@ fn main() {
             // Plugin commands
             list_plugins,
             set_plugin_enabled,
+            sync_plugin_manifests,
 
             // Email commands
             test_smtp_connection,
             send_email,
+
+            // Pandoc commands
+            check_pandoc,
+            pandoc_export,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

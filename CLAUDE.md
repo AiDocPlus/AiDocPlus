@@ -64,15 +64,17 @@ AiDocPlus/
 │           │   │   ├── settings/  # 设置面板
 │           │   │   ├── templates/ # 提示词模板
 │           │   │   └── ui/        # 基础 UI 组件
-│           │   ├── plugins/    # 插件系统
-│           │   │   ├── _framework/    # 插件框架（PluginPanelLayout, PluginPromptBuilderDialog, pluginUtils, i18n）
+│           │   ├── plugins/    # 插件系统（SDK + 框架，插件代码由 AiDocPlus-Plugins 项目部署）
+│           │   │   ├── _framework/    # 插件框架 SDK（PluginHostAPI, 布局组件, UI 原语, i18n）
 │           │   │   ├── types.ts       # 插件接口定义（DocumentPlugin, PluginPanelProps）
-│           │   │   ├── constants.ts   # 插件 UUID 常量
-│           │   │   ├── registry.ts    # 插件注册表（BUILTIN_COMPONENTS）
+│           │   │   ├── constants.ts   # 默认启用插件列表 + 分类定义
+│           │   │   ├── pluginStore.ts # 插件注册表底层存储（PLUGIN_MAP + registerPlugin）
+│           │   │   ├── loader.ts      # 自动发现加载器（import.meta.glob + syncManifestsToBackend）
+│           │   │   ├── registry.ts    # 插件注册表（buildPluginList, getPlugins 等查询 API）
 │           │   │   ├── i18n-loader.ts # 插件 i18n 注册工具
 │           │   │   ├── PluginToolArea.tsx    # 插件工具区（标签栏 + 面板）
 │           │   │   ├── PluginManagerPanel.tsx # 插件管理面板
-│           │   │   └── {name}/        # 各插件目录（summary, ppt, quiz, mindmap, translation, diagram, analytics, lessonplan, table）
+│           │   │   └── {name}/        # 各插件目录（由 AiDocPlus-Plugins 部署，.gitignore 忽略）
 │           │   ├── stores/    # 状态管理（useAppStore, useSettingsStore, useTemplatesStore）
 │           │   ├── hooks/     # 自定义 Hooks（useWorkspaceAutosave）
 │           │   ├── lib/       # 工具函数
@@ -96,7 +98,7 @@ AiDocPlus/
 - **多格式导出**：Markdown、HTML、DOCX、TXT（原生导出 + Pandoc）
 - **工作区状态保存和恢复**：标签页、面板布局、项目状态持久化
 - **附件系统**：支持添加参考文件，AI 生成时自动读取附件内容
-- **插件系统**：可扩展的文档处理插件架构，内置 9 个插件（摘要、PPT、测试题、思维导图、翻译、图表、统计、教案、表格），支持源码编辑、提示词构造器、插件管理
+- **插件系统**：全外部插件架构（21 个插件，独立仓库 [AiDocPlus-Plugins](https://github.com/AiDocPlus/AiDocPlus-Plugins)），自注册 + 自动发现 + manifest 驱动
 
 ### 运行命令
 
@@ -146,9 +148,16 @@ pnpm clean      # 清理构建缓存
 
 **绝不混淆这两种角色。**
 
-### 插件架构（v2 — 双类别体系）
+### 插件架构（v3 — 全外部插件体系）
 
-应用采用**双类别插件架构**，插件分为「内容生成类」和「功能执行类」两大类，通过三层解耦设计实现松耦合。
+应用采用**全外部插件架构**，不存在任何内部/内置插件。所有 21 个插件都是独立的外部插件，通过自注册 + 自动发现机制加载。插件分为「内容生成类」和「功能执行类」两大类，通过三层解耦设计实现松耦合。
+
+#### 核心机制
+
+- **自注册**：每个插件的 `index.ts` 在 import 时自动调用 `registerPlugin()` 注册到 `PLUGIN_MAP`
+- **自动发现**：`loader.ts` 使用 `import.meta.glob` 自动发现所有插件目录
+- **Manifest 驱动**：每个插件自带 `manifest.json`，包含 UUID、名称、分类等元数据
+- **前后端同步**：前端发现的 manifest 通过 `sync_plugin_manifests` 命令幂等同步到后端磁盘
 
 #### 两大类别
 
@@ -274,10 +283,11 @@ if (isFunctionalPlugin(plugin)) {
 ```
 
 #### 核心设计
-- **Manifest 驱动**：后端 `~/AiDocPlus/Plugins/{uuid}/manifest.json` 管理插件元数据和启用状态
-- **Manifest 新增字段**：`majorCategory`（大类）和 `subCategory`（子类），均为 string 类型可扩展
+- **Manifest 驱动**：每个插件自带 `manifest.json`，前端通过 `sync_plugin_manifests` 同步到后端 `~/AiDocPlus/Plugins/{uuid}/manifest.json`
+- **Manifest 字段**：`id`（UUID）、`name`、`version`、`description`、`icon`、`majorCategory`、`subCategory`、`tags` 等
+- **自注册**：`pluginStore.ts` 提供 `registerPlugin()` API，各插件 `index.ts` 在 import 时调用
+- **自动发现**：`loader.ts` 使用 `import.meta.glob` 发现所有 `plugins/*/index.ts` 和 `plugins/*/manifest.json`
 - **通用数据存储**：内容生成类使用 `document.pluginData`，功能执行类使用 `usePluginStorageStore`
-- **UUID 标识**：每个插件有唯一 UUID，定义在 `plugins/constants.ts`
 - **分类常量**：`PLUGIN_MAJOR_CATEGORIES`（大类）和 `PLUGIN_SUB_CATEGORIES`（子类），定义在 `plugins/constants.ts`
 
 #### 插件接口（`plugins/types.ts`）
@@ -295,14 +305,15 @@ interface DocumentPlugin {
 ```
 
 #### 后端插件管理
-- **`src-tauri/src/plugin.rs`**：`PluginManifest` 结构体（含 `major_category`/`sub_category`）、内置插件初始化、列表查询、启用/禁用
-- **IPC 命令**：`list_plugins`（返回 manifest 列表）、`set_plugin_enabled`（切换启用状态）
-- 应用启动时调用 `init_builtin_plugins()` 自动创建内置插件的 manifest 文件
+- **`src-tauri/src/plugin.rs`**：`PluginManifest` 结构体（含 `major_category`/`sub_category`）、manifest 同步、列表查询、启用/禁用
+- **IPC 命令**：`list_plugins`（返回 manifest 列表）、`set_plugin_enabled`（切换启用状态）、`sync_plugin_manifests`（前端 manifest 同步到磁盘）
+- 应用启动时调用 `ensure_plugins_dir()` 确保插件目录存在（不再硬编码任何插件）
 
-#### 前端插件注册（`plugins/registry.ts`）
-- `BUILTIN_COMPONENTS`：UUID → `{ PanelComponent, icon, hasData, toFragments? }` 的映射
-- `buildPluginList(manifests)`：从后端 manifest 列表 + 内置组件映射构建运行时插件列表（传递 majorCategory/subCategory）
-- `getPlugins()` / `getPluginById(id)`：运行时查询
+#### 前端插件注册
+- **`pluginStore.ts`**：`PLUGIN_MAP`（Map 实例）+ `registerPlugin()` API，零依赖底层模块
+- **`loader.ts`**：`import.meta.glob` 自动发现所有插件 `index.ts` 和 `manifest.json`，提供 `syncManifestsToBackend()`
+- **`registry.ts`**：导入 `loader`（触发自注册），提供 `buildPluginList(manifests)`、`getPlugins()`、`getPluginById(id)` 等查询 API
+- 每个插件的 `index.ts` 从 `pluginStore` 导入 `registerPlugin`，在模块加载时自动注册
 
 #### Store 集成
 - **`stores/useAppStore.ts`**：`pluginManifests`、`loadPlugins()`、`updatePluginData()`
@@ -315,19 +326,22 @@ interface DocumentPlugin {
 4. 文档含插件数据时，🧩 按钮蓝色呼吸灯闪烁提示
 5. **插件管理面板**：树状结构（大类 → 子类 → 插件），支持展开/折叠和搜索
 
-#### 添加新内置插件
+#### 添加新插件
 
-> **⚠️ 重要：创建新插件前，必须先阅读 `.windsurf/workflows/create-plugin.md`（插件创建 Skills）。**
-> 该文档定义了插件开发的完整规则和步骤，包括两类插件的创建流程、PluginHostAPI 使用、数据持久化、UI 规范等所有必须遵循的约定。
-> 使用 Windsurf 时可通过 `/create-plugin` 命令触发该工作流。
+> **⚠️ 重要：插件开发已迁移到独立项目 [AiDocPlus-Plugins](https://github.com/AiDocPlus/AiDocPlus-Plugins)。**
+> 创建新插件请在插件项目中操作，参考插件项目的 `CLAUDE.md` 和 `.windsurf/workflows/create-plugin.md`。
+> 插件开发完成后，通过 `scripts/deploy.sh` 部署到本项目的 `src/plugins/` 目录。
 
-简要步骤：
-1. 在 `plugins/constants.ts` 添加 UUID 常量
-2. 在 `plugins/{name}/` 下创建插件目录，实现 `PanelComponent`
-3. 在 `registry.ts` 的 `BUILTIN_COMPONENTS` 中注册组件映射
-4. 在后端 `plugin.rs` 的 `init_builtin_plugins()` 中添加 manifest（含 `major_category`/`sub_category`）
-5. **内容生成类**使用 `PluginPanelLayout`，**功能执行类**使用 `ToolPluginLayout` + `usePluginHost()`
-6. **文件导出必须使用 Tauri save 对话框 + write_binary_file**（详见 Skills 文档规则 6）
+简要步骤（在插件项目中操作，零改动主程序核心代码）：
+1. 在插件项目 `plugins/{name}/` 下创建插件目录
+2. 创建 `manifest.json`（包含 UUID、名称、分类等元数据）
+3. 创建 `index.ts`：定义 `DocumentPlugin` 对象，从 `manifest.json` 读取 UUID，调用 `registerPlugin()` 自注册
+4. 实现 `{Name}PluginPanel.tsx` 面板组件
+5. 创建 `i18n/{zh,en,ja}.json` 翻译文件
+6. 运行 `pnpm typecheck` 验证类型
+7. 运行 `pnpm deploy` 部署到主程序
+
+> **注意**：无需修改主程序的 `registry.ts`、`constants.ts`、`plugin.rs` 或 `main.rs`。`loader.ts` 会自动发现新插件。
 
 #### 内容生成类插件布局（PluginPanelLayout）
 
@@ -379,21 +393,32 @@ interface DocumentPlugin {
 
 每个插件自带翻译文件（`{plugin}/i18n/{zh,en,ja}.json`），通过 `registerPluginI18n` 注册到 i18next 命名空间（如 `plugin-summary`）。框架层翻译在 `plugins/_framework/i18n/` 中，命名空间为 `plugin-framework`。
 
-#### 当前内置插件
+#### 当前插件（21 个，全部为外部插件）
 
-**内容生成类**（9 个，使用 `PluginPanelLayout`）：
+**内容生成类**（使用 `PluginPanelLayout`）：
 - **摘要插件**（`plugins/summary/`）：AI 多风格文档摘要 — **新内容生成类插件首选参考**
 - **PPT 插件**（`plugins/ppt/`）：AI 生成演示文稿，支持编辑、预览、全屏播放、PPTX 导出
 - **测试题插件**（`plugins/quiz/`）：AI 生成单选、多选、判断题，支持 HTML 预览和导出
 - **思维导图插件**（`plugins/mindmap/`）：AI 生成 Markdown 格式思维导图
 - **翻译插件**（`plugins/translation/`）：AI 多语言翻译
+- **平行翻译插件**（`plugins/parallel-translation/`）：AI 双语对照翻译
 - **图表插件**（`plugins/diagram/`）：AI 生成 Mermaid 图表，支持 SVG 导出
 - **统计插件**（`plugins/analytics/`）：纯前端文档统计分析（非 AI 插件）
 - **教案插件**（`plugins/lessonplan/`）：AI 生成结构化教案
 - **表格插件**（`plugins/table/`）：AI 生成表格，支持 Excel/CSV/JSON 导出
+- **时间线插件**（`plugins/timeline/`）：AI 生成时间线
+- **审阅插件**（`plugins/review/`）：AI 文档审阅和批注
+- **写作统计插件**（`plugins/writing-stats/`）：写作数据统计分析
 
-**功能执行类**（1 个，使用 `ToolPluginLayout` + `usePluginHost()`）：
+**功能执行类**（使用 `ToolPluginLayout` + `usePluginHost()`）：
 - **邮件插件**（`plugins/email/`）：AI 辅助撰写邮件 + SMTP 发送 — **新功能执行类插件首选参考**
+- **文档对比插件**（`plugins/diff/`）：文档版本对比
+- **加密插件**（`plugins/encrypt/`）：文档加密保护
+- **水印插件**（`plugins/watermark/`）：文档水印添加
+- **TTS 插件**（`plugins/tts/`）：文档朗读（文字转语音）
+- **Office 预览器**（`plugins/officeviewer/`）：预览 PDF/DOCX/XLSX/PPTX 文件
+- **Pandoc 导出**（`plugins/pandoc/`）：通过 Pandoc 导出多种格式
+- **发布插件**（`plugins/publish/`）：文档发布到外部平台
 
 ### 标签页隔离
 

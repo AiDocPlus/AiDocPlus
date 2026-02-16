@@ -4,6 +4,7 @@ pub mod email;
 pub mod export;
 pub mod file_system;
 pub mod import;
+pub mod pandoc;
 pub mod plugin;
 pub mod project;
 pub mod search;

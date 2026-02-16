@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { EditorTab, Attachment } from '@aidocplus/shared-types';
 import { EditorPanel } from '../editor/EditorPanel';
 import { ChatPanel } from '../chat/ChatPanel';
@@ -58,18 +58,28 @@ export function EditorWorkspace({ tab }: EditorWorkspaceProps) {
   }, [tab.documentId]);
 
   // 编辑器内容变化时同步到 store（仅内存，不写磁盘），使 ChatPanel 能读到最新内容
-  // 注意：authorNotes 由 ChatPanel 直接同步到 store，此处只同步 content，避免循环更新
+  // 加 debounce 避免每次按键都触发 store 更新
+  const contentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (tab.documentId) {
+    if (!tab.documentId) return;
+    if (contentTimerRef.current) clearTimeout(contentTimerRef.current);
+    contentTimerRef.current = setTimeout(() => {
       updateDocumentInMemory(tab.documentId, { content });
-    }
+      contentTimerRef.current = null;
+    }, 300);
+    return () => { if (contentTimerRef.current) clearTimeout(contentTimerRef.current); };
   }, [content, tab.documentId, updateDocumentInMemory]);
 
-  // composedContent 变化时同步到 store（仅内存）
+  // composedContent 变化时同步到 store（仅内存，加 debounce）
+  const composedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (tab.documentId) {
+    if (!tab.documentId) return;
+    if (composedTimerRef.current) clearTimeout(composedTimerRef.current);
+    composedTimerRef.current = setTimeout(() => {
       updateDocumentInMemory(tab.documentId, { composedContent: composedContent || undefined });
-    }
+      composedTimerRef.current = null;
+    }, 300);
+    return () => { if (composedTimerRef.current) clearTimeout(composedTimerRef.current); };
   }, [composedContent, tab.documentId, updateDocumentInMemory]);
 
   // 监听 store 中 aiGeneratedContent 的外部变化（如 ChatPanel AI 生成），同步到本地 state

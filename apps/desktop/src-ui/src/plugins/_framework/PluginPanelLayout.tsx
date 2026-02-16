@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/i18n';
-import { Wand2, Loader2, Settings2, ChevronDown, ChevronUp, Trash2, Code2 } from 'lucide-react';
+import { useThinkingContent } from './PluginHostAPI';
+import { Wand2, Loader2, Settings2, ChevronDown, ChevronUp, Trash2, Code2, Brain } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
@@ -98,7 +99,7 @@ export interface PluginPanelLayoutProps {
 /**
  * 插件面板统一布局模板
  *
- * 四区域：① 生成区 ② 工具栏 ③ 内容区 ④ 状态栏
+ * 四区域：① 生成区 ② 工具栏 ③ 内容区 ④ 状态区
  * 未生成内容时显示欢迎界面。
  */
 export function PluginPanelLayout({
@@ -135,6 +136,41 @@ export function PluginPanelLayout({
   const [cursorInfo, setCursorInfo] = useState(cursorInfoRef.current);
   const [langExtensions, setLangExtensions] = useState<import('@codemirror/language').LanguageSupport[]>([]);
   const [detectedLangName, setDetectedLangName] = useState('纯文本');
+
+  // ── 状态区：消息历史 + 思考内容 + 收缩/展开 ──
+  const thinkingContent = useThinkingContent();
+  const [statusExpanded, setStatusExpanded] = useState(false);
+  const prevThinkingRef = useRef(thinkingContent);
+  const prevStatusMsgRef = useRef(statusMsg);
+  const statusScrollRef = useRef<HTMLDivElement>(null);
+  const [statusLogs, setStatusLogs] = useState<Array<{ msg: string; isError: boolean }>>([]);
+
+  // statusMsg 变化时追加到历史
+  useEffect(() => {
+    if (statusMsg && statusMsg !== prevStatusMsgRef.current) {
+      setStatusLogs(prev => [...prev, { msg: statusMsg, isError: !!statusIsError }]);
+      setStatusExpanded(true);
+      requestAnimationFrame(() => {
+        if (statusScrollRef.current) {
+          statusScrollRef.current.scrollTop = statusScrollRef.current.scrollHeight;
+        }
+      });
+    }
+    prevStatusMsgRef.current = statusMsg;
+  }, [statusMsg, statusIsError]);
+
+  // 有新的思考内容到来时自动展开并滚动到底部
+  useEffect(() => {
+    if (thinkingContent && thinkingContent !== prevThinkingRef.current) {
+      setStatusExpanded(true);
+      requestAnimationFrame(() => {
+        if (statusScrollRef.current) {
+          statusScrollRef.current.scrollTop = statusScrollRef.current.scrollHeight;
+        }
+      });
+    }
+    prevThinkingRef.current = thinkingContent;
+  }, [thinkingContent]);
 
   const handleOpenSourceEditor = useCallback(() => {
     const code = sourceCode || '';
@@ -212,13 +248,49 @@ export function PluginPanelLayout({
             </div>
           )}
         </div>
-        {statusMsg && (
-          <div className="px-3 py-1.5 text-sm border-t bg-muted/30 flex-shrink-0">
-            <span className={statusIsError ? 'text-destructive' : 'text-green-600 dark:text-green-400'}>
-              {statusMsg}
-            </span>
+        {/* 状态区（统一滚动区域） */}
+        <div className="border-t bg-muted/30 flex-shrink-0">
+          {statusExpanded && (
+            <div
+              ref={statusScrollRef}
+              className="max-h-[150px] overflow-y-auto px-2 py-1.5 text-xs whitespace-pre-wrap border-b"
+              style={{ fontFamily: '宋体', fontSize: '12px' }}
+            >
+              {statusLogs.map((log, i) => (
+                <div key={i} className={log.isError ? 'text-destructive' : 'text-green-600 dark:text-green-400'}>
+                  {log.msg}
+                </div>
+              ))}
+              {thinkingContent && (
+                <div className="text-muted-foreground mt-1">{thinkingContent}</div>
+              )}
+              {statusLogs.length === 0 && !thinkingContent && (
+                <div className="text-muted-foreground">暂无状态信息</div>
+              )}
+            </div>
+          )}
+          <div className="px-2 py-1 text-xs flex items-center gap-2 min-h-[24px]">
+            <div className="flex-1 truncate text-muted-foreground">
+              {!statusExpanded && statusMsg && (
+                <span className={statusIsError ? 'text-destructive' : 'text-green-600 dark:text-green-400'}>
+                  {statusMsg}
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => setStatusExpanded(!statusExpanded)}
+              className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+              title={statusExpanded ? '收起' : '展开'}
+            >
+              <Brain className="h-3 w-3" />
+              <span>状态</span>
+              {statusExpanded
+                ? <ChevronDown className="h-3 w-3" />
+                : <ChevronUp className="h-3 w-3" />
+              }
+            </button>
           </div>
-        )}
+        </div>
         {promptBuilderDialog}
       </div>
     );
@@ -333,14 +405,49 @@ export function PluginPanelLayout({
         {children}
       </div>
 
-      {/* ④ 状态栏（始终可见） */}
-      <div className="px-2 py-1 text-xs border-t bg-muted/30 flex-shrink-0 flex items-center gap-2 flex-wrap min-h-[28px]">
-        {statusExtra}
-        {statusMsg && (
-          <span className={statusIsError ? 'text-destructive' : 'text-green-600 dark:text-green-400'}>
-            {statusMsg}
-          </span>
+      {/* ④ 状态区（统一滚动区域） */}
+      <div className="border-t bg-muted/30 flex-shrink-0">
+        {statusExpanded && (
+          <div
+            ref={statusScrollRef}
+            className="max-h-[150px] overflow-y-auto px-2 py-1.5 text-xs whitespace-pre-wrap border-b"
+            style={{ fontFamily: '宋体', fontSize: '12px' }}
+          >
+            {statusLogs.map((log, i) => (
+              <div key={i} className={log.isError ? 'text-destructive' : 'text-green-600 dark:text-green-400'}>
+                {log.msg}
+              </div>
+            ))}
+            {thinkingContent && (
+              <div className="text-muted-foreground mt-1">{thinkingContent}</div>
+            )}
+            {statusLogs.length === 0 && !thinkingContent && (
+              <div className="text-muted-foreground">暂无状态信息</div>
+            )}
+          </div>
         )}
+        <div className="px-2 py-1 text-xs flex items-center gap-2 min-h-[24px]">
+          {statusExtra}
+          <div className="flex-1 truncate text-muted-foreground">
+            {!statusExpanded && statusMsg && (
+              <span className={statusIsError ? 'text-destructive' : 'text-green-600 dark:text-green-400'}>
+                {statusMsg}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => setStatusExpanded(!statusExpanded)}
+            className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+            title={statusExpanded ? '收起' : '展开'}
+          >
+            <Brain className="h-3 w-3" />
+            <span>状态</span>
+            {statusExpanded
+              ? <ChevronDown className="h-3 w-3" />
+              : <ChevronUp className="h-3 w-3" />
+            }
+          </button>
+        </div>
       </div>
 
       {/* 提示词构造器弹窗（由插件提供） */}

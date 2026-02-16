@@ -1,8 +1,9 @@
 import { ClipboardList } from 'lucide-react';
 import type { DocumentPlugin } from '../types';
 import { registerPluginI18n } from '../i18n-loader';
+import { registerPlugin } from '../pluginStore';
 import { QuizPluginPanel } from './QuizPluginPanel';
-import { PLUGIN_ID_QUIZ } from '../constants';
+import manifest from './manifest.json';
 import zh from './i18n/zh.json';
 import en from './i18n/en.json';
 import ja from './i18n/ja.json';
@@ -10,14 +11,14 @@ import ja from './i18n/ja.json';
 registerPluginI18n('plugin-quiz', { zh, en, ja });
 
 export const quizPlugin: DocumentPlugin = {
-  id: PLUGIN_ID_QUIZ,
+  id: manifest.id,
   name: '生成测试题',
   icon: ClipboardList,
   description: '根据文档内容 AI 生成单选、多选、判断题',
   i18nNamespace: 'plugin-quiz',
   PanelComponent: QuizPluginPanel,
   hasData: (doc) => {
-    const data = doc.pluginData?.[PLUGIN_ID_QUIZ];
+    const data = doc.pluginData?.[manifest.id];
     return data != null && typeof data === 'object' && 'questions' in (data as Record<string, unknown>);
   },
   toFragments: (pluginData) => {
@@ -34,3 +35,5 @@ export const quizPlugin: DocumentPlugin = {
     return [{ title: d.title || '测试题', markdown: `# ${d.title || '测试题'}\n\n` + lines.join('\n\n') }];
   },
 };
+
+registerPlugin(quizPlugin);

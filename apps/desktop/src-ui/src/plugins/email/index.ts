@@ -1,8 +1,9 @@
 import { Mail } from 'lucide-react';
 import type { DocumentPlugin } from '../types';
 import { registerPluginI18n } from '../i18n-loader';
+import { registerPlugin } from '../pluginStore';
 import { EmailPluginPanel } from './EmailPluginPanel';
-import { PLUGIN_ID_EMAIL } from '../constants';
+import manifest from './manifest.json';
 import zh from './i18n/zh.json';
 import en from './i18n/en.json';
 import ja from './i18n/ja.json';
@@ -10,7 +11,7 @@ import ja from './i18n/ja.json';
 registerPluginI18n('plugin-email', { zh, en, ja });
 
 export const emailPlugin: DocumentPlugin = {
-  id: PLUGIN_ID_EMAIL,
+  id: manifest.id,
   name: '邮件发送',
   icon: Mail,
   description: 'AI 辅助撰写邮件正文，通过 SMTP 直接发送文档内容',
@@ -21,3 +22,5 @@ export const emailPlugin: DocumentPlugin = {
   // 功能执行类插件不在 document.pluginData 中存储数据
   hasData: () => false,
 };
+
+registerPlugin(emailPlugin);

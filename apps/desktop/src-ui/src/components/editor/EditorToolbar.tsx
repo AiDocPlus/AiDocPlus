@@ -22,7 +22,8 @@ import {
   RemoveFormatting,
   Sigma,
   Asterisk,
-  FileUp,
+  FileText,
+  ChevronDown,
   Undo2,
   Redo2,
   Copy,
@@ -36,6 +37,8 @@ import {
   Code2,
   Eye,
   Columns,
+  AArrowDown,
+  AArrowUp,
 } from 'lucide-react';
 import React, { useState, useCallback } from 'react';
 import { EditorView } from '@codemirror/view';
@@ -52,9 +55,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from '../ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores/useSettingsStore';
+import { getFragmentsGroupedByPlugin } from '@/plugins/fragments';
+import type { ImportSources } from './MarkdownEditor';
 
 // CodeMirror 辅助函数（带 try-catch 防止 view 失效时崩溃）
 function cmWrap(
@@ -180,9 +188,12 @@ interface EditorToolbarProps {
   viewMode?: ViewMode;
   onViewModeChange?: (mode: ViewMode) => void;
   showViewModeSwitch?: boolean;
+  importSources?: ImportSources;
+  fontSize?: number;
+  onFontSizeChange?: (size: number) => void;
 }
 
-export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMode, onViewModeChange, showViewModeSwitch }: EditorToolbarProps) {
+export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMode, onViewModeChange, showViewModeSwitch, importSources, fontSize, onFontSizeChange }: EditorToolbarProps) {
   const tb = useSettingsStore((s) => s.editor.toolbarButtons) ?? {};
 
   // 延迟执行操作，确保在 DropdownMenu 关闭后再操作 CodeMirror，避免 React 渲染冲突
@@ -214,7 +225,12 @@ export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMod
   return (
     <div className="flex items-center gap-0.5 px-1.5 py-1 bg-background flex-wrap flex-shrink-0">
 
-      {/* ── 编辑操作 ── */}
+      {/* ── 1. 导入（最左端） ── */}
+      {s('importFile') && <ImportButton runAction={runAction} importSources={importSources} />}
+
+      <Sep left={[s('importFile')]} right={[s('undo'), s('redo'), s('copy'), s('cut'), s('paste'), s('clearAll')]} />
+
+      {/* ── 2. 编辑操作（撤销/重做/剪贴板/清空） ── */}
       {s('undo') && <FeedbackButton
         onClick={() => runAction((v) => undo(v))}
         icon={<Undo2 className="h-4 w-4" />}
@@ -257,7 +273,7 @@ export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMod
 
       <Sep left={[s('undo'), s('redo'), s('copy'), s('cut'), s('paste'), s('clearAll')]} right={[s('headings')]} />
 
-      {/* ── 标题 ── */}
+      {/* ── 3. 标题 ── */}
       {s('headings') && <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="标题">
@@ -274,27 +290,26 @@ export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMod
         </DropdownMenuContent>
       </DropdownMenu>}
 
-      <Sep left={[s('headings')]} right={[s('bold'), s('italic'), s('strikethrough'), s('inlineCode'), s('clearFormat')]} />
+      <Sep left={[s('headings')]} right={[s('bold'), s('italic'), s('strikethrough'), s('clearFormat')]} />
 
-      {/* ── 文本格式 ── */}
+      {/* ── 4. 文本格式 ── */}
       {s('bold') && <FeedbackButton onClick={() => doWrap('**', '**', '粗体文本')} icon={<Bold className="h-4 w-4" />} tooltip="粗体 (Cmd+B)" doneTooltip="已加粗" />}
       {s('italic') && <FeedbackButton onClick={() => doWrap('*', '*', '斜体文本')} icon={<Italic className="h-4 w-4" />} tooltip="斜体 (Cmd+I)" doneTooltip="已斜体" />}
       {s('strikethrough') && <FeedbackButton onClick={() => doWrap('~~', '~~', '删除线文本')} icon={<Strikethrough className="h-4 w-4" />} tooltip="删除线 (Cmd+Shift+X)" doneTooltip="已添加删除线" />}
-      {s('inlineCode') && <FeedbackButton onClick={() => doWrap('`', '`', '代码')} icon={<Code className="h-4 w-4" />} tooltip="行内代码 (Cmd+E)" doneTooltip="已添加代码" />}
       {s('clearFormat') && <FeedbackButton onClick={() => runAction((v) => cmClearFormat(v))} icon={<RemoveFormatting className="h-4 w-4" />} tooltip="清除格式" doneTooltip="已清除格式" />}
 
-      <Sep left={[s('bold'), s('italic'), s('strikethrough'), s('inlineCode'), s('clearFormat')]} right={[s('unorderedList'), s('orderedList'), s('taskList'), s('quote'), s('horizontalRule')]} />
+      <Sep left={[s('bold'), s('italic'), s('strikethrough'), s('clearFormat')]} right={[s('unorderedList'), s('orderedList'), s('taskList'), s('quote'), s('horizontalRule')]} />
 
-      {/* ── 段落结构 ── */}
+      {/* ── 5. 段落结构 ── */}
       {s('unorderedList') && <FeedbackButton onClick={() => doPrefix('- ')} icon={<List className="h-4 w-4" />} tooltip="无序列表" doneTooltip="已插入" />}
       {s('orderedList') && <FeedbackButton onClick={() => doPrefix('1. ')} icon={<ListOrdered className="h-4 w-4" />} tooltip="有序列表" doneTooltip="已插入" />}
       {s('taskList') && <FeedbackButton onClick={() => doPrefix('- [ ] ')} icon={<CheckSquare className="h-4 w-4" />} tooltip="任务列表" doneTooltip="已插入" />}
       {s('quote') && <FeedbackButton onClick={() => doPrefix('> ')} icon={<Quote className="h-4 w-4" />} tooltip="引用" doneTooltip="已插入" />}
       {s('horizontalRule') && <FeedbackButton onClick={() => doInsert('\n---\n')} icon={<Minus className="h-4 w-4" />} tooltip="分隔线" doneTooltip="已插入" />}
 
-      <Sep left={[s('unorderedList'), s('orderedList'), s('taskList'), s('quote'), s('horizontalRule')]} right={[s('link'), s('image'), s('table'), s('footnote')]} />
+      <Sep left={[s('unorderedList'), s('orderedList'), s('taskList'), s('quote'), s('horizontalRule')]} right={[s('link'), s('image'), s('table'), s('footnote'), s('inlineCode'), s('codeBlock'), s('mermaid'), s('math')]} />
 
-      {/* ── 插入内容 ── */}
+      {/* ── 6. 插入对象（链接、图片、表格、脚注、行内代码、代码块、图表、公式） ── */}
       {s('link') && <LinkPopover runAction={runAction} />}
       {s('image') && <ImagePopover runAction={runAction} />}
       {s('table') && <TableGridPicker doInsert={doInsert} />}
@@ -316,10 +331,7 @@ export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMod
         tooltip="插入脚注"
         doneTooltip="已插入脚注"
       />}
-
-      <Sep left={[s('link'), s('image'), s('table'), s('footnote')]} right={[s('codeBlock'), s('mermaid')]} />
-
-      {/* ── 代码块 ── */}
+      {s('inlineCode') && <FeedbackButton onClick={() => doWrap('`', '`', '代码')} icon={<Code className="h-4 w-4" />} tooltip="行内代码 (Cmd+E)" doneTooltip="已添加代码" />}
       {s('codeBlock') && <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="代码块">
@@ -333,8 +345,6 @@ export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMod
           ))}
         </DropdownMenuContent>
       </DropdownMenu>}
-
-      {/* ── Mermaid 图表 ── */}
       {s('mermaid') && <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Mermaid 图表">
@@ -363,10 +373,6 @@ export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMod
           <DropdownMenuItem onClick={() => doInsert('\n```mermaid\narchitecture-beta\n    group api(cloud)[API]\n\n    service db(database)[数据库] in api\n    service disk1(disk)[存储] in api\n    service disk2(disk)[备份] in api\n    service server(server)[服务器] in api\n\n    db:L -- R:server\n    disk1:T -- B:server\n    disk2:T -- B:db\n```\n')}>架构图</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>}
-
-      <Sep left={[s('codeBlock'), s('mermaid')]} right={[s('math')]} />
-
-      {/* ── 数学公式 ── */}
       {s('math') && <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="数学公式">
@@ -379,12 +385,16 @@ export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMod
         </DropdownMenuContent>
       </DropdownMenu>}
 
-      <Sep left={[s('math')]} right={[s('goToTop'), s('goToBottom'), s('importFile')]} />
+      <Sep left={[s('link'), s('image'), s('table'), s('footnote'), s('inlineCode'), s('codeBlock'), s('mermaid'), s('math')]} right={[true]} />
 
-      {/* ── 导航 ── */}
+      {/* ── 7. 字体大小 ── */}
+      {fontSize !== undefined && onFontSizeChange && <FontSizeButtons fontSize={fontSize} onFontSizeChange={onFontSizeChange} />}
+
+      <Sep left={[true]} right={[s('goToTop'), s('goToBottom')]} />
+
+      {/* ── 8. 导航/大纲 ── */}
       {s('goToTop') && <ToolbarButton
         onClick={() => runAction((v) => {
-          // 滚动到文档开头
           v.dispatch({
             effects: EditorView.scrollIntoView(0, { y: 'start' })
           });
@@ -394,7 +404,6 @@ export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMod
       />}
       {s('goToBottom') && <ToolbarButton
         onClick={() => runAction((v) => {
-          // 滚动到文档末尾
           const docEnd = v.state.doc.length;
           v.dispatch({
             effects: EditorView.scrollIntoView(docEnd, { y: 'end' })
@@ -403,22 +412,13 @@ export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMod
         icon={<ArrowDownToLine className="h-4 w-4" />}
         tooltip="滚动到底部"
       />}
-
-      <Sep left={[s('goToTop'), s('goToBottom')]} right={[s('importFile')]} />
-
-      {/* ── 导入 ── */}
-      {s('importFile') && <ImportButton runAction={runAction} />}
-
       {onToggleOutline && (
-        <>
-          <div className="w-px h-6 bg-border mx-1" />
-          <ToolbarButton
-            active={outlineOpen}
-            onClick={onToggleOutline}
-            icon={<ListTree className="h-4 w-4" />}
-            tooltip={outlineOpen ? '关闭大纲' : '打开大纲'}
-          />
-        </>
+        <ToolbarButton
+          active={outlineOpen}
+          onClick={onToggleOutline}
+          icon={<ListTree className="h-4 w-4" />}
+          tooltip={outlineOpen ? '关闭大纲' : '打开大纲'}
+        />
       )}
 
       {/* ── 视图模式切换（右侧） ── */}
@@ -624,15 +624,73 @@ function ImagePopover({
   );
 }
 
-// ── 导入按钮 ──
+// ── 字体大小调整 ──
+const FONT_SIZE_MIN = 12;
+const FONT_SIZE_MAX = 28;
+const FONT_SIZE_STEP = 1;
+
+function FontSizeButtons({ fontSize, onFontSizeChange }: { fontSize: number; onFontSizeChange: (size: number) => void }) {
+  const decrease = useCallback(() => {
+    const next = Math.max(FONT_SIZE_MIN, fontSize - FONT_SIZE_STEP);
+    if (next !== fontSize) onFontSizeChange(next);
+  }, [fontSize, onFontSizeChange]);
+
+  const increase = useCallback(() => {
+    const next = Math.min(FONT_SIZE_MAX, fontSize + FONT_SIZE_STEP);
+    if (next !== fontSize) onFontSizeChange(next);
+  }, [fontSize, onFontSizeChange]);
+
+  return (
+    <div className="flex items-center gap-0">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-7 w-7 p-0"
+        title={`减小字体 (当前 ${fontSize}px)`}
+        onClick={decrease}
+        disabled={fontSize <= FONT_SIZE_MIN}
+      >
+        <AArrowDown className="h-4 w-4" />
+      </Button>
+      <span className="text-xs text-muted-foreground w-6 text-center select-none" title="当前字体大小">{fontSize}</span>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-7 w-7 p-0"
+        title={`增大字体 (当前 ${fontSize}px)`}
+        onClick={increase}
+        disabled={fontSize >= FONT_SIZE_MAX}
+      >
+        <AArrowUp className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
+// ── 导入下拉菜单 ──
 function ImportButton({
   runAction,
+  importSources,
 }: {
   runAction: (fn: (v: EditorView) => void) => void;
+  importSources?: ImportSources;
 }) {
   const [importing, setImporting] = useState(false);
 
-  const handleImport = useCallback(async () => {
+  // 在光标位置插入文本
+  const insertText = useCallback((text: string) => {
+    runAction((v) => {
+      const { from } = v.state.selection.main;
+      v.dispatch({
+        changes: { from, to: from, insert: text },
+        selection: { anchor: from + text.length },
+      });
+      v.focus();
+    });
+  }, [runAction]);
+
+  // 从文件导入
+  const handleImportFromFile = useCallback(async () => {
     if (importing) return;
     setImporting(true);
     try {
@@ -658,18 +716,10 @@ function ImportButton({
       const content = await invoke<string>('import_file', { path: filePath });
 
       if (content) {
-        runAction((v) => {
-          const { from } = v.state.selection.main;
-          v.dispatch({
-            changes: { from, to: from, insert: content },
-            selection: { anchor: from + content.length },
-          });
-          v.focus();
-        });
+        insertText(content);
       }
     } catch (error) {
       console.error('[ImportButton] 导入失败:', error);
-      // 在编辑器中插入错误提示
       const errMsg = typeof error === 'string' ? error : (error instanceof Error ? error.message : String(error));
       runAction((v) => {
         cmInsert(v, `\n> ⚠️ 导入失败：${errMsg}\n`);
@@ -677,19 +727,112 @@ function ImportButton({
     } finally {
       setImporting(false);
     }
-  }, [importing, runAction]);
+  }, [importing, runAction, insertText]);
 
+  // 从正文导入
+  const handleImportFromContent = useCallback(() => {
+    const aiContent = importSources?.aiContent;
+    if (aiContent?.trim()) {
+      insertText(aiContent);
+    }
+  }, [importSources?.aiContent, insertText]);
+
+  // 从插件片段导入
+  const handleImportFragment = useCallback((markdown: string) => {
+    insertText(markdown);
+  }, [insertText]);
+
+  // 获取插件片段分组
+  const fragmentGroups = importSources?.document
+    ? getFragmentsGroupedByPlugin(importSources.document)
+    : new Map();
+  const hasFragments = fragmentGroups.size > 0;
+  const hasAiContent = !!importSources?.aiContent?.trim();
+
+  // 如果没有额外导入源，只显示简单的文件导入按钮
+  if (!hasAiContent && !hasFragments) {
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        className={cn('h-7 px-1.5 gap-0.5', importing && 'opacity-50')}
+        title="从文件导入 (txt, md, docx, csv, html, json...)"
+        onClick={handleImportFromFile}
+        disabled={importing}
+      >
+        <FileText className="h-3.5 w-3.5" />
+        <ChevronDown className="h-3 w-3" />
+      </Button>
+    );
+  }
+
+  // 有额外导入源时，显示下拉菜单
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className={cn('h-7 w-7 p-0', importing && 'opacity-50')}
-      title="导入文件 (txt, md, docx, csv, html, json...)"
-      onClick={handleImport}
-      disabled={importing}
-    >
-      <FileUp className="h-4 w-4" />
-    </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn('h-7 px-1.5 gap-0.5', importing && 'opacity-50')}
+          title="导入"
+          disabled={importing}
+        >
+          <FileText className="h-3.5 w-3.5" />
+          <ChevronDown className="h-3 w-3" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-56">
+        <DropdownMenuItem onClick={handleImportFromFile}>
+          <FileText className="h-4 w-4 mr-2" />
+          从文件导入 (txt, md, docx, csv, html...)
+        </DropdownMenuItem>
+        {hasAiContent && (
+          <DropdownMenuItem onClick={handleImportFromContent}>
+            <FileText className="h-4 w-4 mr-2" />
+            从正文导入
+          </DropdownMenuItem>
+        )}
+        {hasFragments && (
+          <>
+            <DropdownMenuSeparator />
+            {Array.from(fragmentGroups.entries()).map(([pluginId, group]) => {
+              const IconComp = group.pluginIcon;
+              if (group.fragments.length === 1) {
+                const f = group.fragments[0];
+                return (
+                  <DropdownMenuItem key={pluginId} onClick={() => handleImportFragment(f.markdown)}>
+                    {IconComp && <IconComp className="h-4 w-4 mr-2 flex-shrink-0" />}
+                    <span className="truncate">{group.pluginName}：{f.title}</span>
+                  </DropdownMenuItem>
+                );
+              }
+              return (
+                <DropdownMenuSub key={pluginId}>
+                  <DropdownMenuSubTrigger>
+                    {IconComp && <IconComp className="h-4 w-4 mr-2 flex-shrink-0" />}
+                    <span className="truncate">{group.pluginName}</span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="w-48">
+                    {group.fragments.map((f: { id: string; markdown: string; title: string }) => (
+                      <DropdownMenuItem key={f.id} onClick={() => handleImportFragment(f.markdown)}>
+                        <span className="truncate">{f.title}</span>
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => {
+                      const allMd = group.fragments.map((f: { markdown: string }) => f.markdown).join('\n\n---\n\n');
+                      handleImportFragment(allMd);
+                    }}>
+                      全部插入
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              );
+            })}
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

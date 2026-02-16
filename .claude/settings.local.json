@@ -23,7 +23,12 @@
       "Bash(pnpm lint:*)",
       "Bash(lsof:*)",
       "Bash(xargs kill:*)",
-      "Bash(open:*)"
+      "Bash(open:*)",
+      "Bash(ls:*)",
+      "Bash(brew install:*)",
+      "WebSearch",
+      "mcp__web-reader__webReader",
+      "Bash(done)"
     ]
   }
 }

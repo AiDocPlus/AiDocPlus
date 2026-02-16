@@ -28,6 +28,7 @@ import { checkboxWidgetExtension } from './extensions/checkboxWidget';
 import { linkHoverTooltip } from './extensions/linkTooltip';
 import { markdownLinterExtension } from './extensions/markdownLinter';
 import { lintKeymap } from '@codemirror/lint';
+import type { Document } from '@aidocplus/shared-types';
 import { DocumentOutline } from './DocumentOutline';
 
 // 自定义高亮样式：基于 defaultHighlightStyle，去掉 heading 下划线，标题分级字号
@@ -61,6 +62,11 @@ const markdownHighlightStyle = HighlightStyle.define([
 
 type ViewMode = 'edit' | 'preview' | 'split';
 
+export interface ImportSources {
+  aiContent?: string;
+  document?: Document;
+}
+
 interface MarkdownEditorProps {
   value: string;
   onChange: (value: string) => void;
@@ -73,6 +79,7 @@ interface MarkdownEditorProps {
   onCursorLineChange?: (line: number) => void;
   editorClassName?: string;
   editorId?: string;
+  importSources?: ImportSources;
 }
 
 // 创建一组 Compartment 实例（每个编辑器实例独立）
@@ -107,6 +114,8 @@ export function MarkdownEditor({
   showViewModeSwitch = true,
   initialLine,
   onCursorLineChange,
+  editorId: _editorId,
+  importSources,
 }: MarkdownEditorProps) {
   const editorDivRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -118,8 +127,10 @@ export function MarkdownEditor({
   const onCursorLineChangeRef = useRef(onCursorLineChange);
   onCursorLineChangeRef.current = onCursorLineChange;
   const lastEmittedRef = useRef(value);
+  const docContentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const editorSettings = useEditorSettings();
+  const [localFontSize, setLocalFontSize] = useState(editorSettings.fontSize);
   const [cursorInfo, setCursorInfo] = useState({ line: 1, col: 1, selChars: 0 });
   const [viewMode, setViewMode] = useState<ViewMode>(editorSettings.defaultViewMode || 'edit');
   const [docContent, setDocContent] = useState(value);
@@ -221,17 +232,28 @@ export function MarkdownEditor({
     const updateListener = EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         const newDoc = update.state.doc.toString();
-        setDocContent(newDoc);
         lastEmittedRef.current = newDoc;
         onChangeRef.current(newDoc);
+        // debounced 更新 docContent（用于统计、大纲、预览）
+        if (docContentTimerRef.current) clearTimeout(docContentTimerRef.current);
+        docContentTimerRef.current = setTimeout(() => {
+          setDocContent(newDoc);
+          docContentTimerRef.current = null;
+        }, 300);
       }
-      // 更新光标（用 requestAnimationFrame 避免同步 setState 冲突）
+      // 更新光标（用 requestAnimationFrame 避免同步 setState 冲突，加值比较守卫避免不必要的重渲染）
       requestAnimationFrame(() => {
         try {
           const { from, to } = update.state.selection.main;
           const line = update.state.doc.lineAt(from);
-          setCursorInfo({ line: line.number, col: from - line.from + 1, selChars: to - from });
-          onCursorLineChangeRef.current?.(line.number);
+          const newLine = line.number;
+          const newCol = from - line.from + 1;
+          const newSelChars = to - from;
+          setCursorInfo(prev => {
+            if (prev.line === newLine && prev.col === newCol && prev.selChars === newSelChars) return prev;
+            return { line: newLine, col: newCol, selChars: newSelChars };
+          });
+          onCursorLineChangeRef.current?.(newLine);
         } catch { /* view may be destroyed */ }
       });
     });
@@ -415,10 +437,10 @@ export function MarkdownEditor({
 
   // 编辑器字体样式
   const editorFontStyle = useMemo(() => ({
-    '--cm-font-size': `${editorSettings.fontSize}px`,
+    '--cm-font-size': `${localFontSize}px`,
     '--cm-font-family': editorSettings.fontFamily,
     '--cm-line-height': `${editorSettings.lineHeight}`,
-  } as React.CSSProperties), [editorSettings.fontSize, editorSettings.fontFamily, editorSettings.lineHeight]);
+  } as React.CSSProperties), [localFontSize, editorSettings.fontFamily, editorSettings.lineHeight]);
 
   // 统计数据
   const characterCount = docContent.length;
@@ -463,6 +485,9 @@ export function MarkdownEditor({
             viewMode={viewMode}
             onViewModeChange={showViewModeSwitch ? setViewMode : undefined}
             showViewModeSwitch={showViewModeSwitch}
+            importSources={importSources}
+            fontSize={localFontSize}
+            onFontSizeChange={setLocalFontSize}
           />
         </div>
       )}
@@ -494,7 +519,7 @@ export function MarkdownEditor({
               content={docContent}
               theme={theme}
               className="px-4 py-3"
-              fontSize={editorSettings.fontSize}
+              fontSize={localFontSize}
               fontFamily={editorSettings.fontFamily}
             />
           </div>
