@@ -11,6 +11,9 @@ on:
         required: false
         default: ''
 
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
@@ -116,39 +119,16 @@ jobs:
           projectPath: ./apps/desktop
           tagName: ${{ github.ref_name }}
           releaseName: 'AiDocPlus __VERSION__'
-          releaseBody: 'See CHANGELOG.md for details.'
+          releaseBody: |
+            ## AiDocPlus __VERSION__
+
+            ### 下载
+            - **macOS (Apple Silicon)**: .dmg 文件
+            - **Windows (x64)**: .exe 安装程序
+            - **Windows (ARM64)**: .exe 安装程序
+
+            ### 更新说明
+            请查看 CHANGELOG.md 获取详细更新内容。
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
-
-  # 创建 GitHub Release（仅在 tag 推送时）
-  create-release:
-    needs: build
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Get version from tag
-        id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: AiDocPlus ${{ steps.get_version.outputs.VERSION }}
-          body: |
-            ## AiDocPlus ${{ steps.get_version.outputs.VERSION }}
-
-            ### 下载
-            - **macOS (Apple Silicon)**: AiDocPlus_${{ steps.get_version.outputs.VERSION }}_aarch64.dmg
-            - **Windows (x64)**: AiDocPlus_${{ steps.get_version.outputs.VERSION }}_x64-setup.exe
-            - **Windows (ARM64)**: AiDocPlus_${{ steps.get_version.outputs.VERSION }}_aarch64-setup.exe
-
-            ### 更新说明
-            请查看 [CHANGELOG.md](./CHANGELOG.md) 获取详细更新内容。
-          draft: true
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
