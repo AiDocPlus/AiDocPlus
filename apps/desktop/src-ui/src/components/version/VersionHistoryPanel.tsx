@@ -344,7 +344,7 @@ export function VersionHistoryPanel({ open, onClose, projectId, documentId }: Ve
                       {/* AI Generated Content */}
                       {previewVersion.aiGeneratedContent && (
                         <div>
-                          <h4 className="text-sm font-medium mb-2">AI 生成内容</h4>
+                          <h4 className="text-sm font-medium mb-2">{t('chat.aiGenerateContent', { defaultValue: 'AI 生成内容' })}</h4>
                           <div className="p-3 bg-muted rounded-lg text-sm whitespace-pre-wrap max-h-64 overflow-auto">
                             {previewVersion.aiGeneratedContent}
                           </div>

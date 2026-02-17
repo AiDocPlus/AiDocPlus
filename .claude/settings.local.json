@@ -28,7 +28,11 @@
       "Bash(brew install:*)",
       "WebSearch",
       "mcp__web-reader__webReader",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(pnpm deploy:*)",
+      "Bash(pnpm run deploy:*)",
+      "Bash(bash scripts/deploy.sh ppt)",
+      "Bash(git add:*)"
     ]
   }
 }

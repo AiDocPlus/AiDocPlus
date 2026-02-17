@@ -41,17 +41,17 @@ export function TabArea({ onSettingsOpen }: TabAreaProps) {
           <div className="text-center space-y-6 max-w-sm">
             <FileText className="w-16 h-16 mx-auto opacity-30" />
             <div className="space-y-2">
-              <p className="text-lg font-medium">没有打开的文档</p>
-              <p className="text-sm opacity-70">点击左侧文件树中的文档开始编辑</p>
+              <p className="text-lg font-medium">{t('tabs.noOpenDocuments', { defaultValue: '没有打开的文档' })}</p>
+              <p className="text-sm opacity-70">{t('tabs.selectDocumentHint', { defaultValue: '点击左侧文件树中的文档开始编辑' })}</p>
             </div>
             <div className="text-xs space-y-1.5 opacity-60">
               <div className="flex items-center justify-center gap-2">
                 <FolderOpen className="w-3.5 h-3.5" />
-                <span>在文件树中点击文档打开</span>
+                <span>{t('tabs.openDocInTree', { defaultValue: '在文件树中点击文档打开' })}</span>
               </div>
               <div className="flex items-center justify-center gap-2">
                 <Keyboard className="w-3.5 h-3.5" />
-                <span>{mod}+N 新建文档 · {mod}+S 保存 · {mod}+F 查找</span>
+                <span>{t('tabs.commonShortcuts', { defaultValue: '{{mod}}+N 新建文档 · {{mod}}+S 保存 · {{mod}}+F 查找', mod })}</span>
               </div>
             </div>
           </div>

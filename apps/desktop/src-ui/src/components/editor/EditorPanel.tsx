@@ -1,5 +1,5 @@
 import { useAppStore } from '@/stores/useAppStore';
-import { Save, SaveAll, Download, FileText, PenLine, Columns, Rows, History, MessageSquare, FilePlus, Search, X, XCircle, ExternalLink, Square, Copy, Minus } from 'lucide-react';
+import { Save, SaveAll, Download, FileText, PenLine, Columns, Rows, History, MessageSquare, FilePlus, Search, X, XCircle, ExternalLink, Square, Copy, Minus, LayoutTemplate, ChevronDown } from 'lucide-react';
 import { Button } from '../ui/button';
 import { PluginMenu } from '@/plugins/PluginMenu';
 import { PluginToolArea } from '@/plugins/PluginToolArea';
@@ -199,7 +199,7 @@ export function EditorPanel({
     if (!document) return;
 
     try {
-      const suffix = contentOverride ? '_合并' : '_AI';
+      const suffix = contentOverride ? t('editor.composedSuffix', { defaultValue: '_合并' }) : t('editor.aiSuffix', { defaultValue: '_AI' });
       const defaultFileName = `${document.title}${suffix}.${format}`;
       const filePath = await save({
         defaultPath: defaultFileName,
@@ -222,13 +222,13 @@ export function EditorPanel({
       });
 
       if (format === 'pdf' && command === 'export_document_native') {
-        await message(`已在浏览器中打开公文格式文档，请使用浏览器的"打印"功能，选择"另存为 PDF"即可导出。\n\n文件位置: ${result}`, {
-          title: '导出为 PDF',
+        await message(t('editor.exportPdfHint', { defaultValue: '已在浏览器中打开公文格式文档，请使用浏览器的“打印”功能，选择“另存为 PDF”即可导出。\n\n文件位置: {{path}}', path: result }), {
+          title: t('editor.exportPdfTitle', { defaultValue: '导出为 PDF' }),
           kind: 'info'
         });
       } else {
-        await message(`导出成功: ${result}`, {
-          title: '导出成功',
+        await message(t('editor.exportSuccessMsg', { defaultValue: '导出成功: {{path}}', path: result }), {
+          title: t('editor.exportSuccessTitle', { defaultValue: '导出成功' }),
           kind: 'info'
         });
       }
@@ -248,8 +248,8 @@ export function EditorPanel({
         }
       }
 
-      await message(`导出失败: ${errorMessage}`, {
-        title: '导出错误',
+      await message(t('editor.exportFailedMsg', { defaultValue: '导出失败: {{error}}', error: errorMessage }), {
+        title: t('editor.exportErrorTitle', { defaultValue: '导出错误' }),
         kind: 'error'
       });
     }
@@ -275,7 +275,7 @@ export function EditorPanel({
       let errorMessage = 'Unknown error';
       if (typeof error === 'string') errorMessage = error;
       else if (error instanceof Error) errorMessage = error.message;
-      await message(`导出并打开失败: ${errorMessage}`, { title: '导出错误', kind: 'error' });
+      await message(t('editor.exportOpenFailed', { defaultValue: '导出并打开失败: {{error}}', error: errorMessage }), { title: t('editor.exportErrorTitle', { defaultValue: '导出错误' }), kind: 'error' });
     }
   };
 
@@ -410,7 +410,7 @@ export function EditorPanel({
           variant={activeView === 'editor' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setActiveView('editor')}
-          title="正文区"
+          title={t('editor.contentArea', { defaultValue: '正文区' })}
           className={`gap-1 h-7 text-xs ${
             activeView === 'editor'
               ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
@@ -418,7 +418,7 @@ export function EditorPanel({
           }`}
         >
           <PenLine className="h-3.5 w-3.5" />
-          正文区
+          {t('editor.contentArea', { defaultValue: '正文区' })}
         </Button>
         <PluginMenu
           pluginAreaOpen={pluginAreaOpen}
@@ -429,7 +429,7 @@ export function EditorPanel({
           variant={activeView === 'composer' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setActiveView('composer')}
-          title="合并区"
+          title={t('editor.composerArea', { defaultValue: '合并区' })}
           className={`gap-1 h-7 text-xs ${
             activeView === 'composer'
               ? 'bg-green-600 hover:bg-green-700 text-white'
@@ -437,20 +437,33 @@ export function EditorPanel({
           }`}
         >
           <FileText className="h-3.5 w-3.5" />
-          合并区
+          {t('editor.composerArea', { defaultValue: '合并区' })}
         </Button>
         <div className="w-px h-4 bg-border mx-0.5" />
 
         {/* ── 文档操作组 ── */}
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-7 w-7"
-          onClick={handleNewDocument}
-          title={`${t('editor.newDocumentInProject', { defaultValue: '新建文档' })} (${mod}N)`}
-        >
-          <FilePlus className="h-3.5 w-3.5" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              className="h-7 px-1.5 gap-0.5"
+              title={`${t('editor.newDocumentInProject', { defaultValue: '新建文档' })} (${mod}N)`}
+            >
+              <FilePlus className="h-3.5 w-3.5" />
+              <ChevronDown className="h-3 w-3 text-muted-foreground" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem onClick={handleNewDocument}>
+              <FilePlus className="h-3.5 w-3.5 mr-2" />
+              {t('editor.newBlankDocument', { defaultValue: '新建空白文档' })}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => window.dispatchEvent(new CustomEvent('menu-new-from-template'))}>
+              <LayoutTemplate className="h-3.5 w-3.5 mr-2" />
+              {t('editor.newFromTemplate', { defaultValue: '从模板新建' })}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button
           variant="outline"
           size="icon"
@@ -492,13 +505,22 @@ export function EditorPanel({
         >
           <SaveAll className="h-3.5 w-3.5" />
         </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-7 w-7"
+          onClick={() => window.dispatchEvent(new CustomEvent('menu-save-as-template'))}
+          title={t('editor.saveAsTemplate', { defaultValue: '存为模板' })}
+        >
+          <LayoutTemplate className="h-3.5 w-3.5" />
+        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="outline"
               size="icon"
               className="h-7 w-7"
-              title={`${t('editor.export')} (${mod}E)`}
+              title={`${t('editor.exportContent', { defaultValue: '导出正文' })} (${mod}E)`}
             >
               <Download className="h-3.5 w-3.5" />
             </Button>
@@ -506,45 +528,45 @@ export function EditorPanel({
           <DropdownMenuContent align="start">
             <DropdownMenuItem onClick={() => handleNativeExport('md')}>
               <FileText className="h-4 w-4 mr-2" />
-              导出为 Markdown (.md)
+              {t('editor.exportAsMd', { defaultValue: '导出为 Markdown (.md)' })}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleNativeExport('html')}>
               <FileText className="h-4 w-4 mr-2" />
-              导出为 HTML (.html)
+              {t('editor.exportAsHtml', { defaultValue: '导出为 HTML (.html)' })}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleNativeExport('docx')}>
               <FileText className="h-4 w-4 mr-2" />
-              导出为 Word (.docx)
+              {t('editor.exportAsDocx', { defaultValue: '导出为 Word (.docx)' })}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleNativeExport('pdf')}>
               <FileText className="h-4 w-4 mr-2" />
-              导出为 PDF (.pdf)
+              {t('editor.exportAsPdf', { defaultValue: '导出为 PDF (.pdf)' })}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleNativeExport('txt')}>
               <FileText className="h-4 w-4 mr-2" />
-              导出为纯文本 (.txt)
+              {t('editor.exportAsTxt', { defaultValue: '导出为纯文本 (.txt)' })}
             </DropdownMenuItem>
             {composedContent?.trim() && (
               <>
                 <DropdownMenuSeparator />
                 <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                  导出合并内容
+                  {t('editor.exportComposed', { defaultValue: '导出合并内容' })}
                 </div>
                 <DropdownMenuItem onClick={() => handleNativeExportComposed('md')}>
                   <FileText className="h-4 w-4 mr-2" />
-                  合并内容 → Markdown
+                  {t('editor.composedMd', { defaultValue: '合并内容 → Markdown' })}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleNativeExportComposed('html')}>
                   <FileText className="h-4 w-4 mr-2" />
-                  合并内容 → HTML
+                  {t('editor.composedHtml', { defaultValue: '合并内容 → HTML' })}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleNativeExportComposed('docx')}>
                   <FileText className="h-4 w-4 mr-2" />
-                  合并内容 → Word
+                  {t('editor.composedDocx', { defaultValue: '合并内容 → Word' })}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleNativeExportComposed('pdf')}>
                   <FileText className="h-4 w-4 mr-2" />
-                  合并内容 → PDF
+                  {t('editor.composedPdf', { defaultValue: '合并内容 → PDF' })}
                 </DropdownMenuItem>
               </>
             )}
@@ -558,7 +580,7 @@ export function EditorPanel({
               variant="outline"
               size="icon"
               className="h-7 w-7"
-              title="导出并用外部程序打开"
+              title={t('editor.exportAndOpen', { defaultValue: '导出并用外部程序打开' })}
             >
               <ExternalLink className="h-3.5 w-3.5" />
             </Button>
@@ -566,37 +588,37 @@ export function EditorPanel({
           <DropdownMenuContent align="start">
             <DropdownMenuItem onClick={() => handleExportAndOpen('docx', 'WPS Office')}>
               <FileText className="h-4 w-4 mr-2" />
-              Word → WPS 打开
+              {t('editor.wordOpenWps', { defaultValue: 'Word → WPS 打开' })}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleExportAndOpen('docx', 'Microsoft Word')}>
               <FileText className="h-4 w-4 mr-2" />
-              Word → Word 打开
+              {t('editor.wordOpenWord', { defaultValue: 'Word → Word 打开' })}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => handleExportAndOpen('html', 'Microsoft Edge')}>
               <FileText className="h-4 w-4 mr-2" />
-              HTML → Edge 打开
+              {t('editor.htmlOpenEdge', { defaultValue: 'HTML → Edge 打开' })}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleExportAndOpen('html', 'Google Chrome')}>
               <FileText className="h-4 w-4 mr-2" />
-              HTML → Chrome 打开
+              {t('editor.htmlOpenChrome', { defaultValue: 'HTML → Chrome 打开' })}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleExportAndOpen('html', 'Safari')}>
               <FileText className="h-4 w-4 mr-2" />
-              HTML → Safari 打开
+              {t('editor.htmlOpenSafari', { defaultValue: 'HTML → Safari 打开' })}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => handleExportAndOpen('md')}>
               <FileText className="h-4 w-4 mr-2" />
-              Markdown → 默认程序打开
+              {t('editor.mdOpenDefault', { defaultValue: 'Markdown → 默认程序打开' })}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleExportAndOpen('docx')}>
               <FileText className="h-4 w-4 mr-2" />
-              Word → 默认程序打开
+              {t('editor.wordOpenDefault', { defaultValue: 'Word → 默认程序打开' })}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleExportAndOpen('html')}>
               <FileText className="h-4 w-4 mr-2" />
-              HTML → 默认浏览器打开
+              {t('editor.htmlOpenDefault', { defaultValue: 'HTML → 默认浏览器打开' })}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -712,23 +734,23 @@ export function EditorPanel({
                 <div className="flex items-center gap-2">
                   <span>{t('editor.aiGeneratedContent', { defaultValue: '正文内容' })}</span>
                   <span className="text-xs text-muted-foreground font-normal">
-                    {layoutMode === 'vertical' ? '(上方)' : '(右侧)'}
+                    {layoutMode === 'vertical' ? t('editor.positionAbove', { defaultValue: '(上方)' }) : t('editor.positionRight', { defaultValue: '(右侧)' })}
                   </span>
                 </div>
                 <div className="flex items-center gap-0.5">
-                  <Button variant="ghost" size="sm" title="最大化"
+                  <Button variant="ghost" size="sm" title={t('editor.maximize', { defaultValue: '最大化' })}
                     onClick={() => setEditorViewState('ai-max')}
-                    className={`h-6 w-6 p-0 ${editorViewState === 'ai-max' ? 'bg-pink-500/20 text-pink-600 dark:text-pink-400' : ''}`}>
+                    className="h-6 w-6 p-0">
                     <Square className="h-3.5 w-3.5" />
                   </Button>
-                  <Button variant="ghost" size="sm" title="恢复"
+                  <Button variant="ghost" size="sm" title={t('editor.restore', { defaultValue: '恢复' })}
                     onClick={() => setEditorViewState('normal')}
-                    className={`h-6 w-6 p-0 ${editorViewState === 'normal' ? 'bg-pink-500/20 text-pink-600 dark:text-pink-400' : ''}`}>
+                    className="h-6 w-6 p-0">
                     <Copy className="h-3.5 w-3.5" />
                   </Button>
-                  <Button variant="ghost" size="sm" title="最小化"
+                  <Button variant="ghost" size="sm" title={t('editor.minimize', { defaultValue: '最小化' })}
                     onClick={() => setEditorViewState('original-max')}
-                    className={`h-6 w-6 p-0 ${editorViewState === 'original-max' ? 'bg-pink-500/20 text-pink-600 dark:text-pink-400' : ''}`}>
+                    className="h-6 w-6 p-0">
                     <Minus className="h-3.5 w-3.5" />
                   </Button>
                 </div>
@@ -772,23 +794,23 @@ export function EditorPanel({
                 <div className="flex items-center gap-2">
                   <span>{t('editor.originalContent', { defaultValue: '素材内容' })}</span>
                   <span className="text-xs text-muted-foreground font-normal">
-                    {layoutMode === 'vertical' ? '(下方)' : '(左侧)'}
+                    {layoutMode === 'vertical' ? t('editor.positionBelow', { defaultValue: '(下方)' }) : t('editor.positionLeft', { defaultValue: '(左侧)' })}
                   </span>
                 </div>
                 <div className="flex items-center gap-0.5">
-                  <Button variant="ghost" size="sm" title="最大化"
+                  <Button variant="ghost" size="sm" title={t('editor.maximize', { defaultValue: '最大化' })}
                     onClick={() => setEditorViewState('original-max')}
-                    className={`h-6 w-6 p-0 ${editorViewState === 'original-max' ? 'bg-pink-500/20 text-pink-600 dark:text-pink-400' : ''}`}>
+                    className="h-6 w-6 p-0">
                     <Square className="h-3.5 w-3.5" />
                   </Button>
-                  <Button variant="ghost" size="sm" title="恢复"
+                  <Button variant="ghost" size="sm" title={t('editor.restore', { defaultValue: '恢复' })}
                     onClick={() => setEditorViewState('normal')}
-                    className={`h-6 w-6 p-0 ${editorViewState === 'normal' ? 'bg-pink-500/20 text-pink-600 dark:text-pink-400' : ''}`}>
+                    className="h-6 w-6 p-0">
                     <Copy className="h-3.5 w-3.5" />
                   </Button>
-                  <Button variant="ghost" size="sm" title="最小化"
+                  <Button variant="ghost" size="sm" title={t('editor.minimize', { defaultValue: '最小化' })}
                     onClick={() => setEditorViewState('ai-max')}
-                    className={`h-6 w-6 p-0 ${editorViewState === 'ai-max' ? 'bg-pink-500/20 text-pink-600 dark:text-pink-400' : ''}`}>
+                    className="h-6 w-6 p-0">
                     <Minus className="h-3.5 w-3.5" />
                   </Button>
                 </div>

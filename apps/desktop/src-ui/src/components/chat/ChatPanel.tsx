@@ -26,18 +26,29 @@ function resolveTheme(): 'light' | 'dark' {
   return t === 'dark' ? 'dark' : 'light';
 }
 
-const CONTEXT_MODES: { key: ChatContextMode; label: string; icon: React.ReactNode }[] = [
-  { key: 'none',      label: '随便聊聊',  icon: <MessageSquareText className="h-3.5 w-3.5" /> },
-  { key: 'material',  label: '素材',      icon: <FileText className="h-3.5 w-3.5" /> },
-  { key: 'prompt',    label: '提示词',    icon: <PenLine className="h-3.5 w-3.5" /> },
-  { key: 'generated', label: '正文',      icon: <Wand2 className="h-3.5 w-3.5" /> },
-];
-
-const CONTEXT_MODE_LABELS: Record<string, string> = {
-  material: '素材内容',
-  prompt: '提示词',
-  generated: '正文内容',
+const CONTEXT_MODE_ICONS: Record<ChatContextMode, React.ReactNode> = {
+  none: <MessageSquareText className="h-3.5 w-3.5" />,
+  material: <FileText className="h-3.5 w-3.5" />,
+  prompt: <PenLine className="h-3.5 w-3.5" />,
+  generated: <Wand2 className="h-3.5 w-3.5" />,
 };
+
+function getContextModes(t: (key: string, opts?: Record<string, unknown>) => string) {
+  return [
+    { key: 'none' as ChatContextMode,      label: t('chat.contextNone', { defaultValue: '随便聊聊' }),  icon: CONTEXT_MODE_ICONS.none },
+    { key: 'material' as ChatContextMode,   label: t('chat.contextMaterial', { defaultValue: '素材' }),  icon: CONTEXT_MODE_ICONS.material },
+    { key: 'prompt' as ChatContextMode,     label: t('chat.contextPrompt', { defaultValue: '提示词' }),  icon: CONTEXT_MODE_ICONS.prompt },
+    { key: 'generated' as ChatContextMode,  label: t('chat.contextGenerated', { defaultValue: '正文' }),  icon: CONTEXT_MODE_ICONS.generated },
+  ];
+}
+
+function getContextModeLabels(t: (key: string, opts?: Record<string, unknown>) => string): Record<string, string> {
+  return {
+    material: t('chat.labelMaterial', { defaultValue: '素材内容' }),
+    prompt: t('chat.labelPrompt', { defaultValue: '提示词' }),
+    generated: t('chat.labelGenerated', { defaultValue: '正文内容' }),
+  };
+}
 
 /**
  * 上下文模式 AI 回复：可编辑文本框 + 应用/复制按钮
@@ -53,6 +64,7 @@ function ContextReplyBox({
   timestamp?: number;
   onApply: (editedContent: string) => void;
 }) {
+  const { t } = useTranslation();
   const [editedContent, setEditedContent] = useState(content);
   const [copied, setCopied] = useState(false);
   const [applied, setApplied] = useState(false);
@@ -75,7 +87,8 @@ function ContextReplyBox({
     setTimeout(() => setApplied(false), 2000);
   };
 
-  const label = CONTEXT_MODE_LABELS[contextMode] || '文档内容';
+  const CONTEXT_MODE_LABELS = getContextModeLabels(t);
+  const label = CONTEXT_MODE_LABELS[contextMode] || t('chat.labelDocument', { defaultValue: '文档内容' });
   const currentTheme = resolveTheme();
 
   return (
@@ -84,7 +97,7 @@ function ContextReplyBox({
       <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 border-b">
         <Wand2 className="h-3.5 w-3.5 text-primary" />
         <span className="text-xs font-medium text-muted-foreground">
-          AI 回复（针对：{label}）
+          {t('chat.aiReply', { defaultValue: 'AI 回复（针对：{{label}}）', label })}
         </span>
         {timestamp && (
           <span className="text-xs text-muted-foreground/60 ml-auto">
@@ -115,15 +128,15 @@ function ContextReplyBox({
           disabled={!editedContent.trim()}
         >
           {applied ? <Check className="h-3.5 w-3.5" /> : <ArrowUpToLine className="h-3.5 w-3.5" />}
-          {applied ? '已应用' : `应用到${label}`}
+          {applied ? t('chat.applied', { defaultValue: '已应用' }) : t('chat.applyTo', { defaultValue: '应用到{{label}}', label })}
         </Button>
         <Button variant="ghost" size="sm" onClick={handleCopy} className="gap-1">
           {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-          {copied ? '已复制' : '复制'}
+          {copied ? t('chat.copied', { defaultValue: '已复制' }) : t('chat.copy', { defaultValue: '复制' })}
         </Button>
         <Button variant="ghost" size="sm" onClick={() => setEditing(!editing)} className="gap-1 ml-auto">
           <PenLine className="h-3.5 w-3.5" />
-          {editing ? '预览' : '编辑'}
+          {editing ? t('chat.previewMode', { defaultValue: '预览' }) : t('chat.editMode', { defaultValue: '编辑' })}
         </Button>
       </div>
     </div>
@@ -138,6 +151,8 @@ interface ChatPanelProps {
 
 export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
   const { t } = useTranslation();
+  const CONTEXT_MODES = getContextModes(t);
+  const CONTEXT_MODE_LABELS = getContextModeLabels(t);
   const {
     tabs,
     aiMessagesByTab,
@@ -230,9 +245,9 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
     for (const att of attachments) {
       try {
         const content = await invoke<string>('import_file', { path: att.filePath });
-        parts.push(`[附件: ${att.fileName}]\n${content}`);
+        parts.push(`${t('chat.attachmentLabel', { defaultValue: '[附件: {{name}}]', name: att.fileName })}\n${content}`);
       } catch (err) {
-        parts.push(`[附件: ${att.fileName}]\n(无法读取: ${err})`);
+        parts.push(t('chat.attachmentError', { defaultValue: '[附件: {{name}}]\n(无法读取: {{error}})', name: att.fileName, error: String(err) }));
       }
     }
     return parts.join('\n\n');
@@ -263,7 +278,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
       const errMsg = typeof error === 'string' ? error : (error instanceof Error ? error.message : JSON.stringify(error));
       useAppStore.getState().addAiMessage(effectiveTabId, {
         role: 'assistant',
-        content: `发送失败：${errMsg}`,
+        content: t('chat.sendFailed', { defaultValue: '发送失败：{{error}}', error: errMsg }),
         timestamp: Date.now() / 1000
       });
     }
@@ -293,7 +308,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
     useAppStore.getState().markTabAsDirty(currentTab.id);
     useAppStore.getState().addAiMessage(effectiveTabId, {
       role: 'assistant',
-      content: `✅ 已将内容应用到「${CONTEXT_MODE_LABELS[mode]}」`,
+      content: t('chat.contentApplied', { defaultValue: '✅ 已将内容应用到「{{label}}」', label: CONTEXT_MODE_LABELS[mode] }),
       timestamp: Date.now() / 1000,
     });
   };
@@ -314,7 +329,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
     if (!activeService?.apiKey) {
       const errorMessage = {
         role: 'assistant' as const,
-        content: '请先配置 API Key 才能使用 AI 生成功能。\n\n请点击聊天面板下方的"设置"按钮，在设置面板的 AI 标签页中配置您的 API Key。',
+        content: t('chat.configureApiKeyMsg', { defaultValue: '请先配置 API Key 才能使用 AI 生成功能。\n\n请点击聊天面板下方的“设置”按钮，在设置面板的 AI 标签页中配置您的 API Key。' }),
         timestamp: Date.now() / 1000
       };
       useAppStore.getState().addAiMessage(effectiveTabId, errorMessage);
@@ -344,7 +359,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
       if (docAttachments.length > 0) {
         const attachmentText = await buildAttachmentText(docAttachments);
         if (attachmentText) {
-          contentForAI = `${latestDoc.content}\n\n---\n附件参考资料：\n\n${attachmentText}`;
+          contentForAI = `${latestDoc.content}\n\n---\n${t('chat.attachmentRef', { defaultValue: '附件参考资料' })}：\n\n${attachmentText}`;
         }
       }
 
@@ -358,7 +373,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
             latestDoc.authorNotes || '',
             latestDoc.aiGeneratedContent,
             'ai',
-            'AI 生成内容（生成前自动保存）',
+            t('chat.aiGenerateTitle', { defaultValue: 'AI 生成内容（生成前自动保存）' }),
             latestDoc.pluginData,
             latestDoc.enabledPlugins
           );
@@ -378,7 +393,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
         // Streaming mode
         const assistantMessage = {
           role: 'assistant' as const,
-          content: '正在生成内容...\n\n(流式生成中，内容将逐步显示)',
+          content: t('chat.generating', { defaultValue: '正在生成内容...\n\n(流式生成中，内容将逐步显示)' }),
           timestamp: Date.now() / 1000
         };
         useAppStore.getState().addAiMessage(effectiveTabId, assistantMessage);
@@ -397,12 +412,12 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
             // 实时更新聊天区的思考状态
             if (parsed.thinking) {
               const thinkMsg = parsed.isThinking
-                ? `💭 **AI 正在思考...**\n\n${parsed.thinking}`
-                : `💭 **AI 思考过程：**\n\n${parsed.thinking}`;
+                ? t('chat.aiThinking', { defaultValue: '💭 **AI 正在思考...**\n\n{{thinking}}', thinking: parsed.thinking })
+                : t('chat.aiThinkingDone', { defaultValue: '💭 **AI 思考过程：**\n\n{{thinking}}', thinking: parsed.thinking });
               const messages = useAppStore.getState().getAiMessages(effectiveTabId);
               if (messages.length > 0) {
                 const lastMsg = messages[messages.length - 1];
-                if (lastMsg.role === 'assistant' && (lastMsg.content.startsWith('正在生成') || lastMsg.content.startsWith('💭'))) {
+                if (lastMsg.role === 'assistant' && (lastMsg.content.includes('正在生成') || lastMsg.content.startsWith('💭') || lastMsg.content.includes('Generating'))) {
                   useAppStore.getState().updateLastAiMessage(effectiveTabId, { content: thinkMsg });
                 }
               }
@@ -441,9 +456,9 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
         await saveDocument({ ...latestDoc, authorNotes: notesToUse, aiGeneratedContent: finalContent });
 
         // Replace the streaming message with completion message（包含思考内容）
-        let completionContent = '已根据您的提示词生成内容。\n\n生成的内容已自动更新到编辑器的 AI 内容栏。';
+        let completionContent = t('chat.generationComplete', { defaultValue: '已根据您的提示词生成内容。\n\n生成的内容已自动更新到编辑器的 AI 内容栏。' });
         if (finalParsed.thinking) {
-          completionContent = `💭 **AI 思考过程：**\n\n${finalParsed.thinking}\n\n---\n\n${completionContent}`;
+          completionContent = `${t('chat.aiThinkingDone', { defaultValue: '💭 **AI 思考过程：**\n\n{{thinking}}', thinking: finalParsed.thinking })}\n\n---\n\n${completionContent}`;
         }
         const completionMessage = {
           role: 'assistant' as const,
@@ -462,7 +477,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
               notesToUse,
               finalContent,
               'ai',
-              'AI 生成内容',
+              t('chat.aiGenerateContent', { defaultValue: 'AI 生成内容' }),
               latestDoc.pluginData,
               latestDoc.enabledPlugins
             );
@@ -486,9 +501,9 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
         await saveDocument({ ...latestDoc, authorNotes: notesToUse, aiGeneratedContent: generated });
 
         // Add confirmation message to chat（包含思考内容）
-        let msgContent = '已根据您的提示词生成内容。\n\n生成的内容已自动更新到编辑器的 AI 内容栏。';
+        let msgContent = t('chat.generationComplete', { defaultValue: '已根据您的提示词生成内容。\n\n生成的内容已自动更新到编辑器的 AI 内容栏。' });
         if (parsed.thinking) {
-          msgContent = `💭 **AI 思考过程：**\n\n${parsed.thinking}\n\n---\n\n${msgContent}`;
+          msgContent = `${t('chat.aiThinkingDone', { defaultValue: '💭 **AI 思考过程：**\n\n{{thinking}}', thinking: parsed.thinking })}\n\n---\n\n${msgContent}`;
         }
         const assistantMessage = {
           role: 'assistant' as const,
@@ -508,7 +523,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
               notesToUse,
               generated,
               'ai',
-              'AI 生成内容',
+              t('chat.aiGenerateContent', { defaultValue: 'AI 生成内容' }),
               latestDoc.pluginData,
               latestDoc.enabledPlugins
             );
@@ -525,16 +540,16 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
       console.error('Error stringified:', JSON.stringify(error, null, 2));
 
       // Provide helpful error message
-      let errorMsg = '未知错误';
+      let errorMsg = t('chat.unknownError', { defaultValue: '未知错误' });
       if (error instanceof Error) {
         errorMsg = error.message;
         // Check for common error patterns
         if (errorMsg.includes('connect') || errorMsg.includes('timeout')) {
-          errorMsg = `网络连接失败：${errorMsg}\n\n请检查网络连接或稍后重试。`;
+          errorMsg = t('chat.networkError', { defaultValue: '网络连接失败：{{error}}\n\n请检查网络连接或稍后重试。', error: errorMsg });
         } else if (errorMsg.includes('401') || errorMsg.includes('Unauthorized') || errorMsg.includes('API key')) {
-          errorMsg = `API Key 无效或未配置。\n\n请点击聊天面板下方的"设置"按钮，在设置面板的 AI 标签页中配置您的 API Key。`;
+          errorMsg = t('chat.apiKeyError', { defaultValue: 'API Key 无效或未配置。\n\n请点击聊天面板下方的"设置"按钮，在设置面板的 AI 标签页中配置您的 API Key。' });
         } else if (errorMsg.includes('429') || errorMsg.includes('rate limit')) {
-          errorMsg = `API 请求频率超限，请稍后重试。`;
+          errorMsg = t('chat.rateLimitError', { defaultValue: 'API 请求频率超限，请稍后重试。' });
         }
       } else if (typeof error === 'string') {
         errorMsg = error;
@@ -546,7 +561,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
       // Add error message to chat
       const errorMessage = {
         role: 'assistant' as const,
-        content: `生成失败：${errorMsg}`,
+        content: t('chat.generateFailed', { defaultValue: '生成失败：{{error}}', error: errorMsg }),
         timestamp: Date.now() / 1000
       };
 
@@ -575,7 +590,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
     <div className="flex-1 flex flex-col overflow-hidden min-h-0">
       {/* Header with close button */}
       <div className="flex items-center justify-between px-4 py-2 border-b bg-background flex-shrink-0">
-        <h2 className="font-semibold">{simpleMode ? '随便聊聊' : 'AI 助手'}</h2>
+        <h2 className="font-semibold">{simpleMode ? t('chat.chatTitle', { defaultValue: '随便聊聊' }) : t('chat.aiAssistant', { defaultValue: 'AI 助手' })}</h2>
         {onClose && (
           <Button
             variant="ghost"
@@ -598,7 +613,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
           >
             <span className="flex items-center gap-2 text-sm font-medium">
               <FileText className="h-4 w-4" />
-              提示词
+              {t('chat.promptLabel', { defaultValue: '提示词' })}
             </span>
             {showAuthorNotes ? (
               <ChevronUp className="h-4 w-4" />
@@ -611,7 +626,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
               <textarea
                 value={authorNotesInput}
                 onChange={(e) => setAuthorNotesInput(e.target.value)}
-                placeholder="输入提示词，告诉 AI 如何扩展或改进你的内容...&#10;&#10;例如：&#10;- 请将这段散文扩展为更详细的描述&#10;- 保持原有的文学风格，增加更多细节&#10;- 重新组织段落结构，使逻辑更清晰"
+                placeholder={t('chat.promptPlaceholder', { defaultValue: '输入提示词，告诉 AI 如何扩展或改进你的内容...\n\n例如：\n- 请将这段散文扩展为更详细的描述\n- 保持原有的文学风格，增加更多细节\n- 重新组织段落结构，使逻辑更清晰' })}
                 className="w-full h-[240px] min-h-[80px] max-h-[400px] p-3 border rounded-md bg-background resize-y focus:outline-none focus:ring-2 focus:ring-ring text-sm"
                 spellCheck={false}
                 autoCorrect="off"
@@ -625,13 +640,13 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
                   size="icon"
                   className="h-7 w-7"
                   onClick={() => setShowTemplates(true)}
-                  title="模板管理"
+                  title={t('chat.templateManage', { defaultValue: '模板管理' })}
                 >
                   <BookOpen className="h-3.5 w-3.5" />
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="icon" className="h-7 w-7" title="快捷模板">
+                    <Button variant="outline" size="icon" className="h-7 w-7" title={t('chat.quickTemplate', { defaultValue: '快捷模板' })}>
                       <ChevronDown className="h-3 w-3" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -668,12 +683,12 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
                   className="h-7 w-7 text-muted-foreground hover:text-destructive"
                   onClick={() => setAuthorNotesInput('')}
                   disabled={!authorNotesInput.trim()}
-                  title="清空提示词"
+                  title={t('chat.clearPrompt', { defaultValue: '清空提示词' })}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
                 <span className="text-xs text-muted-foreground ml-auto">
-                  {authorNotesInput.length} 字符
+                  {t('chat.charCount', { defaultValue: '{{count}} 字符', count: authorNotesInput.length })}
                 </span>
               </div>
 
@@ -701,7 +716,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
                       className="w-4 h-4"
                     />
                     <label htmlFor="web-search-mode" className="text-sm">
-                      联网搜索
+                      {t('chat.webSearch', { defaultValue: '联网搜索' })}
                     </label>
                   </div>
                 </div>
@@ -711,7 +726,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
                     className="flex-1"
                     onClick={handleGenerate}
                     disabled={isCurrentTabStreaming || !authorNotesInput.trim()}
-                    title="根据提示词生成内容，自动更新到 AI 内容栏"
+                    title={t('chat.generateHint', { defaultValue: '根据提示词生成内容，自动更新到 AI 内容栏' })}
                   >
                     <Sparkles className="h-4 w-4 mr-2" />
                     {isCurrentTabStreaming ? `${t('chat.streamingStatus')}` : t('chat.generate')}
@@ -728,7 +743,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
                   )}
                 </div>
                 {!settingsStore.ai.services.some(s => s.id === settingsStore.ai.activeServiceId && s.enabled && s.apiKey) && (
-                  <div className="text-xs text-amber-500 dark:text-amber-400">⚠️ 请先配置 API 服务</div>
+                  <div className="text-xs text-amber-500 dark:text-amber-400">{t('chat.configureApiWarning', { defaultValue: '⚠️ 请先配置 API 服务' })}</div>
                 )}
               </div>
             </div>
@@ -743,7 +758,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
           <div className="px-4 py-1.5 border-b flex-shrink-0 bg-background">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-muted-foreground">
-                对话记录 ({aiMessages.length})
+                {t('chat.chatHistory', { defaultValue: '对话记录 ({{count}})', count: aiMessages.length })}
               </span>
               <Button
                 variant="ghost"
@@ -751,7 +766,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
                 className="h-6 w-6 text-muted-foreground"
                 onClick={() => clearAiMessages(effectiveTabId)}
                 disabled={isCurrentTabStreaming}
-                title="清空对话"
+                title={t('chat.clearChat', { defaultValue: '清空对话' })}
               >
                 <Eraser className="h-3 w-3" />
               </Button>
@@ -762,9 +777,9 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
         <div className="p-4 space-y-4">
           {aiMessages.length === 0 ? (
             <div className="text-center text-muted-foreground py-8">
-              <p className="text-sm">与 AI 助手开始对话</p>
+              <p className="text-sm">{t('chat.startChat', { defaultValue: '与 AI 助手开始对话' })}</p>
               {!settingsStore.ai.services.some(s => s.id === settingsStore.ai.activeServiceId && s.enabled && s.apiKey) && (
-                <p className="text-xs mt-2 text-amber-500 dark:text-amber-400">请先在设置中配置 API 服务</p>
+                <p className="text-xs mt-2 text-amber-500 dark:text-amber-400">{t('chat.configureApiFirst', { defaultValue: '请先在设置中配置 API 服务' })}</p>
               )}
             </div>
           ) : (
@@ -808,11 +823,11 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-xs font-medium opacity-70">
-                          {isUserTurn ? '你' : 'AI'}
+                          {isUserTurn ? t('chat.you', { defaultValue: '你' }) : t('chat.ai', { defaultValue: 'AI' })}
                         </span>
                         {aiMessages.length > 2 && (
                           <span className="text-xs opacity-50">
-                            第 {turnNumber} 轮
+                            {t('chat.turnNumber', { defaultValue: '第 {{num}} 轮', num: turnNumber })}
                           </span>
                         )}
                       </div>
@@ -847,7 +862,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
                     <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce [animation-delay:0.2s]" />
                   </div>
                   <span className="text-xs text-muted-foreground">
-                    AI 正在回复...
+                    {t('chat.aiReplying', { defaultValue: 'AI 正在回复...' })}
                   </span>
                 </div>
               </div>
@@ -875,7 +890,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 border-transparent'
                 }
               `}
-              title={mode.key === 'none' ? '不附加文档内容' : `将「${CONTEXT_MODE_LABELS[mode.key]}」作为 AI 上下文`}
+              title={mode.key === 'none' ? t('chat.contextHintNone', { defaultValue: '不附加文档内容' }) : t('chat.contextHintWith', { defaultValue: '将「{{label}}」作为 AI 上下文', label: CONTEXT_MODE_LABELS[mode.key] })}
             >
               {mode.icon}
               <span>{mode.label}</span>
@@ -889,7 +904,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), isCurrentTabStreaming ? stopAiStreaming() : handleSend())}
-            placeholder={effectiveContextMode !== 'none' ? `针对「${CONTEXT_MODE_LABELS[effectiveContextMode]}」聊聊...` : '随便聊聊...'}
+            placeholder={effectiveContextMode !== 'none' ? t('chat.chatPlaceholderContext', { defaultValue: '针对「{{label}}」聊聊...', label: CONTEXT_MODE_LABELS[effectiveContextMode] }) : t('chat.chatPlaceholderNone', { defaultValue: '随便聊聊...' })}
             disabled={false}
             spellCheck={false}
             autoCorrect="off"
@@ -902,7 +917,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
               onClick={stopAiStreaming}
               size="icon"
               variant="destructive"
-              title="停止生成"
+              title={t('chat.stopGeneration', { defaultValue: '停止生成' })}
               className="self-end"
             >
               <Square className="h-4 w-4" />

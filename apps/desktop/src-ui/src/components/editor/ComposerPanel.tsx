@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from '@/i18n';
 import { MarkdownEditor } from './MarkdownEditor';
 import type { Document } from '@aidocplus/shared-types';
 
@@ -31,6 +32,7 @@ export function ComposerPanel({
   rightSidebarOpen,
   onRightSidebarToggle,
 }: ComposerPanelProps) {
+  const { t } = useTranslation();
 
   // 最大化切换
   const handleMaximize = useCallback(() => {
@@ -58,7 +60,7 @@ export function ComposerPanel({
             size="sm"
             className="gap-1 h-7 text-xs"
             onClick={handleMaximize}
-            title={isMaximized ? '退出最大化' : '最大化'}
+            title={isMaximized ? t('editor.composer.exitMaximize', { defaultValue: '退出最大化' }) : t('editor.composer.maximize', { defaultValue: '最大化' })}
           >
             {isMaximized ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
           </Button>
@@ -70,7 +72,7 @@ export function ComposerPanel({
         <MarkdownEditor
           value={composedContent}
           onChange={onComposedContentChange}
-          placeholder="在此合并文档内容…可从工具栏的导入按钮导入正文、插件或文件内容，也可直接编辑。"
+          placeholder={t('editor.composer.placeholder', { defaultValue: '在此合并文档内容…可从工具栏的导入按钮导入正文、插件或文件内容，也可直接编辑。' })}
           theme={theme}
           showToolbar={true}
           showViewModeSwitch={true}

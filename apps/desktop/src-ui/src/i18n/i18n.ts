@@ -4,13 +4,11 @@ import { initReactI18next } from 'react-i18next';
 // Import translation files
 import zhTranslation from './locales/zh/translation.json';
 import enTranslation from './locales/en/translation.json';
-import jaTranslation from './locales/ja/translation.json';
 
 // Supported languages configuration
 export const SUPPORTED_LANGUAGES = {
   zh: { name: '中文', flag: '🇨🇳' },
-  en: { name: 'English', flag: '🇺🇸' },
-  ja: { name: '日本語', flag: '🇯🇵' }
+  en: { name: 'English', flag: '🇺🇸' }
 } as const;
 
 export type SupportedLanguage = keyof typeof SUPPORTED_LANGUAGES;
@@ -21,8 +19,7 @@ export const DEFAULT_LANGUAGE: SupportedLanguage = 'zh';
 // Resources
 const resources = {
   zh: { translation: zhTranslation },
-  en: { translation: enTranslation },
-  ja: { translation: jaTranslation }
+  en: { translation: enTranslation }
 };
 
 /**

@@ -20,20 +20,23 @@ export function SlidePreview({ slide, theme, width, selected, onClick, className
   const outerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
 
-  // 自适应模式：监听外框尺寸，直接设置内部 transform，避免 state 更新闪烁
+  // 自适应模式：监听外框宽度，同步设置高度和内部缩放
   useEffect(() => {
     if (!autoFit) return;
     const outer = outerRef.current;
     const inner = innerRef.current;
     if (!outer || !inner) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const cw = entry.contentRect.width;
-        if (cw > 0) {
-          inner.style.transform = `scale(${cw / 960})`;
-        }
+
+    const update = () => {
+      const cw = outer.clientWidth;
+      if (cw > 0) {
+        outer.style.height = `${Math.round(cw * 9 / 16)}px`;
+        inner.style.transform = `translate(-50%, -50%) scale(${cw / 960})`;
       }
-    });
+    };
+
+    update();
+    const observer = new ResizeObserver(() => update());
     observer.observe(outer);
     return () => observer.disconnect();
   }, [autoFit]);
@@ -41,22 +44,28 @@ export function SlidePreview({ slide, theme, width, selected, onClick, className
   return (
     <div
       ref={outerRef}
-      className={`relative cursor-pointer rounded-md overflow-hidden ${
+      className={`cursor-pointer rounded-md ${
         selected ? 'border-[3px] border-primary ring-2 ring-primary/30 shadow-xl shadow-primary/20' : 'border-2 border-border hover:border-primary/50'
       } ${className}`}
-      style={autoFit
-        ? { width: '100%', aspectRatio: '16 / 9' }
-        : { width: resolvedWidth, height }
-      }
+      style={{
+        position: 'relative',
+        overflow: 'hidden',
+        ...(autoFit
+          ? { width: '100%' }
+          : { width: resolvedWidth, height }),
+      }}
       onClick={onClick}
     >
       <div
         ref={innerRef}
-        className="origin-top-left absolute"
         style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transformOrigin: 'center center',
           width: 960,
           height: 540,
-          transform: autoFit ? 'scale(0.5)' : `scale(${scale})`,
+          transform: autoFit ? undefined : `translate(-50%, -50%) scale(${scale})`,
           backgroundColor: theme.colors.background,
           color: theme.colors.text,
           fontFamily: theme.fonts.body,

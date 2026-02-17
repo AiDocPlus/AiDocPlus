@@ -9,6 +9,7 @@ mod error;
 mod native_export;
 mod plugin;
 mod project;
+mod template;
 mod workspace;
 
 use commands::{
@@ -22,6 +23,7 @@ use commands::{
     plugin::*,
     project::*,
     search::*,
+    template::*,
     workspace::*,
 };
 use tauri::{Manager, Emitter};
@@ -41,6 +43,9 @@ fn main() {
 
             // Ensure plugins directory exists
             plugin::ensure_plugins_dir();
+
+            // Ensure templates directory exists
+            template::ensure_templates_dir();
 
             // ── 构建原生系统菜单 ──
             let handle = app.handle();
@@ -73,6 +78,7 @@ fn main() {
                 // ── 新建 ──
                 .item(&MenuItem::with_id(handle, "new_project", "新建项目", true, Some("CmdOrCtrl+Shift+N"))?)
                 .item(&MenuItem::with_id(handle, "new_document", "新建文档", true, Some("CmdOrCtrl+N"))?)
+                .item(&MenuItem::with_id(handle, "new_from_template", "从模板新建...", true, Some("CmdOrCtrl+Shift+T"))?)
                 .separator()
                 // ── 保存 ──
                 .item(&MenuItem::with_id(handle, "save", "保存", true, Some("CmdOrCtrl+S"))?)
@@ -89,6 +95,10 @@ fn main() {
                 .item(&MenuItem::with_id(handle, "project_import_zip", "导入项目 (ZIP)...", true, None::<&str>)?)
                 .item(&MenuItem::with_id(handle, "project_backup", "备份项目...", true, None::<&str>)?)
                 .separator()
+                // ── 模板 ──
+                .item(&MenuItem::with_id(handle, "save_as_template", "存为模板...", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "manage_templates", "管理模板...", true, None::<&str>)?)
+                .separator()
                 // ── 文档管理 ──
                 .item(&MenuItem::with_id(handle, "doc_rename", "重命名文档...", true, None::<&str>)?)
                 .item(&MenuItem::with_id(handle, "doc_delete", "删除文档...", true, None::<&str>)?)
@@ -100,15 +110,15 @@ fn main() {
                 .item(&MenuItem::with_id(handle, "close_tab", "关闭文档", true, Some("CmdOrCtrl+W"))?)
                 .build()?;
 
-            // 编辑菜单
+            // 编辑菜单（使用内置 PredefinedMenuItem 以确保剪贴板操作在所有输入框中正常工作）
             let edit_menu = SubmenuBuilder::new(handle, "编辑")
-                .item(&MenuItem::with_id(handle, "undo", "撤销", true, Some("CmdOrCtrl+Z"))?)
-                .item(&MenuItem::with_id(handle, "redo", "重做", true, Some("CmdOrCtrl+Shift+Z"))?)
+                .undo()
+                .redo()
                 .separator()
-                .item(&MenuItem::with_id(handle, "cut", "剪切", true, Some("CmdOrCtrl+X"))?)
-                .item(&MenuItem::with_id(handle, "copy_text", "复制", true, Some("CmdOrCtrl+C"))?)
-                .item(&MenuItem::with_id(handle, "paste", "粘贴", true, Some("CmdOrCtrl+V"))?)
-                .item(&MenuItem::with_id(handle, "select_all", "全选", true, Some("CmdOrCtrl+A"))?)
+                .cut()
+                .copy()
+                .paste()
+                .select_all()
                 .separator()
                 .item(&MenuItem::with_id(handle, "find", "查找...", true, Some("CmdOrCtrl+F"))?)
                 .build()?;
@@ -227,6 +237,21 @@ fn main() {
             list_plugins,
             set_plugin_enabled,
             sync_plugin_manifests,
+
+            // Template commands
+            list_templates,
+            get_template_content,
+            create_template,
+            update_template,
+            delete_template,
+            duplicate_template,
+            save_template_from_document,
+            create_document_from_template,
+            list_template_categories,
+            create_template_category,
+            update_template_category,
+            delete_template_category,
+            reorder_template_categories,
 
             // Email commands
             test_smtp_connection,

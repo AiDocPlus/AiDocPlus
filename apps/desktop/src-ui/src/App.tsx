@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MainLayout } from './components/layout/MainLayout';
 import { useAppStore } from './stores/useAppStore';
 import { useSettingsStore } from './stores/useSettingsStore';
@@ -16,6 +17,7 @@ const queryClient = new QueryClient({
 });
 
 function AppContent() {
+  const { t } = useTranslation();
   const { loadProjects, restoreWorkspace } = useAppStore();
   const { ui } = useSettingsStore();
   const { setRestoring } = useWorkspaceAutosave();
@@ -33,6 +35,10 @@ function AppContent() {
       try {
         // Load plugins from backend
         await useAppStore.getState().loadPlugins();
+
+        // Load templates and categories from backend
+        await useAppStore.getState().loadTemplates();
+        await useAppStore.getState().loadTemplateCategories();
 
         // Restore workspace state (includes loading projects)
         await restoreWorkspace();
@@ -67,7 +73,7 @@ function AppContent() {
       <div className="flex items-center justify-center h-screen bg-background text-foreground">
         <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
-          <p className="text-muted-foreground">正在加载工作区...</p>
+          <p className="text-muted-foreground">{t('common.loading', { defaultValue: '加载中...' })}</p>
         </div>
       </div>
     );

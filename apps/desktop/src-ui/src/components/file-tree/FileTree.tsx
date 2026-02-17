@@ -1,5 +1,5 @@
 import { useAppStore } from '@/stores/useAppStore';
-import { File, Folder, FolderOpen, Plus, Trash2, X, Check, Edit2, Download, FilePlus, Copy, ArrowUpDown, ArrowUp, ArrowDown, GripVertical, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
+import { File, Folder, FolderOpen, Plus, Trash2, X, Check, Edit2, Download, FilePlus, Copy, ArrowUpDown, ArrowUp, ArrowDown, GripVertical, ChevronsDownUp, ChevronsUpDown, LayoutTemplate } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -457,7 +457,7 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
             size="icon"
             onClick={() => setExpandedProjects(new Set(projects.map(p => p.id)))}
             className="h-6 w-6"
-            title="展开全部"
+            title={t('fileTree.expandAll', { defaultValue: '展开全部' })}
           >
             <ChevronsUpDown className="h-3 w-3" />
           </Button>
@@ -466,7 +466,7 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
             size="icon"
             onClick={() => setExpandedProjects(new Set())}
             className="h-6 w-6"
-            title="折叠全部"
+            title={t('fileTree.collapseAll', { defaultValue: '折叠全部' })}
           >
             <ChevronsDownUp className="h-3 w-3" />
           </Button>
@@ -483,7 +483,7 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-40">
               <DropdownMenuItem onClick={() => setSortField('custom')}>
-                <span className="flex-1">自定义（拖动）</span>
+                <span className="flex-1">{t('fileTree.sortCustom', { defaultValue: '自定义（拖动）' })}</span>
                 {sortField === 'custom' && <GripVertical className="h-3 w-3 ml-2" />}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleToggleSort('name')}>
@@ -657,6 +657,22 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
                     title={t('fileTree.newDocument')}
                   >
                     <FilePlus className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isExpanded) {
+                        toggleProject(project.id);
+                        openProject(project.id);
+                      }
+                      window.dispatchEvent(new CustomEvent('menu-new-from-template'));
+                    }}
+                    className="h-6 w-6 p-0"
+                    title={t('fileTree.newFromTemplate', { defaultValue: '从模板新建' })}
+                  >
+                    <LayoutTemplate className="h-3 w-3" />
                   </Button>
                   <Button
                     variant="ghost"

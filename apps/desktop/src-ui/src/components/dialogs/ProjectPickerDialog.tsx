@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Folder } from 'lucide-react';
 import { message } from '@tauri-apps/plugin-dialog';
+import { useTranslation } from '@/i18n';
 
 type Mode = 'move' | 'copy';
 
@@ -14,6 +15,7 @@ interface ProjectPickerDialogProps {
 }
 
 export function ProjectPickerDialog({ open, mode, onClose }: ProjectPickerDialogProps) {
+  const { t } = useTranslation();
   const { projects, currentDocument, moveDocumentToProject, copyDocumentToProject } = useAppStore();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -36,15 +38,15 @@ export function ProjectPickerDialog({ open, mode, onClose }: ProjectPickerDialog
       if (mode === 'move') {
         await moveDocumentToProject(currentDocument.id, currentDocument.projectId, selectedProjectId);
         const targetProject = projects.find(p => p.id === selectedProjectId);
-        await message(`文档 "${currentDocument.title}" 已移动到项目 "${targetProject?.name}"`, { title: '移动成功' });
+        await message(t('projectPicker.moveSuccess', { defaultValue: '文档 "{{docTitle}}" 已移动到项目 "{{projectName}}"', docTitle: currentDocument.title, projectName: targetProject?.name }), { title: t('projectPicker.moveSuccessTitle', { defaultValue: '移动成功' }) });
       } else {
         await copyDocumentToProject(currentDocument.id, currentDocument.projectId, selectedProjectId);
         const targetProject = projects.find(p => p.id === selectedProjectId);
-        await message(`文档 "${currentDocument.title}" 已复制到项目 "${targetProject?.name}"`, { title: '复制成功' });
+        await message(t('projectPicker.copySuccess', { defaultValue: '文档 "{{docTitle}}" 已复制到项目 "{{projectName}}"', docTitle: currentDocument.title, projectName: targetProject?.name }), { title: t('projectPicker.copySuccessTitle', { defaultValue: '复制成功' }) });
       }
       onClose();
     } catch (err) {
-      await message(`操作失败: ${err}`, { title: '错误', kind: 'error' });
+      await message(t('projectPicker.operationFailed', { defaultValue: '操作失败: {{error}}', error: String(err) }), { title: t('projectPicker.errorTitle', { defaultValue: '错误' }), kind: 'error' });
     } finally {
       setIsProcessing(false);
     }
@@ -54,17 +56,19 @@ export function ProjectPickerDialog({ open, mode, onClose }: ProjectPickerDialog
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
-          <DialogTitle>{mode === 'move' ? '移动文档到...' : '复制文档到...'}</DialogTitle>
+          <DialogTitle>{mode === 'move' ? t('projectPicker.moveTitle', { defaultValue: '移动文档到...' }) : t('projectPicker.copyTitle', { defaultValue: '复制文档到...' })}</DialogTitle>
         </DialogHeader>
 
         {!currentDocument ? (
-          <p className="text-sm text-muted-foreground py-4">请先打开一个文档</p>
+          <p className="text-sm text-muted-foreground py-4">{t('projectPicker.noDocument', { defaultValue: '请先打开一个文档' })}</p>
         ) : otherProjects.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4">没有其他项目可选，请先创建新项目</p>
+          <p className="text-sm text-muted-foreground py-4">{t('projectPicker.noProjects', { defaultValue: '没有其他项目可选，请先创建新项目' })}</p>
         ) : (
           <>
             <div className="text-sm text-muted-foreground mb-2">
-              {mode === 'move' ? '将' : '复制'} "<span className="font-medium text-foreground">{currentDocument.title}</span>" {mode === 'move' ? '移动' : '复制'}到：
+              {mode === 'move'
+                ? t('projectPicker.moveDesc', { defaultValue: '将 "{{title}}" 移动到：', title: currentDocument.title })
+                : t('projectPicker.copyDesc', { defaultValue: '复制 "{{title}}" 到：', title: currentDocument.title })}
             </div>
             <div className="max-h-[300px] overflow-y-auto space-y-1">
               {otherProjects.map(project => (
@@ -87,13 +91,13 @@ export function ProjectPickerDialog({ open, mode, onClose }: ProjectPickerDialog
 
         <div className="flex justify-end gap-2 mt-4">
           <Button variant="outline" onClick={onClose} disabled={isProcessing}>
-            取消
+            {t('projectPicker.cancel', { defaultValue: '取消' })}
           </Button>
           <Button
             onClick={handleConfirm}
             disabled={!selectedProjectId || isProcessing}
           >
-            {isProcessing ? '处理中...' : (mode === 'move' ? '移动' : '复制')}
+            {isProcessing ? t('projectPicker.processing', { defaultValue: '处理中...' }) : (mode === 'move' ? t('projectPicker.move', { defaultValue: '移动' }) : t('projectPicker.copy', { defaultValue: '复制' }))}
           </Button>
         </div>
       </DialogContent>

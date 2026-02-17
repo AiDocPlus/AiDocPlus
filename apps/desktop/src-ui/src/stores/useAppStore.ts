@@ -1,11 +1,12 @@
 import { create } from 'zustand';
-import type { Project, Document, DocumentVersion, AIMessage, ChatContextMode, WorkspaceState, EditorTab, PluginManifest } from '@aidocplus/shared-types';
+import type { Project, Document, DocumentVersion, AIMessage, ChatContextMode, WorkspaceState, EditorTab, PluginManifest, TemplateManifest, TemplateCategory } from '@aidocplus/shared-types';
 import { buildPluginList, setPlugins } from '@/plugins/registry';
 import { syncManifestsToBackend } from '@/plugins/loader';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useSettingsStore, getAIInvokeParams } from './useSettingsStore';
 import { isTauri } from '@/lib/isTauri';
+import i18n from '@/i18n';
 
 // Markdown 格式约束提示词：从设置中读取（用户可编辑）
 function getMarkdownModePrompt(): string {
@@ -109,6 +110,21 @@ interface AppState {
   loadPlugins: () => Promise<PluginManifest[]>;
   pluginManifests: PluginManifest[];
 
+  // Template Actions
+  templates: TemplateManifest[];
+  templateCategories: TemplateCategory[];
+  loadTemplates: () => Promise<TemplateManifest[]>;
+  loadTemplateCategories: () => Promise<TemplateCategory[]>;
+  createDocumentFromTemplate: (projectId: string, templateId: string, title: string, author?: string) => Promise<Document>;
+  saveAsTemplate: (projectId: string, documentId: string, name: string, description: string, category: string, includeContent: boolean, includeAiContent: boolean, includePluginData: boolean) => Promise<TemplateManifest>;
+  deleteTemplate: (templateId: string) => Promise<void>;
+  duplicateTemplate: (templateId: string, newName: string) => Promise<TemplateManifest>;
+  updateTemplate: (templateId: string, fields: { name?: string; description?: string; category?: string; icon?: string; tags?: string[] }) => Promise<TemplateManifest>;
+  createTemplateCategory: (key: string, label: string) => Promise<TemplateCategory[]>;
+  updateTemplateCategory: (key: string, label?: string, newKey?: string) => Promise<TemplateCategory[]>;
+  deleteTemplateCategory: (key: string) => Promise<TemplateCategory[]>;
+  reorderTemplateCategories: (orderedKeys: string[]) => Promise<TemplateCategory[]>;
+
   // API Actions
   loadProjects: () => Promise<void>;
   createProject: (name: string, description?: string) => Promise<Project>;
@@ -179,6 +195,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   aiStreamingTabId: null,
   streamStateByTab: {},
   pluginManifests: [],
+  templates: [],
+  templateCategories: [],
 
   // Setters
   setProjects: (projects) => set({ projects }),
@@ -442,7 +460,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const result = await invoke<string>('export_project_zip', { projectId, outputPath });
       return result;
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : '导出项目失败' });
+      set({ error: error instanceof Error ? error.message : i18n.t('store.exportProjectFailed') });
       throw error;
     }
   },
@@ -457,7 +475,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ projects, isLoading: false });
       return project;
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : '导入项目失败', isLoading: false });
+      set({ error: error instanceof Error ? error.message : i18n.t('store.importProjectFailed'), isLoading: false });
       throw error;
     }
   },
@@ -484,7 +502,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
       return movedDoc;
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : '移动文档失败', isLoading: false });
+      set({ error: error instanceof Error ? error.message : i18n.t('store.moveDocFailed'), isLoading: false });
       throw error;
     }
   },
@@ -503,7 +521,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
       return newDoc;
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : '复制文档失败', isLoading: false });
+      set({ error: error instanceof Error ? error.message : i18n.t('store.copyDocFailed'), isLoading: false });
       throw error;
     }
   },
@@ -699,14 +717,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       // 注入聊天上下文（素材/提示词/正文）
       if (contextInfo && contextInfo.mode !== 'none' && contextInfo.content?.trim()) {
         const contextLabels: Record<string, string> = {
-          material: '素材内容',
-          prompt: '提示词',
-          generated: 'AI 生成的正文内容',
+          material: i18n.t('store.contextMaterial'),
+          prompt: i18n.t('store.contextPrompt'),
+          generated: i18n.t('store.contextGenerated'),
         };
-        const label = contextLabels[contextInfo.mode] || '文档内容';
+        const label = contextLabels[contextInfo.mode] || i18n.t('store.contextDefault');
         messages.push({
           role: 'system',
-          content: `以下是用户的${label}：\n\n${contextInfo.content}`,
+          content: i18n.t('store.contextUserLabel', { label }) + `\n\n${contextInfo.content}`,
         });
       }
       messages.push(...tabMessages.map((m: AIMessage) => ({
@@ -1016,6 +1034,134 @@ export const useAppStore = create<AppState>((set, get) => ({
       console.error('Failed to load plugins:', error);
       return [];
     }
+  },
+
+  // Template methods
+  loadTemplates: async () => {
+    try {
+      const templates = await invoke<TemplateManifest[]>('list_templates');
+      set({ templates });
+      return templates;
+    } catch (error) {
+      console.error('Failed to load templates:', error);
+      return [];
+    }
+  },
+
+  createDocumentFromTemplate: async (projectId, templateId, title, author = 'User') => {
+    try {
+      set({ isLoading: true, error: null });
+      const document = await invoke<Document>('create_document_from_template', {
+        projectId, templateId, title, author,
+      });
+      // 重新加载文档列表
+      const documents = await invoke<Document[]>('list_documents', { projectId });
+      set({ documents, isLoading: false });
+      return document;
+    } catch (error) {
+      set({ isLoading: false, error: String(error) });
+      throw error;
+    }
+  },
+
+  saveAsTemplate: async (projectId, documentId, name, description, category, includeContent, includeAiContent, includePluginData) => {
+    try {
+      const template = await invoke<TemplateManifest>('save_template_from_document', {
+        projectId, documentId,
+        templateName: name,
+        templateDescription: description,
+        templateCategory: category,
+        includeContent, includeAiContent, includePluginData,
+      });
+      // 刷新模板列表
+      const templates = await invoke<TemplateManifest[]>('list_templates');
+      set({ templates });
+      return template;
+    } catch (error) {
+      console.error('Failed to save as template:', error);
+      throw error;
+    }
+  },
+
+  deleteTemplate: async (templateId) => {
+    try {
+      await invoke('delete_template', { templateId });
+      const templates = await invoke<TemplateManifest[]>('list_templates');
+      set({ templates });
+    } catch (error) {
+      console.error('Failed to delete template:', error);
+      throw error;
+    }
+  },
+
+  duplicateTemplate: async (templateId, newName) => {
+    try {
+      const template = await invoke<TemplateManifest>('duplicate_template', { templateId, newName });
+      const templates = await invoke<TemplateManifest[]>('list_templates');
+      set({ templates });
+      return template;
+    } catch (error) {
+      console.error('Failed to duplicate template:', error);
+      throw error;
+    }
+  },
+
+  updateTemplate: async (templateId, fields) => {
+    try {
+      const template = await invoke<TemplateManifest>('update_template', {
+        templateId,
+        name: fields.name ?? null,
+        description: fields.description ?? null,
+        category: fields.category ?? null,
+        icon: fields.icon ?? null,
+        tags: fields.tags ?? null,
+        content: null,
+      });
+      const templates = await invoke<TemplateManifest[]>('list_templates');
+      set({ templates });
+      return template;
+    } catch (error) {
+      console.error('Failed to update template:', error);
+      throw error;
+    }
+  },
+
+  // Template category methods
+  loadTemplateCategories: async () => {
+    try {
+      const templateCategories = await invoke<TemplateCategory[]>('list_template_categories');
+      set({ templateCategories });
+      return templateCategories;
+    } catch (error) {
+      console.error('Failed to load template categories:', error);
+      return [];
+    }
+  },
+
+  createTemplateCategory: async (key, label) => {
+    const templateCategories = await invoke<TemplateCategory[]>('create_template_category', { key, label });
+    set({ templateCategories });
+    return templateCategories;
+  },
+
+  updateTemplateCategory: async (key, label, newKey) => {
+    const templateCategories = await invoke<TemplateCategory[]>('update_template_category', {
+      key, label: label ?? null, newKey: newKey ?? null,
+    });
+    set({ templateCategories });
+    return templateCategories;
+  },
+
+  deleteTemplateCategory: async (key) => {
+    const templateCategories = await invoke<TemplateCategory[]>('delete_template_category', { key });
+    set({ templateCategories });
+    return templateCategories;
+  },
+
+  reorderTemplateCategories: async (orderedKeys) => {
+    const templateCategories = await invoke<TemplateCategory[]>('reorder_template_categories', { orderedKeys });
+    set({ templateCategories });
+    return templateCategories;
   },
 
   // Workspace persistence methods

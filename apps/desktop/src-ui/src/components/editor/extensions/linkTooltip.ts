@@ -1,4 +1,5 @@
 import { EditorView, hoverTooltip } from '@codemirror/view';
+import i18n from '@/i18n';
 import type { Tooltip } from '@codemirror/view';
 
 /**
@@ -38,7 +39,7 @@ export const linkHoverTooltip = hoverTooltip((view: EditorView, pos: number): To
           });
 
           const hint = document.createElement('span');
-          hint.textContent = ' — 点击打开';
+          hint.textContent = ` — ${i18n.t('editor.clickToOpen', { defaultValue: '点击打开' })}`;
           hint.style.cssText = 'color:var(--cm-hint-color, #888);font-size:11px;';
 
           dom.appendChild(link);
@@ -70,7 +71,7 @@ export const linkHoverTooltip = hoverTooltip((view: EditorView, pos: number): To
           if (/^https?:\/\//i.test(url)) {
             const img = document.createElement('img');
             img.src = url;
-            img.alt = alt || '图片预览';
+            img.alt = alt || i18n.t('editor.imagePreview', { defaultValue: '图片预览' });
             img.style.cssText = 'max-width:280px;max-height:150px;border-radius:4px;display:block;margin-bottom:4px;';
             img.onerror = () => { img.style.display = 'none'; };
             dom.appendChild(img);

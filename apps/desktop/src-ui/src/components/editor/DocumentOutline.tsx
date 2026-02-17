@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/i18n';
 import type { EditorView } from '@codemirror/view';
 
 interface HeadingItem {
@@ -42,6 +43,7 @@ function parseHeadings(content: string): HeadingItem[] {
 }
 
 export function DocumentOutline({ cmViewRef, content, className }: DocumentOutlineProps) {
+  const { t } = useTranslation();
   const [headings, setHeadings] = useState<HeadingItem[]>([]);
 
   useEffect(() => {
@@ -66,11 +68,11 @@ export function DocumentOutline({ cmViewRef, content, className }: DocumentOutli
   return (
     <div className={cn('flex flex-col h-full w-48', className)}>
       <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground shrink-0 border-b">
-        大纲 ({headings.length})
+        {t('editor.outline.titleCount', { defaultValue: '大纲 ({{count}})', count: headings.length })}
       </div>
       <div className="overflow-y-auto flex-1 space-y-0.5 px-1 py-1">
         {headings.length === 0 ? (
-          <div className="text-xs text-muted-foreground p-2 text-center">暂无标题</div>
+          <div className="text-xs text-muted-foreground p-2 text-center">{t('editor.outline.noHeadings', { defaultValue: '暂无标题' })}</div>
         ) : (
           headings.map((h, i) => (
             <button

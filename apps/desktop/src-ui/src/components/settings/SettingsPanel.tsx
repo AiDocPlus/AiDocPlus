@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Monitor, Type, Globe, Zap, Download, Upload, RotateCcw, Loader2, Puzzle, Plus, Pencil, Trash2, Check, Power, Mail } from 'lucide-react';
+import { X, Monitor, Type, Globe, Zap, Download, Upload, RotateCcw, Loader2, Puzzle, Plus, Pencil, Trash2, Check, Power, Mail, Search, ChevronDown, ChevronRight, LayoutTemplate } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from '../../i18n';
@@ -389,7 +389,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
         </DialogHeader>
 
         <Tabs defaultValue="editor" className="flex-1 overflow-hidden flex flex-col">
-          <TabsList className="grid grid-cols-7 w-full bg-muted">
+          <TabsList className="grid grid-cols-8 w-full bg-muted">
             <TabsTrigger value="editor">
               <Type className="w-4 h-4 mr-1" />
               {t('settings.editor')}
@@ -406,13 +406,17 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
               <Puzzle className="w-4 h-4 mr-1" />
               {t('settings.plugins', { defaultValue: '\u63D2\u4EF6' })}
             </TabsTrigger>
+            <TabsTrigger value="templates">
+              <LayoutTemplate className="w-4 h-4 mr-1" />
+              {t('settings.templateTab', { defaultValue: '模板' })}
+            </TabsTrigger>
             <TabsTrigger value="ai">
               <Zap className="w-4 h-4 mr-1" />
               AI
             </TabsTrigger>
             <TabsTrigger value="email">
               <Mail className="w-4 h-4 mr-1" />
-              邮件
+              {t('settings.emailTab', { defaultValue: '邮件' })}
             </TabsTrigger>
             <TabsTrigger value="advanced">
               {t('settings.advanced')}
@@ -450,6 +454,32 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
               </div>
             </TabsContent>
 
+            {/* Templates */}
+            <TabsContent value="templates" className="space-y-6 p-4 bg-card h-full">
+              <div>
+                <h3 className="text-lg font-semibold mb-2">{t('settings.templateManagement', { defaultValue: '模板管理' })}</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {t('settings.templateManagementDesc', { defaultValue: '管理文档模板。可通过“文件 → 存为模板”将当前文档保存为模板，或通过“文件 → 从模板新建”使用模板创建文档。' })}
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => window.dispatchEvent(new CustomEvent('menu-manage-templates'))}
+                >
+                  <LayoutTemplate className="w-4 h-4 mr-2" />
+                  {t('settings.openTemplateManager', { defaultValue: '打开模板管理器' })}
+                </Button>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold mb-2">{t('settings.templateUsage', { defaultValue: '使用方法' })}</h3>
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  <p>{t('settings.templateUsageStep1', { defaultValue: '1. 编辑文档后，点击工具栏模板按钮或菜单“文件 → 存为模板”' })}</p>
+                  <p>{t('settings.templateUsageStep2', { defaultValue: '2. 设置模板名称、分类，选择保留的内容' })}</p>
+                  <p>{t('settings.templateUsageStep3', { defaultValue: '3. 新建文档时，使用“文件 → 从模板新建”（⌘⇧T）选择模板' })}</p>
+                  <p>{t('settings.templateUsageStep4', { defaultValue: '4. 模板存储在 ~/AiDocPlus/Templates/ 目录中' })}</p>
+                </div>
+              </div>
+            </TabsContent>
+
             {/* Editor Settings */}
             <TabsContent value="editor" className="space-y-6 p-4 bg-card h-full">
               <div>
@@ -472,7 +502,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>编辑器字体</Label>
+                    <Label>{t('settings.editorFont', { defaultValue: '编辑器字体' })}</Label>
                     <Select
                       value={tempSettings.editor.fontFamily}
                       onValueChange={(value) => updateTempEditor({ fontFamily: value })}
@@ -481,17 +511,17 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value='system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif'>系统默认</SelectItem>
-                        <SelectItem value='"PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif'>苹方 / 微软雅黑</SelectItem>
-                        <SelectItem value='"Noto Sans SC", "Source Han Sans SC", "PingFang SC", sans-serif'>思源黑体</SelectItem>
-                        <SelectItem value='"Noto Serif SC", "Source Han Serif SC", "Songti SC", serif'>思源宋体</SelectItem>
-                        <SelectItem value='"Songti SC", "SimSun", "STSong", serif'>宋体</SelectItem>
-                        <SelectItem value='"Kaiti SC", "STKaiti", "KaiTi", serif'>楷体</SelectItem>
-                        <SelectItem value='"JetBrains Mono", "Fira Code", "Consolas", monospace'>等宽字体 (JetBrains Mono)</SelectItem>
-                        <SelectItem value='"Cascadia Code", "Fira Code", "Consolas", monospace'>等宽字体 (Cascadia Code)</SelectItem>
+                        <SelectItem value='system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif'>{t('settings.fontSystemDefault', { defaultValue: '系统默认' })}</SelectItem>
+                        <SelectItem value='"PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif'>{t('settings.fontPingFang', { defaultValue: '苹方 / 微软雅黑' })}</SelectItem>
+                        <SelectItem value='"Noto Sans SC", "Source Han Sans SC", "PingFang SC", sans-serif'>{t('settings.fontNotoSans', { defaultValue: '思源黑体' })}</SelectItem>
+                        <SelectItem value='"Noto Serif SC", "Source Han Serif SC", "Songti SC", serif'>{t('settings.fontNotoSerif', { defaultValue: '思源宋体' })}</SelectItem>
+                        <SelectItem value='"Songti SC", "SimSun", "STSong", serif'>{t('settings.fontSongti', { defaultValue: '宋体' })}</SelectItem>
+                        <SelectItem value='"Kaiti SC", "STKaiti", "KaiTi", serif'>{t('settings.fontKaiti', { defaultValue: '楷体' })}</SelectItem>
+                        <SelectItem value='"JetBrains Mono", "Fira Code", "Consolas", monospace'>{t('settings.fontJetBrains', { defaultValue: '等宽字体 (JetBrains Mono)' })}</SelectItem>
+                        <SelectItem value='"Cascadia Code", "Fira Code", "Consolas", monospace'>{t('settings.fontCascadia', { defaultValue: '等宽字体 (Cascadia Code)' })}</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">应用于编辑器和预览区域</p>
+                    <p className="text-xs text-muted-foreground">{t('settings.fontApplyHint', { defaultValue: '应用于编辑器和预览区域' })}</p>
                   </div>
 
                   <div className="space-y-2">
@@ -555,12 +585,12 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
                   <Separator />
 
-                  <h4 className="text-sm font-medium text-muted-foreground">编辑器功能</h4>
+                  <h4 className="text-sm font-medium text-muted-foreground">{t('settings.editorFeatures', { defaultValue: '编辑器功能' })}</h4>
 
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="highlight-active-line">高亮当前行</Label>
-                      <p className="text-xs text-muted-foreground">高亮显示光标所在行</p>
+                      <Label htmlFor="highlight-active-line">{t('settings.highlightActiveLine', { defaultValue: '高亮当前行' })}</Label>
+                      <p className="text-xs text-muted-foreground">{t('settings.highlightActiveLineDesc', { defaultValue: '高亮显示光标所在行' })}</p>
                     </div>
                     <Switch
                       id="highlight-active-line"
@@ -571,8 +601,8 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="bracket-matching">括号匹配</Label>
-                      <p className="text-xs text-muted-foreground">高亮显示匹配的括号</p>
+                      <Label htmlFor="bracket-matching">{t('settings.bracketMatching', { defaultValue: '括号匹配' })}</Label>
+                      <p className="text-xs text-muted-foreground">{t('settings.bracketMatchingDesc', { defaultValue: '高亮显示匹配的括号' })}</p>
                     </div>
                     <Switch
                       id="bracket-matching"
@@ -583,8 +613,8 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="close-brackets">自动闭合括号</Label>
-                      <p className="text-xs text-muted-foreground">输入左括号时自动补全右括号</p>
+                      <Label htmlFor="close-brackets">{t('settings.closeBrackets', { defaultValue: '自动闭合括号' })}</Label>
+                      <p className="text-xs text-muted-foreground">{t('settings.closeBracketsDesc', { defaultValue: '输入左括号时自动补全右括号' })}</p>
                     </div>
                     <Switch
                       id="close-brackets"
@@ -595,8 +625,8 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="code-folding">代码折叠</Label>
-                      <p className="text-xs text-muted-foreground">在行号旁显示折叠/展开按钮</p>
+                      <Label htmlFor="code-folding">{t('settings.codeFolding', { defaultValue: '代码折叠' })}</Label>
+                      <p className="text-xs text-muted-foreground">{t('settings.codeFoldingDesc', { defaultValue: '在行号旁显示折叠/展开按钮' })}</p>
                     </div>
                     <Switch
                       id="code-folding"
@@ -607,8 +637,8 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="highlight-sel-matches">高亮选中匹配</Label>
-                      <p className="text-xs text-muted-foreground">高亮文档中与选中文本相同的内容</p>
+                      <Label htmlFor="highlight-sel-matches">{t('settings.highlightSelMatches', { defaultValue: '高亮选中匹配' })}</Label>
+                      <p className="text-xs text-muted-foreground">{t('settings.highlightSelMatchesDesc', { defaultValue: '高亮文档中与选中文本相同的内容' })}</p>
                     </div>
                     <Switch
                       id="highlight-sel-matches"
@@ -619,8 +649,8 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="autocompletion">自动补全</Label>
-                      <p className="text-xs text-muted-foreground">输入时显示 Markdown 语法建议</p>
+                      <Label htmlFor="autocompletion">{t('settings.autocompletion', { defaultValue: '自动补全' })}</Label>
+                      <p className="text-xs text-muted-foreground">{t('settings.autocompletionDesc', { defaultValue: '输入时显示 Markdown 语法建议' })}</p>
                     </div>
                     <Switch
                       id="autocompletion"
@@ -631,8 +661,8 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="multi-cursor">多光标编辑</Label>
-                      <p className="text-xs text-muted-foreground">按住 Alt 拖拽可创建矩形选区</p>
+                      <Label htmlFor="multi-cursor">{t('settings.multiCursor', { defaultValue: '多光标编辑' })}</Label>
+                      <p className="text-xs text-muted-foreground">{t('settings.multiCursorDesc', { defaultValue: '按住 Alt 拖拽可创建矩形选区' })}</p>
                     </div>
                     <Switch
                       id="multi-cursor"
@@ -643,8 +673,8 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="scroll-past-end">滚动超出末尾</Label>
-                      <p className="text-xs text-muted-foreground">允许滚动到文档最后一行之后</p>
+                      <Label htmlFor="scroll-past-end">{t('settings.scrollPastEnd', { defaultValue: '滚动超出末尾' })}</Label>
+                      <p className="text-xs text-muted-foreground">{t('settings.scrollPastEndDesc', { defaultValue: '允许滚动到文档最后一行之后' })}</p>
                     </div>
                     <Switch
                       id="scroll-past-end"
@@ -655,8 +685,8 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="indent-on-input">自动缩进</Label>
-                      <p className="text-xs text-muted-foreground">输入特定字符时自动调整缩进</p>
+                      <Label htmlFor="indent-on-input">{t('settings.indentOnInput', { defaultValue: '自动缩进' })}</Label>
+                      <p className="text-xs text-muted-foreground">{t('settings.indentOnInputDesc', { defaultValue: '输入特定字符时自动调整缩进' })}</p>
                     </div>
                     <Switch
                       id="indent-on-input"
@@ -667,8 +697,8 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="markdown-lint">Markdown 语法检查</Label>
-                      <p className="text-xs text-muted-foreground">实时检查标题层级、空链接、未闭合代码块等问题</p>
+                      <Label htmlFor="markdown-lint">{t('settings.markdownLint', { defaultValue: 'Markdown 语法检查' })}</Label>
+                      <p className="text-xs text-muted-foreground">{t('settings.markdownLintDesc', { defaultValue: '实时检查标题层级、空链接、未闭合代码块等问题' })}</p>
                     </div>
                     <Switch
                       id="markdown-lint"
@@ -678,7 +708,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>默认视图模式</Label>
+                    <Label>{t('settings.defaultViewMode', { defaultValue: '默认视图模式' })}</Label>
                     <Select
                       value={tempSettings.editor.defaultViewMode || 'edit'}
                       onValueChange={(value: 'edit' | 'preview' | 'split') => updateTempEditor({ defaultViewMode: value })}
@@ -687,47 +717,47 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="edit">编辑</SelectItem>
-                        <SelectItem value="preview">预览</SelectItem>
-                        <SelectItem value="split">分屏</SelectItem>
+                        <SelectItem value="edit">{t('settings.viewEdit', { defaultValue: '编辑' })}</SelectItem>
+                        <SelectItem value="preview">{t('settings.viewPreview', { defaultValue: '预览' })}</SelectItem>
+                        <SelectItem value="split">{t('settings.viewSplit', { defaultValue: '分屏' })}</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">打开文档时的默认显示模式</p>
+                    <p className="text-xs text-muted-foreground">{t('settings.defaultViewModeDesc', { defaultValue: '打开文档时的默认显示模式' })}</p>
                   </div>
 
                   <Separator />
 
-                  <h4 className="text-sm font-medium text-muted-foreground">工具栏按钮</h4>
-                  <p className="text-xs text-muted-foreground -mt-2">选择在编辑器工具栏中显示哪些按钮组</p>
+                  <h4 className="text-sm font-medium text-muted-foreground">{t('settings.toolbarButtons', { defaultValue: '工具栏按钮' })}</h4>
+                  <p className="text-xs text-muted-foreground -mt-2">{t('settings.toolbarButtonsDesc', { defaultValue: '选择在编辑器工具栏中显示哪些按钮组' })}</p>
 
                   {([
-                    ['undo', '撤销'],
-                    ['redo', '重做'],
-                    ['copy', '复制'],
-                    ['cut', '剪切'],
-                    ['paste', '粘贴'],
-                    ['clearAll', '清空内容'],
-                    ['headings', '标题'],
-                    ['bold', '粗体'],
-                    ['italic', '斜体'],
-                    ['strikethrough', '删除线'],
-                    ['inlineCode', '行内代码'],
-                    ['clearFormat', '清除格式'],
-                    ['unorderedList', '无序列表'],
-                    ['orderedList', '有序列表'],
-                    ['taskList', '任务列表'],
-                    ['quote', '引用'],
-                    ['horizontalRule', '分隔线'],
-                    ['link', '链接'],
-                    ['image', '图片'],
-                    ['table', '表格'],
-                    ['footnote', '脚注'],
-                    ['codeBlock', '代码块'],
-                    ['mermaid', 'Mermaid 图表'],
-                    ['math', '数学公式'],
-                    ['importFile', '导入文件'],
-                    ['goToTop', '滚动到顶部'],
-                    ['goToBottom', '滚动到底部'],
+                    ['undo', t('settings.toolbar.undo', { defaultValue: '撤销' })],
+                    ['redo', t('settings.toolbar.redo', { defaultValue: '重做' })],
+                    ['copy', t('settings.toolbar.copy', { defaultValue: '复制' })],
+                    ['cut', t('settings.toolbar.cut', { defaultValue: '剪切' })],
+                    ['paste', t('settings.toolbar.paste', { defaultValue: '粘贴' })],
+                    ['clearAll', t('settings.toolbar.clearAll', { defaultValue: '清空内容' })],
+                    ['headings', t('settings.toolbar.headings', { defaultValue: '标题' })],
+                    ['bold', t('settings.toolbar.bold', { defaultValue: '粗体' })],
+                    ['italic', t('settings.toolbar.italic', { defaultValue: '斜体' })],
+                    ['strikethrough', t('settings.toolbar.strikethrough', { defaultValue: '删除线' })],
+                    ['inlineCode', t('settings.toolbar.inlineCode', { defaultValue: '行内代码' })],
+                    ['clearFormat', t('settings.toolbar.clearFormat', { defaultValue: '清除格式' })],
+                    ['unorderedList', t('settings.toolbar.unorderedList', { defaultValue: '无序列表' })],
+                    ['orderedList', t('settings.toolbar.orderedList', { defaultValue: '有序列表' })],
+                    ['taskList', t('settings.toolbar.taskList', { defaultValue: '任务列表' })],
+                    ['quote', t('settings.toolbar.quote', { defaultValue: '引用' })],
+                    ['horizontalRule', t('settings.toolbar.horizontalRule', { defaultValue: '分隔线' })],
+                    ['link', t('settings.toolbar.link', { defaultValue: '链接' })],
+                    ['image', t('settings.toolbar.image', { defaultValue: '图片' })],
+                    ['table', t('settings.toolbar.table', { defaultValue: '表格' })],
+                    ['footnote', t('settings.toolbar.footnote', { defaultValue: '脚注' })],
+                    ['codeBlock', t('settings.toolbar.codeBlock', { defaultValue: '代码块' })],
+                    ['mermaid', t('settings.toolbar.mermaid', { defaultValue: 'Mermaid 图表' })],
+                    ['math', t('settings.toolbar.math', { defaultValue: '数学公式' })],
+                    ['importFile', t('settings.toolbar.importFile', { defaultValue: '导入文件' })],
+                    ['goToTop', t('settings.toolbar.goToTop', { defaultValue: '滚动到顶部' })],
+                    ['goToBottom', t('settings.toolbar.goToBottom', { defaultValue: '滚动到底部' })],
                   ] as [keyof import('@aidocplus/shared-types').ToolbarButtons, string][]).map(([key, label]) => (
                     <div key={key} className="flex items-center justify-between">
                       <Label htmlFor={`tb-${key}`}>{label}</Label>
@@ -902,17 +932,17 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             <TabsContent value="ai" className="space-y-6 p-4 bg-card h-full">
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">AI 服务配置</h3>
+                  <h3 className="text-lg font-semibold">{t('settings.aiServiceConfig', { defaultValue: 'AI 服务配置' })}</h3>
                   <Button variant="outline" size="sm" onClick={handleCreateService}>
-                    <Plus className="h-4 w-4 mr-1" />创建 API 服务
+                    <Plus className="h-4 w-4 mr-1" />{t('settings.createApiService', { defaultValue: '创建 API 服务' })}
                   </Button>
                 </div>
 
                 {/* 服务列表 */}
                 {tempSettings.ai.services.length === 0 ? (
                   <div className="text-center py-12 text-muted-foreground">
-                    <p className="text-sm">还没有配置任何 AI 服务</p>
-                    <p className="text-xs mt-1">点击上方「创建 API 服务」按钮添加一个</p>
+                    <p className="text-sm">{t('settings.noAiServices', { defaultValue: '还没有配置任何 AI 服务' })}</p>
+                    <p className="text-xs mt-1">{t('settings.noAiServicesHint', { defaultValue: '点击上方「创建 API 服务」按钮添加一个' })}</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -937,22 +967,22 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                               <span className="font-medium text-sm truncate">{svc.name}</span>
                               <span className="text-xs text-muted-foreground">{provCfg?.name || svc.provider}</span>
                               {isActive && (
-                                <span className="text-xs font-semibold text-primary bg-primary/15 px-1.5 py-0.5 rounded">使用中</span>
+                                <span className="text-xs font-semibold text-primary bg-primary/15 px-1.5 py-0.5 rounded">{t('settings.inUse', { defaultValue: '使用中' })}</span>
                               )}
                             </div>
                             <div className="text-xs text-muted-foreground truncate mt-0.5">
-                              模型: {svc.model || '默认模型'} {svc.apiKey ? '' : '• ⚠️ 未配置 Key'}
+                              {t('settings.modelLabel', { defaultValue: '模型: {{model}}', model: svc.model || t('settings.defaultModel', { defaultValue: '默认模型' }) })} {svc.apiKey ? '' : `• ${t('settings.noKeyWarning', { defaultValue: '⚠️ 未配置 Key' })}`}
                             </div>
                           </div>
                           {/* 操作按钮 */}
                           <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleToggleService(svc.id)} title={svc.enabled ? '禁用' : '启用'}>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleToggleService(svc.id)} title={svc.enabled ? t('settings.disable', { defaultValue: '禁用' }) : t('settings.enable', { defaultValue: '启用' })}>
                               <Power className={`h-3.5 w-3.5 ${!svc.enabled ? 'text-muted-foreground' : !svc.apiKey ? 'text-red-500' : svc.lastTestOk === true ? 'text-green-500' : svc.lastTestOk === false ? 'text-red-500' : 'text-orange-500'}`} />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditService(svc)} title="编辑">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditService(svc)} title={t('settings.edit', { defaultValue: '编辑' })}>
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDeleteService(svc.id)} title="删除">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDeleteService(svc.id)} title={t('settings.delete', { defaultValue: '删除' })}>
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </div>
@@ -965,7 +995,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                 <Separator className="my-4" />
 
                 {/* 全局 AI 设置 */}
-                <h4 className="text-sm font-semibold mb-3">全局设置</h4>
+                <h4 className="text-sm font-semibold mb-3">{t('settings.globalSettings', { defaultValue: '全局设置' })}</h4>
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label>Temperature</Label>
@@ -993,8 +1023,8 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label>流式输出</Label>
-                      <p className="text-xs text-muted-foreground">启用后 AI 回复将逐字显示</p>
+                      <Label>{t('settings.streamingOutput', { defaultValue: '流式输出' })}</Label>
+                      <p className="text-xs text-muted-foreground">{t('settings.streamingOutputDesc', { defaultValue: '启用后 AI 回复将逐字显示' })}</p>
                     </div>
                     <Switch
                       checked={tempSettings.ai.streamEnabled}
@@ -1005,8 +1035,8 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
-                        <Label>强制 Markdown 格式输出</Label>
-                        <p className="text-xs text-muted-foreground">启用后 AI 将始终以纯净 Markdown 格式返回内容，不含多余的开场白和总结语</p>
+                        <Label>{t('settings.forceMarkdown', { defaultValue: '强制 Markdown 格式输出' })}</Label>
+                        <p className="text-xs text-muted-foreground">{t('settings.forceMarkdownDesc', { defaultValue: '启用后 AI 将始终以纯净 Markdown 格式返回内容，不含多余的开场白和总结语' })}</p>
                       </div>
                       <Switch
                         checked={tempSettings.ai.markdownMode ?? true}
@@ -1017,7 +1047,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                       <textarea
                         value={tempSettings.ai.markdownModePrompt ?? ''}
                         onChange={(e) => updateTempAI({ markdownModePrompt: e.target.value })}
-                        placeholder="Markdown 格式约束提示词..."
+                        placeholder={t('settings.markdownPromptPlaceholder', { defaultValue: 'Markdown 格式约束提示词...' })}
                         className="w-full min-h-[120px] px-3 py-2 text-sm border rounded-md bg-background resize-y focus:outline-none focus:ring-1 focus:ring-ring"
                         spellCheck={false}
                         autoCorrect="off"
@@ -1027,11 +1057,11 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>System Prompt <span className="text-xs text-muted-foreground">(可选)</span></Label>
+                    <Label>{t('settings.systemPromptLabel', { defaultValue: 'System Prompt' })} <span className="text-xs text-muted-foreground">{t('settings.systemPromptOptional', { defaultValue: '(可选)' })}</span></Label>
                     <textarea
                       value={tempSettings.ai.systemPrompt || ''}
                       onChange={(e) => updateTempAI({ systemPrompt: e.target.value })}
-                      placeholder="可选，留空则不附加额外系统提示词..."
+                      placeholder={t('settings.systemPromptPlaceholder', { defaultValue: '可选，留空则不附加额外系统提示词...' })}
                       className="w-full min-h-[80px] px-3 py-2 text-sm border rounded-md bg-background resize-y focus:outline-none focus:ring-1 focus:ring-ring"
                       spellCheck={false}
                       autoCorrect="off"
@@ -1040,13 +1070,13 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>插件正文字数限制</Label>
-                    <p className="text-xs text-muted-foreground">插件发送给 AI 的正文最大字符数，0 表示不限制</p>
+                    <Label>{t('settings.pluginContentLimit', { defaultValue: '插件正文字数限制' })}</Label>
+                    <p className="text-xs text-muted-foreground">{t('settings.pluginContentLimitDesc', { defaultValue: '插件发送给 AI 的正文最大字符数，0 表示不限制' })}</p>
                     <Input
                       type="number"
                       value={tempSettings.ai.maxContentLength}
                       onChange={(e) => updateTempAI({ maxContentLength: Math.max(0, parseInt(e.target.value) || 0) })}
-                      placeholder="0（不限制）"
+                      placeholder={t('settings.pluginContentLimitPlaceholder', { defaultValue: '0（不限制）' })}
                       min={0}
                     />
                   </div>
@@ -1058,21 +1088,21 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             <Dialog open={!!editingService} onOpenChange={(open) => { if (!open) setEditingService(null); }}>
               <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
-                  <DialogTitle>{isCreatingService ? '创建 API 服务' : '编辑 API 服务'}</DialogTitle>
+                  <DialogTitle>{isCreatingService ? t('settings.createApiServiceTitle', { defaultValue: '创建 API 服务' }) : t('settings.editApiServiceTitle', { defaultValue: '编辑 API 服务' })}</DialogTitle>
                 </DialogHeader>
                 {editingService && (
                   <div className="space-y-4 py-2">
                     <div className="space-y-2">
-                      <Label>服务名称 <span className="text-xs text-muted-foreground">(可选，留空自动命名)</span></Label>
+                      <Label>{t('settings.serviceNameLabel', { defaultValue: '服务名称' })} <span className="text-xs text-muted-foreground">{t('settings.serviceNameOptional', { defaultValue: '(可选，留空自动命名)' })}</span></Label>
                       <Input
                         value={editingService.name}
                         onChange={(e) => setEditingService({ ...editingService, name: e.target.value })}
-                        placeholder={editingProviderConfig?.name || '例如：我的 GPT 服务'}
+                        placeholder={editingProviderConfig?.name || t('settings.serviceNamePlaceholder', { defaultValue: '例如：我的 GPT 服务' })}
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label>服务商</Label>
+                      <Label>{t('settings.providerLabel', { defaultValue: '服务商' })}</Label>
                       <Select
                         value={editingService.provider}
                         onValueChange={(v) => handleEditProviderChange(v as AIProvider)}
@@ -1089,7 +1119,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-red-500">API Key <span className="text-xs text-red-500">*必填</span></Label>
+                      <Label className="text-red-500">{t('settings.apiKeyRequired', { defaultValue: 'API Key' })} <span className="text-xs text-red-500">{t('settings.apiKeyRequiredMark', { defaultValue: '*必填' })}</span></Label>
                       <Input
                         value={editingService.apiKey}
                         onChange={(e) => setEditingService({ ...editingService, apiKey: e.target.value })}
@@ -1099,29 +1129,29 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                     </div>
 
                     <div className="space-y-2">
-                      <Label>模型</Label>
+                      <Label>{t('settings.modelSelectPlaceholder', { defaultValue: '模型' })}</Label>
                       {editingProviderConfig && editingProviderConfig.models.length > 0 && (
                         <Select
                           value={editingProviderConfig.models.some(m => m.id === editingService.model) ? editingService.model : '__custom__'}
                           onValueChange={(v) => { if (v !== '__custom__') setEditingService({ ...editingService, model: v }); }}
                         >
                           <SelectTrigger className="w-full">
-                            <SelectValue placeholder="选择预置模型..." />
+                            <SelectValue placeholder={t('settings.modelSelectPlaceholder', { defaultValue: '选择预置模型...' })} />
                           </SelectTrigger>
                           <SelectContent>
                             {editingProviderConfig.models.map(m => (
                               <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
                             ))}
-                            <SelectItem value="__custom__">自定义模型...</SelectItem>
+                            <SelectItem value="__custom__">{t('settings.customModel', { defaultValue: '自定义模型...' })}</SelectItem>
                           </SelectContent>
                         </Select>
                       )}
                       <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">模型 ID（实际调用值，可手动修改）</Label>
+                        <Label className="text-xs text-muted-foreground">{t('settings.modelIdLabel', { defaultValue: '模型 ID（实际调用值，可手动修改）' })}</Label>
                         <Input
                           value={editingService.model}
                           onChange={(e) => setEditingService({ ...editingService, model: e.target.value })}
-                          placeholder="输入模型 ID，如 kimi-k2.5"
+                          placeholder={t('settings.modelIdPlaceholder', { defaultValue: '输入模型 ID，如 kimi-k2.5' })}
                           className="font-mono text-sm"
                         />
                       </div>
@@ -1132,7 +1162,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                       <Input
                         value={editingService.baseUrl}
                         onChange={(e) => setEditingService({ ...editingService, baseUrl: e.target.value })}
-                        placeholder="输入 Base URL"
+                        placeholder={t('settings.baseUrlPlaceholder', { defaultValue: '输入 Base URL' })}
                         className="font-mono text-sm"
                       />
                     </div>
@@ -1148,9 +1178,9 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                         className="w-full"
                       >
                         {testingApi ? (
-                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" />测试中...</>
+                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t('settings.testing', { defaultValue: '测试中...' })}</>
                         ) : (
-                          '测试连接'
+                          t('settings.testConnection', { defaultValue: '测试连接' })
                         )}
                       </Button>
                       {testResult && (
@@ -1162,9 +1192,9 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
                     {/* 保存/取消 */}
                     <div className="flex gap-2 pt-2">
-                      <Button variant="outline" className="flex-1" onClick={() => setEditingService(null)}>取消</Button>
+                      <Button variant="outline" className="flex-1" onClick={() => setEditingService(null)}>{t('settings.cancel', { defaultValue: '取消' })}</Button>
                       <Button className="flex-1" onClick={handleSaveService} disabled={!editingService.apiKey}>
-                        <Check className="h-4 w-4 mr-1" />保存
+                        <Check className="h-4 w-4 mr-1" />{t('settings.save', { defaultValue: '保存' })}
                       </Button>
                     </div>
                   </div>
@@ -1176,18 +1206,18 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             <TabsContent value="email" className="space-y-6 p-4 bg-card h-full">
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold">邮箱账户配置</h3>
+                  <h3 className="text-lg font-semibold">{t('settings.emailAccountConfig', { defaultValue: '邮箱账户配置' })}</h3>
                   <Button variant="outline" size="sm" onClick={handleCreateEmailAccount}>
-                    <Plus className="h-4 w-4 mr-1" />添加邮箱账户
+                    <Plus className="h-4 w-4 mr-1" />{t('settings.addEmailAccount', { defaultValue: '添加邮箱账户' })}
                   </Button>
                 </div>
 
                 {tempSettings.email.accounts.length === 0 ? (
                   <div className="text-center py-12 text-muted-foreground">
                     <Mail className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                    <p className="text-sm">还没有配置任何邮箱账户</p>
-                    <p className="text-xs mt-1">点击上方「添加邮箱账户」按钮添加一个</p>
-                    <p className="text-xs mt-3 text-muted-foreground/70">支持网易 163、126、移动 139、QQ 邮箱、Gmail、Outlook 等</p>
+                    <p className="text-sm">{t('settings.noEmailAccounts', { defaultValue: '还没有配置任何邮箱账户' })}</p>
+                    <p className="text-xs mt-1">{t('settings.noEmailAccountsHint', { defaultValue: '点击上方「添加邮箱账户」按钮添加一个' })}</p>
+                    <p className="text-xs mt-3 text-muted-foreground/70">{t('settings.emailProviderSupport', { defaultValue: '支持网易 163、126、移动 139、QQ 邮箱、Gmail、Outlook 等' })}</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -1209,23 +1239,23 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="font-medium text-sm truncate">{acct.name}</span>
-                              <span className="text-xs text-muted-foreground">{preset?.name || '自定义'}</span>
+                              <span className="text-xs text-muted-foreground">{preset?.name || t('settings.customProvider', { defaultValue: '自定义' })}</span>
                               {isActive && (
-                                <span className="text-xs font-semibold text-primary bg-primary/15 px-1.5 py-0.5 rounded">使用中</span>
+                                <span className="text-xs font-semibold text-primary bg-primary/15 px-1.5 py-0.5 rounded">{t('settings.inUse', { defaultValue: '使用中' })}</span>
                               )}
                             </div>
                             <div className="text-xs text-muted-foreground truncate mt-0.5">
-                              {acct.email || '未配置邮箱地址'} {acct.password ? '' : '• ⚠️ 未配置授权码'}
+                              {acct.email || t('settings.noEmailConfigured', { defaultValue: '未配置邮箱地址' })} {acct.password ? '' : `• ${t('settings.noAuthCodeWarning', { defaultValue: '⚠️ 未配置授权码' })}`}
                             </div>
                           </div>
                           <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleToggleEmailAccount(acct.id)} title={acct.enabled ? '禁用' : '启用'}>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleToggleEmailAccount(acct.id)} title={acct.enabled ? t('settings.disable', { defaultValue: '禁用' }) : t('settings.enable', { defaultValue: '启用' })}>
                               <Power className={`h-3.5 w-3.5 ${!acct.enabled ? 'text-muted-foreground' : !acct.password ? 'text-red-500' : acct.lastTestOk === true ? 'text-green-500' : acct.lastTestOk === false ? 'text-red-500' : 'text-orange-500'}`} />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditEmailAccount(acct)} title="编辑">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditEmailAccount(acct)} title={t('settings.edit', { defaultValue: '编辑' })}>
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDeleteEmailAccount(acct.id)} title="删除">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDeleteEmailAccount(acct.id)} title={t('settings.delete', { defaultValue: '删除' })}>
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </div>
@@ -1238,12 +1268,12 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                 <Separator className="my-4" />
 
                 <div>
-                  <h4 className="text-sm font-semibold mb-2">使用说明</h4>
+                  <h4 className="text-sm font-semibold mb-2">{t('settings.emailUsageTitle', { defaultValue: '使用说明' })}</h4>
                   <div className="space-y-1 text-xs text-muted-foreground">
-                    <p>1. 选择邮箱服务商后，SMTP 服务器地址和端口会自动填充</p>
-                    <p>2. 大多数邮箱需要开启 SMTP 服务并获取授权码（非登录密码）</p>
-                    <p>3. 配置完成后可点击「测试连接」验证设置是否正确</p>
-                    <p>4. 在邮件发送插件中可直接选择已配置的账户发送邮件</p>
+                    <p>{t('settings.emailUsageStep1', { defaultValue: '1. 选择邮箱服务商后，SMTP 服务器地址和端口会自动填充' })}</p>
+                    <p>{t('settings.emailUsageStep2', { defaultValue: '2. 大多数邮箱需要开启 SMTP 服务并获取授权码（非登录密码）' })}</p>
+                    <p>{t('settings.emailUsageStep3', { defaultValue: '3. 配置完成后可点击「测试连接」验证设置是否正确' })}</p>
+                    <p>{t('settings.emailUsageStep4', { defaultValue: '4. 在邮件发送插件中可直接选择已配置的账户发送邮件' })}</p>
                   </div>
                 </div>
               </div>
@@ -1253,21 +1283,21 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             <Dialog open={!!editingEmailAccount} onOpenChange={(open) => { if (!open) setEditingEmailAccount(null); }}>
               <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
-                  <DialogTitle>{isCreatingEmailAccount ? '添加邮箱账户' : '编辑邮箱账户'}</DialogTitle>
+                  <DialogTitle>{isCreatingEmailAccount ? t('settings.addEmailAccountTitle', { defaultValue: '添加邮箱账户' }) : t('settings.editEmailAccountTitle', { defaultValue: '编辑邮箱账户' })}</DialogTitle>
                 </DialogHeader>
                 {editingEmailAccount && (
                   <div className="space-y-4 py-2">
                     <div className="space-y-2">
-                      <Label>账户名称 <span className="text-xs text-muted-foreground">(可选，留空自动命名)</span></Label>
+                      <Label>{t('settings.accountNameLabel', { defaultValue: '账户名称' })} <span className="text-xs text-muted-foreground">{t('settings.accountNameOptional', { defaultValue: '(可选，留空自动命名)' })}</span></Label>
                       <Input
                         value={editingEmailAccount.name}
                         onChange={(e) => setEditingEmailAccount({ ...editingEmailAccount, name: e.target.value })}
-                        placeholder="例如：我的工作邮箱"
+                        placeholder={t('settings.accountNamePlaceholder', { defaultValue: '例如：我的工作邮箱' })}
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label>邮箱服务商</Label>
+                      <Label>{t('settings.emailProviderLabel', { defaultValue: '邮箱服务商' })}</Label>
                       <Select
                         value={editingEmailAccount.provider}
                         onValueChange={handleEmailProviderChange}
@@ -1284,7 +1314,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-red-500">邮箱地址 <span className="text-xs text-red-500">*必填</span></Label>
+                      <Label className="text-red-500">{t('settings.emailAddressLabel', { defaultValue: '邮箱地址' })} <span className="text-xs text-red-500">{t('settings.emailAddressRequired', { defaultValue: '*必填' })}</span></Label>
                       <Input
                         value={editingEmailAccount.email}
                         onChange={(e) => setEditingEmailAccount({ ...editingEmailAccount, email: e.target.value })}
@@ -1294,32 +1324,32 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-red-500">SMTP 授权码 <span className="text-xs text-red-500">*必填</span></Label>
+                      <Label className="text-red-500">{t('settings.smtpAuthCodeLabel', { defaultValue: 'SMTP 授权码' })} <span className="text-xs text-red-500">{t('settings.smtpAuthCodeRequired', { defaultValue: '*必填' })}</span></Label>
                       <Input
                         type="password"
                         value={editingEmailAccount.password}
                         onChange={(e) => setEditingEmailAccount({ ...editingEmailAccount, password: e.target.value })}
-                        placeholder="SMTP 授权码（非登录密码）"
+                        placeholder={t('settings.smtpAuthCodePlaceholder', { defaultValue: 'SMTP 授权码（非登录密码）' })}
                         className="font-mono text-sm"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label>发件人显示名称 <span className="text-xs text-muted-foreground">(可选)</span></Label>
+                      <Label>{t('settings.senderNameLabel', { defaultValue: '发件人显示名称' })} <span className="text-xs text-muted-foreground">{t('settings.senderNameOptional', { defaultValue: '(可选)' })}</span></Label>
                       <Input
                         value={editingEmailAccount.displayName || ''}
                         onChange={(e) => setEditingEmailAccount({ ...editingEmailAccount, displayName: e.target.value })}
-                        placeholder="收件人看到的发件人名称"
+                        placeholder={t('settings.senderNamePlaceholder', { defaultValue: '收件人看到的发件人名称' })}
                       />
                     </div>
 
                     <Separator />
 
                     <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">SMTP 服务器设置（选择服务商后自动填充，也可手动修改）</Label>
+                      <Label className="text-xs text-muted-foreground">{t('settings.smtpServerSettings', { defaultValue: 'SMTP 服务器设置（选择服务商后自动填充，也可手动修改）' })}</Label>
                       <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-1">
-                          <Label className="text-xs">SMTP 地址</Label>
+                          <Label className="text-xs">{t('settings.smtpAddress', { defaultValue: 'SMTP 地址' })}</Label>
                           <Input
                             value={editingEmailAccount.smtpHost}
                             onChange={(e) => setEditingEmailAccount({ ...editingEmailAccount, smtpHost: e.target.value })}
@@ -1328,7 +1358,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-xs">端口</Label>
+                          <Label className="text-xs">{t('settings.smtpPort', { defaultValue: '端口' })}</Label>
                           <Input
                             type="number"
                             value={editingEmailAccount.smtpPort}
@@ -1338,7 +1368,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs">加密方式</Label>
+                        <Label className="text-xs">{t('settings.smtpEncryption', { defaultValue: '加密方式' })}</Label>
                         <Select
                           value={editingEmailAccount.encryption}
                           onValueChange={(v) => setEditingEmailAccount({ ...editingEmailAccount, encryption: v as 'tls' | 'starttls' | 'none' })}
@@ -1349,7 +1379,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                           <SelectContent>
                             <SelectItem value="tls">TLS (SSL)</SelectItem>
                             <SelectItem value="starttls">STARTTLS</SelectItem>
-                            <SelectItem value="none">无加密</SelectItem>
+                            <SelectItem value="none">{t('settings.noEncryption', { defaultValue: '无加密' })}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -1365,9 +1395,9 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                         className="w-full"
                       >
                         {testingSmtp ? (
-                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" />测试中...</>
+                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t('settings.testing', { defaultValue: '测试中...' })}</>
                         ) : (
-                          '测试连接'
+                          t('settings.testConnection', { defaultValue: '测试连接' })
                         )}
                       </Button>
                       {smtpTestResult && (
@@ -1378,9 +1408,9 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                     </div>
 
                     <div className="flex gap-2 pt-2">
-                      <Button variant="outline" className="flex-1" onClick={() => setEditingEmailAccount(null)}>取消</Button>
+                      <Button variant="outline" className="flex-1" onClick={() => setEditingEmailAccount(null)}>{t('settings.cancel', { defaultValue: '取消' })}</Button>
                       <Button className="flex-1" onClick={handleSaveEmailAccount} disabled={!editingEmailAccount.email || !editingEmailAccount.password}>
-                        <Check className="h-4 w-4 mr-1" />保存
+                        <Check className="h-4 w-4 mr-1" />{t('settings.save', { defaultValue: '保存' })}
                       </Button>
                     </div>
                   </div>
@@ -1492,64 +1522,179 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 }
 
 /**
- * 插件设置列表 — 从后端 manifest 驱动
+ * 插件设置列表 — 分类分组视图 + 搜索 + 批量操作
  */
 function PluginSettingsList() {
   const { t } = useTranslation();
   const { pluginManifests, loadPlugins } = useAppStore();
+  const { plugins: pluginsSettings } = useSettingsStore();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  const pluginUsageCount: Record<string, number> = pluginsSettings?.usageCount || {};
 
   const handleToggle = async (pluginId: string, enabled: boolean) => {
     try {
       await invoke('set_plugin_enabled', { pluginId, enabled });
-      await loadPlugins(); // 重新加载 manifest
+      await loadPlugins();
     } catch (error) {
       console.error('Failed to toggle plugin:', error);
     }
   };
 
+  const handleBatchToggle = async (pluginIds: string[], enabled: boolean) => {
+    try {
+      for (const id of pluginIds) {
+        await invoke('set_plugin_enabled', { pluginId: id, enabled });
+      }
+      await loadPlugins();
+    } catch (error) {
+      console.error('Failed to batch toggle plugins:', error);
+    }
+  };
+
+  const toggleGroup = (key: string) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
   if (pluginManifests.length === 0) return null;
 
+  // 按分类分组
+  const grouped = new Map<string, typeof pluginManifests>();
+  for (const m of pluginManifests) {
+    const major = m.majorCategory || 'content-generation';
+    if (!grouped.has(major)) grouped.set(major, []);
+    grouped.get(major)!.push(m);
+  }
+
+  // 搜索过滤
+  const filteredGrouped = new Map<string, typeof pluginManifests>();
+  const q = searchQuery.toLowerCase().trim();
+  for (const [key, manifests] of grouped) {
+    const filtered = q
+      ? manifests.filter(m =>
+          m.name.toLowerCase().includes(q) ||
+          m.description.toLowerCase().includes(q) ||
+          m.tags.some(tag => tag.toLowerCase().includes(q))
+        )
+      : manifests;
+    if (filtered.length > 0) {
+      filteredGrouped.set(key, filtered);
+    }
+  }
+
+  // 大类标签映射
+  const majorLabels: Record<string, string> = {
+    'content-generation': t('settings.pluginCategoryContentGen', { defaultValue: '内容生成' }),
+    'functional': t('settings.pluginCategoryFunctional', { defaultValue: '功能执行' }),
+  };
+
   return (
-    <div className="space-y-3">
-      {pluginManifests.map(manifest => (
-        <div
-          key={manifest.id}
-          className="flex items-center gap-4 p-4 rounded-lg border bg-background"
-        >
-          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-primary flex-shrink-0">
-            <Puzzle className="w-5 h-5" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-medium">{manifest.name}</span>
-              <span className={`text-xs px-1.5 py-0.5 rounded ${
-                manifest.type === 'builtin'
-                  ? 'bg-green-500/10 text-green-600'
-                  : 'bg-blue-500/10 text-blue-600'
-              }`}>
-                {manifest.type === 'builtin'
-                  ? t('settings.pluginsSettings.builtin', { defaultValue: '内置' })
-                  : t('settings.pluginsSettings.custom', { defaultValue: '自定义' })}
+    <div className="space-y-4">
+      {/* 搜索栏 */}
+      <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-background">
+        <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          placeholder={t('settings.pluginsSettings.searchPlaceholder', { defaultValue: '搜索插件...' })}
+          className="flex-1 min-w-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+        />
+        {searchQuery && (
+          <button onClick={() => setSearchQuery('')} className="text-muted-foreground hover:text-foreground">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* 分组列表 */}
+      {Array.from(filteredGrouped.entries()).map(([majorKey, manifests]) => {
+        const isCollapsed = collapsedGroups.has(majorKey);
+        const enabledCount = manifests.filter(m => m.enabled).length;
+        const allEnabled = enabledCount === manifests.length;
+
+        return (
+          <div key={majorKey} className="rounded-lg border overflow-hidden">
+            {/* 分组标题栏 */}
+            <div className="flex items-center gap-3 px-4 py-2.5 bg-muted/30">
+              <button
+                onClick={() => toggleGroup(majorKey)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                {isCollapsed
+                  ? <ChevronRight className="h-4 w-4" />
+                  : <ChevronDown className="h-4 w-4" />
+                }
+              </button>
+              <span className="text-sm font-semibold flex-1">
+                {majorLabels[majorKey] || majorKey}
               </span>
-              <span className="text-xs text-muted-foreground">v{manifest.version}</span>
+              <span className="text-xs text-muted-foreground">
+                {enabledCount}/{manifests.length} {t('settings.pluginsSettings.enabled', { defaultValue: '已启用' })}
+              </span>
+              <Switch
+                checked={allEnabled}
+                onCheckedChange={(checked) => handleBatchToggle(manifests.map(m => m.id), checked)}
+              />
             </div>
-            {manifest.description && (
-              <p className="text-sm text-muted-foreground mt-0.5">{manifest.description}</p>
+
+            {/* 插件列表 */}
+            {!isCollapsed && (
+              <div className="divide-y">
+                {manifests.map(manifest => (
+                  <div
+                    key={manifest.id}
+                    className="flex items-center gap-4 px-4 py-3 bg-background"
+                  >
+                    <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 text-primary flex-shrink-0">
+                      <Puzzle className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm">{manifest.name}</span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${
+                          manifest.type === 'builtin'
+                            ? 'bg-green-500/10 text-green-600'
+                            : 'bg-blue-500/10 text-blue-600'
+                        }`}>
+                          {manifest.type === 'builtin'
+                            ? t('settings.pluginsSettings.builtin', { defaultValue: '内置' })
+                            : t('settings.pluginsSettings.custom', { defaultValue: '自定义' })}
+                        </span>
+                        <span className="text-xs text-muted-foreground">v{manifest.version}</span>
+                        {(pluginUsageCount[manifest.id] || 0) > 0 && (
+                          <span className="text-xs text-muted-foreground/60">
+                            {t('settings.pluginUsageCount', { defaultValue: '已使用 {{count}} 次', count: pluginUsageCount[manifest.id] })}
+                          </span>
+                        )}
+                      </div>
+                      {manifest.description && (
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{manifest.description}</p>
+                      )}
+                    </div>
+                    <Switch
+                      checked={manifest.enabled}
+                      onCheckedChange={(checked) => handleToggle(manifest.id, checked)}
+                    />
+                  </div>
+                ))}
+              </div>
             )}
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <span className="text-xs text-muted-foreground">
-              {manifest.enabled
-                ? t('settings.pluginsSettings.enabled', { defaultValue: '已启用' })
-                : t('settings.pluginsSettings.disabled', { defaultValue: '已禁用' })}
-            </span>
-            <Switch
-              checked={manifest.enabled}
-              onCheckedChange={(checked) => handleToggle(manifest.id, checked)}
-            />
-          </div>
+        );
+      })}
+
+      {filteredGrouped.size === 0 && searchQuery && (
+        <div className="text-center py-4 text-sm text-muted-foreground">
+          {t('settings.noMatchingPlugins', { defaultValue: '未找到匹配的插件' })}
         </div>
-      ))}
+      )}
     </div>
   );
 }

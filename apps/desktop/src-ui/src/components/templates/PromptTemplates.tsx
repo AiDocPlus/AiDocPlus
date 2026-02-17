@@ -562,7 +562,7 @@ export function PromptTemplates({ open, onClose, onSelectTemplate }: PromptTempl
                     id="template-content"
                     value={templateForm.content}
                     onChange={(e) => setTemplateForm({ ...templateForm, content: e.target.value })}
-                    placeholder="输入提示词模板内容..."
+                    placeholder={t('templates.promptPlaceholder', { defaultValue: '输入提示词模板内容...' })}
                     rows={8}
                     className="font-mono text-sm"
                   />

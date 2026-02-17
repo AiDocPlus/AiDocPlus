@@ -1,4 +1,5 @@
 import { linter } from '@codemirror/lint';
+import i18n from '@/i18n';
 import type { Diagnostic } from '@codemirror/lint';
 import type { EditorView } from '@codemirror/view';
 
@@ -58,7 +59,7 @@ function markdownLintSource(view: EditorView): Diagnostic[] {
           from: lineFrom,
           to: lineTo,
           severity: 'warning',
-          message: `标题层级跳跃：从 H${lastHeadingLevel} 直接跳到 H${level}，建议使用 H${lastHeadingLevel + 1}`,
+          message: i18n.t('editor.lint.headingLevelSkip', { defaultValue: '标题层级跳跃：从 H{{from}} 直接跳到 H{{to}}，建议使用 H{{suggest}}', from: lastHeadingLevel, to: level, suggest: lastHeadingLevel + 1 }),
           source: 'markdown-lint',
         });
       }
@@ -75,7 +76,7 @@ function markdownLintSource(view: EditorView): Diagnostic[] {
           from: lineFrom,
           to: lineTo,
           severity: 'info',
-          message: `重复标题：与第 ${doc.lineAt(duplicate.from).number} 行的同级标题内容相同`,
+          message: i18n.t('editor.lint.duplicateHeading', { defaultValue: '重复标题：与第 {{line}} 行的同级标题内容相同', line: doc.lineAt(duplicate.from).number }),
           source: 'markdown-lint',
         });
       }
@@ -91,7 +92,7 @@ function markdownLintSource(view: EditorView): Diagnostic[] {
         from: lineFrom + emptyUrlMatch.index,
         to: lineFrom + emptyUrlMatch.index + emptyUrlMatch[0].length,
         severity: 'warning',
-        message: '空链接：URL 为空',
+        message: i18n.t('editor.lint.emptyLinkUrl', { defaultValue: '空链接：URL 为空' }),
         source: 'markdown-lint',
       });
     }
@@ -106,7 +107,7 @@ function markdownLintSource(view: EditorView): Diagnostic[] {
         from: lineFrom + emptyTextMatch.index,
         to: lineFrom + emptyTextMatch.index + emptyTextMatch[0].length,
         severity: 'warning',
-        message: '空链接：链接文本为空',
+        message: i18n.t('editor.lint.emptyLinkText', { defaultValue: '空链接：链接文本为空' }),
         source: 'markdown-lint',
       });
     }
@@ -120,7 +121,7 @@ function markdownLintSource(view: EditorView): Diagnostic[] {
       from: codeBlockStart,
       to: Math.min(codeBlockStart + 3, doc.length),
       severity: 'error',
-      message: '未闭合的代码块：缺少结束的 ```',
+      message: i18n.t('editor.lint.unclosedCodeBlock', { defaultValue: '未闭合的代码块：缺少结束的 ```' }),
       source: 'markdown-lint',
     });
   }

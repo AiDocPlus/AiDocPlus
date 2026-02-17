@@ -78,8 +78,8 @@ export function TabBar({ onSettingsOpen }: TabBarProps) {
     const tab = tabs.find(t => t.id === tabId);
     if (tab && tab.isDirty) {
       const shouldSave = await confirm(
-        `"${tab.title}" 有未保存的更改，是否保存后关闭？`,
-        { title: '未保存的更改', kind: 'warning', okLabel: '保存并关闭', cancelLabel: '不保存' }
+        t('tabs.unsavedConfirm', { defaultValue: '"{{title}}" 有未保存的更改，是否保存后关闭？', title: tab.title }),
+        { title: t('tabs.unsavedChanges', { defaultValue: '未保存的更改' }), kind: 'warning', okLabel: t('tabs.saveAndClose', { defaultValue: '保存并关闭' }), cancelLabel: t('tabs.discardAndClose', { defaultValue: '不保存' }) }
       );
       await closeTab(tabId, shouldSave);
     } else {
@@ -141,7 +141,7 @@ export function TabBar({ onSettingsOpen }: TabBarProps) {
     return (
       <>
         <div className="h-8 border-b bg-muted/20 flex items-center justify-between px-4">
-          <span className="text-sm text-muted-foreground">没有打开的文档</span>
+          <span className="text-sm text-muted-foreground">{t('tabs.noOpenDocuments', { defaultValue: '没有打开的文档' })}</span>
           <Button
             variant="ghost"
             size="icon"
@@ -283,10 +283,10 @@ export function TabBar({ onSettingsOpen }: TabBarProps) {
           return (
             <>
               <DropdownMenuItem onClick={() => { confirmAndCloseTab(contextMenu.tabId); closeContextMenu(); }}>
-                关闭标签
+                {t('tabs.closeTab', { defaultValue: '关闭标签' })}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => { closeOtherTabs(contextMenu.tabId); closeContextMenu(); }}>
-                关闭其他标签
+                {t('tabs.closeOtherTabs', { defaultValue: '关闭其他标签' })}
               </DropdownMenuItem>
               {hasTabsToRight && (
                 <DropdownMenuItem onClick={() => {
@@ -294,12 +294,12 @@ export function TabBar({ onSettingsOpen }: TabBarProps) {
                   rightTabs.forEach(t => closeTab(t.id, false));
                   closeContextMenu();
                 }}>
-                  关闭右侧标签
+                  {t('tabs.closeRightTabs', { defaultValue: '关闭右侧标签' })}
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => { closeAllTabs(); closeContextMenu(); }}>
-                关闭所有标签
+                {t('tabs.closeAllTabs', { defaultValue: '关闭所有标签' })}
               </DropdownMenuItem>
               {ctxTab && (
                 <>
@@ -308,7 +308,7 @@ export function TabBar({ onSettingsOpen }: TabBarProps) {
                     navigator.clipboard.writeText(ctxTab.title);
                     closeContextMenu();
                   }}>
-                    复制文档标题
+                    {t('tabs.copyDocTitle', { defaultValue: '复制文档标题' })}
                   </DropdownMenuItem>
                 </>
               )}

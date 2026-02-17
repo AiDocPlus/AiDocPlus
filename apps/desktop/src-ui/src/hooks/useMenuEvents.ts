@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { open, save, message, confirm } from '@tauri-apps/plugin-dialog';
 import { useAppStore } from '@/stores/useAppStore';
+import i18n from '@/i18n';
 
 /**
  * 监听 Tauri 原生系统菜单事件，分发到前端操作
@@ -56,25 +57,7 @@ export function useMenuEvents(onSettingsOpen: () => void) {
           onSettingsOpen();
           break;
 
-        // ── 编辑菜单 ──
-        case 'undo':
-          document.execCommand('undo');
-          break;
-        case 'redo':
-          document.execCommand('redo');
-          break;
-        case 'cut':
-          document.execCommand('cut');
-          break;
-        case 'copy_text':
-          document.execCommand('copy');
-          break;
-        case 'paste':
-          document.execCommand('paste');
-          break;
-        case 'select_all':
-          document.execCommand('selectAll');
-          break;
+        // ── 编辑菜单（剪切/复制/粘贴/撤销/重做/全选由 Tauri PredefinedMenuItem 原生处理）──
         case 'find':
           window.dispatchEvent(new CustomEvent('open-search'));
           break;
@@ -136,6 +119,17 @@ export function useMenuEvents(onSettingsOpen: () => void) {
           window.dispatchEvent(new CustomEvent('menu-doc-copy-to'));
           break;
 
+        // ── 模板菜单 ──
+        case 'new_from_template':
+          window.dispatchEvent(new CustomEvent('menu-new-from-template'));
+          break;
+        case 'save_as_template':
+          window.dispatchEvent(new CustomEvent('menu-save-as-template'));
+          break;
+        case 'manage_templates':
+          window.dispatchEvent(new CustomEvent('menu-manage-templates'));
+          break;
+
         // ── 帮助菜单 ──
         case 'shortcuts_ref':
           window.dispatchEvent(new CustomEvent('menu-shortcuts-ref'));
@@ -159,31 +153,31 @@ export function useMenuEvents(onSettingsOpen: () => void) {
 async function handleProjectExportZip() {
   const { currentProject, exportProjectZip } = useAppStore.getState();
   if (!currentProject) {
-    await message('请先打开一个项目', { title: '导出项目', kind: 'warning' });
+    await message(i18n.t('menu.openProjectFirst'), { title: i18n.t('menu.exportProject'), kind: 'warning' });
     return;
   }
 
   const outputPath = await save({
-    title: '导出项目为 ZIP',
+    title: i18n.t('menu.exportProjectZip'),
     defaultPath: `${currentProject.name}.zip`,
-    filters: [{ name: 'ZIP 压缩包', extensions: ['zip'] }],
+    filters: [{ name: i18n.t('menu.zipFilter'), extensions: ['zip'] }],
   });
 
   if (!outputPath) return;
 
   try {
     await exportProjectZip(currentProject.id, outputPath);
-    await message(`项目已导出到:\n${outputPath}`, { title: '导出成功' });
+    await message(i18n.t('menu.exportedTo', { path: outputPath }), { title: i18n.t('menu.exportSuccess') });
   } catch (err) {
-    await message(`导出失败: ${err}`, { title: '导出错误', kind: 'error' });
+    await message(i18n.t('menu.exportFailed', { error: String(err) }), { title: i18n.t('menu.exportError'), kind: 'error' });
   }
 }
 
 /** 从 ZIP 导入项目 */
 async function handleProjectImportZip() {
   const zipPath = await open({
-    title: '导入项目 (ZIP)',
-    filters: [{ name: 'ZIP 压缩包', extensions: ['zip'] }],
+    title: i18n.t('menu.importProjectZip'),
+    filters: [{ name: i18n.t('menu.zipFilter'), extensions: ['zip'] }],
     multiple: false,
   });
 
@@ -191,9 +185,9 @@ async function handleProjectImportZip() {
 
   try {
     const project = await useAppStore.getState().importProjectZip(zipPath as string);
-    await message(`项目 "${project.name}" 导入成功`, { title: '导入成功' });
+    await message(i18n.t('menu.importSuccess', { name: project.name }), { title: i18n.t('menu.importSuccessTitle') });
   } catch (err) {
-    await message(`导入失败: ${err}`, { title: '导入错误', kind: 'error' });
+    await message(i18n.t('menu.importFailed', { error: String(err) }), { title: i18n.t('menu.importError'), kind: 'error' });
   }
 }
 
@@ -201,7 +195,7 @@ async function handleProjectImportZip() {
 async function handleProjectBackup() {
   const { currentProject, exportProjectZip } = useAppStore.getState();
   if (!currentProject) {
-    await message('请先打开一个项目', { title: '备份项目', kind: 'warning' });
+    await message(i18n.t('menu.openProjectFirst'), { title: i18n.t('menu.backupProject'), kind: 'warning' });
     return;
   }
 
@@ -210,18 +204,18 @@ async function handleProjectBackup() {
   const defaultName = `${currentProject.name}_backup_${timestamp}.zip`;
 
   const outputPath = await save({
-    title: '备份项目',
+    title: i18n.t('menu.backupProject'),
     defaultPath: defaultName,
-    filters: [{ name: 'ZIP 压缩包', extensions: ['zip'] }],
+    filters: [{ name: i18n.t('menu.zipFilter'), extensions: ['zip'] }],
   });
 
   if (!outputPath) return;
 
   try {
     await exportProjectZip(currentProject.id, outputPath);
-    await message(`项目已备份到:\n${outputPath}`, { title: '备份成功' });
+    await message(i18n.t('menu.backedUpTo', { path: outputPath }), { title: i18n.t('menu.backupSuccess') });
   } catch (err) {
-    await message(`备份失败: ${err}`, { title: '备份错误', kind: 'error' });
+    await message(i18n.t('menu.backupFailed', { error: String(err) }), { title: i18n.t('menu.backupError'), kind: 'error' });
   }
 }
 
@@ -229,19 +223,19 @@ async function handleProjectBackup() {
 async function handleProjectRename() {
   const { currentProject, renameProject, loadProjects } = useAppStore.getState();
   if (!currentProject) {
-    await message('请先打开一个项目', { title: '重命名项目', kind: 'warning' });
+    await message(i18n.t('menu.openProjectFirst'), { title: i18n.t('menu.renameProject'), kind: 'warning' });
     return;
   }
 
-  const newName = window.prompt('请输入新的项目名称：', currentProject.name);
+  const newName = window.prompt(i18n.t('menu.renameProjectPrompt'), currentProject.name);
   if (!newName || newName.trim() === '' || newName.trim() === currentProject.name) return;
 
   try {
     await renameProject(currentProject.id, newName.trim());
     await loadProjects();
-    await message(`项目已重命名为 "${newName.trim()}"`, { title: '重命名成功' });
+    await message(i18n.t('menu.projectRenamed', { name: newName.trim() }), { title: i18n.t('menu.renameSuccess') });
   } catch (err) {
-    await message(`重命名失败: ${err}`, { title: '重命名错误', kind: 'error' });
+    await message(i18n.t('menu.renameFailed', { error: String(err) }), { title: i18n.t('menu.renameError'), kind: 'error' });
   }
 }
 
@@ -249,13 +243,13 @@ async function handleProjectRename() {
 async function handleProjectDelete() {
   const { currentProject, deleteProject, loadProjects, openProject } = useAppStore.getState();
   if (!currentProject) {
-    await message('请先打开一个项目', { title: '删除项目', kind: 'warning' });
+    await message(i18n.t('menu.openProjectFirst'), { title: i18n.t('menu.deleteProject'), kind: 'warning' });
     return;
   }
 
   const confirmed = await confirm(
-    `确定要删除项目 "${currentProject.name}" 吗？\n\n此操作将删除项目及其所有文档，且不可恢复。`,
-    { title: '删除项目', kind: 'warning', okLabel: '删除', cancelLabel: '取消' }
+    i18n.t('menu.deleteProjectConfirm', { name: currentProject.name }),
+    { title: i18n.t('menu.deleteProject'), kind: 'warning', okLabel: i18n.t('menu.deleteLabel'), cancelLabel: i18n.t('menu.cancelLabel') }
   );
   if (!confirmed) return;
 
@@ -268,9 +262,9 @@ async function handleProjectDelete() {
     if (remaining.length > 0) {
       await openProject(remaining[0].id);
     }
-    await message('项目已删除', { title: '删除成功' });
+    await message(i18n.t('menu.projectDeleted'), { title: i18n.t('menu.deleteSuccess') });
   } catch (err) {
-    await message(`删除失败: ${err}`, { title: '删除错误', kind: 'error' });
+    await message(i18n.t('menu.deleteFailed', { error: String(err) }), { title: i18n.t('menu.deleteError'), kind: 'error' });
   }
 }
 
@@ -278,18 +272,18 @@ async function handleProjectDelete() {
 async function handleDocRename() {
   const { currentDocument, renameDocument } = useAppStore.getState();
   if (!currentDocument) {
-    await message('请先打开一个文档', { title: '重命名文档', kind: 'warning' });
+    await message(i18n.t('menu.openDocFirst'), { title: i18n.t('menu.renameDocument'), kind: 'warning' });
     return;
   }
 
-  const newTitle = window.prompt('请输入新的文档标题：', currentDocument.title);
+  const newTitle = window.prompt(i18n.t('menu.renameDocPrompt'), currentDocument.title);
   if (!newTitle || newTitle.trim() === '' || newTitle.trim() === currentDocument.title) return;
 
   try {
     await renameDocument(currentDocument.projectId, currentDocument.id, newTitle.trim());
-    await message(`文档已重命名为 "${newTitle.trim()}"`, { title: '重命名成功' });
+    await message(i18n.t('menu.docRenamed', { title: newTitle.trim() }), { title: i18n.t('menu.renameSuccess') });
   } catch (err) {
-    await message(`重命名失败: ${err}`, { title: '重命名错误', kind: 'error' });
+    await message(i18n.t('menu.docRenameFailed', { error: String(err) }), { title: i18n.t('menu.renameError'), kind: 'error' });
   }
 }
 
@@ -297,13 +291,13 @@ async function handleDocRename() {
 async function handleDocDelete() {
   const { currentDocument, deleteDocument, tabs, closeTab } = useAppStore.getState();
   if (!currentDocument) {
-    await message('请先打开一个文档', { title: '删除文档', kind: 'warning' });
+    await message(i18n.t('menu.openDocFirst'), { title: i18n.t('menu.deleteDocument'), kind: 'warning' });
     return;
   }
 
   const confirmed = await confirm(
-    `确定要删除文档 "${currentDocument.title}" 吗？\n\n此操作不可恢复。`,
-    { title: '删除文档', kind: 'warning', okLabel: '删除', cancelLabel: '取消' }
+    i18n.t('menu.deleteDocConfirm', { title: currentDocument.title }),
+    { title: i18n.t('menu.deleteDocument'), kind: 'warning', okLabel: i18n.t('menu.deleteLabel'), cancelLabel: i18n.t('menu.cancelLabel') }
   );
   if (!confirmed) return;
 
@@ -314,9 +308,9 @@ async function handleDocDelete() {
       await closeTab(tab.id, false);
     }
     await deleteDocument(currentDocument.projectId, currentDocument.id);
-    await message('文档已删除', { title: '删除成功' });
+    await message(i18n.t('menu.docDeleted'), { title: i18n.t('menu.deleteSuccess') });
   } catch (err) {
-    await message(`删除失败: ${err}`, { title: '删除错误', kind: 'error' });
+    await message(i18n.t('menu.docDeleteFailed', { error: String(err) }), { title: i18n.t('menu.deleteError'), kind: 'error' });
   }
 }
 
@@ -324,14 +318,14 @@ async function handleDocDelete() {
 async function handleDocDuplicate() {
   const { currentDocument, createDocument, openTab } = useAppStore.getState();
   if (!currentDocument) {
-    await message('请先打开一个文档', { title: '复制文档', kind: 'warning' });
+    await message(i18n.t('menu.openDocFirst'), { title: i18n.t('menu.duplicateDocument'), kind: 'warning' });
     return;
   }
 
   try {
     const newDoc = await createDocument(
       currentDocument.projectId,
-      `${currentDocument.title} (副本)`,
+      `${currentDocument.title} ${i18n.t('menu.duplicateSuffix')}`,
     );
     if (newDoc) {
       // 将源文档内容复制到新文档
@@ -346,6 +340,6 @@ async function handleDocDuplicate() {
       await openTab(newDoc.id);
     }
   } catch (err) {
-    await message(`复制失败: ${err}`, { title: '复制错误', kind: 'error' });
+    await message(i18n.t('menu.duplicateFailed', { error: String(err) }), { title: i18n.t('menu.duplicateError'), kind: 'error' });
   }
 }

@@ -36,7 +36,6 @@ export function PptPluginPanel({ document, content, pluginData, onPluginDataChan
   const [statusIsError, setStatusIsError] = useState(false);
   const [builderOpen, setBuilderOpen] = useState(false);
   const pptAbortRef = useRef(false);
-  const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const updatePptData = useCallback((updates: Partial<PptPluginData>) => {
     onPluginDataChange({ ...pptData, ...updates });
@@ -48,13 +47,9 @@ export function PptPluginPanel({ document, content, pluginData, onPluginDataChan
     host.docData!.markDirty();
   }, [updatePptData, host]);
 
-  const showStatus = (msg: string, isError = false, persistent = false) => {
-    if (statusTimerRef.current) { clearTimeout(statusTimerRef.current); statusTimerRef.current = null; }
+  const showStatus = (msg: string, isError = false) => {
     setStatusMsg(msg);
     setStatusIsError(isError);
-    if (!persistent) {
-      statusTimerRef.current = setTimeout(() => { setStatusMsg(null); statusTimerRef.current = null; }, 4000);
-    }
   };
 
   const handleGenerate = async () => {
@@ -71,7 +66,7 @@ export function PptPluginPanel({ document, content, pluginData, onPluginDataChan
 
     pptAbortRef.current = false;
     setPptGenerating(true);
-    showStatus('正在生成 PPT，请稍候...', false, true);
+    showStatus('正在生成 PPT，请稍候...');
 
     try {
       const sourceContent = content || document.aiGeneratedContent || '';

@@ -4,6 +4,7 @@ import { Button } from '../ui/button';
 import { VersionHistoryPanel } from '../version/VersionHistoryPanel';
 import { useAppStore } from '@/stores/useAppStore';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/i18n';
 
 interface RightSidebarProps {
   tabId: string;
@@ -11,6 +12,7 @@ interface RightSidebarProps {
 }
 
 export function RightSidebar({ tabId, documentId }: RightSidebarProps) {
+  const { t } = useTranslation();
   const { tabs, documents, setTabPanelState } = useAppStore();
   const tab = tabs.find(t => t.id === tabId);
   const document = documents.find(d => d.id === documentId);
@@ -55,7 +57,7 @@ export function RightSidebar({ tabId, documentId }: RightSidebarProps) {
             <div className="flex-1 flex flex-col border-b">
               <div className="flex items-center gap-2 px-4 py-2 border-b">
                 <History className="h-4 w-4" />
-                <span className="text-sm font-medium">版本历史</span>
+                <span className="text-sm font-medium">{t('tabs.versionHistory', { defaultValue: '版本历史' })}</span>
               </div>
               <div className="flex-1 overflow-auto">
                 <VersionHistoryPanel
@@ -70,7 +72,7 @@ export function RightSidebar({ tabId, documentId }: RightSidebarProps) {
 
           {/* 预留扩展空间 */}
           <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-            更多功能开发中...
+            {t('tabs.moreFeaturesComing', { defaultValue: '更多功能开发中...' })}
           </div>
         </div>
       )}

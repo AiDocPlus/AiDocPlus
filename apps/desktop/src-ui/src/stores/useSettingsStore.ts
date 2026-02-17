@@ -12,11 +12,28 @@ import {
   getActiveService,
 } from '@aidocplus/shared-types';
 
+/** 分类节点 */
+export interface CategoryItem {
+  key: string;
+  label: string;
+  order: number;
+}
+
+/** 用户自定义分类树 */
+interface CustomCategories {
+  majors: CategoryItem[];
+  subs: Record<string, CategoryItem[]>;
+}
+
 interface PluginsSettings {
   /** 插件启用状态，key 为插件 id */
   enabled: Record<string, boolean>;
   /** 插件使用频率统计，key 为插件 id，value 为累计使用次数 */
   usageCount: Record<string, number>;
+  /** 用户自定义分类（与内置分类合并使用） */
+  customCategories?: CustomCategories;
+  /** 全局插件显示顺序（插件 ID 数组） */
+  pluginOrder?: string[];
 }
 
 const DEFAULT_PLUGINS_SETTINGS: PluginsSettings = {
@@ -36,6 +53,13 @@ interface SettingsState extends AppSettings {
   setPluginEnabled: (pluginId: string, enabled: boolean) => void;
   incrementPluginUsage: (pluginId: string) => void;
   getPluginUsageCount: (pluginId: string) => number;
+  // 分类管理
+  addCategory: (type: 'major' | 'sub', majorKey: string | null, key: string, label: string) => void;
+  renameCategory: (type: 'major' | 'sub', majorKey: string | null, key: string, newLabel: string) => void;
+  deleteCategory: (type: 'major' | 'sub', majorKey: string | null, key: string) => void;
+  reorderCategories: (type: 'major' | 'sub', majorKey: string | null, orderedKeys: string[]) => void;
+  // 插件排序
+  setPluginOrder: (orderedIds: string[]) => void;
   updateEditorSettings: (settings: Partial<typeof DEFAULT_EDITOR_SETTINGS>) => void;
   updateUISettings: (settings: Partial<typeof DEFAULT_UI_SETTINGS>) => void;
   updateFileSettings: (settings: Partial<typeof DEFAULT_FILE_SETTINGS>) => void;
@@ -148,6 +172,158 @@ export const useSettingsStore = create<SettingsState>()(
       // 获取插件使用次数
       getPluginUsageCount: (pluginId) => {
         return get().plugins?.usageCount?.[pluginId] || 0;
+      },
+
+      // 添加分类
+      addCategory: (type, majorKey, key, label) => {
+        set((state) => {
+          const plugins = state.plugins || DEFAULT_PLUGINS_SETTINGS;
+          const custom = plugins.customCategories || { majors: [], subs: {} };
+          if (type === 'major') {
+            const maxOrder = custom.majors.reduce((max, c) => Math.max(max, c.order), 0);
+            return {
+              plugins: {
+                ...plugins,
+                customCategories: {
+                  ...custom,
+                  majors: [...custom.majors, { key, label, order: maxOrder + 1 }],
+                },
+              },
+            };
+          } else {
+            if (!majorKey) return {};
+            const subs = custom.subs[majorKey] || [];
+            const maxOrder = subs.reduce((max, c) => Math.max(max, c.order), 0);
+            return {
+              plugins: {
+                ...plugins,
+                customCategories: {
+                  ...custom,
+                  subs: {
+                    ...custom.subs,
+                    [majorKey]: [...subs, { key, label, order: maxOrder + 1 }],
+                  },
+                },
+              },
+            };
+          }
+        });
+      },
+
+      // 重命名分类
+      renameCategory: (type, majorKey, key, newLabel) => {
+        set((state) => {
+          const plugins = state.plugins || DEFAULT_PLUGINS_SETTINGS;
+          const custom = plugins.customCategories || { majors: [], subs: {} };
+          if (type === 'major') {
+            return {
+              plugins: {
+                ...plugins,
+                customCategories: {
+                  ...custom,
+                  majors: custom.majors.map(c => c.key === key ? { ...c, label: newLabel } : c),
+                },
+              },
+            };
+          } else {
+            if (!majorKey) return {};
+            const subs = custom.subs[majorKey] || [];
+            return {
+              plugins: {
+                ...plugins,
+                customCategories: {
+                  ...custom,
+                  subs: {
+                    ...custom.subs,
+                    [majorKey]: subs.map(c => c.key === key ? { ...c, label: newLabel } : c),
+                  },
+                },
+              },
+            };
+          }
+        });
+      },
+
+      // 删除分类
+      deleteCategory: (type, majorKey, key) => {
+        set((state) => {
+          const plugins = state.plugins || DEFAULT_PLUGINS_SETTINGS;
+          const custom = plugins.customCategories || { majors: [], subs: {} };
+          if (type === 'major') {
+            const newSubs = { ...custom.subs };
+            delete newSubs[key];
+            return {
+              plugins: {
+                ...plugins,
+                customCategories: {
+                  ...custom,
+                  majors: custom.majors.filter(c => c.key !== key),
+                  subs: newSubs,
+                },
+              },
+            };
+          } else {
+            if (!majorKey) return {};
+            const subs = custom.subs[majorKey] || [];
+            return {
+              plugins: {
+                ...plugins,
+                customCategories: {
+                  ...custom,
+                  subs: {
+                    ...custom.subs,
+                    [majorKey]: subs.filter(c => c.key !== key),
+                  },
+                },
+              },
+            };
+          }
+        });
+      },
+
+      // 重新排序分类
+      reorderCategories: (type, majorKey, orderedKeys) => {
+        set((state) => {
+          const plugins = state.plugins || DEFAULT_PLUGINS_SETTINGS;
+          const custom = plugins.customCategories || { majors: [], subs: {} };
+          if (type === 'major') {
+            const majors = custom.majors.map(c => ({
+              ...c,
+              order: orderedKeys.indexOf(c.key),
+            }));
+            return {
+              plugins: {
+                ...plugins,
+                customCategories: { ...custom, majors },
+              },
+            };
+          } else {
+            if (!majorKey) return {};
+            const subs = (custom.subs[majorKey] || []).map(c => ({
+              ...c,
+              order: orderedKeys.indexOf(c.key),
+            }));
+            return {
+              plugins: {
+                ...plugins,
+                customCategories: {
+                  ...custom,
+                  subs: { ...custom.subs, [majorKey]: subs },
+                },
+              },
+            };
+          }
+        });
+      },
+
+      // 设置全局插件显示顺序
+      setPluginOrder: (orderedIds) => {
+        set((state) => ({
+          plugins: {
+            ...(state.plugins || DEFAULT_PLUGINS_SETTINGS),
+            pluginOrder: orderedIds,
+          },
+        }));
       },
 
       // Update a single shortcut

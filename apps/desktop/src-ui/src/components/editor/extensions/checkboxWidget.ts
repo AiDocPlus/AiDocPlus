@@ -1,4 +1,5 @@
 import { EditorView, ViewPlugin, Decoration, WidgetType } from '@codemirror/view';
+import i18n from '@/i18n';
 import type { ViewUpdate, DecorationSet } from '@codemirror/view';
 
 /**
@@ -15,7 +16,7 @@ class CheckboxWidget extends WidgetType {
     input.type = 'checkbox';
     input.checked = this.checked;
     input.className = 'cm-task-checkbox';
-    input.setAttribute('aria-label', this.checked ? '已完成' : '未完成');
+    input.setAttribute('aria-label', this.checked ? i18n.t('editor.taskCompleted', { defaultValue: '已完成' }) : i18n.t('editor.taskIncomplete', { defaultValue: '未完成' }));
     input.style.cssText = 'cursor:pointer;vertical-align:middle;margin:0 2px 0 0;pointer-events:auto;';
     input.addEventListener('mousedown', (e) => {
       e.preventDefault(); // 阻止编辑器获得焦点变化

@@ -9,6 +9,9 @@ import { SearchPanel } from '../search/SearchPanel';
 import { ProjectPickerDialog } from '../dialogs/ProjectPickerDialog';
 import { ShortcutsDialog } from '../dialogs/ShortcutsDialog';
 import { AboutDialog } from '../dialogs/AboutDialog';
+import { TemplatePickerDialog } from '../templates/TemplatePickerDialog';
+import { SaveAsTemplateDialog } from '../templates/SaveAsTemplateDialog';
+import { TemplateManagerDialog } from '../templates/TemplateManagerDialog';
 import { cn } from '@/lib/utils';
 import { Menu, X } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -21,6 +24,9 @@ export function MainLayout() {
   const [docPickerMode, setDocPickerMode] = useState<'move' | 'copy' | null>(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [saveAsTemplateOpen, setSaveAsTemplateOpen] = useState(false);
+  const [templateManagerOpen, setTemplateManagerOpen] = useState(false);
 
   // 监听原生系统菜单事件
   useMenuEvents(useCallback(() => setSettingsOpen(true), []));
@@ -31,15 +37,24 @@ export function MainLayout() {
     const onCopyTo = () => setDocPickerMode('copy');
     const onShortcuts = () => setShortcutsOpen(true);
     const onAbout = () => setAboutOpen(true);
+    const onNewFromTemplate = () => setTemplatePickerOpen(true);
+    const onSaveAsTemplate = () => setSaveAsTemplateOpen(true);
+    const onManageTemplates = () => setTemplateManagerOpen(true);
     window.addEventListener('menu-doc-move-to', onMoveTo);
     window.addEventListener('menu-doc-copy-to', onCopyTo);
     window.addEventListener('menu-shortcuts-ref', onShortcuts);
     window.addEventListener('menu-about', onAbout);
+    window.addEventListener('menu-new-from-template', onNewFromTemplate);
+    window.addEventListener('menu-save-as-template', onSaveAsTemplate);
+    window.addEventListener('menu-manage-templates', onManageTemplates);
     return () => {
       window.removeEventListener('menu-doc-move-to', onMoveTo);
       window.removeEventListener('menu-doc-copy-to', onCopyTo);
       window.removeEventListener('menu-shortcuts-ref', onShortcuts);
       window.removeEventListener('menu-about', onAbout);
+      window.removeEventListener('menu-new-from-template', onNewFromTemplate);
+      window.removeEventListener('menu-save-as-template', onSaveAsTemplate);
+      window.removeEventListener('menu-manage-templates', onManageTemplates);
     };
   }, []);
 
@@ -128,6 +143,34 @@ export function MainLayout() {
 
       {/* 关于对话框 */}
       <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
+
+      {/* 模板选择器 */}
+      <TemplatePickerDialog
+        open={templatePickerOpen}
+        onOpenChange={setTemplatePickerOpen}
+        projectId={useAppStore.getState().currentProject?.id || ''}
+      />
+
+      {/* 存为模板 */}
+      {saveAsTemplateOpen && (() => {
+        const { currentDocument } = useAppStore.getState();
+        if (!currentDocument) return null;
+        return (
+          <SaveAsTemplateDialog
+            open={saveAsTemplateOpen}
+            onOpenChange={setSaveAsTemplateOpen}
+            projectId={currentDocument.projectId}
+            documentId={currentDocument.id}
+            documentTitle={currentDocument.title}
+          />
+        );
+      })()}
+
+      {/* 模板管理 */}
+      <TemplateManagerDialog
+        open={templateManagerOpen}
+        onOpenChange={setTemplateManagerOpen}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { Button } from '../ui/button';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/i18n';
 import type { Attachment } from '@aidocplus/shared-types';
 
 interface AttachmentPanelProps {
@@ -12,6 +13,7 @@ interface AttachmentPanelProps {
 }
 
 export function AttachmentPanel({ attachments, onAttachmentsChange }: AttachmentPanelProps) {
+  const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(attachments.length === 0);
   const [adding, setAdding] = useState(false);
   const [previewId, setPreviewId] = useState<string | null>(null);
@@ -26,12 +28,12 @@ export function AttachmentPanel({ attachments, onAttachmentsChange }: Attachment
         multiple: true,
         filters: [
           {
-            name: '文档文件',
+            name: t('editor.attachDocFiles', { defaultValue: '文档文件' }),
             extensions: ['txt', 'md', 'markdown', 'docx', 'csv', 'html', 'htm', 'json', 'xml', 'yaml', 'yml', 'toml', 'rst', 'tex', 'log'],
           },
-          { name: 'Word 文档', extensions: ['docx'] },
-          { name: '文本文件', extensions: ['txt', 'md', 'markdown'] },
-          { name: '所有文件', extensions: ['*'] },
+          { name: t('editor.attachWordDoc', { defaultValue: 'Word 文档' }), extensions: ['docx'] },
+          { name: t('editor.attachTextFiles', { defaultValue: '文本文件' }), extensions: ['txt', 'md', 'markdown'] },
+          { name: t('editor.attachAllFiles', { defaultValue: '所有文件' }), extensions: ['*'] },
         ],
       });
 
@@ -90,7 +92,7 @@ export function AttachmentPanel({ attachments, onAttachmentsChange }: Attachment
       setPreviewContent(content);
     } catch (error) {
       const errMsg = typeof error === 'string' ? error : String(error);
-      setPreviewContent(`⚠️ 无法预览：${errMsg}`);
+      setPreviewContent(`⚠️ ${t('editor.previewFailed', { defaultValue: '无法预览：{{error}}', error: errMsg })}`);
     } finally {
       setPreviewLoading(false);
     }
@@ -123,7 +125,7 @@ export function AttachmentPanel({ attachments, onAttachmentsChange }: Attachment
           onClick={() => setCollapsed(!collapsed)}
         >
           <Paperclip className="h-3.5 w-3.5" />
-          附件{attachments.length > 0 && ` (${attachments.length})`}
+          {attachments.length > 0 ? t('editor.attachment.titleCount', { defaultValue: '附件 ({{count}})', count: attachments.length }) : t('editor.attachment.title', { defaultValue: '附件' })}
         </span>
         <div className="flex items-center gap-1">
           <Button
@@ -134,7 +136,7 @@ export function AttachmentPanel({ attachments, onAttachmentsChange }: Attachment
             disabled={adding}
           >
             {adding ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
-            <span className="ml-1">添加</span>
+            <span className="ml-1">{t('editor.attachment.add', { defaultValue: '添加' })}</span>
           </Button>
           <span className="cursor-pointer" onClick={() => setCollapsed(!collapsed)}>
             {collapsed ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />}
@@ -147,7 +149,7 @@ export function AttachmentPanel({ attachments, onAttachmentsChange }: Attachment
         <div className="px-4 pb-2 space-y-1 max-h-[200px] overflow-y-auto">
           {attachments.length === 0 ? (
             <div className="text-xs text-muted-foreground py-2 text-center">
-              暂无附件，点击"添加"选择文件
+              {t('editor.attachment.noAttachments', { defaultValue: '暂无附件，点击“添加”选择文件' })}
             </div>
           ) : (
             attachments.map((att) => (
@@ -166,7 +168,7 @@ export function AttachmentPanel({ attachments, onAttachmentsChange }: Attachment
                     size="sm"
                     className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100"
                     onClick={() => handlePreview(att)}
-                    title="预览内容"
+                    title={t('editor.attachment.previewContent', { defaultValue: '预览内容' })}
                   >
                     <Eye className={cn('h-3 w-3', previewId === att.id && 'text-primary')} />
                   </Button>
@@ -175,7 +177,7 @@ export function AttachmentPanel({ attachments, onAttachmentsChange }: Attachment
                     size="sm"
                     className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 hover:text-destructive"
                     onClick={() => handleRemove(att.id)}
-                    title="移除附件"
+                    title={t('editor.attachment.removeAttachment', { defaultValue: '移除附件' })}
                   >
                     <X className="h-3 w-3" />
                   </Button>
@@ -186,12 +188,12 @@ export function AttachmentPanel({ attachments, onAttachmentsChange }: Attachment
                     {previewLoading ? (
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Loader2 className="h-3 w-3 animate-spin" />
-                        正在转换...
+                        {t('editor.attachment.converting', { defaultValue: '正在转换...' })}
                       </div>
                     ) : (
                       <pre className="whitespace-pre-wrap break-words font-mono text-[11px]">
                         {previewContent.length > 2000
-                          ? previewContent.slice(0, 2000) + '\n\n... (内容过长，仅显示前 2000 字符)'
+                          ? previewContent.slice(0, 2000) + t('editor.attachment.contentTruncated', { defaultValue: '\n\n... (内容过长，仅显示前 2000 字符)' })
                           : previewContent}
                       </pre>
                     )}

@@ -61,6 +61,7 @@ import {
 } from '../ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores/useSettingsStore';
+import { useTranslation } from '@/i18n';
 import { getFragmentsGroupedByPlugin } from '@/plugins/fragments';
 import type { ImportSources } from './MarkdownEditor';
 
@@ -194,6 +195,7 @@ interface EditorToolbarProps {
 }
 
 export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMode, onViewModeChange, showViewModeSwitch, importSources, fontSize, onFontSizeChange }: EditorToolbarProps) {
+  const { t } = useTranslation();
   const tb = useSettingsStore((s) => s.editor.toolbarButtons) ?? {};
 
   // 延迟执行操作，确保在 DropdownMenu 关闭后再操作 CodeMirror，避免 React 渲染冲突
@@ -234,32 +236,32 @@ export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMod
       {s('undo') && <FeedbackButton
         onClick={() => runAction((v) => undo(v))}
         icon={<Undo2 className="h-4 w-4" />}
-        tooltip="撤销 (Cmd+Z)"
-        doneTooltip="已撤销"
+        tooltip={t('editor.toolbar.undo', { defaultValue: '撤销 (Cmd+Z)' })}
+        doneTooltip={t('editor.toolbar.undoDone', { defaultValue: '已撤销' })}
       />}
       {s('redo') && <FeedbackButton
         onClick={() => runAction((v) => redo(v))}
         icon={<Redo2 className="h-4 w-4" />}
-        tooltip="重做 (Cmd+Shift+Z)"
-        doneTooltip="已重做"
+        tooltip={t('editor.toolbar.redo', { defaultValue: '重做 (Cmd+Shift+Z)' })}
+        doneTooltip={t('editor.toolbar.redoDone', { defaultValue: '已重做' })}
       />}
       {s('copy') && <FeedbackButton
         onClick={() => runAction((v) => { const sel = cmGetSelection(v); if (sel) navigator.clipboard.writeText(sel); })}
         icon={<Copy className="h-4 w-4" />}
-        tooltip="复制 (Cmd+C)"
-        doneTooltip="已复制"
+        tooltip={t('editor.toolbar.copy', { defaultValue: '复制 (Cmd+C)' })}
+        doneTooltip={t('editor.toolbar.copyDone', { defaultValue: '已复制' })}
       />}
       {s('cut') && <FeedbackButton
         onClick={() => runAction((v) => { const sel = cmGetSelection(v); if (sel) { navigator.clipboard.writeText(sel); const { from, to } = v.state.selection.main; v.dispatch({ changes: { from, to, insert: '' } }); } })}
         icon={<Scissors className="h-4 w-4" />}
-        tooltip="剪切 (Cmd+X)"
-        doneTooltip="已剪切"
+        tooltip={t('editor.toolbar.cut', { defaultValue: '剪切 (Cmd+X)' })}
+        doneTooltip={t('editor.toolbar.cutDone', { defaultValue: '已剪切' })}
       />}
       {s('paste') && <FeedbackButton
         onClick={() => runAction(async (v) => { try { const text = await navigator.clipboard.readText(); if (text) cmInsert(v, text); } catch { /* clipboard access denied */ } })}
         icon={<ClipboardPaste className="h-4 w-4" />}
-        tooltip="粘贴 (Cmd+V)"
-        doneTooltip="已粘贴"
+        tooltip={t('editor.toolbar.paste', { defaultValue: '粘贴 (Cmd+V)' })}
+        doneTooltip={t('editor.toolbar.pasteDone', { defaultValue: '已粘贴' })}
       />}
       {s('clearAll') && <FeedbackButton
         onClick={() => runAction((v) => {
@@ -267,8 +269,8 @@ export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMod
           if (len > 0) v.dispatch({ changes: { from: 0, to: len, insert: '' } });
         })}
         icon={<Trash2 className="h-4 w-4" />}
-        tooltip="清空全部内容"
-        doneTooltip="已清空"
+        tooltip={t('editor.toolbar.clearAll', { defaultValue: '清空全部内容' })}
+        doneTooltip={t('editor.toolbar.clearAllDone', { defaultValue: '已清空' })}
       />}
 
       <Sep left={[s('undo'), s('redo'), s('copy'), s('cut'), s('paste'), s('clearAll')]} right={[s('headings')]} />
@@ -276,36 +278,36 @@ export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMod
       {/* ── 3. 标题 ── */}
       {s('headings') && <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="标题">
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title={t('editor.toolbar.heading', { defaultValue: '标题' })}>
             <Heading1 className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
-          <DropdownMenuItem onClick={() => doPrefix('# ')}><Heading1 className="h-4 w-4 mr-2" />一级标题</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => doPrefix('## ')}><Heading2 className="h-4 w-4 mr-2" />二级标题</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => doPrefix('### ')}><Heading3 className="h-4 w-4 mr-2" />三级标题</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => doPrefix('#### ')}><Heading4 className="h-4 w-4 mr-2" />四级标题</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => doPrefix('##### ')}><Heading5 className="h-4 w-4 mr-2" />五级标题</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => doPrefix('###### ')}><Heading6 className="h-4 w-4 mr-2" />六级标题</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doPrefix('# ')}><Heading1 className="h-4 w-4 mr-2" />{t('editor.toolbar.heading1', { defaultValue: '一级标题' })}</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doPrefix('## ')}><Heading2 className="h-4 w-4 mr-2" />{t('editor.toolbar.heading2', { defaultValue: '二级标题' })}</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doPrefix('### ')}><Heading3 className="h-4 w-4 mr-2" />{t('editor.toolbar.heading3', { defaultValue: '三级标题' })}</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doPrefix('#### ')}><Heading4 className="h-4 w-4 mr-2" />{t('editor.toolbar.heading4', { defaultValue: '四级标题' })}</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doPrefix('##### ')}><Heading5 className="h-4 w-4 mr-2" />{t('editor.toolbar.heading5', { defaultValue: '五级标题' })}</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doPrefix('###### ')}><Heading6 className="h-4 w-4 mr-2" />{t('editor.toolbar.heading6', { defaultValue: '六级标题' })}</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>}
 
       <Sep left={[s('headings')]} right={[s('bold'), s('italic'), s('strikethrough'), s('clearFormat')]} />
 
       {/* ── 4. 文本格式 ── */}
-      {s('bold') && <FeedbackButton onClick={() => doWrap('**', '**', '粗体文本')} icon={<Bold className="h-4 w-4" />} tooltip="粗体 (Cmd+B)" doneTooltip="已加粗" />}
-      {s('italic') && <FeedbackButton onClick={() => doWrap('*', '*', '斜体文本')} icon={<Italic className="h-4 w-4" />} tooltip="斜体 (Cmd+I)" doneTooltip="已斜体" />}
-      {s('strikethrough') && <FeedbackButton onClick={() => doWrap('~~', '~~', '删除线文本')} icon={<Strikethrough className="h-4 w-4" />} tooltip="删除线 (Cmd+Shift+X)" doneTooltip="已添加删除线" />}
-      {s('clearFormat') && <FeedbackButton onClick={() => runAction((v) => cmClearFormat(v))} icon={<RemoveFormatting className="h-4 w-4" />} tooltip="清除格式" doneTooltip="已清除格式" />}
+      {s('bold') && <FeedbackButton onClick={() => doWrap('**', '**', t('editor.toolbar.boldPlaceholder', { defaultValue: '粗体文本' }))} icon={<Bold className="h-4 w-4" />} tooltip={t('editor.toolbar.boldCmd', { defaultValue: '粗体 (Cmd+B)' })} doneTooltip={t('editor.toolbar.boldDone', { defaultValue: '已加粗' })} />}
+      {s('italic') && <FeedbackButton onClick={() => doWrap('*', '*', t('editor.toolbar.italicPlaceholder', { defaultValue: '斜体文本' }))} icon={<Italic className="h-4 w-4" />} tooltip={t('editor.toolbar.italicCmd', { defaultValue: '斜体 (Cmd+I)' })} doneTooltip={t('editor.toolbar.italicDone', { defaultValue: '已斜体' })} />}
+      {s('strikethrough') && <FeedbackButton onClick={() => doWrap('~~', '~~', t('editor.toolbar.strikethroughPlaceholder', { defaultValue: '删除线文本' }))} icon={<Strikethrough className="h-4 w-4" />} tooltip={t('editor.toolbar.strikethroughCmd', { defaultValue: '删除线 (Cmd+Shift+X)' })} doneTooltip={t('editor.toolbar.strikethroughDone', { defaultValue: '已添加删除线' })} />}
+      {s('clearFormat') && <FeedbackButton onClick={() => runAction((v) => cmClearFormat(v))} icon={<RemoveFormatting className="h-4 w-4" />} tooltip={t('editor.toolbar.clearFormat', { defaultValue: '清除格式' })} doneTooltip={t('editor.toolbar.clearFormatDone', { defaultValue: '已清除' })} />}
 
       <Sep left={[s('bold'), s('italic'), s('strikethrough'), s('clearFormat')]} right={[s('unorderedList'), s('orderedList'), s('taskList'), s('quote'), s('horizontalRule')]} />
 
       {/* ── 5. 段落结构 ── */}
-      {s('unorderedList') && <FeedbackButton onClick={() => doPrefix('- ')} icon={<List className="h-4 w-4" />} tooltip="无序列表" doneTooltip="已插入" />}
-      {s('orderedList') && <FeedbackButton onClick={() => doPrefix('1. ')} icon={<ListOrdered className="h-4 w-4" />} tooltip="有序列表" doneTooltip="已插入" />}
-      {s('taskList') && <FeedbackButton onClick={() => doPrefix('- [ ] ')} icon={<CheckSquare className="h-4 w-4" />} tooltip="任务列表" doneTooltip="已插入" />}
-      {s('quote') && <FeedbackButton onClick={() => doPrefix('> ')} icon={<Quote className="h-4 w-4" />} tooltip="引用" doneTooltip="已插入" />}
-      {s('horizontalRule') && <FeedbackButton onClick={() => doInsert('\n---\n')} icon={<Minus className="h-4 w-4" />} tooltip="分隔线" doneTooltip="已插入" />}
+      {s('unorderedList') && <FeedbackButton onClick={() => doPrefix('- ')} icon={<List className="h-4 w-4" />} tooltip={t('editor.toolbar.unorderedList', { defaultValue: '无序列表' })} doneTooltip={t('editor.toolbar.inserted', { defaultValue: '已插入' })} />}
+      {s('orderedList') && <FeedbackButton onClick={() => doPrefix('1. ')} icon={<ListOrdered className="h-4 w-4" />} tooltip={t('editor.toolbar.orderedList', { defaultValue: '有序列表' })} doneTooltip={t('editor.toolbar.inserted', { defaultValue: '已插入' })} />}
+      {s('taskList') && <FeedbackButton onClick={() => doPrefix('- [ ] ')} icon={<CheckSquare className="h-4 w-4" />} tooltip={t('editor.toolbar.taskList', { defaultValue: '任务列表' })} doneTooltip={t('editor.toolbar.inserted', { defaultValue: '已插入' })} />}
+      {s('quote') && <FeedbackButton onClick={() => doPrefix('> ')} icon={<Quote className="h-4 w-4" />} tooltip={t('editor.toolbar.quote', { defaultValue: '引用' })} doneTooltip={t('editor.toolbar.inserted', { defaultValue: '已插入' })} />}
+      {s('horizontalRule') && <FeedbackButton onClick={() => doInsert('\n---\n')} icon={<Minus className="h-4 w-4" />} tooltip={t('editor.toolbar.horizontalRule', { defaultValue: '分隔线' })} doneTooltip={t('editor.toolbar.inserted', { defaultValue: '已插入' })} />}
 
       <Sep left={[s('unorderedList'), s('orderedList'), s('taskList'), s('quote'), s('horizontalRule')]} right={[s('link'), s('image'), s('table'), s('footnote'), s('inlineCode'), s('codeBlock'), s('mermaid'), s('math')]} />
 
@@ -318,7 +320,7 @@ export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMod
           runAction((v) => {
             const { from } = v.state.selection.main;
             const sel = cmGetSelection(v);
-            const noteText = sel || '脚注内容';
+            const noteText = sel || t('editor.toolbar.footnotePlaceholder', { defaultValue: '脚注内容' });
             const insert = `[^1]\n\n[^1]: ${noteText}`;
             v.dispatch({
               changes: { from, to: from + sel.length, insert },
@@ -328,18 +330,18 @@ export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMod
           });
         }}
         icon={<Asterisk className="h-4 w-4" />}
-        tooltip="插入脚注"
-        doneTooltip="已插入脚注"
+        tooltip={t('editor.toolbar.footnote', { defaultValue: '插入脚注' })}
+        doneTooltip={t('editor.toolbar.footnoteDone', { defaultValue: '已插入脚注' })}
       />}
-      {s('inlineCode') && <FeedbackButton onClick={() => doWrap('`', '`', '代码')} icon={<Code className="h-4 w-4" />} tooltip="行内代码 (Cmd+E)" doneTooltip="已添加代码" />}
+      {s('inlineCode') && <FeedbackButton onClick={() => doWrap('`', '`', t('editor.toolbar.inlineCodePlaceholder', { defaultValue: '代码' }))} icon={<Code className="h-4 w-4" />} tooltip={t('editor.toolbar.inlineCodeCmd', { defaultValue: '行内代码 (Cmd+E)' })} doneTooltip={t('editor.toolbar.inlineCodeDone', { defaultValue: '已添加代码' })} />}
       {s('codeBlock') && <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="代码块">
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title={t('editor.toolbar.codeBlock', { defaultValue: '代码块' })}>
             <CodeXml className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
-          <DropdownMenuItem onClick={() => doInsert('\n```\n\n```\n')}>普通代码块</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doInsert('\n```\n\n```\n')}>{t('editor.toolbar.plainCodeBlock', { defaultValue: '普通代码块' })}</DropdownMenuItem>
           {['javascript', 'typescript', 'python', 'rust', 'html', 'css', 'json', 'sql', 'bash'].map(lang => (
             <DropdownMenuItem key={lang} onClick={() => doInsert(`\n\`\`\`${lang}\n\n\`\`\`\n`)}>{lang}</DropdownMenuItem>
           ))}
@@ -347,41 +349,41 @@ export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMod
       </DropdownMenu>}
       {s('mermaid') && <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Mermaid 图表">
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title={t('editor.toolbar.mermaidChart', { defaultValue: 'Mermaid 图表' })}>
             <Workflow className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="max-h-80 overflow-y-auto">
-          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\ngraph TD\n    A[开始] --> B{判断}\n    B -->|是| C[结果1]\n    B -->|否| D[结果2]\n```\n')}>流程图</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\nsequenceDiagram\n    participant A as 客户端\n    participant B as 服务器\n    A->>B: 请求\n    B-->>A: 响应\n```\n')}>时序图</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\nclassDiagram\n    class Animal {\n        +String name\n        +int age\n        +makeSound()\n    }\n    class Dog {\n        +fetch()\n    }\n    Animal <|-- Dog\n```\n')}>类图</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\nstateDiagram-v2\n    [*] --> 待处理\n    待处理 --> 进行中: 开始\n    进行中 --> 已完成: 完成\n    进行中 --> 待处理: 退回\n    已完成 --> [*]\n```\n')}>状态图</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\ngraph TD\n    A[开始] --> B{判断}\n    B -->|是| C[结果1]\n    B -->|否| D[结果2]\n```\n')}>{t('editor.toolbar.mermaidFlowchart', { defaultValue: '流程图' })}</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\nsequenceDiagram\n    participant A as 客户端\n    participant B as 服务器\n    A->>B: 请求\n    B-->>A: 响应\n```\n')}>{t('editor.toolbar.mermaidSequence', { defaultValue: '时序图' })}</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\nclassDiagram\n    class Animal {\n        +String name\n        +int age\n        +makeSound()\n    }\n    class Dog {\n        +fetch()\n    }\n    Animal <|-- Dog\n```\n')}>{t('editor.toolbar.mermaidClass', { defaultValue: '类图' })}</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\nstateDiagram-v2\n    [*] --> 待处理\n    待处理 --> 进行中: 开始\n    进行中 --> 已完成: 完成\n    进行中 --> 待处理: 退回\n    已完成 --> [*]\n```\n')}>{t('editor.toolbar.mermaidState', { defaultValue: '状态图' })}</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\nerDiagram\n    CUSTOMER ||--o{ ORDER : places\n    ORDER ||--|{ LINE-ITEM : contains\n    CUSTOMER {\n        string name\n        string email\n    }\n    ORDER {\n        int orderNumber\n        date created\n    }\n```\n')}>ER 图</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\npie title 项目占比\n    "分类A" : 40\n    "分类B" : 30\n    "分类C" : 20\n    "分类D" : 10\n```\n')}>饼图</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\ngantt\n    title 项目计划\n    dateFormat YYYY-MM-DD\n    section 阶段一\n        任务1 :a1, 2024-01-01, 30d\n        任务2 :after a1, 20d\n    section 阶段二\n        任务3 :2024-02-20, 25d\n        任务4 :after a1, 15d\n```\n')}>甘特图</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\nerDiagram\n    CUSTOMER ||--o{ ORDER : places\n    ORDER ||--|{ LINE-ITEM : contains\n    CUSTOMER {\n        string name\n        string email\n    }\n    ORDER {\n        int orderNumber\n        date created\n    }\n```\n')}>{t('editor.toolbar.mermaidER', { defaultValue: 'ER 图' })}</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\npie title 项目占比\n    "分类A" : 40\n    "分类B" : 30\n    "分类C" : 20\n    "分类D" : 10\n```\n')}>{t('editor.toolbar.mermaidPie', { defaultValue: '饼图' })}</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\ngantt\n    title 项目计划\n    dateFormat YYYY-MM-DD\n    section 阶段一\n        任务1 :a1, 2024-01-01, 30d\n        任务2 :after a1, 20d\n    section 阶段二\n        任务3 :2024-02-20, 25d\n        任务4 :after a1, 15d\n```\n')}>{t('editor.toolbar.mermaidGantt', { defaultValue: '甘特图' })}</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\nmindmap\n  root((中心主题))\n    分支A\n      子项1\n      子项2\n    分支B\n      子项3\n      子项4\n    分支C\n```\n')}>思维导图</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\ntimeline\n    title 项目里程碑\n    2024-Q1 : 需求分析\n            : 技术选型\n    2024-Q2 : 开发阶段\n            : 单元测试\n    2024-Q3 : 集成测试\n            : 上线部署\n```\n')}>时间线</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\ngitGraph\n    commit\n    commit\n    branch develop\n    checkout develop\n    commit\n    commit\n    checkout main\n    merge develop\n    commit\n```\n')}>Git 图</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\njourney\n    title 用户购物旅程\n    section 浏览\n      打开首页: 5: 用户\n      搜索商品: 4: 用户\n    section 购买\n      加入购物车: 3: 用户\n      结算支付: 2: 用户\n    section 售后\n      确认收货: 5: 用户\n```\n')}>用户旅程</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\nmindmap\n  root((中心主题))\n    分支A\n      子项1\n      子项2\n    分支B\n      子项3\n      子项4\n    分支C\n```\n')}>{t('editor.toolbar.mermaidMindmap', { defaultValue: '思维导图' })}</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\ntimeline\n    title 项目里程碑\n    2024-Q1 : 需求分析\n            : 技术选型\n    2024-Q2 : 开发阶段\n            : 单元测试\n    2024-Q3 : 集成测试\n            : 上线部署\n```\n')}>{t('editor.toolbar.mermaidTimeline', { defaultValue: '时间线' })}</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\ngitGraph\n    commit\n    commit\n    branch develop\n    checkout develop\n    commit\n    commit\n    checkout main\n    merge develop\n    commit\n```\n')}>{t('editor.toolbar.mermaidGit', { defaultValue: 'Git 图' })}</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\njourney\n    title 用户购物旅程\n    section 浏览\n      打开首页: 5: 用户\n      搜索商品: 4: 用户\n    section 购买\n      加入购物车: 3: 用户\n      结算支付: 2: 用户\n    section 售后\n      确认收货: 5: 用户\n```\n')}>{t('editor.toolbar.mermaidJourney', { defaultValue: '用户旅程' })}</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\nquadrantChart\n    title 优先级矩阵\n    x-axis 低紧急 --> 高紧急\n    y-axis 低重要 --> 高重要\n    quadrant-1 立即执行\n    quadrant-2 计划执行\n    quadrant-3 委托他人\n    quadrant-4 暂时搁置\n    任务A: [0.8, 0.9]\n    任务B: [0.3, 0.7]\n    任务C: [0.7, 0.3]\n    任务D: [0.2, 0.2]\n```\n')}>象限图</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\nxychart-beta\n    title "月度销售额"\n    x-axis [1月, 2月, 3月, 4月, 5月, 6月]\n    y-axis "销售额（万元）" 0 --> 100\n    bar [30, 45, 60, 55, 70, 85]\n    line [30, 45, 60, 55, 70, 85]\n```\n')}>XY 图表</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\nsankey-beta\n\n来源A,目标X,30\n来源A,目标Y,20\n来源B,目标X,15\n来源B,目标Z,25\n来源C,目标Y,10\n来源C,目标Z,20\n```\n')}>桑基图</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\nblock-beta\n    columns 3\n    前端 中间件 后端\n    space:3\n    数据库\n```\n')}>框图</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\narchitecture-beta\n    group api(cloud)[API]\n\n    service db(database)[数据库] in api\n    service disk1(disk)[存储] in api\n    service disk2(disk)[备份] in api\n    service server(server)[服务器] in api\n\n    db:L -- R:server\n    disk1:T -- B:server\n    disk2:T -- B:db\n```\n')}>架构图</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\nquadrantChart\n    title 优先级矩阵\n    x-axis 低紧急 --> 高紧急\n    y-axis 低重要 --> 高重要\n    quadrant-1 立即执行\n    quadrant-2 计划执行\n    quadrant-3 委托他人\n    quadrant-4 暂时搁置\n    任务A: [0.8, 0.9]\n    任务B: [0.3, 0.7]\n    任务C: [0.7, 0.3]\n    任务D: [0.2, 0.2]\n```\n')}>{t('editor.toolbar.mermaidQuadrant', { defaultValue: '象限图' })}</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\nxychart-beta\n    title "月度销售额"\n    x-axis [1月, 2月, 3月, 4月, 5月, 6月]\n    y-axis "销售额（万元）" 0 --> 100\n    bar [30, 45, 60, 55, 70, 85]\n    line [30, 45, 60, 55, 70, 85]\n```\n')}>{t('editor.toolbar.mermaidXY', { defaultValue: 'XY 图表' })}</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\nsankey-beta\n\n来源A,目标X,30\n来源A,目标Y,20\n来源B,目标X,15\n来源B,目标Z,25\n来源C,目标Y,10\n来源C,目标Z,20\n```\n')}>{t('editor.toolbar.mermaidSankey', { defaultValue: '桑基图' })}</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\nblock-beta\n    columns 3\n    前端 中间件 后端\n    space:3\n    数据库\n```\n')}>{t('editor.toolbar.mermaidBlock', { defaultValue: '框图' })}</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doInsert('\n```mermaid\narchitecture-beta\n    group api(cloud)[API]\n\n    service db(database)[数据库] in api\n    service disk1(disk)[存储] in api\n    service disk2(disk)[备份] in api\n    service server(server)[服务器] in api\n\n    db:L -- R:server\n    disk1:T -- B:server\n    disk2:T -- B:db\n```\n')}>{t('editor.toolbar.mermaidArchitecture', { defaultValue: '架构图' })}</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>}
       {s('math') && <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="数学公式">
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title={t('editor.toolbar.mathFormula', { defaultValue: '数学公式' })}>
             <Sigma className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
-          <DropdownMenuItem onClick={() => doWrap('$', '$', 'E=mc^2')}>行内公式 $...$</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => doInsert('\n$$\n\\sum_{i=1}^{n} x_i\n$$\n')}>块级公式 $$...$$</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doWrap('$', '$', 'E=mc^2')}>{t('editor.toolbar.inlineFormula', { defaultValue: '行内公式 $...$' })}</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => doInsert('\n$$\n\\sum_{i=1}^{n} x_i\n$$\n')}>{t('editor.toolbar.blockFormula', { defaultValue: '块级公式 $$...$$' })}</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>}
 
@@ -400,7 +402,7 @@ export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMod
           });
         })}
         icon={<ArrowUpToLine className="h-4 w-4" />}
-        tooltip="滚动到顶部"
+        tooltip={t('editor.toolbar.scrollToTop', { defaultValue: '滚动到顶部' })}
       />}
       {s('goToBottom') && <ToolbarButton
         onClick={() => runAction((v) => {
@@ -410,14 +412,14 @@ export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMod
           });
         })}
         icon={<ArrowDownToLine className="h-4 w-4" />}
-        tooltip="滚动到底部"
+        tooltip={t('editor.toolbar.scrollToBottom', { defaultValue: '滚动到底部' })}
       />}
       {onToggleOutline && (
         <ToolbarButton
           active={outlineOpen}
           onClick={onToggleOutline}
           icon={<ListTree className="h-4 w-4" />}
-          tooltip={outlineOpen ? '关闭大纲' : '打开大纲'}
+          tooltip={outlineOpen ? t('editor.toolbar.closeOutline', { defaultValue: '关闭大纲' }) : t('editor.toolbar.openOutline', { defaultValue: '打开大纲' })}
         />
       )}
 
@@ -431,10 +433,10 @@ export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMod
               'flex items-center gap-1 px-1.5 py-0.5 rounded text-xs transition-colors',
               viewMode === 'edit' ? 'bg-pink-500/20 text-pink-600 dark:text-pink-400' : 'text-muted-foreground hover:text-foreground'
             )}
-            title="编辑模式"
+            title={t('editor.toolbar.editMode', { defaultValue: '编辑模式' })}
           >
             <Code2 className="h-3.5 w-3.5" />
-            编辑
+            {t('editor.toolbar.edit', { defaultValue: '编辑' })}
           </button>
           <button
             type="button"
@@ -443,10 +445,10 @@ export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMod
               'flex items-center gap-1 px-1.5 py-0.5 rounded text-xs transition-colors',
               viewMode === 'preview' ? 'bg-pink-500/20 text-pink-600 dark:text-pink-400' : 'text-muted-foreground hover:text-foreground'
             )}
-            title="预览模式"
+            title={t('editor.toolbar.previewMode', { defaultValue: '预览模式' })}
           >
             <Eye className="h-3.5 w-3.5" />
-            预览
+            {t('editor.toolbar.preview', { defaultValue: '预览' })}
           </button>
           <button
             type="button"
@@ -455,10 +457,10 @@ export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMod
               'flex items-center gap-1 px-1.5 py-0.5 rounded text-xs transition-colors',
               viewMode === 'split' ? 'bg-pink-500/20 text-pink-600 dark:text-pink-400' : 'text-muted-foreground hover:text-foreground'
             )}
-            title="分屏模式"
+            title={t('editor.toolbar.splitMode', { defaultValue: '分屏模式' })}
           >
             <Columns className="h-3.5 w-3.5" />
-            分屏
+            {t('editor.toolbar.split', { defaultValue: '分屏' })}
           </button>
         </div>
       )}
@@ -494,12 +496,13 @@ function LinkPopover({
 }: {
   runAction: (fn: (v: EditorView) => void) => void;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [linkText, setLinkText] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
 
   const handleInsert = useCallback(() => {
-    const text = linkText || '链接文本';
+    const text = linkText || t('editor.toolbar.linkTextDefault', { defaultValue: '链接文本' });
     const url = linkUrl || 'https://';
     runAction((v) => {
       const { from, to } = v.state.selection.main;
@@ -520,17 +523,17 @@ function LinkPopover({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="插入链接 (Cmd+K)">
+        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title={t('editor.toolbar.insertLinkCmd', { defaultValue: '插入链接 (Cmd+K)' })}>
           <LinkIcon className="h-4 w-4" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80" align="start">
         <div className="space-y-3">
-          <h4 className="text-sm font-medium">插入链接</h4>
+          <h4 className="text-sm font-medium">{t('editor.toolbar.insertLink', { defaultValue: '插入链接' })}</h4>
           <div className="space-y-2">
-            <Label className="text-xs">链接文本</Label>
+            <Label className="text-xs">{t('editor.toolbar.linkText', { defaultValue: '链接文本' })}</Label>
             <Input
-              placeholder="链接文本（可选，使用选中文本）"
+              placeholder={t('editor.toolbar.linkTextPlaceholder', { defaultValue: '链接文本（可选，使用选中文本）' })}
               value={linkText}
               onChange={(e) => setLinkText(e.target.value)}
               className="h-8 text-sm"
@@ -538,7 +541,7 @@ function LinkPopover({
             />
           </div>
           <div className="space-y-2">
-            <Label className="text-xs">URL 地址</Label>
+            <Label className="text-xs">{t('editor.toolbar.urlAddress', { defaultValue: 'URL 地址' })}</Label>
             <Input
               placeholder="https://example.com"
               value={linkUrl}
@@ -550,9 +553,9 @@ function LinkPopover({
           </div>
           <div className="flex justify-end gap-2">
             <PopoverClose asChild>
-              <Button variant="ghost" size="sm" className="h-7 text-xs">取消</Button>
+              <Button variant="ghost" size="sm" className="h-7 text-xs">{t('editor.toolbar.cancel', { defaultValue: '取消' })}</Button>
             </PopoverClose>
-            <Button size="sm" className="h-7 text-xs" onClick={handleInsert}>插入</Button>
+            <Button size="sm" className="h-7 text-xs" onClick={handleInsert}>{t('editor.toolbar.insert', { defaultValue: '插入' })}</Button>
           </div>
         </div>
       </PopoverContent>
@@ -566,12 +569,13 @@ function ImagePopover({
 }: {
   runAction: (fn: (v: EditorView) => void) => void;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [altText, setAltText] = useState('');
   const [imgUrl, setImgUrl] = useState('');
 
   const handleInsert = useCallback(() => {
-    const alt = altText || '图片';
+    const alt = altText || t('editor.toolbar.imageDescDefault', { defaultValue: '图片' });
     const url = imgUrl || 'https://';
     runAction((v) => {
       cmInsert(v, `![${alt}](${url})`);
@@ -584,17 +588,17 @@ function ImagePopover({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="插入图片">
+        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title={t('editor.toolbar.insertImage', { defaultValue: '插入图片' })}>
           <ImageIcon className="h-4 w-4" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80" align="start">
         <div className="space-y-3">
-          <h4 className="text-sm font-medium">插入图片</h4>
+          <h4 className="text-sm font-medium">{t('editor.toolbar.insertImage', { defaultValue: '插入图片' })}</h4>
           <div className="space-y-2">
-            <Label className="text-xs">图片描述</Label>
+            <Label className="text-xs">{t('editor.toolbar.imageDescription', { defaultValue: '图片描述' })}</Label>
             <Input
-              placeholder="图片描述（alt 文本）"
+              placeholder={t('editor.toolbar.imageDescPlaceholder', { defaultValue: '图片描述（alt 文本）' })}
               value={altText}
               onChange={(e) => setAltText(e.target.value)}
               className="h-8 text-sm"
@@ -602,7 +606,7 @@ function ImagePopover({
             />
           </div>
           <div className="space-y-2">
-            <Label className="text-xs">图片 URL</Label>
+            <Label className="text-xs">{t('editor.toolbar.imageUrl', { defaultValue: '图片 URL' })}</Label>
             <Input
               placeholder="https://example.com/image.png"
               value={imgUrl}
@@ -614,9 +618,9 @@ function ImagePopover({
           </div>
           <div className="flex justify-end gap-2">
             <PopoverClose asChild>
-              <Button variant="ghost" size="sm" className="h-7 text-xs">取消</Button>
+              <Button variant="ghost" size="sm" className="h-7 text-xs">{t('editor.toolbar.cancel', { defaultValue: '取消' })}</Button>
             </PopoverClose>
-            <Button size="sm" className="h-7 text-xs" onClick={handleInsert}>插入</Button>
+            <Button size="sm" className="h-7 text-xs" onClick={handleInsert}>{t('editor.toolbar.insert', { defaultValue: '插入' })}</Button>
           </div>
         </div>
       </PopoverContent>
@@ -630,6 +634,7 @@ const FONT_SIZE_MAX = 28;
 const FONT_SIZE_STEP = 1;
 
 function FontSizeButtons({ fontSize, onFontSizeChange }: { fontSize: number; onFontSizeChange: (size: number) => void }) {
+  const { t } = useTranslation();
   const decrease = useCallback(() => {
     const next = Math.max(FONT_SIZE_MIN, fontSize - FONT_SIZE_STEP);
     if (next !== fontSize) onFontSizeChange(next);
@@ -646,18 +651,18 @@ function FontSizeButtons({ fontSize, onFontSizeChange }: { fontSize: number; onF
         variant="ghost"
         size="sm"
         className="h-7 w-7 p-0"
-        title={`减小字体 (当前 ${fontSize}px)`}
+        title={t('editor.toolbar.decreaseFont', { defaultValue: '减小字体 (当前 {{size}}px)', size: fontSize })}
         onClick={decrease}
         disabled={fontSize <= FONT_SIZE_MIN}
       >
         <AArrowDown className="h-4 w-4" />
       </Button>
-      <span className="text-xs text-muted-foreground w-6 text-center select-none" title="当前字体大小">{fontSize}</span>
+      <span className="text-xs text-muted-foreground w-6 text-center select-none" title={t('editor.toolbar.currentFontSize', { defaultValue: '当前字体大小' })}>{fontSize}</span>
       <Button
         variant="ghost"
         size="sm"
         className="h-7 w-7 p-0"
-        title={`增大字体 (当前 ${fontSize}px)`}
+        title={t('editor.toolbar.increaseFont', { defaultValue: '增大字体 (当前 {{size}}px)', size: fontSize })}
         onClick={increase}
         disabled={fontSize >= FONT_SIZE_MAX}
       >
@@ -675,6 +680,7 @@ function ImportButton({
   runAction: (fn: (v: EditorView) => void) => void;
   importSources?: ImportSources;
 }) {
+  const { t } = useTranslation();
   const [importing, setImporting] = useState(false);
 
   // 在光标位置插入文本
@@ -698,12 +704,12 @@ function ImportButton({
         multiple: false,
         filters: [
           {
-            name: '文档文件',
+            name: t('editor.toolbar.documentFiles', { defaultValue: '文档文件' }),
             extensions: ['txt', 'md', 'markdown', 'docx', 'csv', 'html', 'htm', 'json', 'xml', 'yaml', 'yml', 'toml', 'rst', 'tex', 'log'],
           },
-          { name: 'Word 文档', extensions: ['docx'] },
-          { name: '文本文件', extensions: ['txt', 'md', 'markdown'] },
-          { name: '所有文件', extensions: ['*'] },
+          { name: t('editor.toolbar.wordFiles', { defaultValue: 'Word 文档' }), extensions: ['docx'] },
+          { name: t('editor.toolbar.textFiles', { defaultValue: '文本文件' }), extensions: ['txt', 'md', 'markdown'] },
+          { name: t('editor.toolbar.allFiles', { defaultValue: '所有文件' }), extensions: ['*'] },
         ],
       });
 
@@ -722,7 +728,7 @@ function ImportButton({
       console.error('[ImportButton] 导入失败:', error);
       const errMsg = typeof error === 'string' ? error : (error instanceof Error ? error.message : String(error));
       runAction((v) => {
-        cmInsert(v, `\n> ⚠️ 导入失败：${errMsg}\n`);
+        cmInsert(v, `\n> ⚠️ ${t('editor.toolbar.importFailed', { defaultValue: '导入失败：{{error}}', error: errMsg })}\n`);
       });
     } finally {
       setImporting(false);
@@ -749,24 +755,7 @@ function ImportButton({
   const hasFragments = fragmentGroups.size > 0;
   const hasAiContent = !!importSources?.aiContent?.trim();
 
-  // 如果没有额外导入源，只显示简单的文件导入按钮
-  if (!hasAiContent && !hasFragments) {
-    return (
-      <Button
-        variant="ghost"
-        size="sm"
-        className={cn('h-7 px-1.5 gap-0.5', importing && 'opacity-50')}
-        title="从文件导入 (txt, md, docx, csv, html, json...)"
-        onClick={handleImportFromFile}
-        disabled={importing}
-      >
-        <FileText className="h-3.5 w-3.5" />
-        <ChevronDown className="h-3 w-3" />
-      </Button>
-    );
-  }
-
-  // 有额外导入源时，显示下拉菜单
+  // 始终显示下拉菜单
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -774,7 +763,7 @@ function ImportButton({
           variant="ghost"
           size="sm"
           className={cn('h-7 px-1.5 gap-0.5', importing && 'opacity-50')}
-          title="导入"
+          title={t('editor.toolbar.import', { defaultValue: '导入' })}
           disabled={importing}
         >
           <FileText className="h-3.5 w-3.5" />
@@ -784,12 +773,12 @@ function ImportButton({
       <DropdownMenuContent align="start" className="w-56">
         <DropdownMenuItem onClick={handleImportFromFile}>
           <FileText className="h-4 w-4 mr-2" />
-          从文件导入 (txt, md, docx, csv, html...)
+          {t('editor.toolbar.importFromFile', { defaultValue: '从文件导入 (txt, md, docx, csv, html...)' })}
         </DropdownMenuItem>
         {hasAiContent && (
           <DropdownMenuItem onClick={handleImportFromContent}>
             <FileText className="h-4 w-4 mr-2" />
-            从正文导入
+            {t('editor.toolbar.importFromContent', { defaultValue: '从正文导入' })}
           </DropdownMenuItem>
         )}
         {hasFragments && (
@@ -823,7 +812,7 @@ function ImportButton({
                       const allMd = group.fragments.map((f: { markdown: string }) => f.markdown).join('\n\n---\n\n');
                       handleImportFragment(allMd);
                     }}>
-                      全部插入
+                      {t('editor.toolbar.insertAll', { defaultValue: '全部插入' })}
                     </DropdownMenuItem>
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
@@ -838,6 +827,7 @@ function ImportButton({
 
 // ── 表格网格选择器 ──
 function TableGridPicker({ doInsert }: { doInsert: (text: string) => void }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [hoverRows, setHoverRows] = useState(0);
   const [hoverCols, setHoverCols] = useState(0);
@@ -845,10 +835,10 @@ function TableGridPicker({ doInsert }: { doInsert: (text: string) => void }) {
   const maxCols = 8;
 
   const handleSelect = useCallback((rows: number, cols: number) => {
-    const header = '| ' + Array.from({ length: cols }, (_, i) => `标题${i + 1}`).join(' | ') + ' |';
+    const header = '| ' + Array.from({ length: cols }, (_, i) => `${t('editor.toolbar.tableHeader', { defaultValue: '标题' })}${i + 1}`).join(' | ') + ' |';
     const separator = '| ' + Array.from({ length: cols }, () => '---').join(' | ') + ' |';
     const bodyRows = Array.from({ length: rows }, () =>
-      '| ' + Array.from({ length: cols }, () => '内容').join(' | ') + ' |'
+      '| ' + Array.from({ length: cols }, () => t('editor.toolbar.tableContent', { defaultValue: '内容' })).join(' | ') + ' |'
     ).join('\n');
     doInsert(`\n${header}\n${separator}\n${bodyRows}\n`);
     setOpen(false);
@@ -859,14 +849,14 @@ function TableGridPicker({ doInsert }: { doInsert: (text: string) => void }) {
   return (
     <Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setHoverRows(0); setHoverCols(0); } }}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="插入表格">
+        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title={t('editor.toolbar.insertTable', { defaultValue: '插入表格' })}>
           <Table className="h-4 w-4" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-3" align="start">
         <div className="space-y-2">
           <h4 className="text-sm font-medium">
-            插入表格 {hoverRows > 0 && hoverCols > 0 ? `${hoverRows}×${hoverCols}` : ''}
+            {t('editor.toolbar.insertTable', { defaultValue: '插入表格' })} {hoverRows > 0 && hoverCols > 0 ? `${hoverRows}×${hoverCols}` : ''}
           </h4>
           <div
             className="grid gap-1"

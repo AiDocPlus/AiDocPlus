@@ -81,6 +81,46 @@ export interface PluginManifest {
   conflicts?: string[];          // 互斥的插件 UUID
 }
 
+// ============================================================
+// Template Types
+// ============================================================
+
+export interface TemplateManifest {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;                  // lucide-react 图标名称
+  author: string;
+  type: 'builtin' | 'custom';
+  category: string;              // 分类 key
+  tags: string[];
+  createdAt: number;
+  updatedAt: number;
+  includeContent: boolean;       // 是否包含素材内容
+  includeAiContent: boolean;     // 是否包含正文内容
+  enabledPlugins: string[];      // 预设插件列表
+  pluginData?: Record<string, unknown>;
+  minAppVersion?: string;
+}
+
+export interface TemplateContent {
+  authorNotes: string;
+  aiGeneratedContent: string;
+  content: string;
+  pluginData?: Record<string, unknown>;
+}
+
+export interface TemplateCategory {
+  key: string;
+  label: string;
+  order: number;
+  type: 'builtin' | 'custom';
+}
+
+// ============================================================
+// Document Metadata & Version Types
+// ============================================================
+
 export interface DocumentMetadata {
   createdAt: number; // Unix timestamp in seconds
   updatedAt: number; // Unix timestamp in seconds
