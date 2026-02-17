@@ -28,22 +28,21 @@ jobs:
             args: --target x86_64-pc-windows-msvc
             target: x86_64-pc-windows-msvc
             artifact: nsis
-          - platform: windows-latest
-            args: --target aarch64-pc-windows-msvc
-            target: aarch64-pc-windows-msvc
-            artifact: nsis
 
     runs-on: ${{ matrix.platform }}
 
     steps:
       - name: Checkout main repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Checkout plugins repository
         uses: actions/checkout@v4
         with:
           repository: AiDocPlus/AiDocPlus-Plugins
           path: plugins-repo
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -124,8 +123,7 @@ jobs:
 
             ### 下载
             - **macOS (Apple Silicon)**: .dmg 文件
-            - **Windows (x64)**: .exe 安装程序
-            - **Windows (ARM64)**: .exe 安装程序
+            - **Windows (x64)**: .exe 安装程序（兼容 ARM64 设备）
 
             ### 更新说明
             请查看 CHANGELOG.md 获取详细更新内容。
