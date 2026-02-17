@@ -32,7 +32,11 @@
       "Bash(pnpm deploy:*)",
       "Bash(pnpm run deploy:*)",
       "Bash(bash scripts/deploy.sh ppt)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "mcp__zread__get_repo_structure",
+      "Bash(git tag:*)"
     ]
   }
 }

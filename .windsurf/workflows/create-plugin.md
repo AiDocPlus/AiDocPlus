@@ -4,9 +4,15 @@ description: 创建 AiDocPlus 外部插件（已迁移到独立项目）
 
 # 创建外部插件 Skills
 
-> **⚠️ 插件开发已迁移到独立项目 [AiDocPlus-Plugins](https://github.com/AiDocPlus/AiDocPlus-Plugins)。**
-> 请在插件项目中创建和修改插件，参考插件项目的 `CLAUDE.md` 和 `.windsurf/workflows/create-plugin.md`。
-> 本文件仅作为主程序侧的参考，完整的插件开发 Skills 请查看插件项目。
+> **⚠️⚠️⚠️ 强制规则：所有插件代码必须在独立项目 AiDocPlus-Plugins 中操作！**
+>
+> - **插件项目路径**：`/Users/jdh/Code/AiDocPlus-Plugins`
+> - **GitHub 仓库**：[AiDocPlus-Plugins](https://github.com/AiDocPlus/AiDocPlus-Plugins)
+> - **创建/修改/调试任何具体插件** → 在 `AiDocPlus-Plugins/plugins/{name}/` 中操作
+> - **绝不在主程序 `src/plugins/` 下直接修改插件代码** — 会被 `deploy.sh` 覆盖而丢失
+> - **主程序 `src/plugins/` 只维护 SDK 框架文件**（`_framework/`、`types.ts`、`loader.ts` 等）
+>
+> 完整的插件开发 Skills 请查看插件项目的 `CLAUDE.md` 和 `.windsurf/workflows/create-plugin.md`。
 
 本文件保留了插件架构的核心规则供主程序开发者参考。如需创建新插件，请切换到 AiDocPlus-Plugins 项目。
 
