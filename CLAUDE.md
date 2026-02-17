@@ -596,3 +596,65 @@ cjk = re.compile(r'[\u4e00-\u9fff]')
 1. **端口占用**：`lsof -ti:5173 | xargs kill -9`
 2. **依赖问题**：删除 `node_modules` 和 `pnpm-lock.yaml`，重新 `pnpm install`
 3. **构建失败**：运行 `pnpm clean` 清理缓存后重新构建
+4. **Git 推送超时（使用 ClashX 代理）**：
+   ```bash
+   # 配置 git 使用本地代理（ClashX 默认端口 7890）
+   git config --global http.proxy http://127.0.0.1:7890
+   git config --global https.proxy http://127.0.0.1:7890
+
+   # 取消代理配置
+   git config --global --unset http.proxy
+   git config --global --unset https.proxy
+   ```
+
+## GitHub Actions CI/CD
+
+### 工作流配置
+
+项目使用 `.github/workflows/build.yml` 进行跨平台构建。
+
+**触发条件**：
+- 推送 `v*` 格式的 tag
+- 手动触发（workflow_dispatch）
+
+**构建平台**：
+- macOS aarch64 (Apple Silicon)
+- Windows x64
+- Windows ARM64
+
+### 发布新版本流程
+
+```bash
+# 1. 更新版本号
+# - apps/desktop/src-tauri/tauri.conf.json
+# - apps/desktop/package.json
+
+# 2. 提交更改
+git add -A && git commit -m "chore: 更新版本号至 x.x.x"
+git push origin main
+
+# 3. 创建并推送 tag
+git tag vx.x.x
+git push origin vx.x.x
+```
+
+### 重要经验教训
+
+1. **pnpm 版本冲突**：不要在 GitHub Actions 中硬编码 pnpm 版本，让 `pnpm/action-setup@v4` 自动从 `package.json` 的 `packageManager` 字段读取
+   ```yaml
+   # 错误 ❌
+   - uses: pnpm/action-setup@v4
+     with:
+       version: 9
+
+   # 正确 ✅
+   - uses: pnpm/action-setup@v4
+   ```
+
+2. **重复的工作流运行**：确保 `.github/workflows/` 目录下只有一个工作流文件监听相同事件，否则会触发多次构建
+
+3. **私有仓库权限**：
+   - 需要 `permissions: contents: write` 才能创建 Release
+   - 检出私有仓库需要使用 `persist-credentials: false` 或配置 PAT
+
+4. **外部插件仓库集成**：构建时需要从 `AiDocPlus/AiDocPlus-Plugins` 检出并部署插件到主程序
