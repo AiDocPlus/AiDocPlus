@@ -11,9 +11,6 @@ on:
         required: false
         default: ''
 
-env:
-  PNPM_VERSION: 9
-
 jobs:
   build:
     strategy:
@@ -48,8 +45,6 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
