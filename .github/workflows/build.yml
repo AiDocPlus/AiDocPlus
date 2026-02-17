@@ -25,6 +25,10 @@ jobs:
             args: --target x86_64-pc-windows-msvc
             target: x86_64-pc-windows-msvc
             artifact: nsis
+          - platform: windows-latest
+            args: --target aarch64-pc-windows-msvc
+            target: aarch64-pc-windows-msvc
+            artifact: nsis
 
     runs-on: ${{ matrix.platform }}
 
@@ -140,6 +144,7 @@ jobs:
             ### 下载
             - **macOS (Apple Silicon)**: AiDocPlus_${{ steps.get_version.outputs.VERSION }}_aarch64.dmg
             - **Windows (x64)**: AiDocPlus_${{ steps.get_version.outputs.VERSION }}_x64-setup.exe
+            - **Windows (ARM64)**: AiDocPlus_${{ steps.get_version.outputs.VERSION }}_aarch64-setup.exe
 
             ### 更新说明
             请查看 [CHANGELOG.md](./CHANGELOG.md) 获取详细更新内容。
