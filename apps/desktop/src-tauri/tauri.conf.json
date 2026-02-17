@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
   "productName": "AiDocPlus",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "identifier": "com.aidocplus.app",
   "build": {
     "beforeDevCommand": "cd src-ui && pnpm dev",
