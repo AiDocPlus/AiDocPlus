@@ -346,6 +346,12 @@ div[role="dialog"] {
   animation: plugin-breathe 2s ease-in-out infinite !important;
 }
 
+/* pptx-preview 幻灯片居中 */
+.pptx-preview-wrapper {
+  margin: 0 auto !important;
+  max-width: 100%;
+}
+
 /* 隐藏滚动条但保留滚动功能 */
 .scrollbar-hide {
   -ms-overflow-style: none;
