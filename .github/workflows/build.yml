@@ -1,4 +1,4 @@
-name: Build and Release
+name: Build Windows x64
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to build (e.g., 0.1.3)'
+        description: 'Version to build (e.g., 0.1.6)'
         required: false
         default: ''
 
@@ -15,34 +15,75 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: macos-latest
-            args: --target aarch64-apple-darwin
-            target: aarch64-apple-darwin
-            artifact: dmg
-          - platform: windows-latest
-            args: --target x86_64-pc-windows-msvc
-            target: x86_64-pc-windows-msvc
-            artifact: nsis
-
-    runs-on: ${{ matrix.platform }}
+  build-windows:
+    runs-on: windows-latest
 
     steps:
-      - name: Checkout main repository
+      # ── 1. Checkout 所有仓库到同级目录 ──
+      # 工作目录结构（$GITHUB_WORKSPACE 下）：
+      #   AiDocPlus/          ← 构建目标（本仓库）
+      #   AiDocPlus-Main/     ← 主程序源码
+      #   AiDocPlus-Roles/    ← 角色数据
+      #   AiDocPlus-PromptTemplates/
+      #   AiDocPlus-DocTemplates/
+      #   AiDocPlus-ProjectTemplates/
+      #   AiDocPlus-AIProviders/
+      #   AiDocPlus-Plugins/
+
+      - name: Checkout AiDocPlus (build target)
         uses: actions/checkout@v4
         with:
+          path: AiDocPlus
           persist-credentials: false
 
-      - name: Checkout plugins repository
+      - name: Checkout AiDocPlus-Main
+        uses: actions/checkout@v4
+        with:
+          repository: AiDocPlus/AiDocPlus-Main
+          path: AiDocPlus-Main
+
+      - name: Checkout AiDocPlus-Roles
+        uses: actions/checkout@v4
+        with:
+          repository: AiDocPlus/AiDocPlus-Roles
+          path: AiDocPlus-Roles
+
+      - name: Checkout AiDocPlus-PromptTemplates
+        uses: actions/checkout@v4
+        with:
+          repository: AiDocPlus/AiDocPlus-PromptTemplates
+          path: AiDocPlus-PromptTemplates
+
+      - name: Checkout AiDocPlus-DocTemplates
+        uses: actions/checkout@v4
+        with:
+          repository: AiDocPlus/AiDocPlus-DocTemplates
+          path: AiDocPlus-DocTemplates
+
+      - name: Checkout AiDocPlus-ProjectTemplates
+        uses: actions/checkout@v4
+        with:
+          repository: AiDocPlus/AiDocPlus-ProjectTemplates
+          path: AiDocPlus-ProjectTemplates
+
+      - name: Checkout AiDocPlus-AIProviders
+        uses: actions/checkout@v4
+        with:
+          repository: AiDocPlus/AiDocPlus-AIProviders
+          path: AiDocPlus-AIProviders
+
+      - name: Checkout AiDocPlus-Plugins
         uses: actions/checkout@v4
         with:
           repository: AiDocPlus/AiDocPlus-Plugins
-          path: plugins-repo
-          token: ${{ secrets.GITHUB_TOKEN }}
+          path: AiDocPlus-Plugins
+
+      # ── 2. 安装工具链 ──
+
+      - name: Setup Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -51,82 +92,101 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
+        with:
+          version: 10
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: x86_64-pc-windows-msvc
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: './apps/desktop/src-tauri -> target'
+          workspaces: './AiDocPlus/apps/desktop/src-tauri -> target'
 
       - name: Cache pnpm store
         uses: actions/cache@v4
         with:
           path: ~/.pnpm-store
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('AiDocPlus/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-
 
-      - name: Deploy plugins to main project
+      # ── 3. 总装（assemble） ──
+      # AiDocPlus-Main 的 deploy.sh 依赖 rsync（Windows 无），
+      # 这里用纯 bash find+cp 实现等效逻辑；其余资源仓库直接调用各自脚本。
+
+      - name: Deploy AiDocPlus-Main (rsync replacement)
         shell: bash
         run: |
-          # 部署插件目录（排除 SDK 文件）
-          SRC_PLUGINS="./plugins-repo/plugins"
-          DST_PLUGINS="./apps/desktop/src-ui/src/plugins"
+          echo "📦 部署 AiDocPlus-Main..."
+          MAIN_DIR="AiDocPlus-Main"
+          TARGET_DIR="AiDocPlus"
 
-          # SDK 文件列表（不部署，这些由主程序维护）
-          SDK_FILES=("_framework" "types.ts" "pluginStore.ts" "i18n-loader.ts" "constants.ts" "fragments.ts" "registry.ts" "env.d.ts")
-
-          is_sdk_file() {
-            local name="$1"
-            for sdk in "${SDK_FILES[@]}"; do
-              if [ "$name" = "$sdk" ]; then
-                return 0
-              fi
+          cd "$MAIN_DIR"
+          find . -type f \
+            ! -path '*/node_modules/*' \
+            ! -path '*/.git/*' \
+            ! -path '*/.turbo/*' \
+            ! -path '*/target/*' \
+            ! -path '*/.DS_Store' \
+            ! -path '*/plugins-repo/*' \
+            ! -path '*/.claude/*' \
+            ! -path '*/scripts/deploy.sh' \
+            ! -name 'pnpm-lock.yaml' \
+            ! -path '*/packages/shared-types/src/generated/*.generated.ts' \
+            ! -path '*/apps/desktop/src-tauri/bundled-resources/*' \
+            ! -path '*/apps/desktop/src-ui/src/plugins/*/*' \
+            | while IFS= read -r file; do
+              dir=$(dirname "$file")
+              mkdir -p "../${TARGET_DIR}/${dir}"
+              cp -f "$file" "../${TARGET_DIR}/${file}"
             done
-            return 1
-          }
+          cd ..
 
-          echo "=== 部署插件 ==="
-          echo "源: $SRC_PLUGINS"
-          echo "目标: $DST_PLUGINS"
+          mkdir -p "${TARGET_DIR}/packages/shared-types/src/generated"
+          echo "✅ AiDocPlus-Main 部署完成"
 
-          for dir in "$SRC_PLUGINS"/*/; do
-            name=$(basename "$dir")
-            if is_sdk_file "$name"; then
-              echo "  跳过 SDK 文件: $name"
-              continue
+      - name: Deploy resource repositories
+        shell: bash
+        run: |
+          for repo in Roles PromptTemplates DocTemplates ProjectTemplates AIProviders; do
+            REPO_DIR="AiDocPlus-${repo}"
+            echo "📦 部署 ${REPO_DIR}..."
+            if [ -f "${REPO_DIR}/scripts/build.sh" ]; then
+              bash "${REPO_DIR}/scripts/build.sh"
             fi
-            echo "  → $name"
-            rm -rf "$DST_PLUGINS/$name"
-            cp -r "$SRC_PLUGINS/$name" "$DST_PLUGINS/$name"
+            bash "${REPO_DIR}/scripts/deploy.sh"
           done
 
-          echo "=== 部署完成 ==="
+          echo "📦 部署 AiDocPlus-Plugins..."
+          bash AiDocPlus-Plugins/scripts/deploy.sh
+
+          echo "🎉 总装完成"
+
+      # ── 4. 安装依赖并构建 ──
 
       - name: Install frontend dependencies
+        working-directory: AiDocPlus
         run: pnpm install
 
-      - name: Build Tauri app
+      - name: Build Tauri app (Windows x64)
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          projectPath: ./apps/desktop
+          projectPath: ./AiDocPlus/apps/desktop
           tagName: ${{ github.ref_name }}
           releaseName: 'AiDocPlus __VERSION__'
           releaseBody: |
             ## AiDocPlus __VERSION__
 
             ### 下载
-            - **macOS (Apple Silicon)**: .dmg 文件
-            - **Windows (x64)**: .exe 安装程序（兼容 ARM64 设备）
+            - **Windows (x64)**: .exe 安装程序（NSIS）
 
             ### 更新说明
             请查看 CHANGELOG.md 获取详细更新内容。
           releaseDraft: true
           prerelease: false
-          args: ${{ matrix.args }}
+          args: --target x86_64-pc-windows-msvc
