@@ -1,0 +1,19 @@
+{
+  "id": "event-online",
+  "name": "线上活动",
+  "description": "线上活动策划",
+  "icon": "🎉",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "event",
+  "subCategory": "general",
+  "tags": [
+    "线上活动"
+  ],
+  "order": 173,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

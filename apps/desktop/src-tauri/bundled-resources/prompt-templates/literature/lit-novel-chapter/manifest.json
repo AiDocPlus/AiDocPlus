@@ -1,0 +1,19 @@
+{
+  "id": "lit-novel-chapter",
+  "name": "小说章节",
+  "description": "小说章节创作，人物鲜明、情节起伏",
+  "icon": "📖",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "literature",
+  "subCategory": "general",
+  "tags": [
+    "小说章节"
+  ],
+  "order": 27,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

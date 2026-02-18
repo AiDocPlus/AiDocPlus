@@ -1,0 +1,19 @@
+{
+  "id": "tech-deployment",
+  "name": "部署文档",
+  "description": "部署指南",
+  "icon": "💻",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "tech",
+  "subCategory": "general",
+  "tags": [
+    "部署文档"
+  ],
+  "order": 164,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

@@ -1,0 +1,19 @@
+{
+  "id": "gongwen-qingshi",
+  "name": "请示",
+  "description": "请示公文",
+  "icon": "📄",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "official",
+  "subCategory": "general",
+  "tags": [
+    "请示"
+  ],
+  "order": 152,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

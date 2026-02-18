@@ -1,0 +1,19 @@
+{
+  "id": "learning-lesson-plan",
+  "name": "教案设计",
+  "description": "规范的课堂教学教案，含目标、过程和板书设计",
+  "icon": "📚",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "learning",
+  "subCategory": "general",
+  "tags": [
+    "教案设计"
+  ],
+  "order": 57,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

@@ -1,0 +1,19 @@
+{
+  "id": "speech-annual-party",
+  "name": "年会发言",
+  "description": "年会/总结大会发言",
+  "icon": "🎤",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "speech",
+  "subCategory": "general",
+  "tags": [
+    "年会发言"
+  ],
+  "order": 144,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

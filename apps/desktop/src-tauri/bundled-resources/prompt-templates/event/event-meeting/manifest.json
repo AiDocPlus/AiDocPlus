@@ -1,0 +1,19 @@
+{
+  "id": "event-meeting",
+  "name": "会议策划",
+  "description": "会议策划方案，含议程、人员、物料安排",
+  "icon": "🎉",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "event",
+  "subCategory": "general",
+  "tags": [
+    "会议策划"
+  ],
+  "order": 70,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

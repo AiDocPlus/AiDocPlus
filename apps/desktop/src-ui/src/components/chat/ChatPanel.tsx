@@ -5,7 +5,7 @@ import { useAppStore } from '@/stores/useAppStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { PromptTemplates } from '../templates/PromptTemplates';
 import { invoke } from '@tauri-apps/api/core';
-import { timestampToDate } from '@aidocplus/shared-types';
+import { timestampToDate, getProviderConfig, getActiveService, getActiveRole } from '@aidocplus/shared-types';
 import type { PromptTemplate, Attachment, ChatContextMode } from '@aidocplus/shared-types';
 import { useTemplatesStore } from '@/stores/useTemplatesStore';
 import { useTranslation } from '@/i18n';
@@ -175,6 +175,12 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
 
   const settingsStore = useSettingsStore();
 
+  // 获取当前 provider 的能力声明
+  const activeService = getActiveService(settingsStore.ai);
+  const providerConfig = activeService ? getProviderConfig(activeService.provider) : undefined;
+  const supportsWebSearch = providerConfig?.capabilities?.webSearch ?? false;
+  const supportsFunctionCalling = providerConfig?.capabilities?.functionCalling ?? false;
+
   // 获取当前标签对应的文档
   const currentTab = tabs.find(tab => tab.id === tabId);
   const currentDocument = currentTab
@@ -186,6 +192,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
   const [showTemplates, setShowTemplates] = useState(false);
   const [useStreaming, setUseStreaming] = useState(true);
   const [webSearch, setWebSearch] = useState(true);
+  const [useTools, setUseTools] = useState(false);
   const [authorNotesInput, setAuthorNotesInput] = useState('');
   const [contextMode, _setContextMode] = useState<ChatContextMode>('none');
   // simpleMode 时强制为 none
@@ -272,7 +279,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
       const ctxInfo = effectiveContextMode !== 'none'
         ? { mode: effectiveContextMode, content: getContextContent() }
         : undefined;
-      await sendChatMessage(effectiveTabId, messageContent, webSearch, ctxInfo);
+      await sendChatMessage(effectiveTabId, messageContent, webSearch && supportsWebSearch, ctxInfo, useTools && supportsFunctionCalling);
     } catch (error) {
       console.error('Failed to send message:', error);
       const errMsg = typeof error === 'string' ? error : (error instanceof Error ? error.message : JSON.stringify(error));
@@ -322,6 +329,9 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
     if (!notesToUse) {
       return;
     }
+
+    // 自动收起提示词区域
+    setShowAuthorNotes(false);
 
     // Check if API key is configured
     const aiSettings = useSettingsStore.getState().ai;
@@ -409,7 +419,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
             // 解析 <think> 标签：分离思考内容和正文内容
             const parsed = parseThinkTags(accumulatedContent);
 
-            // 实时更新聊天区的思考状态
+            // 实时更新聊天区的思考状态（模型可能强制返回思考内容）
             if (parsed.thinking) {
               const thinkMsg = parsed.isThinking
                 ? t('chat.aiThinking', { defaultValue: '💭 **AI 正在思考...**\n\n{{thinking}}', thinking: parsed.thinking })
@@ -590,7 +600,19 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
     <div className="flex-1 flex flex-col overflow-hidden min-h-0">
       {/* Header with close button */}
       <div className="flex items-center justify-between px-4 py-2 border-b bg-background flex-shrink-0">
-        <h2 className="font-semibold">{simpleMode ? t('chat.chatTitle', { defaultValue: '随便聊聊' }) : t('chat.aiAssistant', { defaultValue: 'AI 助手' })}</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="font-semibold">{simpleMode ? t('chat.chatTitle', { defaultValue: '随便聊聊' }) : t('chat.aiAssistant', { defaultValue: 'AI 助手' })}</h2>
+          {(() => {
+            const activeRole = getActiveRole(settingsStore.role);
+            if (!activeRole || !activeRole.systemPrompt) return null;
+            return (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary flex items-center gap-1" title={activeRole.description}>
+                <span>{activeRole.icon}</span>
+                <span>{activeRole.name}</span>
+              </span>
+            );
+          })()}
+        </div>
         {onClose && (
           <Button
             variant="ghost"
@@ -707,16 +729,30 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
                       {t('chat.streamingEnabled')}
                     </label>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2" title={supportsWebSearch ? '' : t('chat.webSearchUnsupported', { defaultValue: '当前模型不支持联网搜索' })}>
                     <input
                       type="checkbox"
                       id="web-search-mode"
-                      checked={webSearch}
+                      checked={webSearch && supportsWebSearch}
                       onChange={(e) => setWebSearch(e.target.checked)}
+                      disabled={!supportsWebSearch}
                       className="w-4 h-4"
                     />
-                    <label htmlFor="web-search-mode" className="text-sm">
+                    <label htmlFor="web-search-mode" className={`text-sm ${!supportsWebSearch ? 'opacity-50' : ''}`}>
                       {t('chat.webSearch', { defaultValue: '联网搜索' })}
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2" title={supportsFunctionCalling ? t('chat.toolsHint', { defaultValue: '启用后 AI 可调用内置工具（搜索文档等）' }) : t('chat.toolsUnsupported', { defaultValue: '当前模型不支持工具调用' })}>
+                    <input
+                      type="checkbox"
+                      id="tools-mode"
+                      checked={useTools && supportsFunctionCalling}
+                      onChange={(e) => setUseTools(e.target.checked)}
+                      disabled={!supportsFunctionCalling}
+                      className="w-4 h-4"
+                    />
+                    <label htmlFor="tools-mode" className={`text-sm ${!supportsFunctionCalling ? 'opacity-50' : ''}`}>
+                      {t('chat.tools', { defaultValue: '工具调用' })}
                     </label>
                   </div>
                 </div>
@@ -835,7 +871,13 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
                         <div className="text-sm whitespace-pre-wrap break-words">{message.content}</div>
                       ) : (
                         <div className="text-sm [&_.markdown-preview]:p-0 [&_.markdown-preview]:text-inherit">
-                          <MarkdownPreview content={message.content} theme={resolveTheme()} className="!p-0" fontSize={13} />
+                          <MarkdownPreview content={(() => {
+                            const parsed = parseThinkTags(message.content);
+                            if (!parsed.thinking) return message.content;
+                            if (settingsStore.ai.enableThinking) return message.content;
+                            // 未启用深度思考但模型返回了思考内容：折叠展示
+                            return `<details>\n<summary>${t('chat.thinkingCollapsed', { defaultValue: '💭 查看 AI 思考过程' })}</summary>\n\n${parsed.thinking}\n\n</details>\n\n${parsed.content}`;
+                          })()} theme={resolveTheme()} className="!p-0" fontSize={13} />
                         </div>
                       )}
                     </div>

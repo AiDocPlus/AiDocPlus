@@ -1,0 +1,19 @@
+{
+  "id": "academic-cover-letter",
+  "name": "投稿信",
+  "description": "期刊投稿信",
+  "icon": "🎓",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "academic",
+  "subCategory": "general",
+  "tags": [
+    "投稿信"
+  ],
+  "order": 162,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

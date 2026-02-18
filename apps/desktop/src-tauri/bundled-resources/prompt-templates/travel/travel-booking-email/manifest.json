@@ -1,0 +1,19 @@
+{
+  "id": "travel-booking-email",
+  "name": "预订邮件",
+  "description": "旅行预订相关邮件模板，含咨询、确认、变更",
+  "icon": "🧳",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "travel",
+  "subCategory": "general",
+  "tags": [
+    "预订邮件"
+  ],
+  "order": 46,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

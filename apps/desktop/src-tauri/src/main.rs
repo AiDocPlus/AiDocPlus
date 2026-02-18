@@ -9,7 +9,9 @@ mod error;
 mod native_export;
 mod plugin;
 mod project;
+mod resource_engine;
 mod template;
+mod tools;
 mod workspace;
 
 use commands::{
@@ -22,6 +24,7 @@ use commands::{
     pandoc::*,
     plugin::*,
     project::*,
+    resource::*,
     search::*,
     template::*,
     workspace::*,
@@ -40,6 +43,28 @@ fn main() {
         .setup(|app| {
             // Initialize app state
             app.manage(config::AppState::new());
+
+            // Initialize resource engine
+            let resource_state = resource_engine::ResourceEngineState::new();
+            let home = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+            let resources_root = home.join("AiDocPlus").join("Resources");
+            if let Err(e) = resource_state.init(resources_root.clone()) {
+                eprintln!("[ResourceEngine] 初始化失败: {}", e);
+            } else {
+                // 从 bundled-resources 重建索引
+                let bundled_dir = std::env::current_exe()
+                    .ok()
+                    .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+                    .unwrap_or_default()
+                    .join("bundled-resources");
+                if let Err(e) = resource_state.with_engine(|engine| {
+                    engine.rebuild_index_from_bundled(&bundled_dir)?;
+                    engine.rebuild_index_from_local()
+                }) {
+                    eprintln!("[ResourceEngine] 索引重建失败: {}", e);
+                }
+            }
+            app.manage(resource_state);
 
             // Ensure plugins directory exists
             plugin::ensure_plugins_dir();
@@ -260,6 +285,15 @@ fn main() {
             // Pandoc commands
             check_pandoc,
             pandoc_export,
+
+            // Resource engine commands
+            resource_list,
+            resource_search,
+            resource_get,
+            resource_set_enabled,
+            resource_stats,
+            resource_categories,
+            resource_rebuild_index,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

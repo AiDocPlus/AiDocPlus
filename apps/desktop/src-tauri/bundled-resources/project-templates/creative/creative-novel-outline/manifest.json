@@ -1,0 +1,22 @@
+{
+  "id": "creative-novel-outline",
+  "name": "小说大纲",
+  "description": "小说创作大纲模板，含人物设定、世界观和情节规划",
+  "icon": "Feather",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "project-template",
+  "majorCategory": "creative",
+  "subCategory": "general",
+  "tags": [
+    "小说",
+    "创作",
+    "大纲",
+    "写作"
+  ],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

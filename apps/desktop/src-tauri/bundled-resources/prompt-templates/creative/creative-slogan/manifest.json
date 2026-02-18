@@ -1,0 +1,19 @@
+{
+  "id": "creative-slogan",
+  "name": "口号标语",
+  "description": "宣传口号/标语",
+  "icon": "✨",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "creative",
+  "subCategory": "general",
+  "tags": [
+    "口号标语"
+  ],
+  "order": 213,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

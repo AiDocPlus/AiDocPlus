@@ -1,0 +1,19 @@
+{
+  "id": "exam-grad-major",
+  "name": "专业课复习提纲",
+  "description": "专业课知识体系复习提纲",
+  "icon": "🎓",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "exam-grad",
+  "subCategory": "general",
+  "tags": [
+    "专业课复习提纲"
+  ],
+  "order": 92,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

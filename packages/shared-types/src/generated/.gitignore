@@ -1,0 +1,3 @@
+# 由各资源仓库 deploy 写入的生成文件
+*.generated.ts
+!.gitkeep

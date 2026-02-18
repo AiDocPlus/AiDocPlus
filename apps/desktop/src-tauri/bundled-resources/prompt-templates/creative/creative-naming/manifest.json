@@ -1,0 +1,19 @@
+{
+  "id": "creative-naming",
+  "name": "创意命名",
+  "description": "品牌/产品/角色命名",
+  "icon": "✨",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "creative",
+  "subCategory": "general",
+  "tags": [
+    "创意命名"
+  ],
+  "order": 214,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

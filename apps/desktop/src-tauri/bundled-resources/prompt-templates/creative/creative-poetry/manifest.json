@@ -1,0 +1,19 @@
+{
+  "id": "creative-poetry",
+  "name": "诗歌创作",
+  "description": "现代诗/古体诗",
+  "icon": "✨",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "creative",
+  "subCategory": "general",
+  "tags": [
+    "诗歌创作"
+  ],
+  "order": 211,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

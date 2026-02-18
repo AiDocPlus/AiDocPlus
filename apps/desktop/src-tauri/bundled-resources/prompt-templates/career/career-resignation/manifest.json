@@ -1,0 +1,19 @@
+{
+  "id": "career-resignation",
+  "name": "离职沟通",
+  "description": "离职申请和交接沟通",
+  "icon": "🚀",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "career",
+  "subCategory": "general",
+  "tags": [
+    "离职沟通"
+  ],
+  "order": 203,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

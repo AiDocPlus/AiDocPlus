@@ -1,0 +1,19 @@
+{
+  "id": "exam-grad-analysis",
+  "name": "真题解析模板",
+  "description": "真题解析标准模板",
+  "icon": "🎓",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "exam-grad",
+  "subCategory": "general",
+  "tags": [
+    "真题解析模板"
+  ],
+  "order": 93,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

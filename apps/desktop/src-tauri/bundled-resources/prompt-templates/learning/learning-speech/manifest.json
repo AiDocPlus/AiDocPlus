@@ -1,0 +1,19 @@
+{
+  "id": "learning-speech",
+  "name": "交流发言",
+  "description": "学习交流发言稿，适合研讨会、分享会等场合",
+  "icon": "📚",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "learning",
+  "subCategory": "general",
+  "tags": [
+    "交流发言"
+  ],
+  "order": 51,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

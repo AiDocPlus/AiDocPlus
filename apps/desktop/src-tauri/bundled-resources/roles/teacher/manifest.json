@@ -1,0 +1,22 @@
+{
+  "id": "teacher",
+  "name": "教师",
+  "description": "教案设计、课件制作、学生评语、教学反思",
+  "icon": "👨‍🏫",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "role",
+  "majorCategory": "education",
+  "subCategory": "teaching",
+  "tags": ["教师", "教案", "教学", "teacher"],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z",
+  "recommendedTemplateCategories": ["learning", "essay", "speech"],
+  "recommendedPlugins": ["lessonplan", "quiz", "ppt"],
+  "i18n": {
+    "en": { "name": "Teacher", "description": "Lesson plans, courseware, student evaluations, teaching reflections" }
+  }
+}

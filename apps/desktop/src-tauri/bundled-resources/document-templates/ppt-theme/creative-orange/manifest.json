@@ -1,0 +1,32 @@
+{
+  "id": "creative-orange",
+  "name": "创意橙",
+  "description": "PPT 主题: 创意橙",
+  "icon": "🎨",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "document-template",
+  "subType": "ppt-theme",
+  "majorCategory": "ppt-theme",
+  "subCategory": "general",
+  "tags": [
+    "ppt",
+    "创意橙"
+  ],
+  "order": 4,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z",
+  "colors": {
+    "primary": "#ea580c",
+    "secondary": "#f97316",
+    "background": "#fff7ed",
+    "text": "#431407",
+    "accent": "#fbbf24"
+  },
+  "fonts": {
+    "title": "system-ui, \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+    "body": "system-ui, \"PingFang SC\", \"Microsoft YaHei\", sans-serif"
+  }
+}

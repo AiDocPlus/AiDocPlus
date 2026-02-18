@@ -1,0 +1,19 @@
+{
+  "id": "creative-script",
+  "name": "剧本创作",
+  "description": "短剧/微电影剧本",
+  "icon": "✨",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "creative",
+  "subCategory": "general",
+  "tags": [
+    "剧本创作"
+  ],
+  "order": 209,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

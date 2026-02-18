@@ -1,0 +1,19 @@
+{
+  "id": "translation-terminology",
+  "name": "术语翻译",
+  "description": "专业术语翻译",
+  "icon": "🌐",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "translation",
+  "subCategory": "general",
+  "tags": [
+    "术语翻译"
+  ],
+  "order": 139,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

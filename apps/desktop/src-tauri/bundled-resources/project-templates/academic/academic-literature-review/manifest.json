@@ -1,0 +1,21 @@
+{
+  "id": "academic-literature-review",
+  "name": "文献综述",
+  "description": "系统性文献综述模板，适用于研究领域的文献梳理与分析",
+  "icon": "BookOpen",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "project-template",
+  "majorCategory": "academic",
+  "subCategory": "general",
+  "tags": [
+    "文献综述",
+    "学术",
+    "研究综述"
+  ],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

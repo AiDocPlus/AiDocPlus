@@ -1,0 +1,19 @@
+{
+  "id": "exam-grad-adjustment",
+  "name": "考研调剂",
+  "description": "调剂申请和沟通",
+  "icon": "🎓",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "exam-grad",
+  "subCategory": "general",
+  "tags": [
+    "考研调剂"
+  ],
+  "order": 182,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

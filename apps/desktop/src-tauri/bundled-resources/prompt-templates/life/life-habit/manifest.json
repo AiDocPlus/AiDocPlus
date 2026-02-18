@@ -1,0 +1,19 @@
+{
+  "id": "life-habit",
+  "name": "习惯追踪",
+  "description": "习惯养成追踪表",
+  "icon": "🌸",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "life",
+  "subCategory": "general",
+  "tags": [
+    "习惯追踪"
+  ],
+  "order": 83,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

@@ -7,6 +7,7 @@ pub mod import;
 pub mod pandoc;
 pub mod plugin;
 pub mod project;
+pub mod resource;
 pub mod template;
 pub mod search;
 pub mod workspace;

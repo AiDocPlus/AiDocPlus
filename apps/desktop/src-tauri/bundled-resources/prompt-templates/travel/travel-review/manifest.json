@@ -1,0 +1,19 @@
+{
+  "id": "travel-review",
+  "name": "景点点评",
+  "description": "详细的景点点评，含评分、亮点、不足和Tips",
+  "icon": "🧳",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "travel",
+  "subCategory": "general",
+  "tags": [
+    "景点点评"
+  ],
+  "order": 45,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

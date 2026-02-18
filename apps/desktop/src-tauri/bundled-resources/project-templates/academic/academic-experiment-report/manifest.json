@@ -1,0 +1,22 @@
+{
+  "id": "academic-experiment-report",
+  "name": "实验报告",
+  "description": "科学实验报告模板，含实验目的、原理、步骤、数据和分析",
+  "icon": "FlaskConical",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "project-template",
+  "majorCategory": "academic",
+  "subCategory": "general",
+  "tags": [
+    "实验",
+    "报告",
+    "科学",
+    "数据分析"
+  ],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

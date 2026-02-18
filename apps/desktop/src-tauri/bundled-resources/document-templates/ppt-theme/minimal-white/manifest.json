@@ -1,0 +1,32 @@
+{
+  "id": "minimal-white",
+  "name": "简约白",
+  "description": "PPT 主题: 简约白",
+  "icon": "🎨",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "document-template",
+  "subType": "ppt-theme",
+  "majorCategory": "ppt-theme",
+  "subCategory": "general",
+  "tags": [
+    "ppt",
+    "简约白"
+  ],
+  "order": 2,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z",
+  "colors": {
+    "primary": "#18181b",
+    "secondary": "#52525b",
+    "background": "#fafafa",
+    "text": "#18181b",
+    "accent": "#a1a1aa"
+  },
+  "fonts": {
+    "title": "system-ui, \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+    "body": "system-ui, \"PingFang SC\", \"Microsoft YaHei\", sans-serif"
+  }
+}

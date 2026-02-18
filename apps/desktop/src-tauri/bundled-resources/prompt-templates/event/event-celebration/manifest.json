@@ -1,0 +1,19 @@
+{
+  "id": "event-celebration",
+  "name": "庆典活动",
+  "description": "庆典活动方案，含周年庆、开业等",
+  "icon": "🎉",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "event",
+  "subCategory": "general",
+  "tags": [
+    "庆典活动"
+  ],
+  "order": 72,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

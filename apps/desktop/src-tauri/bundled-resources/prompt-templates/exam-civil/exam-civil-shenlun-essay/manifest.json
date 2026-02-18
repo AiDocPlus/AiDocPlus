@@ -1,0 +1,19 @@
+{
+  "id": "exam-civil-shenlun-essay",
+  "name": "申论大作文",
+  "description": "申论大作文写作方法",
+  "icon": "🏛️",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "exam-civil",
+  "subCategory": "general",
+  "tags": [
+    "申论大作文"
+  ],
+  "order": 100,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

@@ -1,0 +1,19 @@
+{
+  "id": "event-competition",
+  "name": "比赛策划",
+  "description": "比赛活动策划方案，含赛制、评分、奖项",
+  "icon": "🎉",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "event",
+  "subCategory": "general",
+  "tags": [
+    "比赛策划"
+  ],
+  "order": 74,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

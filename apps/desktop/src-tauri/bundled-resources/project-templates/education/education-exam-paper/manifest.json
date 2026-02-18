@@ -1,0 +1,22 @@
+{
+  "id": "education-exam-paper",
+  "name": "试卷/测验",
+  "description": "考试试卷模板，含选择题、填空题、简答题等题型",
+  "icon": "FileCheck",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "project-template",
+  "majorCategory": "education",
+  "subCategory": "general",
+  "tags": [
+    "试卷",
+    "考试",
+    "测验",
+    "题目"
+  ],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

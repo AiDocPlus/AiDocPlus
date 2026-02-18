@@ -1,0 +1,19 @@
+{
+  "id": "marketing-social-media",
+  "name": "社交媒体文案",
+  "description": "社交媒体文案，适配微信/微博/小红书等平台",
+  "icon": "📢",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "marketing",
+  "subCategory": "general",
+  "tags": [
+    "社交媒体文案"
+  ],
+  "order": 11,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

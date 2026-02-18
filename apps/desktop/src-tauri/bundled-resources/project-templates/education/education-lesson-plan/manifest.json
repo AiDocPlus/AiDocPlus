@@ -1,0 +1,22 @@
+{
+  "id": "education-lesson-plan",
+  "name": "教学设计",
+  "description": "课堂教学设计模板，含教学目标、过程和评价",
+  "icon": "School",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "project-template",
+  "majorCategory": "education",
+  "subCategory": "general",
+  "tags": [
+    "教学",
+    "教案",
+    "课堂设计",
+    "教育"
+  ],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

@@ -1,0 +1,22 @@
+{
+  "id": "general-reading-notes",
+  "name": "读书笔记",
+  "description": "读书笔记模板，记录书籍要点、感悟和行动计划",
+  "icon": "Bookmark",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "project-template",
+  "majorCategory": "general",
+  "subCategory": "general",
+  "tags": [
+    "读书",
+    "笔记",
+    "摘录",
+    "感悟"
+  ],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

@@ -1,0 +1,19 @@
+{
+  "id": "health-diet-plan",
+  "name": "饮食计划",
+  "description": "健康饮食计划制定",
+  "icon": "💪",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "health",
+  "subCategory": "general",
+  "tags": [
+    "饮食计划"
+  ],
+  "order": 217,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

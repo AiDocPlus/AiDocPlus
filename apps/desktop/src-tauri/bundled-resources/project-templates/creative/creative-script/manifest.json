@@ -1,0 +1,22 @@
+{
+  "id": "creative-script",
+  "name": "剧本/脚本",
+  "description": "影视剧本或短视频脚本创作模板",
+  "icon": "Clapperboard",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "project-template",
+  "majorCategory": "creative",
+  "subCategory": "general",
+  "tags": [
+    "剧本",
+    "脚本",
+    "影视",
+    "创作"
+  ],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

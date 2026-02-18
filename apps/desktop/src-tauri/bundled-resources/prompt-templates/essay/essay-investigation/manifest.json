@@ -1,0 +1,19 @@
+{
+  "id": "essay-investigation",
+  "name": "调查报告",
+  "description": "调查报告写作",
+  "icon": "📝",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "essay",
+  "subCategory": "general",
+  "tags": [
+    "调查报告"
+  ],
+  "order": 180,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

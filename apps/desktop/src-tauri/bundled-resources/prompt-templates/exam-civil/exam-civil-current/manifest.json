@@ -1,0 +1,19 @@
+{
+  "id": "exam-civil-current",
+  "name": "时政热点分析",
+  "description": "时政热点分析框架",
+  "icon": "🏛️",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "exam-civil",
+  "subCategory": "general",
+  "tags": [
+    "时政热点分析"
+  ],
+  "order": 103,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

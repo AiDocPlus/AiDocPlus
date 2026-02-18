@@ -1,0 +1,32 @@
+{
+  "id": "elegant-purple",
+  "name": "典雅紫",
+  "description": "PPT 主题: 典雅紫",
+  "icon": "🎨",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "document-template",
+  "subType": "ppt-theme",
+  "majorCategory": "ppt-theme",
+  "subCategory": "general",
+  "tags": [
+    "ppt",
+    "典雅紫"
+  ],
+  "order": 5,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z",
+  "colors": {
+    "primary": "#7c3aed",
+    "secondary": "#a78bfa",
+    "background": "#faf5ff",
+    "text": "#2e1065",
+    "accent": "#c084fc"
+  },
+  "fonts": {
+    "title": "Georgia, \"PingFang SC\", \"Microsoft YaHei\", serif",
+    "body": "system-ui, \"PingFang SC\", \"Microsoft YaHei\", sans-serif"
+  }
+}

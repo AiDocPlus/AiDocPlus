@@ -1,0 +1,19 @@
+{
+  "id": "life-goal",
+  "name": "目标规划",
+  "description": "制定目标和行动计划",
+  "icon": "🌸",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "life",
+  "subCategory": "general",
+  "tags": [
+    "目标规划"
+  ],
+  "order": 82,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

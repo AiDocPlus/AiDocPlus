@@ -1,0 +1,22 @@
+{
+  "id": "academic-thesis",
+  "name": "学术论文",
+  "description": "标准学术论文结构，含摘要、引言、方法、结果、讨论、结论等章节",
+  "icon": "GraduationCap",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "project-template",
+  "majorCategory": "academic",
+  "subCategory": "general",
+  "tags": [
+    "论文",
+    "学术",
+    "研究",
+    "毕业论文"
+  ],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

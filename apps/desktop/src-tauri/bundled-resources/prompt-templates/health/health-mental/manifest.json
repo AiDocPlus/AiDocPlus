@@ -1,0 +1,19 @@
+{
+  "id": "health-mental",
+  "name": "心理调适",
+  "description": "心理健康建议",
+  "icon": "💪",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "health",
+  "subCategory": "general",
+  "tags": [
+    "心理调适"
+  ],
+  "order": 219,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

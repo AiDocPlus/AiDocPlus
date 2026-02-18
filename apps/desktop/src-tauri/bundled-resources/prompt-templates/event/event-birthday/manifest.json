@@ -1,0 +1,19 @@
+{
+  "id": "event-birthday",
+  "name": "生日派对",
+  "description": "生日派对策划",
+  "icon": "🎉",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "event",
+  "subCategory": "general",
+  "tags": [
+    "生日派对"
+  ],
+  "order": 172,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

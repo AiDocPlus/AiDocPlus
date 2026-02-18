@@ -1,0 +1,19 @@
+{
+  "id": "travel-emergency",
+  "name": "紧急求助",
+  "description": "旅行紧急情况应对指南，含证件丢失、行李问题等",
+  "icon": "🧳",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "travel",
+  "subCategory": "general",
+  "tags": [
+    "紧急求助"
+  ],
+  "order": 47,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

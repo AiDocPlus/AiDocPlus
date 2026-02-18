@@ -1,0 +1,19 @@
+{
+  "id": "translation-business",
+  "name": "商务翻译",
+  "description": "商务文档翻译",
+  "icon": "🌐",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "translation",
+  "subCategory": "general",
+  "tags": [
+    "商务翻译"
+  ],
+  "order": 142,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

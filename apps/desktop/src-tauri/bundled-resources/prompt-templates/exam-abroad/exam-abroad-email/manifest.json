@@ -1,0 +1,19 @@
+{
+  "id": "exam-abroad-email",
+  "name": "留学申请邮件",
+  "description": "留学申请各类邮件模板",
+  "icon": "✈️",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "exam-abroad",
+  "subCategory": "general",
+  "tags": [
+    "留学申请邮件"
+  ],
+  "order": 112,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

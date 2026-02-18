@@ -1,0 +1,19 @@
+{
+  "id": "exam-grad-mistakes",
+  "name": "错题整理",
+  "description": "错题整理分析模板",
+  "icon": "🎓",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "exam-grad",
+  "subCategory": "general",
+  "tags": [
+    "错题整理"
+  ],
+  "order": 96,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

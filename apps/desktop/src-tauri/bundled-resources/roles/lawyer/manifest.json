@@ -1,0 +1,22 @@
+{
+  "id": "lawyer",
+  "name": "律师",
+  "description": "法律文书、合同审查、法律意见书、案例分析",
+  "icon": "⚖️",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "role",
+  "majorCategory": "legal",
+  "subCategory": "general",
+  "tags": ["律师", "法律", "合同", "lawyer", "legal"],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z",
+  "recommendedTemplateCategories": ["official", "business"],
+  "recommendedPlugins": ["review", "email"],
+  "i18n": {
+    "en": { "name": "Lawyer", "description": "Legal documents, contract review, legal opinions, case analysis" }
+  }
+}

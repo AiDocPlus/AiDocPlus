@@ -1,0 +1,22 @@
+{
+  "id": "government-notice",
+  "name": "通知/公告",
+  "description": "政府机关或企事业单位通知公告模板",
+  "icon": "Bell",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "project-template",
+  "majorCategory": "government",
+  "subCategory": "general",
+  "tags": [
+    "通知",
+    "公告",
+    "公文",
+    "行政"
+  ],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

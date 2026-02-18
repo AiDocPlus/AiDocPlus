@@ -1,0 +1,19 @@
+{
+  "id": "humor-crosstalk",
+  "name": "相声/脱口秀",
+  "description": "相声或脱口秀文稿，包袱精准、节奏感强",
+  "icon": "😂",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "humor",
+  "subCategory": "general",
+  "tags": [
+    "相声/脱口秀"
+  ],
+  "order": 37,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

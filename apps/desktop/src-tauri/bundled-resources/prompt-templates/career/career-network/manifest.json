@@ -1,0 +1,19 @@
+{
+  "id": "career-network",
+  "name": "职场社交",
+  "description": "职场社交和名片邮件",
+  "icon": "🚀",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "career",
+  "subCategory": "general",
+  "tags": [
+    "职场社交"
+  ],
+  "order": 207,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

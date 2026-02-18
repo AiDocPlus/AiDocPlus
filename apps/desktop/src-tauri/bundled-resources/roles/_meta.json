@@ -1,0 +1,130 @@
+{
+  "schemaVersion": "1.0",
+  "resourceType": "role",
+  "defaultLocale": "zh",
+  "categories": [
+    {
+      "key": "general",
+      "name": "通用",
+      "icon": "📝",
+      "order": 0,
+      "i18n": { "en": { "name": "General" } },
+      "subCategories": [
+        { "key": "default", "name": "默认", "order": 0, "i18n": { "en": { "name": "Default" } } }
+      ]
+    },
+    {
+      "key": "legal",
+      "name": "法律法务",
+      "icon": "⚖️",
+      "order": 1,
+      "i18n": { "en": { "name": "Legal" } },
+      "subCategories": [
+        { "key": "general", "name": "综合法律", "order": 0, "i18n": { "en": { "name": "General Legal" } } },
+        { "key": "contract", "name": "合同", "order": 1, "i18n": { "en": { "name": "Contract" } } },
+        { "key": "litigation", "name": "诉讼", "order": 2, "i18n": { "en": { "name": "Litigation" } } }
+      ]
+    },
+    {
+      "key": "education",
+      "name": "教育教学",
+      "icon": "📚",
+      "order": 2,
+      "i18n": { "en": { "name": "Education" } },
+      "subCategories": [
+        { "key": "teaching", "name": "教学", "order": 0, "i18n": { "en": { "name": "Teaching" } } },
+        { "key": "learning", "name": "学习", "order": 1, "i18n": { "en": { "name": "Learning" } } }
+      ]
+    },
+    {
+      "key": "government",
+      "name": "政务公文",
+      "icon": "🏛️",
+      "order": 3,
+      "i18n": { "en": { "name": "Government" } },
+      "subCategories": [
+        { "key": "official-doc", "name": "公文写作", "order": 0, "i18n": { "en": { "name": "Official Documents" } } }
+      ]
+    },
+    {
+      "key": "tech",
+      "name": "技术开发",
+      "icon": "💻",
+      "order": 4,
+      "i18n": { "en": { "name": "Technology" } },
+      "subCategories": [
+        { "key": "software", "name": "软件开发", "order": 0, "i18n": { "en": { "name": "Software Development" } } }
+      ]
+    },
+    {
+      "key": "business",
+      "name": "商务办公",
+      "icon": "💼",
+      "order": 5,
+      "i18n": { "en": { "name": "Business" } },
+      "subCategories": [
+        { "key": "management", "name": "管理", "order": 0, "i18n": { "en": { "name": "Management" } } }
+      ]
+    },
+    {
+      "key": "creative",
+      "name": "创意写作",
+      "icon": "✨",
+      "order": 6,
+      "i18n": { "en": { "name": "Creative Writing" } },
+      "subCategories": [
+        { "key": "content", "name": "内容创作", "order": 0, "i18n": { "en": { "name": "Content Creation" } } }
+      ]
+    },
+    {
+      "key": "academic",
+      "name": "学术研究",
+      "icon": "🎓",
+      "order": 7,
+      "i18n": { "en": { "name": "Academic" } },
+      "subCategories": [
+        { "key": "research", "name": "科研", "order": 0, "i18n": { "en": { "name": "Research" } } }
+      ]
+    },
+    {
+      "key": "marketing",
+      "name": "营销传播",
+      "icon": "📢",
+      "order": 8,
+      "i18n": { "en": { "name": "Marketing" } },
+      "subCategories": [
+        { "key": "copywriting", "name": "文案", "order": 0, "i18n": { "en": { "name": "Copywriting" } } }
+      ]
+    },
+    {
+      "key": "media",
+      "name": "自媒体",
+      "icon": "📱",
+      "order": 9,
+      "i18n": { "en": { "name": "Social Media" } },
+      "subCategories": [
+        { "key": "content", "name": "内容运营", "order": 0, "i18n": { "en": { "name": "Content Operations" } } }
+      ]
+    },
+    {
+      "key": "finance",
+      "name": "财务金融",
+      "icon": "💰",
+      "order": 10,
+      "i18n": { "en": { "name": "Finance" } },
+      "subCategories": [
+        { "key": "accounting", "name": "会计", "order": 0, "i18n": { "en": { "name": "Accounting" } } }
+      ]
+    },
+    {
+      "key": "medical",
+      "name": "医疗健康",
+      "icon": "🏥",
+      "order": 11,
+      "i18n": { "en": { "name": "Medical" } },
+      "subCategories": [
+        { "key": "clinical", "name": "临床", "order": 0, "i18n": { "en": { "name": "Clinical" } } }
+      ]
+    }
+  ]
+}

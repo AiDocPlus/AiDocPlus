@@ -1,0 +1,19 @@
+{
+  "id": "travel-caption",
+  "name": "旅行配文",
+  "description": "适合社交媒体的旅行照片配文，多风格可选",
+  "icon": "🧳",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "travel",
+  "subCategory": "general",
+  "tags": [
+    "旅行配文"
+  ],
+  "order": 44,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

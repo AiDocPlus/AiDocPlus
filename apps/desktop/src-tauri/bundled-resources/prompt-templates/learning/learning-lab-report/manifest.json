@@ -1,0 +1,19 @@
+{
+  "id": "learning-lab-report",
+  "name": "实验报告",
+  "description": "实验报告模板",
+  "icon": "📚",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "learning",
+  "subCategory": "general",
+  "tags": [
+    "实验报告"
+  ],
+  "order": 129,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

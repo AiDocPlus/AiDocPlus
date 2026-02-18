@@ -4,7 +4,7 @@ import { useAppStore } from '@/stores/useAppStore';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from '../../i18n';
 import { useSettingsStore } from '../../stores/useSettingsStore';
-import { AI_PROVIDERS, getProviderConfig, EMAIL_PROVIDER_PRESETS, getEmailPreset } from '@aidocplus/shared-types';
+import { AI_PROVIDERS, getProviderConfig, EMAIL_PROVIDER_PRESETS, getEmailPreset, BUILT_IN_ROLES, getActiveRole } from '@aidocplus/shared-types';
 import type { AIProvider, AIServiceConfig, EmailAccountConfig } from '@aidocplus/shared-types';
 import { SUPPORTED_LANGUAGES, type SupportedLanguage, changeAppLanguage } from '../../i18n';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
@@ -30,10 +30,12 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
     file,
     ai,
     email,
+    role,
     updateEditorSettings,
     updateUISettings,
     updateAISettings,
     updateEmailSettings,
+    updateRoleSettings,
     resetSettings,
     exportSettings,
     importSettings,
@@ -389,7 +391,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
         </DialogHeader>
 
         <Tabs defaultValue="editor" className="flex-1 overflow-hidden flex flex-col">
-          <TabsList className="grid grid-cols-8 w-full bg-muted">
+          <TabsList className="grid grid-cols-9 w-full bg-muted">
             <TabsTrigger value="editor">
               <Type className="w-4 h-4 mr-1" />
               {t('settings.editor')}
@@ -402,9 +404,13 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
               <Globe className="w-4 h-4 mr-1" />
               {t('settings.language')}
             </TabsTrigger>
+            <TabsTrigger value="role">
+              <span className="mr-1">🎭</span>
+              {t('settings.roleTab', { defaultValue: '角色' })}
+            </TabsTrigger>
             <TabsTrigger value="plugins">
               <Puzzle className="w-4 h-4 mr-1" />
-              {t('settings.plugins', { defaultValue: '\u63D2\u4EF6' })}
+              {t('settings.plugins', { defaultValue: '插件' })}
             </TabsTrigger>
             <TabsTrigger value="templates">
               <LayoutTemplate className="w-4 h-4 mr-1" />
@@ -424,12 +430,144 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
           </TabsList>
 
           <div className="flex-1 overflow-y-auto bg-card" id="settings-content">
+            {/* Role */}
+            <TabsContent value="role" className="space-y-6 p-4 bg-card h-full">
+              <div>
+                <h3 className="text-lg font-semibold mb-2">{t('settings.roleSettings.title', { defaultValue: '角色设定' })}</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {t('settings.roleSettings.description', { defaultValue: '选择一个职业角色，AI 将自动适配该角色的专业知识和写作风格。' })}
+                </p>
+                <Separator className="mb-4" />
+
+                {/* 当前角色 */}
+                <div className="mb-6">
+                  <Label className="text-sm font-medium mb-2 block">{t('settings.roleSettings.currentRole', { defaultValue: '当前角色' })}</Label>
+                  <div className="text-sm text-muted-foreground mb-3">
+                    {role.activeRoleId
+                      ? (() => { const r = getActiveRole(role); return r ? `${r.icon} ${r.name} — ${r.description}` : t('settings.roleSettings.noRole', { defaultValue: '未选择角色' }); })()
+                      : t('settings.roleSettings.noRole', { defaultValue: '未选择角色（使用通用模式）' })
+                    }
+                  </div>
+                </div>
+
+                {/* 内置角色卡片 */}
+                <Label className="text-sm font-medium mb-3 block">{t('settings.roleSettings.builtinRoles', { defaultValue: '内置角色' })}</Label>
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                  {BUILT_IN_ROLES.map((r) => (
+                    <button
+                      key={r.id}
+                      onClick={() => updateRoleSettings({ activeRoleId: role.activeRoleId === r.id ? '' : r.id })}
+                      className={`text-left p-3 rounded-lg border-2 transition-all hover:shadow-sm ${
+                        role.activeRoleId === r.id
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xl">{r.icon}</span>
+                        <span className="font-medium text-sm">{r.name}</span>
+                        {role.activeRoleId === r.id && (
+                          <Check className="w-4 h-4 text-primary ml-auto" />
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-2">{r.description}</p>
+                    </button>
+                  ))}
+                </div>
+
+                {/* 自定义角色 */}
+                {role.customRoles.length > 0 && (
+                  <>
+                    <Label className="text-sm font-medium mb-3 block">{t('settings.roleSettings.customRoles', { defaultValue: '自定义角色' })}</Label>
+                    <div className="grid grid-cols-2 gap-3 mb-6">
+                      {role.customRoles.map((r) => (
+                        <button
+                          key={r.id}
+                          onClick={() => updateRoleSettings({ activeRoleId: role.activeRoleId === r.id ? '' : r.id })}
+                          className={`text-left p-3 rounded-lg border-2 transition-all hover:shadow-sm ${
+                            role.activeRoleId === r.id
+                              ? 'border-primary bg-primary/5'
+                              : 'border-border hover:border-primary/50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xl">{r.icon}</span>
+                            <span className="font-medium text-sm">{r.name}</span>
+                            {role.activeRoleId === r.id && (
+                              <Check className="w-4 h-4 text-primary ml-auto" />
+                            )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const confirmed = window.confirm(t('settings.roleSettings.deleteConfirm', { defaultValue: '确定删除该自定义角色吗？' }));
+                                if (confirmed) {
+                                  updateRoleSettings({
+                                    customRoles: role.customRoles.filter(cr => cr.id !== r.id),
+                                    activeRoleId: role.activeRoleId === r.id ? '' : role.activeRoleId,
+                                  });
+                                }
+                              }}
+                              className="ml-auto p-1 hover:bg-destructive/10 rounded"
+                              title={t('common.delete', { defaultValue: '删除' })}
+                            >
+                              <Trash2 className="w-3 h-3 text-destructive" />
+                            </button>
+                          </div>
+                          <p className="text-xs text-muted-foreground line-clamp-2">{r.description}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                <Separator className="mb-4" />
+
+                {/* 角色 System Prompt 预览 */}
+                {role.activeRoleId && (() => {
+                  const activeRole = getActiveRole(role);
+                  if (!activeRole || !activeRole.systemPrompt) return null;
+                  return (
+                    <div className="mb-4">
+                      <Label className="text-sm font-medium mb-2 block">{t('settings.roleSettings.promptPreview', { defaultValue: '角色 System Prompt 预览' })}</Label>
+                      <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground whitespace-pre-wrap max-h-40 overflow-y-auto font-mono">
+                        {activeRole.systemPrompt}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {t('settings.roleSettings.promptNote', { defaultValue: '此 prompt 会自动拼接在您的自定义 System Prompt 之前，为 AI 建立职业身份基调。' })}
+                      </p>
+                    </div>
+                  );
+                })()}
+
+                {/* 推荐信息 */}
+                {role.activeRoleId && (() => {
+                  const activeRole = getActiveRole(role);
+                  if (!activeRole) return null;
+                  const hasRecommendations = (activeRole.recommendedTemplateCategories?.length ?? 0) > 0 || (activeRole.recommendedPlugins?.length ?? 0) > 0;
+                  if (!hasRecommendations) return null;
+                  return (
+                    <div className="mb-4">
+                      <Label className="text-sm font-medium mb-2 block">{t('settings.roleSettings.recommendations', { defaultValue: '角色推荐' })}</Label>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        {(activeRole.recommendedTemplateCategories?.length ?? 0) > 0 && (
+                          <p>📋 {t('settings.roleSettings.recommendedTemplates', { defaultValue: '推荐模板分类' })}：{activeRole.recommendedTemplateCategories?.join('、')}</p>
+                        )}
+                        {(activeRole.recommendedPlugins?.length ?? 0) > 0 && (
+                          <p>🧩 {t('settings.roleSettings.recommendedPlugins', { defaultValue: '推荐插件' })}：{activeRole.recommendedPlugins?.join('、')}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </TabsContent>
+
             {/* Plugins */}
             <TabsContent value="plugins" className="space-y-6 p-4 bg-card h-full">
               <div>
-                <h3 className="text-lg font-semibold mb-2">{t('settings.pluginsSettings.title', { defaultValue: '\u63D2\u4EF6\u7BA1\u7406' })}</h3>
+                <h3 className="text-lg font-semibold mb-2">{t('settings.pluginsSettings.title', { defaultValue: '插件管理' })}</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  {t('settings.pluginsSettings.description', { defaultValue: '\u7BA1\u7406\u6587\u6863\u5904\u7406\u63D2\u4EF6\u3002\u63D2\u4EF6\u53EF\u4EE5\u5BF9\u6587\u6863\u5185\u5BB9\u8FDB\u884C\u4E8C\u6B21\u52A0\u5DE5\uFF0C\u5982\u751F\u6210 PPT\u3001\u601D\u7EF4\u5BFC\u56FE\u7B49\u3002' })}
+                  {t('settings.pluginsSettings.description', { defaultValue: '管理文档处理插件。插件可以对文档内容进行二次加工，如生成 PPT、思维导图等。' })}
                 </p>
                 <Separator className="mb-4" />
                 <PluginSettingsList />
@@ -437,7 +575,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                 {useAppStore.getState().pluginManifests.length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">
                     <Puzzle className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                    <p>{t('settings.pluginsSettings.noPlugins', { defaultValue: '\u6682\u65E0\u53EF\u7528\u63D2\u4EF6' })}</p>
+                    <p>{t('settings.pluginsSettings.noPlugins', { defaultValue: '暂无可用插件' })}</p>
                   </div>
                 )}
               </div>
@@ -445,11 +583,11 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
               <Separator />
 
               <div>
-                <h3 className="text-lg font-semibold mb-2">{t('settings.pluginsSettings.usage', { defaultValue: '\u4F7F\u7528\u65B9\u6CD5' })}</h3>
+                <h3 className="text-lg font-semibold mb-2">{t('settings.pluginsSettings.usage', { defaultValue: '使用方法' })}</h3>
                 <div className="space-y-2 text-sm text-muted-foreground">
-                  <p>{t('settings.pluginsSettings.usageStep1', { defaultValue: '1. \u5728\u6587\u6863\u7F16\u8F91\u5668\u5DE5\u5177\u680F\u4E2D\u70B9\u51FB \uD83E\uDDE9 \u63D2\u4EF6\u6309\u94AE' })}</p>
-                  <p>{t('settings.pluginsSettings.usageStep2', { defaultValue: '2. \u4ECE\u4E0B\u62C9\u83DC\u5355\u4E2D\u9009\u62E9\u8981\u4F7F\u7528\u7684\u63D2\u4EF6' })}</p>
-                  <p>{t('settings.pluginsSettings.usageStep3', { defaultValue: '3. \u63D2\u4EF6\u9762\u677F\u5C06\u66FF\u4EE3\u7F16\u8F91\u5668\u533A\u57DF\u663E\u793A\uFF0C\u70B9\u51FB\u201C\u8FD4\u56DE\u7F16\u8F91\u5668\u201D\u53EF\u9000\u51FA' })}</p>
+                  <p>{t('settings.pluginsSettings.usageStep1', { defaultValue: '1. 在文档编辑器工具栏中点击 🧩 插件按钮' })}</p>
+                  <p>{t('settings.pluginsSettings.usageStep2', { defaultValue: '2. 从下拉菜单中选择要使用的插件' })}</p>
+                  <p>{t('settings.pluginsSettings.usageStep3', { defaultValue: '3. 插件面板将替代编辑器区域显示，点击“返回编辑器”可退出' })}</p>
                 </div>
               </div>
             </TabsContent>
@@ -1029,6 +1167,17 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                     <Switch
                       checked={tempSettings.ai.streamEnabled}
                       onCheckedChange={(checked) => updateTempAI({ streamEnabled: checked })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>{t('settings.enableThinking', { defaultValue: '深度思考' })}</Label>
+                      <p className="text-xs text-muted-foreground">{t('settings.enableThinkingDesc', { defaultValue: '启用后支持的模型将展示推理/思考过程（Qwen/DeepSeek/Claude 等）' })}</p>
+                    </div>
+                    <Switch
+                      checked={tempSettings.ai.enableThinking ?? false}
+                      onCheckedChange={(checked) => updateTempAI({ enableThinking: checked })}
                     />
                   </div>
 

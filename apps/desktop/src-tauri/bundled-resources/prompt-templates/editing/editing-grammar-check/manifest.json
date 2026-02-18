@@ -1,0 +1,19 @@
+{
+  "id": "editing-grammar-check",
+  "name": "语法检查",
+  "description": "语法错误检测和修正",
+  "icon": "✏️",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "editing",
+  "subCategory": "general",
+  "tags": [
+    "语法检查"
+  ],
+  "order": 113,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

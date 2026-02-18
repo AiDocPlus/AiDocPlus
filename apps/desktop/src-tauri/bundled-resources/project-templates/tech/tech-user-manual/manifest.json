@@ -1,0 +1,21 @@
+{
+  "id": "tech-user-manual",
+  "name": "用户手册",
+  "description": "软件产品用户使用手册模板",
+  "icon": "BookMarked",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "project-template",
+  "majorCategory": "tech",
+  "subCategory": "general",
+  "tags": [
+    "用户手册",
+    "使用说明",
+    "帮助文档"
+  ],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

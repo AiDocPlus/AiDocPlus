@@ -1,0 +1,19 @@
+{
+  "id": "translation-subtitle",
+  "name": "字幕翻译",
+  "description": "视频字幕翻译",
+  "icon": "🌐",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "translation",
+  "subCategory": "general",
+  "tags": [
+    "字幕翻译"
+  ],
+  "order": 141,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

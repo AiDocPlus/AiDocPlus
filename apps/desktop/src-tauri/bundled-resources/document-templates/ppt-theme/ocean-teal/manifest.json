@@ -1,0 +1,32 @@
+{
+  "id": "ocean-teal",
+  "name": "海洋青",
+  "description": "PPT 主题: 海洋青",
+  "icon": "🎨",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "document-template",
+  "subType": "ppt-theme",
+  "majorCategory": "ppt-theme",
+  "subCategory": "general",
+  "tags": [
+    "ppt",
+    "海洋青"
+  ],
+  "order": 7,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z",
+  "colors": {
+    "primary": "#0d9488",
+    "secondary": "#2dd4bf",
+    "background": "#f0fdfa",
+    "text": "#134e4a",
+    "accent": "#06b6d4"
+  },
+  "fonts": {
+    "title": "system-ui, \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+    "body": "system-ui, \"PingFang SC\", \"Microsoft YaHei\", sans-serif"
+  }
+}

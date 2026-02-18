@@ -1,0 +1,62 @@
+{
+  "id": "anthropic",
+  "name": "Anthropic (Claude)",
+  "description": "Anthropic (Claude) AI 服务",
+  "icon": "🧠",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "ai-provider",
+  "majorCategory": "international",
+  "subCategory": "general",
+  "tags": [
+    "Anthropic (Claude)"
+  ],
+  "order": 1,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z",
+  "baseUrl": "https://api.anthropic.com/v1",
+  "defaultModel": "claude-opus-4-6",
+  "models": [
+    {
+      "id": "claude-opus-4-6",
+      "name": "Claude Opus 4.6（最强旗舰，1M context）"
+    },
+    {
+      "id": "claude-opus-4-5",
+      "name": "Claude Opus 4.5"
+    },
+    {
+      "id": "claude-sonnet-4-5",
+      "name": "Claude Sonnet 4.5（推荐）"
+    },
+    {
+      "id": "claude-haiku-4-5",
+      "name": "Claude Haiku 4.5（快速低价）"
+    },
+    {
+      "id": "claude-opus-4-1-20250805",
+      "name": "Claude Opus 4.1"
+    },
+    {
+      "id": "claude-sonnet-4-20250514",
+      "name": "Claude Sonnet 4"
+    },
+    {
+      "id": "claude-3-7-sonnet-20250219",
+      "name": "Claude Sonnet 3.7"
+    },
+    {
+      "id": "claude-3-5-sonnet-20241022",
+      "name": "Claude Sonnet 3.5 v2"
+    }
+  ],
+  "authHeader": "x-api-key",
+  "capabilities": {
+    "webSearch": true,
+    "thinking": true,
+    "functionCalling": true,
+    "vision": true
+  }
+}

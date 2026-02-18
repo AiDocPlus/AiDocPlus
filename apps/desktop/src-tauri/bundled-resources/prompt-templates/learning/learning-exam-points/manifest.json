@@ -1,0 +1,19 @@
+{
+  "id": "learning-exam-points",
+  "name": "考点总结",
+  "description": "学科考点总结，含高频考点、解题技巧和复习建议",
+  "icon": "📚",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "learning",
+  "subCategory": "general",
+  "tags": [
+    "考点总结"
+  ],
+  "order": 53,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

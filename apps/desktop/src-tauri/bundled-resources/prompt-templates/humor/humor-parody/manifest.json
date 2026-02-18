@@ -1,0 +1,19 @@
+{
+  "id": "humor-parody",
+  "name": "恶搞改编",
+  "description": "对经典文章的搞笑改编，古今反差",
+  "icon": "😂",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "humor",
+  "subCategory": "general",
+  "tags": [
+    "恶搞改编"
+  ],
+  "order": 36,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

@@ -1,0 +1,19 @@
+{
+  "id": "exam-civil-mistakes",
+  "name": "错题本整理",
+  "description": "行测申论错题整理模板",
+  "icon": "🏛️",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "exam-civil",
+  "subCategory": "general",
+  "tags": [
+    "错题本整理"
+  ],
+  "order": 104,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

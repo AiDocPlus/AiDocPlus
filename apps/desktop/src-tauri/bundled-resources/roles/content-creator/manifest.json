@@ -1,0 +1,22 @@
+{
+  "id": "content-creator",
+  "name": "自媒体",
+  "description": "爆款文案、短视频脚本、种草笔记、公众号文章",
+  "icon": "📱",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "role",
+  "majorCategory": "media",
+  "subCategory": "content",
+  "tags": ["自媒体", "文案", "短视频", "content-creator"],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z",
+  "recommendedTemplateCategories": ["marketing", "creative"],
+  "recommendedPlugins": ["ppt", "publish"],
+  "i18n": {
+    "en": { "name": "Content Creator", "description": "Viral copy, short video scripts, product reviews, blog posts" }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "editing-style-convert",
+  "name": "文体转换",
+  "description": "正式/口语/学术等风格转换",
+  "icon": "✏️",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "editing",
+  "subCategory": "general",
+  "tags": [
+    "文体转换"
+  ],
+  "order": 115,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

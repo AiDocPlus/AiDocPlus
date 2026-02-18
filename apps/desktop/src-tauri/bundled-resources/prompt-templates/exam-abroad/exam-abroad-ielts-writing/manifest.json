@@ -1,0 +1,19 @@
+{
+  "id": "exam-abroad-ielts-writing",
+  "name": "雅思写作模板",
+  "description": "雅思写作Task1/Task2模板",
+  "icon": "✈️",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "exam-abroad",
+  "subCategory": "general",
+  "tags": [
+    "雅思写作模板"
+  ],
+  "order": 107,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

@@ -45,13 +45,19 @@ AiDocPlus/
 │   └── desktop/               # 桌面应用
 │       ├── src-tauri/        # Rust 后端
 │       │   ├── src/
-│       │   │   ├── commands/ # IPC 命令处理（ai.rs, document.rs, export.rs, import.rs, workspace.rs）
+│       │   │   ├── commands/ # IPC 命令处理（ai.rs, document.rs, export.rs, import.rs, workspace.rs, template.rs, resource.rs）
 │       │   │   ├── main.rs  # 入口文件
 │       │   │   ├── ai.rs    # AI HTTP 请求和流式处理
 │       │   │   ├── document.rs # 文档数据模型
+│       │   │   ├── template.rs # 文档模板管理（用户模板 + 内置模板加载）
+│       │   │   ├── resource_engine.rs # 资源引擎（SQLite 索引 + FTS5 全文搜索）
 │       │   │   ├── native_export/ # 原生导出模块
 │       │   │   ├── pandoc.rs # Pandoc 导出
 │       │   │   └── ...
+│       │   ├── bundled-resources/  # 外部化资源数据（由各资源仓库 deploy.sh 部署，.gitignore 忽略）
+│       │   │   ├── ai-providers/          # AI 提供商 manifest
+│       │   │   ├── document-templates/    # 文档模板分类 + PPT 主题
+│       │   │   └── project-templates/     # 项目模板分类 + 内置模板
 │       │   └── Cargo.toml
 │       └── src-ui/          # React 前端
 │           ├── src/
@@ -82,6 +88,17 @@ AiDocPlus/
 │           └── package.json
 ├── packages/                 # 共享包
 │   ├── shared-types/        # TypeScript 类型定义
+│   │   └── src/
+│   │       ├── index.ts     # 类型定义 + 外部化导入
+│   │       └── generated/   # 自动生成文件（由各资源仓库 deploy.sh 部署，.gitignore 忽略）
+│   │           ├── roles.generated.ts
+│   │           ├── prompt-templates.generated.ts
+│   │           ├── template-categories.generated.ts
+│   │           ├── ai-providers.generated.ts
+│   │           ├── ppt-themes.generated.ts
+│   │           ├── doc-template-categories.generated.ts
+│   │           ├── project-template-categories.generated.ts
+│   │           └── project-templates.generated.ts
 │   └── utils/               # 工具函数
 ├── turbo.json
 └── pnpm-workspace.yaml
@@ -99,6 +116,8 @@ AiDocPlus/
 - **工作区状态保存和恢复**：标签页、面板布局、项目状态持久化
 - **附件系统**：支持添加参考文件，AI 生成时自动读取附件内容
 - **插件系统**：全外部插件架构（21 个插件，独立仓库 [AiDocPlus-Plugins](https://github.com/AiDocPlus/AiDocPlus-Plugins)），自注册 + 自动发现 + manifest 驱动
+- **资源外部化**：角色、提示词模板、AI 提供商、文档模板、项目模板等资源数据全部外部化到独立仓库，通过构建流水线自动生成 TypeScript 文件并部署
+- **内置项目模板**：20 个预设文档模板（学术、商务、技术、创意、教育、政务、通用 7 大类），从 bundled-resources 自动加载
 
 ### 运行命令
 
@@ -126,6 +145,120 @@ pnpm clean      # 清理构建缓存
 - Node.js >= 18.0.0
 - pnpm >= 9.0.0
 - Rust（用于构建 Tauri 后端）
+
+## 资源外部化架构（v3）
+
+### 多仓库结构
+
+AiDocPlus 采用多仓库架构，将大量硬编码资源数据外部化到独立仓库，支持社区贡献和独立版本管理。
+
+| 仓库 | 说明 | 资源数量 |
+|------|------|----------|
+| **AiDocPlus-Main** | 主程序源码仓库 | — |
+| **AiDocPlus-Roles** | 内置角色（system prompt） | 10 个角色 |
+| **AiDocPlus-PromptTemplates** | 提示词模板 | 225 个模板 |
+| **AiDocPlus-AIProviders** | AI 服务提供商配置 | 13 个提供商 |
+| **AiDocPlus-DocTemplates** | PPT 主题 + 文档模板分类 | 8 主题 + 8 分类 |
+| **AiDocPlus-ProjectTemplates** | 项目模板分类 + 内置模板 | 7 分类 + 20 模板 |
+| **AiDocPlus-Plugins** | 外部插件 | 21 个插件 |
+| **AiDocPlus**（构建目标） | 总装构建目标目录 | — |
+
+每个资源仓库的目录结构：
+```
+AiDocPlus-{Resource}/
+├── data/                    # 资源数据（manifest.json + content 文件）
+│   ├── _meta.json           # 分类定义
+│   └── {category}/{id}/     # 每个资源一个目录
+│       ├── manifest.json
+│       └── content.md / content.json / system-prompt.md
+├── scripts/
+│   ├── build.sh             # 构建入口（调用 build.py）
+│   ├── build.py             # 扫描 data/ 生成 dist/*.generated.ts
+│   ├── deploy.sh            # 部署到 AiDocPlus 构建目标
+│   └── extract_from_source.js  # 一次性提取脚本（从 index.ts 提取原始数据）
+├── dist/                    # 构建产物（.gitignore 忽略）
+└── .gitignore
+```
+
+### 构建流水线
+
+**总装脚本**：`AiDocPlus-Main/scripts/assemble.sh`
+
+按顺序执行所有仓库的 build + deploy：
+```
+Main → Roles → PromptTemplates → DocTemplates → ProjectTemplates → AIProviders → Plugins
+```
+
+每个资源仓库的构建流程：
+1. **build.py** — 扫描 `data/` 目录，生成 `dist/*.generated.ts`
+2. **deploy.sh** — 将 generated TS 复制到 `AiDocPlus/packages/shared-types/src/generated/`，资源数据复制到 `AiDocPlus/apps/desktop/src-tauri/bundled-resources/`
+
+**关键保护机制**：`AiDocPlus-Main/scripts/deploy.sh` 使用 `rsync --delete`，但排除以下路径防止其他仓库的部署产物被删除：
+- `packages/shared-types/src/generated/*.generated.ts`
+- `apps/desktop/src-tauri/bundled-resources`
+- `apps/desktop/src-ui/src/plugins/*/`
+
+### index.ts 外部化映射
+
+`packages/shared-types/src/index.ts` 从 17,349 行精简到 928 行（-95%），大量硬编码数组替换为 generated 导入：
+
+| 原始常量 | 生成文件 | 来源仓库 |
+|----------|----------|----------|
+| `BUILT_IN_ROLES` | `roles.generated.ts` | AiDocPlus-Roles |
+| `BUILT_IN_TEMPLATES` | `prompt-templates.generated.ts` | AiDocPlus-PromptTemplates |
+| `TEMPLATE_CATEGORIES` | `template-categories.generated.ts` | AiDocPlus-PromptTemplates |
+| `AI_PROVIDERS` + `getProviderConfig` | `ai-providers.generated.ts` | AiDocPlus-AIProviders |
+| `BUILT_IN_PPT_THEMES` + `DEFAULT_PPT_THEME` | `ppt-themes.generated.ts` | AiDocPlus-DocTemplates |
+
+**注意**：`BUILT_IN_ROLES` 使用 `import` + `export const` 方式（而非 `export { } from`），因为 `getActiveRole()` 和 `getAllRoles()` 需要本地绑定。
+
+### Rust 端资源加载
+
+- **resource_engine.rs**：SQLite 索引 + FTS5 全文搜索引擎，7 个 Tauri commands
+- **template.rs**：
+  - `list_templates()` — 合并用户模板（`~/AiDocPlus/Templates/`）+ bundled-resources 内置模板，用户优先、ID 去重
+  - `get_template_content()` — 先查用户目录，再查 `bundled-resources/project-templates/`
+  - `default_categories()` — 优先从 `bundled-resources/document-templates/_meta.json` 读取，硬编码作为 fallback
+- **Cargo.toml**：新增 `rusqlite`（bundled）+ `sha2` 依赖
+
+### 内置项目模板（20 个）
+
+| 分类 | 模板 |
+|------|------|
+| 🎓 学术论文 | 学术论文、文献综述、实验报告 |
+| 💼 商务报告 | 年度工作报告、项目提案、会议纪要、市场分析报告 |
+| 💻 技术文档 | API 接口文档、架构设计文档、用户手册 |
+| ✨ 创意写作 | 小说大纲、剧本/脚本、公众号文章 |
+| 📚 教育教学 | 教学设计、试卷/测验 |
+| 🏛️ 公文政务 | 通知/公告、工作方案 |
+| 📄 通用 | 空白文档、读书笔记、周报 |
+
+每个模板包含 `manifest.json`（元数据）和 `content.json`（预设提示词 + 文档骨架）。
+
+### 添加新资源
+
+#### 添加新项目模板
+1. 在 `AiDocPlus-ProjectTemplates/data/{category}/{id}/` 下创建 `manifest.json` 和 `content.json`
+2. 运行 `bash scripts/build.sh && bash scripts/deploy.sh`
+3. 验证：`npx tsc --noEmit`（在 `apps/desktop/src-ui` 中）
+
+#### 添加新 AI 提供商
+1. 在 `AiDocPlus-AIProviders/data/{category}/{id}/` 下创建 `manifest.json`
+2. 运行 `bash scripts/build.sh && bash scripts/deploy.sh`
+
+#### 添加新 PPT 主题
+1. 在 `AiDocPlus-DocTemplates/data/ppt-theme/{id}/` 下创建 `manifest.json`
+2. 运行 `bash scripts/build.sh && bash scripts/deploy.sh`
+
+#### 总装验证
+```bash
+# 一键构建和部署所有仓库
+bash AiDocPlus-Main/scripts/assemble.sh
+
+# 验证编译
+cd apps/desktop/src-ui && npx tsc --noEmit
+cd apps/desktop/src-tauri && cargo check
+```
 
 ## Architecture Notes
 

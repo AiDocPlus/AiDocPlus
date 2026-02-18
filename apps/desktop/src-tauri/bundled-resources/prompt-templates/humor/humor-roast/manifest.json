@@ -1,0 +1,19 @@
+{
+  "id": "humor-roast",
+  "name": "吐槽段子",
+  "description": "吐槽风格段子集，短小精悍、角度刁钻",
+  "icon": "😂",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "humor",
+  "subCategory": "general",
+  "tags": [
+    "吐槽段子"
+  ],
+  "order": 35,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

@@ -1,0 +1,19 @@
+{
+  "id": "daily-cover-letter",
+  "name": "求职自荐信",
+  "description": "求职自荐信，突出能力匹配和求职动机",
+  "icon": "🏠",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "daily",
+  "subCategory": "general",
+  "tags": [
+    "求职自荐信"
+  ],
+  "order": 15,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

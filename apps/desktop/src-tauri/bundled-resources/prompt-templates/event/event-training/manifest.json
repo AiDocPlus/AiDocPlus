@@ -1,0 +1,19 @@
+{
+  "id": "event-training",
+  "name": "培训方案",
+  "description": "培训方案设计，含课程、方法、评估",
+  "icon": "🎉",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "event",
+  "subCategory": "general",
+  "tags": [
+    "培训方案"
+  ],
+  "order": 75,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

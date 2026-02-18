@@ -8,6 +8,7 @@ import {
   DEFAULT_FILE_SETTINGS,
   DEFAULT_AI_SETTINGS,
   DEFAULT_EMAIL_SETTINGS,
+  DEFAULT_ROLE_SETTINGS,
   getProviderConfig,
   getActiveService,
 } from '@aidocplus/shared-types';
@@ -65,6 +66,7 @@ interface SettingsState extends AppSettings {
   updateFileSettings: (settings: Partial<typeof DEFAULT_FILE_SETTINGS>) => void;
   updateAISettings: (settings: Partial<typeof DEFAULT_AI_SETTINGS>) => void;
   updateEmailSettings: (settings: Partial<typeof DEFAULT_EMAIL_SETTINGS>) => void;
+  updateRoleSettings: (settings: Partial<typeof DEFAULT_ROLE_SETTINGS>) => void;
   updateShortcut: (key: string, value: string) => void;
   resetSettings: () => void;
   resetCategory: (category: 'editor' | 'ui' | 'file' | 'ai') => void;
@@ -81,6 +83,7 @@ export const useSettingsStore = create<SettingsState>()(
       file: { ...DEFAULT_FILE_SETTINGS },
       ai: { ...DEFAULT_AI_SETTINGS },
       email: { ...DEFAULT_EMAIL_SETTINGS },
+      role: { ...DEFAULT_ROLE_SETTINGS },
       shortcuts: { ...DEFAULT_SETTINGS.shortcuts },
       plugins: { ...DEFAULT_PLUGINS_SETTINGS },
       isLoading: false,
@@ -94,6 +97,7 @@ export const useSettingsStore = create<SettingsState>()(
           file: settings.file ?? state.file,
           ai: settings.ai ?? state.ai,
           email: settings.email ?? state.email,
+          role: settings.role ?? state.role,
           shortcuts: settings.shortcuts ?? state.shortcuts
         }));
       },
@@ -130,6 +134,13 @@ export const useSettingsStore = create<SettingsState>()(
       updateEmailSettings: (settings) => {
         set((state) => ({
           email: { ...state.email, ...settings }
+        }));
+      },
+
+      // Update role settings
+      updateRoleSettings: (settings) => {
+        set((state) => ({
+          role: { ...state.role, ...settings }
         }));
       },
 
@@ -399,9 +410,22 @@ export const useSettingsStore = create<SettingsState>()(
         email: state.email,
         shortcuts: state.shortcuts,
         plugins: state.plugins,
+        role: state.role,
       }),
-      version: 8,
+      version: 10,
       migrate: (persistedState: any, version: number) => {
+        if (version < 10) {
+          // 迁移: 新增 role 字段
+          if (!persistedState.role) {
+            persistedState.role = { ...DEFAULT_ROLE_SETTINGS };
+          }
+        }
+        if (version < 9) {
+          // 迁移: 确保 ai.enableThinking 字段存在
+          if (persistedState.ai && persistedState.ai.enableThinking === undefined) {
+            persistedState.ai.enableThinking = false;
+          }
+        }
         if (version < 8) {
           // 迁移: 更新 markdownModePrompt（旧版含“加粗”指令导致 AI 输出不当加粗）
           if (persistedState.ai) {

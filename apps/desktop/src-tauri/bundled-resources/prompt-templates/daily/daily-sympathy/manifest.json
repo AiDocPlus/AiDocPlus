@@ -1,0 +1,19 @@
+{
+  "id": "daily-sympathy",
+  "name": "慰问信",
+  "description": "慰问信/慰问短信",
+  "icon": "🏠",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "daily",
+  "subCategory": "general",
+  "tags": [
+    "慰问信"
+  ],
+  "order": 137,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "resourceType": "ai-provider",
+  "defaultLocale": "zh",
+  "categories": [
+    {
+      "key": "international",
+      "name": "国际服务",
+      "icon": "🌍",
+      "order": 0
+    },
+    {
+      "key": "china",
+      "name": "国内服务",
+      "icon": "🇨🇳",
+      "order": 1
+    },
+    {
+      "key": "custom",
+      "name": "自定义",
+      "icon": "⚙️",
+      "order": 2
+    }
+  ]
+}

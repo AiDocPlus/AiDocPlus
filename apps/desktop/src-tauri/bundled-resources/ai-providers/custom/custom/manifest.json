@@ -1,0 +1,29 @@
+{
+  "id": "custom",
+  "name": "自定义 (OpenAI 兼容)",
+  "description": "自定义 (OpenAI 兼容) AI 服务",
+  "icon": "⚙️",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "ai-provider",
+  "majorCategory": "custom",
+  "subCategory": "general",
+  "tags": [
+    "自定义 (OpenAI 兼容)"
+  ],
+  "order": 12,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z",
+  "baseUrl": "",
+  "defaultModel": "",
+  "models": [],
+  "authHeader": "bearer",
+  "capabilities": {
+    "webSearch": false,
+    "thinking": false,
+    "functionCalling": false,
+    "vision": false
+  }
+}

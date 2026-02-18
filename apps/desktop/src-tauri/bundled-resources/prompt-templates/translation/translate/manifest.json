@@ -1,0 +1,19 @@
+{
+  "id": "translate",
+  "name": "翻译内容",
+  "description": "将内容翻译为指定语言",
+  "icon": "🌐",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "translation",
+  "subCategory": "general",
+  "tags": [
+    "翻译内容"
+  ],
+  "order": 4,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

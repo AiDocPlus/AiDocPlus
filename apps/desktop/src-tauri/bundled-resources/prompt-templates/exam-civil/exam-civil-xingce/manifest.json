@@ -1,0 +1,19 @@
+{
+  "id": "exam-civil-xingce",
+  "name": "行测备考策略",
+  "description": "行测各模块备考方法",
+  "icon": "🏛️",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "exam-civil",
+  "subCategory": "general",
+  "tags": [
+    "行测备考策略"
+  ],
+  "order": 99,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

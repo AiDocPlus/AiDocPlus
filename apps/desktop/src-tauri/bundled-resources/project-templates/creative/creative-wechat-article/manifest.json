@@ -1,0 +1,22 @@
+{
+  "id": "creative-wechat-article",
+  "name": "公众号文章",
+  "description": "微信公众号长文创作模板，含标题、导语、正文和互动",
+  "icon": "MessageSquare",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "project-template",
+  "majorCategory": "creative",
+  "subCategory": "general",
+  "tags": [
+    "公众号",
+    "自媒体",
+    "文章",
+    "新媒体"
+  ],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

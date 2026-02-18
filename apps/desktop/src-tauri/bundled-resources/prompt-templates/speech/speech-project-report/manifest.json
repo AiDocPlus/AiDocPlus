@@ -1,0 +1,19 @@
+{
+  "id": "speech-project-report",
+  "name": "项目汇报",
+  "description": "项目进展汇报，含进度、成果、风险和计划",
+  "icon": "🎤",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "speech",
+  "subCategory": "general",
+  "tags": [
+    "项目汇报"
+  ],
+  "order": 61,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

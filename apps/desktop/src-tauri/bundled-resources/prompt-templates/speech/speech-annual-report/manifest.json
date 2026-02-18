@@ -1,0 +1,19 @@
+{
+  "id": "speech-annual-report",
+  "name": "述职报告",
+  "description": "年度/季度述职报告，含成绩、不足和计划",
+  "icon": "🎤",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "speech",
+  "subCategory": "general",
+  "tags": [
+    "述职报告"
+  ],
+  "order": 60,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

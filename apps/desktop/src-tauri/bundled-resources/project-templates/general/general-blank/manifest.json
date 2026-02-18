@@ -1,0 +1,21 @@
+{
+  "id": "general-blank",
+  "name": "空白文档",
+  "description": "干净的空白文档，自由创作",
+  "icon": "File",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "project-template",
+  "majorCategory": "general",
+  "subCategory": "general",
+  "tags": [
+    "空白",
+    "通用",
+    "自由"
+  ],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

@@ -1,0 +1,19 @@
+{
+  "id": "humor-meme-text",
+  "name": "表情包文案",
+  "description": "表情包配文",
+  "icon": "😂",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "humor",
+  "subCategory": "general",
+  "tags": [
+    "表情包文案"
+  ],
+  "order": 198,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

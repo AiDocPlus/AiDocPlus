@@ -1,0 +1,22 @@
+{
+  "id": "tech-api-doc",
+  "name": "API 接口文档",
+  "description": "RESTful API 接口设计与说明文档",
+  "icon": "Code",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "project-template",
+  "majorCategory": "tech",
+  "subCategory": "general",
+  "tags": [
+    "API",
+    "接口",
+    "技术文档",
+    "开发"
+  ],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

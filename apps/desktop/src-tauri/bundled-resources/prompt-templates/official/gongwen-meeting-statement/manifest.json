@@ -1,0 +1,19 @@
+{
+  "id": "gongwen-meeting-statement",
+  "name": "会议表态发言",
+  "description": "会议表态发言稿，态度鲜明、措施具体",
+  "icon": "📄",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "official",
+  "subCategory": "general",
+  "tags": [
+    "会议表态发言"
+  ],
+  "order": 22,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

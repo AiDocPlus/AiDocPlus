@@ -1,0 +1,19 @@
+{
+  "id": "travel-budget",
+  "name": "旅行预算",
+  "description": "详细的旅行预算表，含各项费用明细和省钱攻略",
+  "icon": "🧳",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "travel",
+  "subCategory": "general",
+  "tags": [
+    "旅行预算"
+  ],
+  "order": 42,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

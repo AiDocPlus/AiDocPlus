@@ -1,0 +1,19 @@
+{
+  "id": "creative-plot",
+  "name": "剧情大纲",
+  "description": "影视/小说剧情大纲",
+  "icon": "✨",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "creative",
+  "subCategory": "general",
+  "tags": [
+    "剧情大纲"
+  ],
+  "order": 216,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

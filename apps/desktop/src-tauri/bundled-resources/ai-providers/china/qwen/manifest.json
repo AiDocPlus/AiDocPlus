@@ -1,0 +1,66 @@
+{
+  "id": "qwen",
+  "name": "通义千问 (Qwen)",
+  "description": "通义千问 (Qwen) AI 服务",
+  "icon": "☁️",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "ai-provider",
+  "majorCategory": "china",
+  "subCategory": "general",
+  "tags": [
+    "通义千问 (Qwen)"
+  ],
+  "order": 5,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z",
+  "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  "defaultModel": "qwen3-max",
+  "models": [
+    {
+      "id": "qwen3-max",
+      "name": "Qwen3 Max"
+    },
+    {
+      "id": "qwen-max",
+      "name": "Qwen Max"
+    },
+    {
+      "id": "qwen-plus",
+      "name": "Qwen Plus（推荐）"
+    },
+    {
+      "id": "qwen-turbo",
+      "name": "Qwen Turbo"
+    },
+    {
+      "id": "qwen-long",
+      "name": "Qwen Long"
+    },
+    {
+      "id": "qwen3-coder-plus",
+      "name": "Qwen3 Coder Plus"
+    },
+    {
+      "id": "qwen-coder-plus",
+      "name": "Qwen Coder Plus"
+    },
+    {
+      "id": "qwq-plus",
+      "name": "QwQ Plus（推理）"
+    },
+    {
+      "id": "qwen-flash",
+      "name": "Qwen Flash"
+    }
+  ],
+  "authHeader": "bearer",
+  "capabilities": {
+    "webSearch": true,
+    "thinking": true,
+    "functionCalling": true,
+    "vision": true
+  }
+}

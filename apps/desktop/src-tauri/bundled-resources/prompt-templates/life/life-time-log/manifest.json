@@ -1,0 +1,19 @@
+{
+  "id": "life-time-log",
+  "name": "时间日志",
+  "description": "时间追踪记录",
+  "icon": "🌸",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "life",
+  "subCategory": "general",
+  "tags": [
+    "时间日志"
+  ],
+  "order": 170,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

@@ -1,0 +1,293 @@
+{
+  "schemaVersion": "1.0",
+  "resourceType": "prompt-template",
+  "defaultLocale": "zh",
+  "categories": [
+    {
+      "key": "editing",
+      "name": "编辑处理",
+      "icon": "✏️",
+      "order": 0,
+      "subCategories": [
+        {
+          "key": "general",
+          "name": "综合",
+          "order": 0
+        }
+      ]
+    },
+    {
+      "key": "official",
+      "name": "公文",
+      "icon": "📄",
+      "order": 1,
+      "subCategories": [
+        {
+          "key": "general",
+          "name": "综合",
+          "order": 0
+        }
+      ]
+    },
+    {
+      "key": "travel",
+      "name": "旅游出行",
+      "icon": "🧳",
+      "order": 2,
+      "subCategories": [
+        {
+          "key": "general",
+          "name": "综合",
+          "order": 0
+        }
+      ]
+    },
+    {
+      "key": "creative",
+      "name": "创意写作",
+      "icon": "✨",
+      "order": 3,
+      "subCategories": [
+        {
+          "key": "general",
+          "name": "综合",
+          "order": 0
+        }
+      ]
+    },
+    {
+      "key": "humor",
+      "name": "搞笑",
+      "icon": "😂",
+      "order": 4,
+      "subCategories": [
+        {
+          "key": "general",
+          "name": "综合",
+          "order": 0
+        }
+      ]
+    },
+    {
+      "key": "business",
+      "name": "商务办公",
+      "icon": "💼",
+      "order": 5,
+      "subCategories": [
+        {
+          "key": "general",
+          "name": "综合",
+          "order": 0
+        }
+      ]
+    },
+    {
+      "key": "learning",
+      "name": "学习教育",
+      "icon": "📚",
+      "order": 6,
+      "subCategories": [
+        {
+          "key": "general",
+          "name": "综合",
+          "order": 0
+        }
+      ]
+    },
+    {
+      "key": "daily",
+      "name": "生活实用",
+      "icon": "🏠",
+      "order": 7,
+      "subCategories": [
+        {
+          "key": "general",
+          "name": "综合",
+          "order": 0
+        }
+      ]
+    },
+    {
+      "key": "translation",
+      "name": "翻译",
+      "icon": "🌐",
+      "order": 8,
+      "subCategories": [
+        {
+          "key": "general",
+          "name": "综合",
+          "order": 0
+        }
+      ]
+    },
+    {
+      "key": "speech",
+      "name": "演讲汇报",
+      "icon": "🎤",
+      "order": 9,
+      "subCategories": [
+        {
+          "key": "general",
+          "name": "综合",
+          "order": 0
+        }
+      ]
+    },
+    {
+      "key": "marketing",
+      "name": "营销文案",
+      "icon": "📢",
+      "order": 10,
+      "subCategories": [
+        {
+          "key": "general",
+          "name": "综合",
+          "order": 0
+        }
+      ]
+    },
+    {
+      "key": "academic",
+      "name": "学术写作",
+      "icon": "🎓",
+      "order": 11,
+      "subCategories": [
+        {
+          "key": "general",
+          "name": "综合",
+          "order": 0
+        }
+      ]
+    },
+    {
+      "key": "tech",
+      "name": "技术文档",
+      "icon": "💻",
+      "order": 12,
+      "subCategories": [
+        {
+          "key": "general",
+          "name": "综合",
+          "order": 0
+        }
+      ]
+    },
+    {
+      "key": "life",
+      "name": "生活记录",
+      "icon": "🌸",
+      "order": 13,
+      "subCategories": [
+        {
+          "key": "general",
+          "name": "综合",
+          "order": 0
+        }
+      ]
+    },
+    {
+      "key": "career",
+      "name": "职场成长",
+      "icon": "🚀",
+      "order": 14,
+      "subCategories": [
+        {
+          "key": "general",
+          "name": "综合",
+          "order": 0
+        }
+      ]
+    },
+    {
+      "key": "event",
+      "name": "活动策划",
+      "icon": "🎉",
+      "order": 15,
+      "subCategories": [
+        {
+          "key": "general",
+          "name": "综合",
+          "order": 0
+        }
+      ]
+    },
+    {
+      "key": "essay",
+      "name": "作文",
+      "icon": "📝",
+      "order": 16,
+      "subCategories": [
+        {
+          "key": "general",
+          "name": "综合",
+          "order": 0
+        }
+      ]
+    },
+    {
+      "key": "exam-grad",
+      "name": "考研复习",
+      "icon": "🎓",
+      "order": 17,
+      "subCategories": [
+        {
+          "key": "general",
+          "name": "综合",
+          "order": 0
+        }
+      ]
+    },
+    {
+      "key": "exam-civil",
+      "name": "考公复习",
+      "icon": "🏛️",
+      "order": 18,
+      "subCategories": [
+        {
+          "key": "general",
+          "name": "综合",
+          "order": 0
+        }
+      ]
+    },
+    {
+      "key": "exam-abroad",
+      "name": "留学考试",
+      "icon": "✈️",
+      "order": 19,
+      "subCategories": [
+        {
+          "key": "general",
+          "name": "综合",
+          "order": 0
+        }
+      ]
+    },
+    {
+      "key": "health",
+      "name": "健康养生",
+      "icon": "💪",
+      "order": 20,
+      "subCategories": [
+        {
+          "key": "general",
+          "name": "综合",
+          "order": 0
+        }
+      ]
+    },
+    {
+      "key": "literature",
+      "name": "文学",
+      "icon": "📖",
+      "order": 21,
+      "subCategories": [
+        {
+          "key": "general",
+          "name": "综合",
+          "order": 0
+        }
+      ]
+    }
+  ]
+}

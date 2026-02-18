@@ -1,0 +1,32 @@
+{
+  "id": "business-blue",
+  "name": "商务蓝",
+  "description": "PPT 主题: 商务蓝",
+  "icon": "🎨",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "document-template",
+  "subType": "ppt-theme",
+  "majorCategory": "ppt-theme",
+  "subCategory": "general",
+  "tags": [
+    "ppt",
+    "商务蓝"
+  ],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z",
+  "colors": {
+    "primary": "#1a56db",
+    "secondary": "#3b82f6",
+    "background": "#ffffff",
+    "text": "#1e293b",
+    "accent": "#0ea5e9"
+  },
+  "fonts": {
+    "title": "system-ui, \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+    "body": "system-ui, \"PingFang SC\", \"Microsoft YaHei\", sans-serif"
+  }
+}

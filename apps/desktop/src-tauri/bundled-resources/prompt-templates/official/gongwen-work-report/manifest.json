@@ -1,0 +1,19 @@
+{
+  "id": "gongwen-work-report",
+  "name": "工作汇报",
+  "description": "阶段性工作进展汇报",
+  "icon": "📄",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "official",
+  "subCategory": "general",
+  "tags": [
+    "工作汇报"
+  ],
+  "order": 24,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

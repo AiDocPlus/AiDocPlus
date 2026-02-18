@@ -1,0 +1,19 @@
+{
+  "id": "humor-sketch",
+  "name": "小品剧本",
+  "description": "幽默小品剧本，笑点密集、有反转",
+  "icon": "😂",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "humor",
+  "subCategory": "general",
+  "tags": [
+    "小品剧本"
+  ],
+  "order": 34,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

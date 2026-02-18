@@ -1,0 +1,19 @@
+{
+  "id": "health-weight",
+  "name": "体重管理",
+  "description": "减肥/增重计划",
+  "icon": "💪",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "health",
+  "subCategory": "general",
+  "tags": [
+    "体重管理"
+  ],
+  "order": 224,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

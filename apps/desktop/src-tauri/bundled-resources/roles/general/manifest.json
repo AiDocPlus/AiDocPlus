@@ -1,0 +1,17 @@
+{
+  "id": "general",
+  "name": "通用",
+  "description": "无特定职业身份，适用于通用文档写作",
+  "icon": "📝",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "role",
+  "majorCategory": "general",
+  "subCategory": "default",
+  "tags": ["通用", "默认", "general"],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

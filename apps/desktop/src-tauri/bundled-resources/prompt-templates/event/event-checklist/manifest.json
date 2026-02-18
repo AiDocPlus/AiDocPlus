@@ -1,0 +1,19 @@
+{
+  "id": "event-checklist",
+  "name": "活动清单",
+  "description": "活动执行清单，从策划到收尾完整覆盖",
+  "icon": "🎉",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "event",
+  "subCategory": "general",
+  "tags": [
+    "活动清单"
+  ],
+  "order": 77,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

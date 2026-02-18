@@ -1,0 +1,19 @@
+{
+  "id": "gongwen-unit-summary",
+  "name": "年度单位总结",
+  "description": "单位/部门年度工作总结",
+  "icon": "📄",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "official",
+  "subCategory": "general",
+  "tags": [
+    "年度单位总结"
+  ],
+  "order": 21,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

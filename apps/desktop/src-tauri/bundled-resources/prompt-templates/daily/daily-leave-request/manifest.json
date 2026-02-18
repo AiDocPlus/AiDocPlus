@@ -1,0 +1,19 @@
+{
+  "id": "daily-leave-request",
+  "name": "请假条",
+  "description": "各类请假申请",
+  "icon": "🏠",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "daily",
+  "subCategory": "general",
+  "tags": [
+    "请假条"
+  ],
+  "order": 131,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

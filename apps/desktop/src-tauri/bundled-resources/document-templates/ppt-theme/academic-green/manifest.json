@@ -1,0 +1,32 @@
+{
+  "id": "academic-green",
+  "name": "学术绿",
+  "description": "PPT 主题: 学术绿",
+  "icon": "🎨",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "document-template",
+  "subType": "ppt-theme",
+  "majorCategory": "ppt-theme",
+  "subCategory": "general",
+  "tags": [
+    "ppt",
+    "学术绿"
+  ],
+  "order": 3,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z",
+  "colors": {
+    "primary": "#166534",
+    "secondary": "#22c55e",
+    "background": "#f0fdf4",
+    "text": "#14532d",
+    "accent": "#4ade80"
+  },
+  "fonts": {
+    "title": "Georgia, \"PingFang SC\", \"Microsoft YaHei\", serif",
+    "body": "system-ui, \"PingFang SC\", \"Microsoft YaHei\", sans-serif"
+  }
+}

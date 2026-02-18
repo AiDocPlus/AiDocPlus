@@ -1,0 +1,22 @@
+{
+  "id": "government-work-plan",
+  "name": "工作方案",
+  "description": "政务工作方案/实施方案模板",
+  "icon": "ClipboardList",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "project-template",
+  "majorCategory": "government",
+  "subCategory": "general",
+  "tags": [
+    "方案",
+    "工作计划",
+    "实施方案",
+    "政务"
+  ],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

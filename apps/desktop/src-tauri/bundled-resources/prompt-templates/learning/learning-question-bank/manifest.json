@@ -1,0 +1,19 @@
+{
+  "id": "learning-question-bank",
+  "name": "习题整理",
+  "description": "学科练习题集，含多种题型和详细解析",
+  "icon": "📚",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "learning",
+  "subCategory": "general",
+  "tags": [
+    "习题整理"
+  ],
+  "order": 56,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

@@ -1,0 +1,19 @@
+{
+  "id": "exam-civil-short-answer",
+  "name": "申论小题",
+  "description": "归纳概括等小题",
+  "icon": "🏛️",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "exam-civil",
+  "subCategory": "general",
+  "tags": [
+    "申论小题"
+  ],
+  "order": 184,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

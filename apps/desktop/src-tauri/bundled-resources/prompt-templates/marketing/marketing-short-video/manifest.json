@@ -1,0 +1,19 @@
+{
+  "id": "marketing-short-video",
+  "name": "短视频脚本",
+  "description": "短视频内容脚本",
+  "icon": "📢",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "marketing",
+  "subCategory": "general",
+  "tags": [
+    "短视频脚本"
+  ],
+  "order": 146,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

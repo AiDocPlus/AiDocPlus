@@ -36,7 +36,18 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "mcp__zread__get_repo_structure",
-      "Bash(git tag:*)"
+      "Bash(git tag:*)",
+      "mcp__web-search-prime__webSearchPrime",
+      "Bash(git remote set-url:*)",
+      "Bash(echo:*)",
+      "Bash(curl:*)",
+      "Bash(networksetup:*)",
+      "Bash(git config:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh release list:*)",
+      "Bash(gh release view:*)",
+      "Bash(gh release edit:*)"
     ]
   }
 }

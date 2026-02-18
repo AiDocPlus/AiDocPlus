@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Project, Document, DocumentVersion, AIMessage, ChatContextMode, WorkspaceState, EditorTab, PluginManifest, TemplateManifest, TemplateCategory } from '@aidocplus/shared-types';
+import { getActiveRole } from '@aidocplus/shared-types';
 import { buildPluginList, setPlugins } from '@/plugins/registry';
 import { syncManifestsToBackend } from '@/plugins/loader';
 import { invoke } from '@tauri-apps/api/core';
@@ -12,6 +13,13 @@ import i18n from '@/i18n';
 function getMarkdownModePrompt(): string {
   const ai = useSettingsStore.getState().ai;
   return ai.markdownModePrompt || '';
+}
+
+// 角色 System Prompt：从当前激活角色获取
+function getRoleSystemPrompt(): string {
+  const role = useSettingsStore.getState().role;
+  const activeRole = getActiveRole(role);
+  return activeRole?.systemPrompt?.trim() || '';
 }
 
 // 标签页面板状态类型
@@ -100,7 +108,7 @@ interface AppState {
   clearAiMessages: (tabId: string) => void;
   setAiStreaming: (streaming: boolean, tabId?: string) => void;
   stopAiStreaming: () => void;
-  sendChatMessage: (tabId: string, content: string, enableWebSearch?: boolean, contextInfo?: { mode: ChatContextMode; content: string }) => Promise<string>;
+  sendChatMessage: (tabId: string, content: string, enableWebSearch?: boolean, contextInfo?: { mode: ChatContextMode; content: string }, enableTools?: boolean) => Promise<string>;
   generateContent: (authorNotes: string, currentContent: string) => Promise<string>;
   generateContentStream: (authorNotes: string, currentContent: string, onChunk: (chunk: string) => void, conversationHistory?: AIMessage[], enableWebSearch?: boolean) => Promise<string>;
 
@@ -659,7 +667,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ isAiStreaming: false, aiStreamingTabId: null });
   },
   // AI Actions（流式聊天，支持停止）
-  sendChatMessage: async (tabId, content, enableWebSearch, contextInfo) => {
+  sendChatMessage: async (tabId, content, enableWebSearch, contextInfo, enableTools) => {
     // 获取当前标签页的流状态
     const currentStreamState = get().streamStateByTab[tabId] || {
       unlistenFn: null,
@@ -706,11 +714,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       const tabMessages = get().aiMessagesByTab[tabId] || [];
       const aiSettings = useSettingsStore.getState().ai;
 
-      // 构建消息列表，包含可选的 system prompt + markdownMode 格式约束
+      // 构建消息列表，包含可选的 角色prompt + 用户prompt + markdownMode 格式约束
       const messages: { role: string; content: string }[] = [];
+      const rolePrompt = getRoleSystemPrompt();
       const userSystemPrompt = aiSettings.systemPrompt?.trim() || '';
       const mdPrompt = aiSettings.markdownMode ? getMarkdownModePrompt() : '';
-      const combinedSystemPrompt = [userSystemPrompt, mdPrompt].filter(Boolean).join('\n\n');
+      const combinedSystemPrompt = [rolePrompt, userSystemPrompt, mdPrompt].filter(Boolean).join('\n\n');
       if (combinedSystemPrompt) {
         messages.push({ role: 'system', content: combinedSystemPrompt });
       }
@@ -778,6 +787,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         messages,
         ...aiParams,
         enableWebSearch: enableWebSearch || undefined,
+        enableThinking: aiSettings.enableThinking || undefined,
+        enableTools: enableTools || undefined,
         requestId
       });
 
@@ -906,12 +917,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         ...aiParams,
         conversationHistory: historyForBackend || undefined,
         systemPrompt: (() => {
+          const roleSp = getRoleSystemPrompt();
           const userSp = aiSettings.systemPrompt?.trim() || '';
           const mdSp = aiSettings.markdownMode ? getMarkdownModePrompt() : '';
-          const combined = [userSp, mdSp].filter(Boolean).join('\n\n');
+          const combined = [roleSp, userSp, mdSp].filter(Boolean).join('\n\n');
           return combined || undefined;
         })(),
         enableWebSearch: enableWebSearch || undefined,
+        enableThinking: aiSettings.enableThinking || undefined,
         requestId
       };
 

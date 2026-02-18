@@ -1,0 +1,19 @@
+{
+  "id": "exam-civil-structured",
+  "name": "结构化面试",
+  "description": "结构化面试各类题型答题框架",
+  "icon": "🏛️",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "exam-civil",
+  "subCategory": "general",
+  "tags": [
+    "结构化面试"
+  ],
+  "order": 102,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

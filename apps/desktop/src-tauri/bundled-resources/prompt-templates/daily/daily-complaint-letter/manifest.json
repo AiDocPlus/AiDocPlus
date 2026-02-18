@@ -1,0 +1,19 @@
+{
+  "id": "daily-complaint-letter",
+  "name": "投诉信/维权信",
+  "description": "理性维权信件，有理有据表达诉求",
+  "icon": "🏠",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "daily",
+  "subCategory": "general",
+  "tags": [
+    "投诉信/维权信"
+  ],
+  "order": 16,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

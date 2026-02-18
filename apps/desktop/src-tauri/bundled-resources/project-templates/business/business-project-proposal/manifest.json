@@ -1,0 +1,22 @@
+{
+  "id": "business-project-proposal",
+  "name": "项目提案",
+  "description": "商业项目提案模板，含背景分析、方案设计、预算和时间表",
+  "icon": "Lightbulb",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "project-template",
+  "majorCategory": "business",
+  "subCategory": "general",
+  "tags": [
+    "提案",
+    "项目",
+    "商业计划",
+    "方案"
+  ],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

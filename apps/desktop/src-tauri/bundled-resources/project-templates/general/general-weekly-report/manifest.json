@@ -1,0 +1,21 @@
+{
+  "id": "general-weekly-report",
+  "name": "周报",
+  "description": "个人或团队周工作总结与下周计划",
+  "icon": "Calendar",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "project-template",
+  "majorCategory": "general",
+  "subCategory": "general",
+  "tags": [
+    "周报",
+    "工作总结",
+    "计划"
+  ],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

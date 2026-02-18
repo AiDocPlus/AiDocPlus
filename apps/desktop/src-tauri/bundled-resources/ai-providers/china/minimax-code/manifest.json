@@ -1,0 +1,38 @@
+{
+  "id": "minimax-code",
+  "name": "MiniMax (Coding Plan)",
+  "description": "MiniMax (Coding Plan) AI 服务",
+  "icon": "💻",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "ai-provider",
+  "majorCategory": "china",
+  "subCategory": "general",
+  "tags": [
+    "MiniMax (Coding Plan)"
+  ],
+  "order": 9,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z",
+  "baseUrl": "https://api.minimaxi.com/v1",
+  "defaultModel": "MiniMax-M2.5",
+  "models": [
+    {
+      "id": "MiniMax-M2.5",
+      "name": "MiniMax M2.5"
+    },
+    {
+      "id": "MiniMax-M2.5-highspeed",
+      "name": "MiniMax M2.5 高速版"
+    }
+  ],
+  "authHeader": "bearer",
+  "capabilities": {
+    "webSearch": false,
+    "thinking": true,
+    "functionCalling": true,
+    "vision": false
+  }
+}

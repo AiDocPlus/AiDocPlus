@@ -1,0 +1,19 @@
+{
+  "id": "career-worklife",
+  "name": "工作生活平衡",
+  "description": "工作生活平衡建议",
+  "icon": "🚀",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "career",
+  "subCategory": "general",
+  "tags": [
+    "工作生活平衡"
+  ],
+  "order": 208,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

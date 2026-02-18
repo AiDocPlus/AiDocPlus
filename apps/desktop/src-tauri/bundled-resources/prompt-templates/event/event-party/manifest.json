@@ -1,0 +1,19 @@
+{
+  "id": "event-party",
+  "name": "聚会方案",
+  "description": "聚会活动方案，含游戏、餐饮、预算",
+  "icon": "🎉",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "event",
+  "subCategory": "general",
+  "tags": [
+    "聚会方案"
+  ],
+  "order": 76,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

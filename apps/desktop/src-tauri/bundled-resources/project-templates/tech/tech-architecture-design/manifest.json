@@ -1,0 +1,22 @@
+{
+  "id": "tech-architecture-design",
+  "name": "架构设计文档",
+  "description": "软件系统架构设计文档模板",
+  "icon": "Network",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "project-template",
+  "majorCategory": "tech",
+  "subCategory": "general",
+  "tags": [
+    "架构",
+    "设计",
+    "系统",
+    "技术"
+  ],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

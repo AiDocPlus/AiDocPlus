@@ -1,0 +1,22 @@
+{
+  "id": "business-meeting-minutes",
+  "name": "会议纪要",
+  "description": "标准会议纪要模板，记录会议要点、决议和行动项",
+  "icon": "Users",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "project-template",
+  "majorCategory": "business",
+  "subCategory": "general",
+  "tags": [
+    "会议",
+    "纪要",
+    "记录",
+    "决议"
+  ],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

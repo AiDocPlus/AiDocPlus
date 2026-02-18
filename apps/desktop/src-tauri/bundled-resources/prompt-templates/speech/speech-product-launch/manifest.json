@@ -1,0 +1,19 @@
+{
+  "id": "speech-product-launch",
+  "name": "新产品发布会",
+  "description": "产品发布演讲",
+  "icon": "🎤",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "speech",
+  "subCategory": "general",
+  "tags": [
+    "新产品发布会"
+  ],
+  "order": 143,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

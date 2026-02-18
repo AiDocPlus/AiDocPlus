@@ -1,0 +1,22 @@
+{
+  "id": "business-market-analysis",
+  "name": "市场分析报告",
+  "description": "市场调研与竞争分析报告模板",
+  "icon": "TrendingUp",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "project-template",
+  "majorCategory": "business",
+  "subCategory": "general",
+  "tags": [
+    "市场分析",
+    "竞争分析",
+    "调研",
+    "商业"
+  ],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

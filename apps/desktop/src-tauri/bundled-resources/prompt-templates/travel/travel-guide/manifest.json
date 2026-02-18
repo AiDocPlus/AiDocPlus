@@ -1,0 +1,19 @@
+{
+  "id": "travel-guide",
+  "name": "旅游攻略",
+  "description": "详细的目的地旅游攻略，含交通、景点、美食、住宿",
+  "icon": "🧳",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "travel",
+  "subCategory": "general",
+  "tags": [
+    "旅游攻略"
+  ],
+  "order": 38,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

@@ -1,0 +1,19 @@
+{
+  "id": "life-mood",
+  "name": "心情记录",
+  "description": "记录情绪和心情",
+  "icon": "🌸",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "life",
+  "subCategory": "general",
+  "tags": [
+    "心情记录"
+  ],
+  "order": 80,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

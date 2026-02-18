@@ -1,0 +1,19 @@
+{
+  "id": "tech-design-doc",
+  "name": "技术方案",
+  "description": "技术设计文档",
+  "icon": "💻",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "tech",
+  "subCategory": "general",
+  "tags": [
+    "技术方案"
+  ],
+  "order": 163,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

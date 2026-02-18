@@ -1,0 +1,66 @@
+{
+  "id": "glm",
+  "name": "智谱 AI (通用)",
+  "description": "智谱 AI (通用) AI 服务",
+  "icon": "🔮",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "ai-provider",
+  "majorCategory": "china",
+  "subCategory": "general",
+  "tags": [
+    "智谱 AI (通用)"
+  ],
+  "order": 6,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z",
+  "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
+  "defaultModel": "glm-5",
+  "models": [
+    {
+      "id": "glm-5",
+      "name": "GLM-5（旗舰）"
+    },
+    {
+      "id": "glm-4.7",
+      "name": "GLM-4.7"
+    },
+    {
+      "id": "glm-4.7-flash",
+      "name": "GLM-4.7 Flash（免费）"
+    },
+    {
+      "id": "glm-4.6",
+      "name": "GLM-4.6"
+    },
+    {
+      "id": "glm-4.5-air",
+      "name": "GLM-4.5 Air"
+    },
+    {
+      "id": "glm-4.5-airx",
+      "name": "GLM-4.5 AirX"
+    },
+    {
+      "id": "glm-4.5-flash",
+      "name": "GLM-4.5 Flash（免费）"
+    },
+    {
+      "id": "glm-4-flash",
+      "name": "GLM-4 Flash（免费）"
+    },
+    {
+      "id": "glm-4-long",
+      "name": "GLM-4 Long"
+    }
+  ],
+  "authHeader": "bearer",
+  "capabilities": {
+    "webSearch": true,
+    "thinking": true,
+    "functionCalling": true,
+    "vision": true
+  }
+}

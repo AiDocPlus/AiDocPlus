@@ -1,0 +1,22 @@
+{
+  "id": "business-annual-report",
+  "name": "年度工作报告",
+  "description": "企业或部门年度工作总结与来年计划",
+  "icon": "BarChart3",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "project-template",
+  "majorCategory": "business",
+  "subCategory": "general",
+  "tags": [
+    "年报",
+    "工作总结",
+    "年度计划",
+    "商务"
+  ],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

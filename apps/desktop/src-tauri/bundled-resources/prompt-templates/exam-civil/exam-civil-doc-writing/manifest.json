@@ -1,0 +1,19 @@
+{
+  "id": "exam-civil-doc-writing",
+  "name": "公文写作",
+  "description": "申论公文写作",
+  "icon": "🏛️",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "prompt-template",
+  "majorCategory": "exam-civil",
+  "subCategory": "general",
+  "tags": [
+    "公文写作"
+  ],
+  "order": 185,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}
