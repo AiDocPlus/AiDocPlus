@@ -5,7 +5,7 @@ import { useAppStore } from '@/stores/useAppStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { PromptTemplates } from '../templates/PromptTemplates';
 import { invoke } from '@tauri-apps/api/core';
-import { timestampToDate, getProviderConfig, getActiveService, getActiveRole } from '@aidocplus/shared-types';
+import { timestampToDate, getProviderConfig, getActiveService, getActiveRoleInstance, getRoleForInstance } from '@aidocplus/shared-types';
 import type { PromptTemplate, Attachment, ChatContextMode, AIServiceConfig } from '@aidocplus/shared-types';
 import { useTemplatesStore } from '@/stores/useTemplatesStore';
 import { useTranslation } from '@/i18n';
@@ -603,12 +603,13 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
         <div className="flex items-center gap-2 min-w-0">
           <h2 className="font-semibold flex-shrink-0">{simpleMode ? t('chat.chatTitle', { defaultValue: '随便聊聊' }) : t('chat.aiAssistant', { defaultValue: 'AI 助手' })}</h2>
           {(() => {
-            const activeRole = getActiveRole(settingsStore.role);
-            if (!activeRole || !activeRole.systemPrompt) return null;
+            const activeInstance = getActiveRoleInstance(settingsStore.role);
+            if (!activeInstance) return null;
+            const roleTemplate = getRoleForInstance(activeInstance);
             return (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary flex items-center gap-1 flex-shrink-0" title={activeRole.description}>
-                <span>{activeRole.icon}</span>
-                <span>{activeRole.name}</span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary flex items-center gap-1 flex-shrink-0" title={activeInstance.description ?? roleTemplate?.description}>
+                <span>{activeInstance.icon}</span>
+                <span>{activeInstance.name}</span>
               </span>
             );
           })()}
