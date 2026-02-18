@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { AppSettings } from '@aidocplus/shared-types';
+import type { AppSettings, RoleInstance } from '@aidocplus/shared-types';
 import {
   DEFAULT_SETTINGS,
   DEFAULT_EDITOR_SETTINGS,
@@ -67,6 +67,10 @@ interface SettingsState extends AppSettings {
   updateAISettings: (settings: Partial<typeof DEFAULT_AI_SETTINGS>) => void;
   updateEmailSettings: (settings: Partial<typeof DEFAULT_EMAIL_SETTINGS>) => void;
   updateRoleSettings: (settings: Partial<typeof DEFAULT_ROLE_SETTINGS>) => void;
+  createRoleInstance: (instance: RoleInstance) => void;
+  updateRoleInstance: (id: string, updates: Partial<RoleInstance>) => void;
+  deleteRoleInstance: (id: string) => void;
+  setActiveInstance: (id: string) => void;
   updateShortcut: (key: string, value: string) => void;
   resetSettings: () => void;
   resetCategory: (category: 'editor' | 'ui' | 'file' | 'ai') => void;
@@ -141,6 +145,47 @@ export const useSettingsStore = create<SettingsState>()(
       updateRoleSettings: (settings) => {
         set((state) => ({
           role: { ...state.role, ...settings }
+        }));
+      },
+
+      // 创建角色实例
+      createRoleInstance: (instance) => {
+        set((state) => ({
+          role: {
+            ...state.role,
+            instances: [...state.role.instances, instance],
+            activeInstanceId: instance.id,
+          }
+        }));
+      },
+
+      // 更新角色实例
+      updateRoleInstance: (id, updates) => {
+        set((state) => ({
+          role: {
+            ...state.role,
+            instances: state.role.instances.map(i =>
+              i.id === id ? { ...i, ...updates, updatedAt: Date.now() } : i
+            ),
+          }
+        }));
+      },
+
+      // 删除角色实例
+      deleteRoleInstance: (id) => {
+        set((state) => ({
+          role: {
+            ...state.role,
+            instances: state.role.instances.filter(i => i.id !== id),
+            activeInstanceId: state.role.activeInstanceId === id ? '' : state.role.activeInstanceId,
+          }
+        }));
+      },
+
+      // 设置激活的角色实例
+      setActiveInstance: (id) => {
+        set((state) => ({
+          role: { ...state.role, activeInstanceId: id }
         }));
       },
 
@@ -412,13 +457,11 @@ export const useSettingsStore = create<SettingsState>()(
         plugins: state.plugins,
         role: state.role,
       }),
-      version: 10,
+      version: 11,
       migrate: (persistedState: any, version: number) => {
-        if (version < 10) {
-          // 迁移: 新增 role 字段
-          if (!persistedState.role) {
-            persistedState.role = { ...DEFAULT_ROLE_SETTINGS };
-          }
+        if (version < 11) {
+          // 迁移: 重置 role 为新结构（RoleInstance 模型）
+          persistedState.role = { ...DEFAULT_ROLE_SETTINGS };
         }
         if (version < 9) {
           // 迁移: 确保 ai.enableThinking 字段存在
@@ -515,6 +558,35 @@ export const usePluginsSettings = () => useSettingsStore((state) => state.plugin
 export function getAIInvokeParams() {
   const ai = useSettingsStore.getState().ai;
   const service = getActiveService(ai);
+  if (!service) {
+    return { provider: undefined, apiKey: undefined, model: undefined, baseUrl: undefined };
+  }
+  const providerConfig = getProviderConfig(service.provider);
+  return {
+    provider: service.provider || undefined,
+    apiKey: service.apiKey || undefined,
+    model: service.model || undefined,
+    baseUrl: service.baseUrl || providerConfig?.baseUrl || undefined,
+  };
+}
+
+/**
+ * 获取指定 AI 服务的 invoke 调用参数。
+ * @param serviceId 指定的服务 ID，如果未提供或服务不存在/未启用，则回退到全局激活服务
+ */
+export function getAIInvokeParamsForService(serviceId?: string) {
+  const ai = useSettingsStore.getState().ai;
+
+  // 尝试获取指定服务（必须是已启用的）
+  let service = serviceId
+    ? ai.services.find(s => s.id === serviceId && s.enabled)
+    : undefined;
+
+  // 如果找不到指定服务，回退到全局激活服务
+  if (!service) {
+    service = getActiveService(ai);
+  }
+
   if (!service) {
     return { provider: undefined, apiKey: undefined, model: undefined, baseUrl: undefined };
   }

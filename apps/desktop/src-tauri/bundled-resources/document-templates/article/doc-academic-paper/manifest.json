@@ -1,0 +1,21 @@
+{
+  "id": "doc-academic-paper",
+  "name": "学术论文",
+  "description": "标准学术论文结构，含摘要、引言、方法、结果、讨论",
+  "icon": "🎓",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "document-template",
+  "majorCategory": "article",
+  "subCategory": "general",
+  "tags": [],
+  "roles": [
+    "researcher",
+    "student"
+  ],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

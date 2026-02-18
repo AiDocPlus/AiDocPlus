@@ -1,0 +1,21 @@
+{
+  "id": "doc-experiment-report",
+  "name": "实验报告",
+  "description": "科学实验报告，含实验目的、方法、结果和分析",
+  "icon": "🧪",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "document-template",
+  "majorCategory": "report",
+  "subCategory": "general",
+  "tags": [],
+  "roles": [
+    "researcher",
+    "student"
+  ],
+  "order": 3,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

@@ -1,0 +1,22 @@
+{
+  "id": "doc-reading-notes",
+  "name": "读书笔记",
+  "description": "读书笔记模板，记录阅读感悟和核心观点",
+  "icon": "📚",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "document-template",
+  "majorCategory": "general",
+  "subCategory": "general",
+  "tags": [],
+  "roles": [
+    "general",
+    "student",
+    "researcher"
+  ],
+  "order": 1,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

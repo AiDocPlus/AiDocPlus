@@ -47,7 +47,9 @@
       "Bash(gh run view:*)",
       "Bash(gh release list:*)",
       "Bash(gh release view:*)",
-      "Bash(gh release edit:*)"
+      "Bash(gh release edit:*)",
+      "Bash(bash scripts/assemble.sh)",
+      "Bash(pnpm install)"
     ]
   }
 }

@@ -52,6 +52,7 @@ export interface Document {
   pluginData?: Record<string, unknown>;  // 插件数据，key = 插件 UUID
   enabledPlugins?: string[];  // 该文档启用的插件 UUID 列表（顺序即标签栏顺序）
   composedContent?: string;  // 合并内容（Markdown），汇集正文+插件片段+外部导入
+  aiServiceId?: string;      // 文档级 AI 服务绑定（可选，空=全局默认）
 }
 
 // ============================================================
@@ -73,6 +74,7 @@ export interface PluginManifest {
   subCategory: string;           // 子类：'ai-text' | 'visualization' | 'communication' | ...
   category: string;              // 兼容旧数据（= subCategory 别名）
   tags: string[];                // 搜索标签（中英文关键词）
+  roles?: string[];              // 所属角色 ID 列表（空/缺省 = 适用所有角色）
   // ── 插件市场预留字段 ──
   homepage?: string;             // 插件主页/文档链接
   license?: string;              // 许可证
@@ -95,6 +97,7 @@ export interface TemplateManifest {
   type: 'builtin' | 'custom';
   category: string;              // 分类 key
   tags: string[];
+  roles?: string[];              // 所属角色 ID 列表（空/缺省 = 适用所有角色）
   createdAt: number;
   updatedAt: number;
   includeContent: boolean;       // 是否包含素材内容
@@ -579,16 +582,35 @@ export interface UserRole {
   suggestedTemperature?: number;
   /** 可选：推荐的 AI maxTokens */
   suggestedMaxTokens?: number;
-  /** 可选：推荐的模板分类 key */
-  recommendedTemplateCategories?: string[];
-  /** 可选：推荐的插件 ID */
-  recommendedPlugins?: string[];
+}
+
+/** 角色实例：用户基于角色模板创建的可定制配置方案 */
+export interface RoleInstance {
+  id: string;                     // UUID
+  name: string;                   // 实例名称（默认=角色名）
+  roleId: string;                 // 来源角色模板 ID
+  icon: string;
+  description?: string;
+  createdAt: number;              // Unix timestamp (ms)
+  updatedAt: number;
+  // ── 资源子集（用户可定制） ──
+  plugins: string[];              // 插件 UUID 列表
+  promptTemplateIds: string[];    // 提示词模板 ID 列表
+  projectTemplateIds: string[];   // 项目模板 ID 列表
+  docTemplateIds: string[];       // 文档模板 ID 列表
+  aiServiceId?: string;           // 绑定 AI 服务 ID（可选，空=全局默认）
+  // ── AI 行为覆盖（可选，覆盖全局设置） ──
+  systemPrompt?: string;          // 覆盖角色模板的 systemPrompt
+  temperature?: number;
+  maxTokens?: number;
 }
 
 export interface RoleSettings {
-  /** 当前激活角色 ID，'' 表示无角色 */
-  activeRoleId: string;
-  /** 自定义角色列表（内置角色不持久化） */
+  /** 当前激活的角色实例 ID，'' 表示无 */
+  activeInstanceId: string;
+  /** 用户创建的角色实例列表 */
+  instances: RoleInstance[];
+  /** 自定义角色模板定义（用户自定义的角色，非实例） */
   customRoles: UserRole[];
 }
 
@@ -596,21 +618,32 @@ export interface RoleSettings {
 export const BUILT_IN_ROLES = _BUILT_IN_ROLES;
 
 export const DEFAULT_ROLE_SETTINGS: RoleSettings = {
-  activeRoleId: '',
+  activeInstanceId: '',
+  instances: [],
   customRoles: [],
 };
 
-/** 获取当前激活的角色 */
-export function getActiveRole(role: RoleSettings): UserRole | undefined {
-  if (!role.activeRoleId) return undefined;
-  const builtIn = BUILT_IN_ROLES.find(r => r.id === role.activeRoleId);
-  if (builtIn) return builtIn;
-  return role.customRoles.find(r => r.id === role.activeRoleId);
+/** 获取当前激活的角色实例 */
+export function getActiveRoleInstance(role: RoleSettings): RoleInstance | undefined {
+  if (!role.activeInstanceId) return undefined;
+  return role.instances.find(i => i.id === role.activeInstanceId);
 }
 
-/** 获取所有角色（内置 + 自定义） */
+/** 根据实例获取对应的角色模板 */
+export function getRoleForInstance(instance: RoleInstance): UserRole | undefined {
+  return BUILT_IN_ROLES.find(r => r.id === instance.roleId);
+}
+
+/** 获取所有角色模板（内置 + 自定义） */
 export function getAllRoles(role: RoleSettings): UserRole[] {
   return [...BUILT_IN_ROLES, ...role.customRoles];
+}
+
+/** 获取实例的有效 systemPrompt（实例覆盖 > 角色模板） */
+export function getInstanceSystemPrompt(instance: RoleInstance): string {
+  if (instance.systemPrompt) return instance.systemPrompt;
+  const role = getRoleForInstance(instance);
+  return role?.systemPrompt ?? '';
 }
 
 export interface AppSettings {

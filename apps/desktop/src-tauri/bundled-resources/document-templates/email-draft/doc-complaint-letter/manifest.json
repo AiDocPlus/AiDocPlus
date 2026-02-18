@@ -1,0 +1,21 @@
+{
+  "id": "doc-complaint-letter",
+  "name": "投诉信",
+  "description": "正式投诉信，清晰陈述问题并提出合理诉求",
+  "icon": "📝",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "document-template",
+  "majorCategory": "email-draft",
+  "subCategory": "general",
+  "tags": [],
+  "roles": [
+    "lawyer",
+    "civil-servant"
+  ],
+  "order": 2,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

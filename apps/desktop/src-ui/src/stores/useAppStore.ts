@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Project, Document, DocumentVersion, AIMessage, ChatContextMode, WorkspaceState, EditorTab, PluginManifest, TemplateManifest, TemplateCategory } from '@aidocplus/shared-types';
-import { getActiveRole } from '@aidocplus/shared-types';
+import { getActiveRoleInstance, getInstanceSystemPrompt } from '@aidocplus/shared-types';
 import { buildPluginList, setPlugins } from '@/plugins/registry';
 import { syncManifestsToBackend } from '@/plugins/loader';
 import { invoke } from '@tauri-apps/api/core';
@@ -15,11 +15,12 @@ function getMarkdownModePrompt(): string {
   return ai.markdownModePrompt || '';
 }
 
-// 角色 System Prompt：从当前激活角色获取
+// 角色 System Prompt：从当前激活角色实例获取
 function getRoleSystemPrompt(): string {
   const role = useSettingsStore.getState().role;
-  const activeRole = getActiveRole(role);
-  return activeRole?.systemPrompt?.trim() || '';
+  const instance = getActiveRoleInstance(role);
+  if (!instance) return '';
+  return getInstanceSystemPrompt(instance).trim();
 }
 
 // 标签页面板状态类型

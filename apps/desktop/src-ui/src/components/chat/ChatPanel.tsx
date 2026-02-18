@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, X, ChevronDown, ChevronUp, FileText, BookOpen, Square, Eraser, Trash2, Copy, Check, ArrowUpToLine, MessageSquareText, PenLine, Wand2 } from 'lucide-react';
+import { Send, Sparkles, X, ChevronDown, ChevronUp, FileText, BookOpen, Square, Eraser, Trash2, Copy, Check, ArrowUpToLine, MessageSquareText, PenLine, Wand2, Bot, CheckCircle2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useAppStore } from '@/stores/useAppStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { PromptTemplates } from '../templates/PromptTemplates';
 import { invoke } from '@tauri-apps/api/core';
 import { timestampToDate, getProviderConfig, getActiveService, getActiveRole } from '@aidocplus/shared-types';
-import type { PromptTemplate, Attachment, ChatContextMode } from '@aidocplus/shared-types';
+import type { PromptTemplate, Attachment, ChatContextMode, AIServiceConfig } from '@aidocplus/shared-types';
 import { useTemplatesStore } from '@/stores/useTemplatesStore';
 import { useTranslation } from '@/i18n';
 import { parseThinkTags } from '@/utils/thinkTagParser';
@@ -600,16 +600,63 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
     <div className="flex-1 flex flex-col overflow-hidden min-h-0">
       {/* Header with close button */}
       <div className="flex items-center justify-between px-4 py-2 border-b bg-background flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <h2 className="font-semibold">{simpleMode ? t('chat.chatTitle', { defaultValue: '随便聊聊' }) : t('chat.aiAssistant', { defaultValue: 'AI 助手' })}</h2>
+        <div className="flex items-center gap-2 min-w-0">
+          <h2 className="font-semibold flex-shrink-0">{simpleMode ? t('chat.chatTitle', { defaultValue: '随便聊聊' }) : t('chat.aiAssistant', { defaultValue: 'AI 助手' })}</h2>
           {(() => {
             const activeRole = getActiveRole(settingsStore.role);
             if (!activeRole || !activeRole.systemPrompt) return null;
             return (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary flex items-center gap-1" title={activeRole.description}>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary flex items-center gap-1 flex-shrink-0" title={activeRole.description}>
                 <span>{activeRole.icon}</span>
                 <span>{activeRole.name}</span>
               </span>
+            );
+          })()}
+          {/* AI 服务快速切换 */}
+          {(() => {
+            const services = settingsStore.ai.services.filter((s: AIServiceConfig) => s.enabled);
+            if (services.length === 0) return null;
+            const current = activeService;
+            const currentLabel = current ? (current.name || current.model || current.provider) : t('chat.configureApiWarning', { defaultValue: '⚠️ 请先配置 API 服务' });
+            if (services.length <= 1) {
+              return (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground flex items-center gap-1 truncate max-w-[140px]" title={currentLabel}>
+                  <Bot className="h-3 w-3 flex-shrink-0" />
+                  <span className="truncate">{currentLabel}</span>
+                </span>
+              );
+            }
+            return (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="text-xs px-2 py-0.5 rounded-full bg-muted hover:bg-muted/80 text-muted-foreground flex items-center gap-1 truncate max-w-[160px] transition-colors" title={t('chat.switchService', { defaultValue: '切换 AI 服务' })}>
+                    <Bot className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">{currentLabel}</span>
+                    <ChevronDown className="h-3 w-3 flex-shrink-0 opacity-60" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  <DropdownMenuLabel className="text-xs">{t('chat.selectService', { defaultValue: '选择 AI 服务' })}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {services.map((svc: AIServiceConfig) => (
+                    <DropdownMenuItem
+                      key={svc.id}
+                      onClick={() => settingsStore.updateAISettings({ activeServiceId: svc.id })}
+                      className="flex items-center gap-2"
+                    >
+                      {svc.id === settingsStore.ai.activeServiceId ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                      ) : (
+                        <span className="w-3.5" />
+                      )}
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm truncate">{svc.name || svc.provider}</span>
+                        <span className="text-xs text-muted-foreground truncate">{svc.model}</span>
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             );
           })()}
         </div>

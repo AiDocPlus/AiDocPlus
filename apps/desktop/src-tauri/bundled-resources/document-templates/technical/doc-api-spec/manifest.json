@@ -1,0 +1,20 @@
+{
+  "id": "doc-api-spec",
+  "name": "API说明文档",
+  "description": "RESTful API接口文档，含请求参数、响应格式和示例",
+  "icon": "🔌",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "document-template",
+  "majorCategory": "technical",
+  "subCategory": "general",
+  "tags": [],
+  "roles": [
+    "programmer"
+  ],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

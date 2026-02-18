@@ -1,0 +1,5 @@
+{
+  "authorNotes": "请帮我撰写一份API说明文档，要求：\n1. 清晰描述接口功能\n2. 详细说明请求参数和格式\n3. 描述响应数据结构\n4. 提供请求和响应示例",
+  "aiGeneratedContent": "",
+  "content": "# [接口名称] API 文档\n\n## 接口概述\n\n- **接口地址：** `[HTTP方法] /api/v1/[path]`\n- **功能描述：** [简要描述接口功能]\n- **认证方式：** Bearer Token\n\n## 请求参数\n\n### Header\n\n| 参数名 | 类型 | 必填 | 说明 |\n|--------|------|------|------|\n| Authorization | string | 是 | Bearer {token} |\n\n### Body\n\n| 参数名 | 类型 | 必填 | 说明 |\n|--------|------|------|------|\n| | | | |\n\n## 响应格式\n\n```json\n{\n  \"code\": 200,\n  \"message\": \"success\",\n  \"data\": {}\n}\n```\n\n## 请求示例\n\n```bash\ncurl -X POST 'https://api.example.com/api/v1/[path]' \\\n  -H 'Authorization: Bearer {token}' \\\n  -H 'Content-Type: application/json' \\\n  -d '{}'\n```\n\n## 错误码\n\n| 错误码 | 说明 |\n|--------|------|\n| 400 | 请求参数错误 |\n| 401 | 未授权 |\n| 500 | 服务器内部错误 |"
+}

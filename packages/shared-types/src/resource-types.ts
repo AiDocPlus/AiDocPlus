@@ -77,6 +77,9 @@ export interface ResourceManifestBase {
     tags?: string[];
   }>;
 
+  // ── 角色关联 ──
+  roles?: string[];                 // 所属角色 ID 列表（空/缺省 = 适用所有角色）
+
   // ── 安全（预留） ──
   checksum?: string;                // SHA-256
   signature?: string;
