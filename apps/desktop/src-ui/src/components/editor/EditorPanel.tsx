@@ -16,7 +16,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
 } from '../ui/dropdown-menu';
 import { ResizableHandle } from '../ui/resizable-handle';
 import { AttachmentPanel } from './AttachmentPanel';

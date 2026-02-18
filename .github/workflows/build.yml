@@ -14,22 +14,16 @@ on:
 permissions:
   contents: write
 
+env:
+  PYTHONIOENCODING: utf-8
+  PYTHONUTF8: '1'
+
 jobs:
   build-windows:
     runs-on: windows-latest
 
     steps:
       # ── 1. Checkout 所有仓库到同级目录 ──
-      # 工作目录结构（$GITHUB_WORKSPACE 下）：
-      #   AiDocPlus/          ← 构建目标（本仓库）
-      #   AiDocPlus-Main/     ← 主程序源码
-      #   AiDocPlus-Roles/    ← 角色数据
-      #   AiDocPlus-PromptTemplates/
-      #   AiDocPlus-DocTemplates/
-      #   AiDocPlus-ProjectTemplates/
-      #   AiDocPlus-AIProviders/
-      #   AiDocPlus-Plugins/
-
       - name: Checkout AiDocPlus (build target)
         uses: actions/checkout@v4
         with:
@@ -79,7 +73,6 @@ jobs:
           path: AiDocPlus-Plugins
 
       # ── 2. 安装工具链 ──
-
       - name: Setup Python 3
         uses: actions/setup-python@v5
         with:
@@ -114,13 +107,10 @@ jobs:
             ${{ runner.os }}-pnpm-
 
       # ── 3. 总装（assemble） ──
-      # AiDocPlus-Main 的 deploy.sh 依赖 rsync（Windows 无），
-      # 这里用纯 bash find+cp 实现等效逻辑；其余资源仓库直接调用各自脚本。
-
       - name: Deploy AiDocPlus-Main (rsync replacement)
         shell: bash
         run: |
-          echo "📦 部署 AiDocPlus-Main..."
+          echo "Deploy AiDocPlus-Main..."
           MAIN_DIR="AiDocPlus-Main"
           TARGET_DIR="AiDocPlus"
 
@@ -146,27 +136,26 @@ jobs:
           cd ..
 
           mkdir -p "${TARGET_DIR}/packages/shared-types/src/generated"
-          echo "✅ AiDocPlus-Main 部署完成"
+          echo "AiDocPlus-Main deployed"
 
       - name: Deploy resource repositories
         shell: bash
         run: |
           for repo in Roles PromptTemplates DocTemplates ProjectTemplates AIProviders; do
             REPO_DIR="AiDocPlus-${repo}"
-            echo "📦 部署 ${REPO_DIR}..."
+            echo "Deploy ${REPO_DIR}..."
             if [ -f "${REPO_DIR}/scripts/build.sh" ]; then
               bash "${REPO_DIR}/scripts/build.sh"
             fi
             bash "${REPO_DIR}/scripts/deploy.sh"
           done
 
-          echo "📦 部署 AiDocPlus-Plugins..."
+          echo "Deploy AiDocPlus-Plugins..."
           bash AiDocPlus-Plugins/scripts/deploy.sh
 
-          echo "🎉 总装完成"
+          echo "Assembly complete"
 
       # ── 4. 安装依赖并构建 ──
-
       - name: Install frontend dependencies
         working-directory: AiDocPlus
         run: pnpm install
