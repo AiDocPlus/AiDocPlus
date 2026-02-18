@@ -33,8 +33,6 @@ pub struct TemplateManifest {
     pub plugin_data: Option<serde_json::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "minAppVersion")]
     pub min_app_version: Option<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub roles: Vec<String>,
 }
 
 /// 模板内容 — 按需加载
@@ -101,17 +99,7 @@ pub fn list_templates() -> Vec<TemplateManifest> {
     }
 
     // 2. 加载内置项目模板（bundled-resources/project-templates/）
-    if let Some(builtin) = load_builtin_templates("project-templates") {
-        for manifest in builtin {
-            if !seen_ids.contains(&manifest.id) {
-                seen_ids.insert(manifest.id.clone());
-                templates.push(manifest);
-            }
-        }
-    }
-
-    // 3. 加载内置文档模板（bundled-resources/document-templates/）
-    if let Some(builtin) = load_builtin_templates("document-templates") {
+    if let Some(builtin) = load_builtin_templates() {
         for manifest in builtin {
             if !seen_ids.contains(&manifest.id) {
                 seen_ids.insert(manifest.id.clone());
@@ -123,10 +111,10 @@ pub fn list_templates() -> Vec<TemplateManifest> {
     templates
 }
 
-/// 从 bundled-resources/{subdir} 递归加载内置模板 manifest
-fn load_builtin_templates(subdir: &str) -> Option<Vec<TemplateManifest>> {
+/// 从 bundled-resources/project-templates 递归加载内置模板 manifest
+fn load_builtin_templates() -> Option<Vec<TemplateManifest>> {
     let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
-    let bundled_dir = exe_dir.join("bundled-resources").join(subdir);
+    let bundled_dir = exe_dir.join("bundled-resources").join("project-templates");
     if !bundled_dir.exists() {
         return None;
     }
@@ -159,10 +147,6 @@ fn scan_manifests_recursive(dir: &std::path::Path, templates: &mut Vec<TemplateM
                             template_type: "builtin".to_string(),
                             category: value.get("majorCategory").and_then(|v| v.as_str()).unwrap_or("general").to_string(),
                             tags: value.get("tags")
-                                .and_then(|v| v.as_array())
-                                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
-                                .unwrap_or_default(),
-                            roles: value.get("roles")
                                 .and_then(|v| v.as_array())
                                 .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
                                 .unwrap_or_default(),
@@ -200,22 +184,17 @@ pub fn get_template_content(template_id: &str) -> Result<TemplateContent, String
     }
 
     // 2. 查 bundled-resources/project-templates 中的内置模板
-    if let Some(content) = find_builtin_template_content(template_id, "project-templates") {
-        return Ok(content);
-    }
-
-    // 3. 查 bundled-resources/document-templates 中的内置文档模板
-    if let Some(content) = find_builtin_template_content(template_id, "document-templates") {
+    if let Some(content) = find_builtin_template_content(template_id) {
         return Ok(content);
     }
 
     Err(format!("Template content not found: {}", template_id))
 }
 
-/// 在 bundled-resources/{subdir} 中递归查找指定 ID 的 content.json
-fn find_builtin_template_content(template_id: &str, subdir: &str) -> Option<TemplateContent> {
+/// 在 bundled-resources/project-templates 中递归查找指定 ID 的 content.json
+fn find_builtin_template_content(template_id: &str) -> Option<TemplateContent> {
     let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
-    let bundled_dir = exe_dir.join("bundled-resources").join(subdir);
+    let bundled_dir = exe_dir.join("bundled-resources").join("project-templates");
     find_content_recursive(&bundled_dir, template_id)
 }
 

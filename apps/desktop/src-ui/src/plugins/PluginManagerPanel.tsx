@@ -90,6 +90,8 @@ interface PluginManagerPanelProps {
   enabledPluginIds?: string[];
   onEnabledPluginsChange: (pluginIds: string[]) => void;
   onClose: () => void;
+  /** 过滤显示的插件大类，不传则显示全部 */
+  filterCategory?: 'content-generation' | 'functional';
 }
 
 /**
@@ -100,6 +102,7 @@ export function PluginManagerPanel({
   enabledPluginIds,
   onEnabledPluginsChange,
   onClose,
+  filterCategory,
 }: PluginManagerPanelProps) {
   const { t } = useTranslation('plugin-framework');
   const { pluginManifests, loadPlugins } = useAppStore();
@@ -154,6 +157,15 @@ export function PluginManagerPanel({
   // 过滤插件
   const filteredPlugins = useMemo(() => {
     let plugins = allPlugins;
+
+    // 按大类过滤（来自 filterCategory prop）
+    if (filterCategory) {
+      plugins = plugins.filter(p => {
+        const m = getManifest(p.id);
+        const cat = m?.majorCategory || p.majorCategory || 'content-generation';
+        return cat === filterCategory;
+      });
+    }
 
     if (selectedNode !== 'all') {
       if (selectedNode.includes(':')) {

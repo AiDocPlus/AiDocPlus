@@ -1,7 +1,7 @@
 import { useAppStore } from '@/stores/useAppStore';
-import { Save, SaveAll, Download, FileText, PenLine, Columns, Rows, History, MessageSquare, FilePlus, Search, X, XCircle, ExternalLink, Square, Copy, Minus, LayoutTemplate, ChevronDown } from 'lucide-react';
+import { Save, SaveAll, FileText, PenLine, Columns, Rows, History, MessageSquare, FilePlus, Search, X, XCircle, Square, Copy, Minus, LayoutTemplate, ChevronDown } from 'lucide-react';
 import { Button } from '../ui/button';
-import { PluginMenu } from '@/plugins/PluginMenu';
+import { PluginMenu, FunctionalPluginMenu } from '@/plugins/PluginMenu';
 import { PluginToolArea } from '@/plugins/PluginToolArea';
 import { MarkdownEditor } from './MarkdownEditor';
 import { ComposerPanel } from './ComposerPanel';
@@ -42,7 +42,7 @@ interface EditorPanelProps {
   onAttachmentsChange: (attachments: Attachment[]) => void;
   composedContent: string;
   onComposedContentChange: (value: string) => void;
-  onActiveViewChange?: (view: 'editor' | 'plugins' | 'composer') => void;
+  onActiveViewChange?: (view: 'editor' | 'plugins' | 'composer' | 'functional') => void;
 }
 
 export function EditorPanel({
@@ -69,10 +69,11 @@ export function EditorPanel({
   const { t } = useTranslation();
   const { documents, tabs, saveDocument, markTabAsDirty, markTabAsClean, createDocument, openTab, closeTab, closeAllTabs, aiStreamingTabId, sidebarOpen, setSidebarOpen } = useAppStore();
   const isAiStreaming = aiStreamingTabId === tabId;
-  type ActiveView = 'editor' | 'plugins' | 'composer';
+  type ActiveView = 'editor' | 'plugins' | 'composer' | 'functional';
   const [activeView, _setActiveView] = useState<ActiveView>('editor');
   const setActiveView = (v: ActiveView) => { _setActiveView(v); onActiveViewChange?.(v); };
   const pluginAreaOpen = activeView === 'plugins';
+  const functionalAreaOpen = activeView === 'functional';
   const [pluginMaximized, setPluginMaximized] = useState(false);
   // 正文区两个编辑器的视图状态：normal=正常分栏, ai-max=正文最大化, original-max=素材最大化
   type EditorViewState = 'normal' | 'ai-max' | 'original-max';
@@ -90,7 +91,7 @@ export function EditorPanel({
     const handler = (e: Event) => {
       if (!isActive()) return;
       const detail = (e as CustomEvent).detail;
-      if (detail === 'editor' || detail === 'plugins' || detail === 'composer') {
+      if (detail === 'editor' || detail === 'plugins' || detail === 'composer' || detail === 'functional') {
         setActiveView(detail);
       }
     };
@@ -422,7 +423,7 @@ export function EditorPanel({
         </Button>
         <PluginMenu
           pluginAreaOpen={pluginAreaOpen}
-          onToggle={() => setActiveView('plugins')}
+          onToggle={() => setActiveView(pluginAreaOpen ? 'editor' : 'plugins')}
           document={document}
         />
         <Button
@@ -439,6 +440,11 @@ export function EditorPanel({
           <FileText className="h-3.5 w-3.5" />
           {t('editor.composerArea', { defaultValue: '合并区' })}
         </Button>
+        <FunctionalPluginMenu
+          functionalAreaOpen={functionalAreaOpen}
+          onToggle={() => setActiveView(functionalAreaOpen ? 'editor' : 'functional')}
+          document={document}
+        />
         <div className="w-px h-4 bg-border mx-0.5" />
 
         {/* ── 文档操作组 ── */}
@@ -514,114 +520,6 @@ export function EditorPanel({
         >
           <LayoutTemplate className="h-3.5 w-3.5" />
         </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-7 w-7"
-              title={`${t('editor.exportContent', { defaultValue: '导出正文' })} (${mod}E)`}
-            >
-              <Download className="h-3.5 w-3.5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuItem onClick={() => handleNativeExport('md')}>
-              <FileText className="h-4 w-4 mr-2" />
-              {t('editor.exportAsMd', { defaultValue: '导出为 Markdown (.md)' })}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleNativeExport('html')}>
-              <FileText className="h-4 w-4 mr-2" />
-              {t('editor.exportAsHtml', { defaultValue: '导出为 HTML (.html)' })}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleNativeExport('docx')}>
-              <FileText className="h-4 w-4 mr-2" />
-              {t('editor.exportAsDocx', { defaultValue: '导出为 Word (.docx)' })}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleNativeExport('pdf')}>
-              <FileText className="h-4 w-4 mr-2" />
-              {t('editor.exportAsPdf', { defaultValue: '导出为 PDF (.pdf)' })}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleNativeExport('txt')}>
-              <FileText className="h-4 w-4 mr-2" />
-              {t('editor.exportAsTxt', { defaultValue: '导出为纯文本 (.txt)' })}
-            </DropdownMenuItem>
-            {composedContent?.trim() && (
-              <>
-                <DropdownMenuSeparator />
-                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                  {t('editor.exportComposed', { defaultValue: '导出合并内容' })}
-                </div>
-                <DropdownMenuItem onClick={() => handleNativeExportComposed('md')}>
-                  <FileText className="h-4 w-4 mr-2" />
-                  {t('editor.composedMd', { defaultValue: '合并内容 → Markdown' })}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleNativeExportComposed('html')}>
-                  <FileText className="h-4 w-4 mr-2" />
-                  {t('editor.composedHtml', { defaultValue: '合并内容 → HTML' })}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleNativeExportComposed('docx')}>
-                  <FileText className="h-4 w-4 mr-2" />
-                  {t('editor.composedDocx', { defaultValue: '合并内容 → Word' })}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleNativeExportComposed('pdf')}>
-                  <FileText className="h-4 w-4 mr-2" />
-                  {t('editor.composedPdf', { defaultValue: '合并内容 → PDF' })}
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* ── 导出并打开 ── */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-7 w-7"
-              title={t('editor.exportAndOpen', { defaultValue: '导出并用外部程序打开' })}
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuItem onClick={() => handleExportAndOpen('docx', 'WPS Office')}>
-              <FileText className="h-4 w-4 mr-2" />
-              {t('editor.wordOpenWps', { defaultValue: 'Word → WPS 打开' })}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExportAndOpen('docx', 'Microsoft Word')}>
-              <FileText className="h-4 w-4 mr-2" />
-              {t('editor.wordOpenWord', { defaultValue: 'Word → Word 打开' })}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => handleExportAndOpen('html', 'Microsoft Edge')}>
-              <FileText className="h-4 w-4 mr-2" />
-              {t('editor.htmlOpenEdge', { defaultValue: 'HTML → Edge 打开' })}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExportAndOpen('html', 'Google Chrome')}>
-              <FileText className="h-4 w-4 mr-2" />
-              {t('editor.htmlOpenChrome', { defaultValue: 'HTML → Chrome 打开' })}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExportAndOpen('html', 'Safari')}>
-              <FileText className="h-4 w-4 mr-2" />
-              {t('editor.htmlOpenSafari', { defaultValue: 'HTML → Safari 打开' })}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => handleExportAndOpen('md')}>
-              <FileText className="h-4 w-4 mr-2" />
-              {t('editor.mdOpenDefault', { defaultValue: 'Markdown → 默认程序打开' })}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExportAndOpen('docx')}>
-              <FileText className="h-4 w-4 mr-2" />
-              {t('editor.wordOpenDefault', { defaultValue: 'Word → 默认程序打开' })}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleExportAndOpen('html')}>
-              <FileText className="h-4 w-4 mr-2" />
-              {t('editor.htmlOpenDefault', { defaultValue: 'HTML → 默认浏览器打开' })}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
         <div className="w-px h-4 bg-border mx-0.5" />
 
         {/* ── 视图/工具组 ── */}
@@ -675,10 +573,10 @@ export function EditorPanel({
       </div>
       )}
 
-      {/* Editor Content / Plugin Area / Composer（三态互斥显示） */}
+      {/* Editor Content / Plugin Area / Composer / Functional（四态互斥显示） */}
       <div className="flex-1 min-h-0 overflow-hidden">
         {activeView === 'plugins' && document ? (
-          /* 插件区域 */
+          /* 内容插件区域 */
           <PluginToolArea
             document={document}
             tabId={tabId || ''}
@@ -692,6 +590,24 @@ export function EditorPanel({
               if (open && !chatOpen) onChatToggle?.();
               if (!open && chatOpen) onChatToggle?.();
             }}
+            filterCategory="content-generation"
+          />
+        ) : activeView === 'functional' && document ? (
+          /* 功能插件区域 */
+          <PluginToolArea
+            document={document}
+            tabId={tabId || ''}
+            aiContent={aiContent}
+            isMaximized={pluginMaximized}
+            onMaximizeToggle={() => setPluginMaximized(prev => !prev)}
+            leftSidebarOpen={sidebarOpen}
+            onLeftSidebarToggle={(open) => setSidebarOpen(open)}
+            rightSidebarOpen={chatOpen}
+            onRightSidebarToggle={(open) => {
+              if (open && !chatOpen) onChatToggle?.();
+              if (!open && chatOpen) onChatToggle?.();
+            }}
+            filterCategory="functional"
           />
         ) : activeView === 'composer' && document ? (
           /* 合并内容面板 */
@@ -766,6 +682,12 @@ export function EditorPanel({
                     editable={!isAiStreaming}
                     editorId={`ai-content-${document.id}`}
                     importSources={{ document }}
+                    exportCallbacks={{
+                      onNativeExport: handleNativeExport,
+                      onNativeExportComposed: handleNativeExportComposed,
+                      onExportAndOpen: handleExportAndOpen,
+                      composedContent,
+                    }}
                   />
                 </div>
               )}

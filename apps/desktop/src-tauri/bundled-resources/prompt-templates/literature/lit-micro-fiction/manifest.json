@@ -15,5 +15,9 @@
   "enabled": true,
   "source": "builtin",
   "createdAt": "2026-02-18T00:00:00Z",
-  "updatedAt": "2026-02-18T00:00:00Z"
+  "updatedAt": "2026-02-18T00:00:00Z",
+  "roles": [
+    "content-creator",
+    "student"
+  ]
 }

@@ -8,15 +8,21 @@
   "resourceType": "role",
   "majorCategory": "education",
   "subCategory": "learning",
-  "tags": ["学生", "论文", "学习", "student"],
+  "tags": [
+    "学生",
+    "论文",
+    "学习",
+    "student"
+  ],
   "order": 1,
   "enabled": true,
   "source": "builtin",
   "createdAt": "2026-02-18T00:00:00Z",
   "updatedAt": "2026-02-18T00:00:00Z",
-  "recommendedTemplateCategories": ["academic", "exam-grad", "exam-civil", "exam-abroad"],
-  "recommendedPlugins": ["summary", "mindmap"],
   "i18n": {
-    "en": { "name": "Student", "description": "Thesis writing, note organization, exam review, book reports" }
+    "en": {
+      "name": "Student",
+      "description": "Thesis writing, note organization, exam review, book reports"
+    }
   }
 }

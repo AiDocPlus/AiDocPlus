@@ -8,15 +8,22 @@
   "resourceType": "role",
   "majorCategory": "tech",
   "subCategory": "software",
-  "tags": ["程序员", "技术", "开发", "programmer", "developer"],
+  "tags": [
+    "程序员",
+    "技术",
+    "开发",
+    "programmer",
+    "developer"
+  ],
   "order": 0,
   "enabled": true,
   "source": "builtin",
   "createdAt": "2026-02-18T00:00:00Z",
   "updatedAt": "2026-02-18T00:00:00Z",
-  "recommendedTemplateCategories": ["tech"],
-  "recommendedPlugins": ["diagram", "diff"],
   "i18n": {
-    "en": { "name": "Programmer", "description": "Technical docs, API docs, code comments, architecture design" }
+    "en": {
+      "name": "Programmer",
+      "description": "Technical docs, API docs, code comments, architecture design"
+    }
   }
 }

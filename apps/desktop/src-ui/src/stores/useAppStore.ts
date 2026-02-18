@@ -1,11 +1,11 @@
 import { create } from 'zustand';
 import type { Project, Document, DocumentVersion, AIMessage, ChatContextMode, WorkspaceState, EditorTab, PluginManifest, TemplateManifest, TemplateCategory } from '@aidocplus/shared-types';
-import { getActiveRoleInstance, getInstanceSystemPrompt } from '@aidocplus/shared-types';
+import { getActiveRole } from '@aidocplus/shared-types';
 import { buildPluginList, setPlugins } from '@/plugins/registry';
 import { syncManifestsToBackend } from '@/plugins/loader';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { useSettingsStore, getAIInvokeParamsForService } from './useSettingsStore';
+import { useSettingsStore, getAIInvokeParams } from './useSettingsStore';
 import { isTauri } from '@/lib/isTauri';
 import i18n from '@/i18n';
 
@@ -15,12 +15,11 @@ function getMarkdownModePrompt(): string {
   return ai.markdownModePrompt || '';
 }
 
-// 角色 System Prompt：从当前激活角色实例获取
+// 角色 System Prompt：从当前激活角色获取
 function getRoleSystemPrompt(): string {
   const role = useSettingsStore.getState().role;
-  const instance = getActiveRoleInstance(role);
-  if (!instance) return '';
-  return getInstanceSystemPrompt(instance).trim();
+  const activeRole = getActiveRole(role);
+  return activeRole?.systemPrompt?.trim() || '';
 }
 
 // 标签页面板状态类型
@@ -110,8 +109,8 @@ interface AppState {
   setAiStreaming: (streaming: boolean, tabId?: string) => void;
   stopAiStreaming: () => void;
   sendChatMessage: (tabId: string, content: string, enableWebSearch?: boolean, contextInfo?: { mode: ChatContextMode; content: string }, enableTools?: boolean) => Promise<string>;
-  generateContent: (authorNotes: string, currentContent: string, aiServiceId?: string) => Promise<string>;
-  generateContentStream: (authorNotes: string, currentContent: string, onChunk: (chunk: string) => void, conversationHistory?: AIMessage[], enableWebSearch?: boolean, aiServiceId?: string) => Promise<string>;
+  generateContent: (authorNotes: string, currentContent: string) => Promise<string>;
+  generateContentStream: (authorNotes: string, currentContent: string, onChunk: (chunk: string) => void, conversationHistory?: AIMessage[], enableWebSearch?: boolean) => Promise<string>;
 
   // Plugin Actions
   updatePluginData: (documentId: string, pluginId: string, data: unknown) => void;
@@ -783,12 +782,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       }));
 
-      // 优先使用当前标签页文档绑定的 AI 服务，回退到全局
-      const currentDocForChat = (() => {
-        const tab = get().tabs.find(t => t.id === tabId);
-        return tab ? get().documents.find(d => d.id === tab.documentId) : undefined;
-      })();
-      const aiParams = getAIInvokeParamsForService(currentDocForChat?.aiServiceId);
+      const aiParams = getAIInvokeParams();
       await invoke<string>('chat_stream', {
         messages,
         ...aiParams,
@@ -826,12 +820,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  generateContent: async (authorNotes, currentContent, aiServiceId) => {
+  generateContent: async (authorNotes, currentContent) => {
     try {
       set({ isAiStreaming: true, error: null });
       // 注意：非流式模式下 aiStreamingTabId 由 ChatPanel 在调用前设置
 
-      const aiParams = getAIInvokeParamsForService(aiServiceId);
+      const aiParams = getAIInvokeParams();
       const generated = await invoke<string>('generate_content', {
         authorNotes,
         currentContent,
@@ -848,7 +842,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  generateContentStream: async (authorNotes, currentContent, onChunk, conversationHistory, enableWebSearch, aiServiceId) => {
+  generateContentStream: async (authorNotes, currentContent, onChunk, conversationHistory, enableWebSearch) => {
     const { aiStreamingTabId } = get();
     const tabId = aiStreamingTabId || 'default';
 
@@ -916,7 +910,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         content: msg.content
       }));
 
-      const aiParams = getAIInvokeParamsForService(aiServiceId);
+      const aiParams = getAIInvokeParams();
       const invokeParams = {
         authorNotes,
         currentContent,

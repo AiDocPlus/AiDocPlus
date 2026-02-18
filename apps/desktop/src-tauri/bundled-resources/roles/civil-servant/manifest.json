@@ -8,15 +8,21 @@
   "resourceType": "role",
   "majorCategory": "government",
   "subCategory": "official-doc",
-  "tags": ["公务员", "公文", "政务", "civil-servant"],
+  "tags": [
+    "公务员",
+    "公文",
+    "政务",
+    "civil-servant"
+  ],
   "order": 0,
   "enabled": true,
   "source": "builtin",
   "createdAt": "2026-02-18T00:00:00Z",
   "updatedAt": "2026-02-18T00:00:00Z",
-  "recommendedTemplateCategories": ["official", "speech", "business"],
-  "recommendedPlugins": ["email", "summary", "review"],
   "i18n": {
-    "en": { "name": "Civil Servant", "description": "Official documents, policy interpretation, meeting minutes, work reports" }
+    "en": {
+      "name": "Civil Servant",
+      "description": "Official documents, policy interpretation, meeting minutes, work reports"
+    }
   }
 }

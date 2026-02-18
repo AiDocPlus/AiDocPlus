@@ -82,7 +82,6 @@ pub fn save_template_from_document(
         enabled_plugins: document.enabled_plugins.clone().unwrap_or_default(),
         plugin_data: if includePluginData { document.plugin_data.clone() } else { None },
         min_app_version: None,
-        roles: vec![],
     };
 
     let content = TemplateContent {

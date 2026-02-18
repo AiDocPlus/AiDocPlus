@@ -8,15 +8,21 @@
   "resourceType": "role",
   "majorCategory": "media",
   "subCategory": "content",
-  "tags": ["自媒体", "文案", "短视频", "content-creator"],
+  "tags": [
+    "自媒体",
+    "文案",
+    "短视频",
+    "content-creator"
+  ],
   "order": 0,
   "enabled": true,
   "source": "builtin",
   "createdAt": "2026-02-18T00:00:00Z",
   "updatedAt": "2026-02-18T00:00:00Z",
-  "recommendedTemplateCategories": ["marketing", "creative"],
-  "recommendedPlugins": ["ppt", "publish"],
   "i18n": {
-    "en": { "name": "Content Creator", "description": "Viral copy, short video scripts, product reviews, blog posts" }
+    "en": {
+      "name": "Content Creator",
+      "description": "Viral copy, short video scripts, product reviews, blog posts"
+    }
   }
 }

@@ -4,7 +4,7 @@ import { useAppStore } from '@/stores/useAppStore';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from '../../i18n';
 import { useSettingsStore } from '../../stores/useSettingsStore';
-import { AI_PROVIDERS, getProviderConfig, EMAIL_PROVIDER_PRESETS, getEmailPreset } from '@aidocplus/shared-types';
+import { AI_PROVIDERS, getProviderConfig, EMAIL_PROVIDER_PRESETS, getEmailPreset, BUILT_IN_ROLES, getActiveRole } from '@aidocplus/shared-types';
 import type { AIProvider, AIServiceConfig, EmailAccountConfig } from '@aidocplus/shared-types';
 import { SUPPORTED_LANGUAGES, type SupportedLanguage, changeAppLanguage } from '../../i18n';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
@@ -16,7 +16,6 @@ import { Switch } from '../ui/switch';
 import { Slider } from '../ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Separator } from '../ui/separator';
-import { RolePanel } from './RolePanel';
 
 interface SettingsPanelProps {
   open: boolean;
@@ -36,10 +35,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
     updateUISettings,
     updateAISettings,
     updateEmailSettings,
-    createRoleInstance,
-    updateRoleInstance,
-    deleteRoleInstance,
-    setActiveInstance,
+    updateRoleSettings,
     resetSettings,
     exportSettings,
     importSettings,
@@ -435,15 +431,135 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
           <div className="flex-1 overflow-y-auto bg-card" id="settings-content">
             {/* Role */}
-            <TabsContent value="role" className="p-4 bg-card h-full">
-              <RolePanel
-                role={role}
-                onCreateInstance={createRoleInstance}
-                onUpdateInstance={updateRoleInstance}
-                onDeleteInstance={deleteRoleInstance}
-                onSetActive={setActiveInstance}
-                t={t}
-              />
+            <TabsContent value="role" className="space-y-6 p-4 bg-card h-full">
+              <div>
+                <h3 className="text-lg font-semibold mb-2">{t('settings.roleSettings.title', { defaultValue: '角色设定' })}</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {t('settings.roleSettings.description', { defaultValue: '选择一个职业角色，AI 将自动适配该角色的专业知识和写作风格。' })}
+                </p>
+                <Separator className="mb-4" />
+
+                {/* 当前角色 */}
+                <div className="mb-6">
+                  <Label className="text-sm font-medium mb-2 block">{t('settings.roleSettings.currentRole', { defaultValue: '当前角色' })}</Label>
+                  <div className="text-sm text-muted-foreground mb-3">
+                    {role.activeRoleId
+                      ? (() => { const r = getActiveRole(role); return r ? `${r.icon} ${r.name} — ${r.description}` : t('settings.roleSettings.noRole', { defaultValue: '未选择角色' }); })()
+                      : t('settings.roleSettings.noRole', { defaultValue: '未选择角色（使用通用模式）' })
+                    }
+                  </div>
+                </div>
+
+                {/* 内置角色卡片 */}
+                <Label className="text-sm font-medium mb-3 block">{t('settings.roleSettings.builtinRoles', { defaultValue: '内置角色' })}</Label>
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                  {BUILT_IN_ROLES.map((r) => (
+                    <button
+                      key={r.id}
+                      onClick={() => updateRoleSettings({ activeRoleId: role.activeRoleId === r.id ? '' : r.id })}
+                      className={`text-left p-3 rounded-lg border-2 transition-all hover:shadow-sm ${
+                        role.activeRoleId === r.id
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xl">{r.icon}</span>
+                        <span className="font-medium text-sm">{r.name}</span>
+                        {role.activeRoleId === r.id && (
+                          <Check className="w-4 h-4 text-primary ml-auto" />
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-2">{r.description}</p>
+                    </button>
+                  ))}
+                </div>
+
+                {/* 自定义角色 */}
+                {role.customRoles.length > 0 && (
+                  <>
+                    <Label className="text-sm font-medium mb-3 block">{t('settings.roleSettings.customRoles', { defaultValue: '自定义角色' })}</Label>
+                    <div className="grid grid-cols-2 gap-3 mb-6">
+                      {role.customRoles.map((r) => (
+                        <button
+                          key={r.id}
+                          onClick={() => updateRoleSettings({ activeRoleId: role.activeRoleId === r.id ? '' : r.id })}
+                          className={`text-left p-3 rounded-lg border-2 transition-all hover:shadow-sm ${
+                            role.activeRoleId === r.id
+                              ? 'border-primary bg-primary/5'
+                              : 'border-border hover:border-primary/50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xl">{r.icon}</span>
+                            <span className="font-medium text-sm">{r.name}</span>
+                            {role.activeRoleId === r.id && (
+                              <Check className="w-4 h-4 text-primary ml-auto" />
+                            )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const confirmed = window.confirm(t('settings.roleSettings.deleteConfirm', { defaultValue: '确定删除该自定义角色吗？' }));
+                                if (confirmed) {
+                                  updateRoleSettings({
+                                    customRoles: role.customRoles.filter(cr => cr.id !== r.id),
+                                    activeRoleId: role.activeRoleId === r.id ? '' : role.activeRoleId,
+                                  });
+                                }
+                              }}
+                              className="ml-auto p-1 hover:bg-destructive/10 rounded"
+                              title={t('common.delete', { defaultValue: '删除' })}
+                            >
+                              <Trash2 className="w-3 h-3 text-destructive" />
+                            </button>
+                          </div>
+                          <p className="text-xs text-muted-foreground line-clamp-2">{r.description}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                <Separator className="mb-4" />
+
+                {/* 角色 System Prompt 预览 */}
+                {role.activeRoleId && (() => {
+                  const activeRole = getActiveRole(role);
+                  if (!activeRole || !activeRole.systemPrompt) return null;
+                  return (
+                    <div className="mb-4">
+                      <Label className="text-sm font-medium mb-2 block">{t('settings.roleSettings.promptPreview', { defaultValue: '角色 System Prompt 预览' })}</Label>
+                      <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground whitespace-pre-wrap max-h-40 overflow-y-auto font-mono">
+                        {activeRole.systemPrompt}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {t('settings.roleSettings.promptNote', { defaultValue: '此 prompt 会自动拼接在您的自定义 System Prompt 之前，为 AI 建立职业身份基调。' })}
+                      </p>
+                    </div>
+                  );
+                })()}
+
+                {/* 推荐信息 */}
+                {role.activeRoleId && (() => {
+                  const activeRole = getActiveRole(role);
+                  if (!activeRole) return null;
+                  const hasRecommendations = (activeRole.recommendedTemplateCategories?.length ?? 0) > 0 || (activeRole.recommendedPlugins?.length ?? 0) > 0;
+                  if (!hasRecommendations) return null;
+                  return (
+                    <div className="mb-4">
+                      <Label className="text-sm font-medium mb-2 block">{t('settings.roleSettings.recommendations', { defaultValue: '角色推荐' })}</Label>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        {(activeRole.recommendedTemplateCategories?.length ?? 0) > 0 && (
+                          <p>📋 {t('settings.roleSettings.recommendedTemplates', { defaultValue: '推荐模板分类' })}：{activeRole.recommendedTemplateCategories?.join('、')}</p>
+                        )}
+                        {(activeRole.recommendedPlugins?.length ?? 0) > 0 && (
+                          <p>🧩 {t('settings.roleSettings.recommendedPlugins', { defaultValue: '推荐插件' })}：{activeRole.recommendedPlugins?.join('、')}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
             </TabsContent>
 
             {/* Plugins */}

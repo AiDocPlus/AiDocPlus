@@ -62,5 +62,7 @@
   "majorCategories": {
     "content-generation": "内容生成",
     "functional": "功能执行"
-  }
+  },
+  "functionalArea": "功能区",
+  "functionalToggle": "展开/收起功能插件区"
 }

@@ -346,6 +346,10 @@ div[role="dialog"] {
   animation: plugin-breathe 2s ease-in-out infinite !important;
 }
 
+.animate-functional-breathe {
+  animation: plugin-breathe 2s ease-in-out infinite !important;
+}
+
 /* pptx-preview 幻灯片居中 */
 .pptx-preview-wrapper {
   margin: 0 auto !important;

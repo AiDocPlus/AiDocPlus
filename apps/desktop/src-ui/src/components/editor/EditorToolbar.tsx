@@ -39,6 +39,8 @@ import {
   Columns,
   AArrowDown,
   AArrowUp,
+  Download,
+  ExternalLink,
 } from 'lucide-react';
 import React, { useState, useCallback } from 'react';
 import { EditorView } from '@codemirror/view';
@@ -182,6 +184,14 @@ function ToolbarButton({ active, onClick, icon, tooltip }: ToolbarButtonProps) {
 
 type ViewMode = 'edit' | 'preview' | 'split';
 
+/** 导出回调（从 EditorPanel 传入） */
+export interface ExportCallbacks {
+  onNativeExport: (format: string) => void;
+  onNativeExportComposed: (format: string) => void;
+  onExportAndOpen: (format: string, appName?: string) => void;
+  composedContent?: string;
+}
+
 interface EditorToolbarProps {
   cmViewRef: React.RefObject<EditorView | null>;
   outlineOpen?: boolean;
@@ -192,9 +202,10 @@ interface EditorToolbarProps {
   importSources?: ImportSources;
   fontSize?: number;
   onFontSizeChange?: (size: number) => void;
+  exportCallbacks?: ExportCallbacks;
 }
 
-export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMode, onViewModeChange, showViewModeSwitch, importSources, fontSize, onFontSizeChange }: EditorToolbarProps) {
+export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMode, onViewModeChange, showViewModeSwitch, importSources, fontSize, onFontSizeChange, exportCallbacks }: EditorToolbarProps) {
   const { t } = useTranslation();
   const tb = useSettingsStore((s) => s.editor.toolbarButtons) ?? {};
 
@@ -421,6 +432,117 @@ export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMod
           icon={<ListTree className="h-4 w-4" />}
           tooltip={outlineOpen ? t('editor.toolbar.closeOutline', { defaultValue: '关闭大纲' }) : t('editor.toolbar.openOutline', { defaultValue: '打开大纲' })}
         />
+      )}
+
+      {/* ── 9. 导出按钮 ── */}
+      {exportCallbacks && (
+        <>
+          <Sep left={[true]} right={[true]} />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex items-center justify-center h-7 w-7 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                title={t('editor.exportContent', { defaultValue: '导出正文' })}
+              >
+                <Download className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => exportCallbacks.onNativeExport('md')}>
+                <FileText className="h-4 w-4 mr-2" />
+                {t('editor.exportAsMd', { defaultValue: '导出为 Markdown (.md)' })}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportCallbacks.onNativeExport('html')}>
+                <FileText className="h-4 w-4 mr-2" />
+                {t('editor.exportAsHtml', { defaultValue: '导出为 HTML (.html)' })}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportCallbacks.onNativeExport('docx')}>
+                <FileText className="h-4 w-4 mr-2" />
+                {t('editor.exportAsDocx', { defaultValue: '导出为 Word (.docx)' })}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportCallbacks.onNativeExport('pdf')}>
+                <FileText className="h-4 w-4 mr-2" />
+                {t('editor.exportAsPdf', { defaultValue: '导出为 PDF (.pdf)' })}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportCallbacks.onNativeExport('txt')}>
+                <FileText className="h-4 w-4 mr-2" />
+                {t('editor.exportAsTxt', { defaultValue: '导出为纯文本 (.txt)' })}
+              </DropdownMenuItem>
+              {exportCallbacks.composedContent?.trim() && (
+                <>
+                  <DropdownMenuSeparator />
+                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                    {t('editor.exportComposed', { defaultValue: '导出合并内容' })}
+                  </div>
+                  <DropdownMenuItem onClick={() => exportCallbacks.onNativeExportComposed('md')}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    {t('editor.composedMd', { defaultValue: '合并内容 → Markdown' })}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => exportCallbacks.onNativeExportComposed('html')}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    {t('editor.composedHtml', { defaultValue: '合并内容 → HTML' })}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => exportCallbacks.onNativeExportComposed('docx')}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    {t('editor.composedDocx', { defaultValue: '合并内容 → Word' })}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => exportCallbacks.onNativeExportComposed('pdf')}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    {t('editor.composedPdf', { defaultValue: '合并内容 → PDF' })}
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex items-center justify-center h-7 w-7 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                title={t('editor.exportAndOpen', { defaultValue: '导出并用外部程序打开' })}
+              >
+                <ExternalLink className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => exportCallbacks.onExportAndOpen('docx', 'WPS Office')}>
+                <FileText className="h-4 w-4 mr-2" />
+                {t('editor.wordOpenWps', { defaultValue: 'Word → WPS 打开' })}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportCallbacks.onExportAndOpen('docx', 'Microsoft Word')}>
+                <FileText className="h-4 w-4 mr-2" />
+                {t('editor.wordOpenWord', { defaultValue: 'Word → Word 打开' })}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => exportCallbacks.onExportAndOpen('html', 'Microsoft Edge')}>
+                <FileText className="h-4 w-4 mr-2" />
+                {t('editor.htmlOpenEdge', { defaultValue: 'HTML → Edge 打开' })}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportCallbacks.onExportAndOpen('html', 'Google Chrome')}>
+                <FileText className="h-4 w-4 mr-2" />
+                {t('editor.htmlOpenChrome', { defaultValue: 'HTML → Chrome 打开' })}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportCallbacks.onExportAndOpen('html', 'Safari')}>
+                <FileText className="h-4 w-4 mr-2" />
+                {t('editor.htmlOpenSafari', { defaultValue: 'HTML → Safari 打开' })}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => exportCallbacks.onExportAndOpen('md')}>
+                <FileText className="h-4 w-4 mr-2" />
+                {t('editor.mdOpenDefault', { defaultValue: 'Markdown → 默认程序打开' })}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportCallbacks.onExportAndOpen('docx')}>
+                <FileText className="h-4 w-4 mr-2" />
+                {t('editor.wordOpenDefault', { defaultValue: 'Word → 默认程序打开' })}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => exportCallbacks.onExportAndOpen('html')}>
+                <FileText className="h-4 w-4 mr-2" />
+                {t('editor.htmlOpenDefault', { defaultValue: 'HTML → 默认浏览器打开' })}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </>
       )}
 
       {/* ── 视图模式切换（右侧） ── */}

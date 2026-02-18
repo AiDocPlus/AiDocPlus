@@ -148,16 +148,18 @@ interface PluginToolAreaProps {
   leftSidebarOpen?: boolean;
   /** 右侧侧边栏当前是否打开 */
   rightSidebarOpen?: boolean;
+  /** 过滤显示的插件大类，不传则显示全部 */
+  filterCategory?: 'content-generation' | 'functional';
 }
 
 /**
  * 插件工具区：顶部插件标签栏 + 当前插件面板 / 管理面板
  */
-export function PluginToolArea({ document, tabId, aiContent, isMaximized, onMaximizeToggle, onLeftSidebarToggle, onRightSidebarToggle, leftSidebarOpen, rightSidebarOpen }: PluginToolAreaProps) {
+export function PluginToolArea({ document, tabId, aiContent, isMaximized, onMaximizeToggle, onLeftSidebarToggle, onRightSidebarToggle, leftSidebarOpen, rightSidebarOpen, filterCategory }: PluginToolAreaProps) {
   // 记住最大化前的侧边栏状态，以便恢复
   const sidebarStateBeforeMaximize = useRef<{ left: boolean; right: boolean } | null>(null);
   const { t } = useTranslation('plugin-framework');
-  const { updatePluginData, markTabAsDirty, updateDocumentEnabledPlugins, saveDocument, setTabPanelState } = useAppStore();
+  const { updatePluginData, markTabAsDirty, updateDocumentEnabledPlugins, saveDocument, setTabPanelState, pluginManifests } = useAppStore();
   const savedActivePluginId = useAppStore(s => s.tabs.find(tab => tab.id === tabId)?.panelState?.activePluginId);
   const { incrementPluginUsage } = useSettingsStore();
 
@@ -182,7 +184,15 @@ export function PluginToolArea({ document, tabId, aiContent, isMaximized, onMaxi
     pluginTabsRef.current?.scrollBy({ left: 150, behavior: 'smooth' });
   }, []);
 
-  const docPlugins = useMemo(() => getPluginsForDocument(document), [document]);
+  const allDocPlugins = useMemo(() => getPluginsForDocument(document), [document]);
+  const docPlugins = useMemo(() => {
+    if (!filterCategory) return allDocPlugins;
+    return allDocPlugins.filter(p => {
+      const m = pluginManifests.find(m => m.id === p.id);
+      const cat = m?.majorCategory || p.majorCategory || 'content-generation';
+      return cat === filterCategory;
+    });
+  }, [allDocPlugins, filterCategory, pluginManifests]);
   const allPlugins = useMemo(() => getAllPlugins(), []);
 
   // 标签数量变化时重新检查滚动状态
@@ -279,7 +289,16 @@ export function PluginToolArea({ document, tabId, aiContent, isMaximized, onMaxi
     onMaximizeToggle?.();
   }, [isMaximized, leftSidebarOpen, rightSidebarOpen, onLeftSidebarToggle, onRightSidebarToggle, onMaximizeToggle]);
 
-  if (allPlugins.length === 0) return null;
+  const visibleAllPlugins = useMemo(() => {
+    if (!filterCategory) return allPlugins;
+    return allPlugins.filter(p => {
+      const m = pluginManifests.find(m => m.id === p.id);
+      const cat = m?.majorCategory || p.majorCategory || 'content-generation';
+      return cat === filterCategory;
+    });
+  }, [allPlugins, filterCategory, pluginManifests]);
+
+  if (visibleAllPlugins.length === 0) return null;
 
   return (
     <div className="flex flex-col h-full border-t">
@@ -378,6 +397,7 @@ export function PluginToolArea({ document, tabId, aiContent, isMaximized, onMaxi
             enabledPluginIds={document.enabledPlugins}
             onEnabledPluginsChange={handleEnabledPluginsChange}
             onClose={() => setShowManager(false)}
+            filterCategory={filterCategory}
           />
         ) : activePlugin ? (
           <PluginErrorBoundary pluginId={activePlugin.id}>

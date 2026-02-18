@@ -80,6 +80,7 @@ interface MarkdownEditorProps {
   editorClassName?: string;
   editorId?: string;
   importSources?: ImportSources;
+  exportCallbacks?: import('./EditorToolbar').ExportCallbacks;
 }
 
 // 创建一组 Compartment 实例（每个编辑器实例独立）
@@ -116,6 +117,7 @@ export function MarkdownEditor({
   onCursorLineChange,
   editorId: _editorId,
   importSources,
+  exportCallbacks,
 }: MarkdownEditorProps) {
   const editorDivRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -488,6 +490,7 @@ export function MarkdownEditor({
             importSources={importSources}
             fontSize={localFontSize}
             onFontSizeChange={setLocalFontSize}
+            exportCallbacks={exportCallbacks}
           />
         </div>
       )}

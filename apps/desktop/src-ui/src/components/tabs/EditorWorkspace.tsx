@@ -17,7 +17,7 @@ export function EditorWorkspace({ tab }: EditorWorkspaceProps) {
   const [aiContent, setAiContent] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [composedContent, setComposedContent] = useState('');
-  const [activeView, setActiveView] = useState<'editor' | 'plugins' | 'composer'>('editor');
+  const [activeView, setActiveView] = useState<'editor' | 'plugins' | 'composer' | 'functional'>('editor');
 
   const tabLayoutMode = tab.panelState.layoutMode ?? 'vertical';
   const tabChatPanelWidth = tab.panelState.chatPanelWidth ?? 320;
@@ -158,7 +158,7 @@ export function EditorWorkspace({ tab }: EditorWorkspaceProps) {
             key={`chat-${tab.id}-${activeView}`}
             tabId={activeView === 'editor' ? tab.id : `${tab.id}::${activeView}`}
             onClose={() => handlePanelToggle('chatOpen', false)}
-            simpleMode={activeView !== 'editor'}
+            simpleMode={activeView === 'plugins' || activeView === 'composer' || activeView === 'functional'}
           />
         </div>
       )}

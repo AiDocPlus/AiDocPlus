@@ -8,15 +8,21 @@
   "resourceType": "role",
   "majorCategory": "marketing",
   "subCategory": "copywriting",
-  "tags": ["营销", "文案", "品牌", "marketing"],
+  "tags": [
+    "营销",
+    "文案",
+    "品牌",
+    "marketing"
+  ],
   "order": 0,
   "enabled": true,
   "source": "builtin",
   "createdAt": "2026-02-18T00:00:00Z",
   "updatedAt": "2026-02-18T00:00:00Z",
-  "recommendedTemplateCategories": ["marketing", "business", "event"],
-  "recommendedPlugins": ["ppt", "email"],
   "i18n": {
-    "en": { "name": "Marketing Specialist", "description": "Marketing plans, brand copy, data reports, event proposals" }
+    "en": {
+      "name": "Marketing Specialist",
+      "description": "Marketing plans, brand copy, data reports, event proposals"
+    }
   }
 }

@@ -62,5 +62,7 @@
   "majorCategories": {
     "content-generation": "Content Generation",
     "functional": "Functional"
-  }
+  },
+  "functionalArea": "Functional",
+  "functionalToggle": "Toggle functional plugin area"
 }

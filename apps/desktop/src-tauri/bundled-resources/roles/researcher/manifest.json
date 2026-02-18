@@ -8,15 +8,22 @@
   "resourceType": "role",
   "majorCategory": "academic",
   "subCategory": "research",
-  "tags": ["学术", "研究", "论文", "researcher", "academic"],
+  "tags": [
+    "学术",
+    "研究",
+    "论文",
+    "researcher",
+    "academic"
+  ],
   "order": 0,
   "enabled": true,
   "source": "builtin",
   "createdAt": "2026-02-18T00:00:00Z",
   "updatedAt": "2026-02-18T00:00:00Z",
-  "recommendedTemplateCategories": ["academic"],
-  "recommendedPlugins": ["analytics", "summary"],
   "i18n": {
-    "en": { "name": "Researcher", "description": "Academic writing, literature review, research proposals, data analysis reports" }
+    "en": {
+      "name": "Researcher",
+      "description": "Academic writing, literature review, research proposals, data analysis reports"
+    }
   }
 }

@@ -20,6 +20,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - platform: macos-latest
+            args: --target aarch64-apple-darwin
+            target: aarch64-apple-darwin
+            artifact: dmg
           - platform: windows-latest
             args: --target x86_64-pc-windows-msvc
             target: x86_64-pc-windows-msvc
@@ -118,8 +122,8 @@ jobs:
             ## AiDocPlus __VERSION__
 
             ### 下载
+            - **macOS (Apple Silicon)**: .dmg 文件
             - **Windows (x64)**: .exe 安装程序（兼容 ARM64 设备）
-            - **macOS (Apple Silicon)**: 请访问官网下载
 
             ### 更新说明
             请查看 CHANGELOG.md 获取详细更新内容。
