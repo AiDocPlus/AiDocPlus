@@ -175,17 +175,21 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
 
   const settingsStore = useSettingsStore();
 
-  // 获取当前 provider 的能力声明
-  const activeService = getActiveService(settingsStore.ai);
-  const providerConfig = activeService ? getProviderConfig(activeService.provider) : undefined;
-  const supportsWebSearch = providerConfig?.capabilities?.webSearch ?? false;
-  const supportsFunctionCalling = providerConfig?.capabilities?.functionCalling ?? false;
-
   // 获取当前标签对应的文档
   const currentTab = tabs.find(tab => tab.id === tabId);
   const currentDocument = currentTab
     ? useAppStore.getState().documents.find(d => d.id === currentTab.documentId)
     : null;
+
+  // 获取当前文档绑定的服务（优先）或全局服务，用于能力声明
+  const docAiServiceId = currentDocument?.aiServiceId;
+  const effectiveService = docAiServiceId
+    ? settingsStore.ai.services.find(s => s.id === docAiServiceId && s.enabled) ?? getActiveService(settingsStore.ai)
+    : getActiveService(settingsStore.ai);
+  const activeService = effectiveService;
+  const providerConfig = activeService ? getProviderConfig(activeService.provider) : undefined;
+  const supportsWebSearch = providerConfig?.capabilities?.webSearch ?? false;
+  const supportsFunctionCalling = providerConfig?.capabilities?.functionCalling ?? false;
 
   const [input, setInput] = useState('');
   const [showAuthorNotes, setShowAuthorNotes] = useState(true);
@@ -449,7 +453,8 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
             }
           },
           [],  // 内容生成与聊天独立，不传聊天历史
-          webSearch
+          webSearch,
+          currentDocument?.aiServiceId
         );
 
         // 清除可能残留的定时器
@@ -499,7 +504,8 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
         // Non-streaming mode
         const rawGenerated = await generateContent(
           notesToUse,
-          contentForAI
+          contentForAI,
+          currentDocument?.aiServiceId
         );
 
         // 解析 <think> 标签：分离思考内容和正文内容
@@ -613,13 +619,14 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
               </span>
             );
           })()}
-          {/* AI 服务快速切换 */}
+          {/* AI 服务快速切换（文档级） */}
           {(() => {
             const services = settingsStore.ai.services.filter((s: AIServiceConfig) => s.enabled);
             if (services.length === 0) return null;
             const current = activeService;
+            const isDocBound = !!(currentDocument && currentDocument.aiServiceId);
             const currentLabel = current ? (current.name || current.model || current.provider) : t('chat.configureApiWarning', { defaultValue: '⚠️ 请先配置 API 服务' });
-            if (services.length <= 1) {
+            if (services.length <= 1 && !isDocBound) {
               return (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground flex items-center gap-1 truncate max-w-[140px]" title={currentLabel}>
                   <Bot className="h-3 w-3 flex-shrink-0" />
@@ -630,22 +637,55 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
             return (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="text-xs px-2 py-0.5 rounded-full bg-muted hover:bg-muted/80 text-muted-foreground flex items-center gap-1 truncate max-w-[160px] transition-colors" title={t('chat.switchService', { defaultValue: '切换 AI 服务' })}>
+                  <button
+                    className={`text-xs px-2 py-0.5 rounded-full hover:bg-muted/80 flex items-center gap-1 truncate max-w-[160px] transition-colors ${
+                      isDocBound ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' : 'bg-muted text-muted-foreground'
+                    }`}
+                    title={t('chat.switchService', { defaultValue: '切换 AI 服务（当前文档）' })}
+                  >
                     <Bot className="h-3 w-3 flex-shrink-0" />
                     <span className="truncate">{currentLabel}</span>
                     <ChevronDown className="h-3 w-3 flex-shrink-0 opacity-60" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
-                  <DropdownMenuLabel className="text-xs">{t('chat.selectService', { defaultValue: '选择 AI 服务' })}</DropdownMenuLabel>
+                <DropdownMenuContent align="start" className="w-60">
+                  <DropdownMenuLabel className="text-xs">{t('chat.docAiService', { defaultValue: '当前文档 AI 服务' })}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {/* 使用全局默认 */}
+                  <DropdownMenuItem
+                    onClick={() => {
+                      if (currentDocument && currentTab) {
+                        updateDocumentInMemory(currentTab.documentId, { aiServiceId: undefined });
+                      }
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    {!isDocBound ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                    ) : (
+                      <span className="w-3.5" />
+                    )}
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm">{t('chat.globalDefault', { defaultValue: '全局默认' })}</span>
+                      <span className="text-xs text-muted-foreground truncate">
+                        {(() => { const gs = getActiveService(settingsStore.ai); return gs ? (gs.name || gs.model || gs.provider) : t('chat.noService', { defaultValue: '未配置' }); })()}
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   {services.map((svc: AIServiceConfig) => (
                     <DropdownMenuItem
                       key={svc.id}
-                      onClick={() => settingsStore.updateAISettings({ activeServiceId: svc.id })}
+                      onClick={() => {
+                        if (currentDocument && currentTab) {
+                          updateDocumentInMemory(currentTab.documentId, { aiServiceId: svc.id });
+                        } else {
+                          settingsStore.updateAISettings({ activeServiceId: svc.id });
+                        }
+                      }}
                       className="flex items-center gap-2"
                     >
-                      {svc.id === settingsStore.ai.activeServiceId ? (
+                      {svc.id === (currentDocument?.aiServiceId || settingsStore.ai.activeServiceId) ? (
                         <CheckCircle2 className="h-3.5 w-3.5 text-primary flex-shrink-0" />
                       ) : (
                         <span className="w-3.5" />

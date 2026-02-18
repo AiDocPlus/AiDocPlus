@@ -7,10 +7,12 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
 import type { EditorView } from '@codemirror/view';
+import type { ViewUpdate } from '@codemirror/view';
 import { LanguageDescription } from '@codemirror/language';
 import { languages } from '@codemirror/language-data';
+import type { ReactCodeMirrorProps } from '@uiw/react-codemirror';
 
-const CodeMirror = lazy(() => import('@uiw/react-codemirror'));
+const CodeMirror = lazy(() => import('@uiw/react-codemirror')) as React.ComponentType<ReactCodeMirrorProps>;
 const EditorToolbar = lazy(() => import('@/components/editor/EditorToolbar').then(m => ({ default: m.EditorToolbar })));
 
 /** 根据内容启发式检测语言名称 */
@@ -474,8 +476,8 @@ export function PluginPanelLayout({
                 height="55vh"
                 extensions={langExtensions}
                 basicSetup={{ lineNumbers: true, foldGutter: true, highlightActiveLine: true }}
-                onCreateEditor={(view) => { sourceCmViewRef.current = view; }}
-                onUpdate={(viewUpdate) => {
+                onCreateEditor={(view: EditorView) => { sourceCmViewRef.current = view; }}
+                onUpdate={(viewUpdate: ViewUpdate) => {
                   if (!viewUpdate.selectionSet && !viewUpdate.docChanged) return;
                   const state = viewUpdate.state;
                   const pos = state.selection.main.head;

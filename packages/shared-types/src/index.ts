@@ -582,6 +582,10 @@ export interface UserRole {
   suggestedTemperature?: number;
   /** 可选：推荐的 AI maxTokens */
   suggestedMaxTokens?: number;
+  /** 可选：推荐的模板分类 */
+  recommendedTemplateCategories?: string[];
+  /** 可选：推荐的插件 ID 列表 */
+  recommendedPlugins?: string[];
 }
 
 /** 角色实例：用户基于角色模板创建的可定制配置方案 */

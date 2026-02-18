@@ -5,7 +5,7 @@ import { buildPluginList, setPlugins } from '@/plugins/registry';
 import { syncManifestsToBackend } from '@/plugins/loader';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { useSettingsStore, getAIInvokeParams } from './useSettingsStore';
+import { useSettingsStore, getAIInvokeParamsForService } from './useSettingsStore';
 import { isTauri } from '@/lib/isTauri';
 import i18n from '@/i18n';
 
@@ -110,8 +110,8 @@ interface AppState {
   setAiStreaming: (streaming: boolean, tabId?: string) => void;
   stopAiStreaming: () => void;
   sendChatMessage: (tabId: string, content: string, enableWebSearch?: boolean, contextInfo?: { mode: ChatContextMode; content: string }, enableTools?: boolean) => Promise<string>;
-  generateContent: (authorNotes: string, currentContent: string) => Promise<string>;
-  generateContentStream: (authorNotes: string, currentContent: string, onChunk: (chunk: string) => void, conversationHistory?: AIMessage[], enableWebSearch?: boolean) => Promise<string>;
+  generateContent: (authorNotes: string, currentContent: string, aiServiceId?: string) => Promise<string>;
+  generateContentStream: (authorNotes: string, currentContent: string, onChunk: (chunk: string) => void, conversationHistory?: AIMessage[], enableWebSearch?: boolean, aiServiceId?: string) => Promise<string>;
 
   // Plugin Actions
   updatePluginData: (documentId: string, pluginId: string, data: unknown) => void;
@@ -783,7 +783,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       }));
 
-      const aiParams = getAIInvokeParams();
+      // 优先使用当前标签页文档绑定的 AI 服务，回退到全局
+      const currentDocForChat = (() => {
+        const tab = get().tabs.find(t => t.id === tabId);
+        return tab ? get().documents.find(d => d.id === tab.documentId) : undefined;
+      })();
+      const aiParams = getAIInvokeParamsForService(currentDocForChat?.aiServiceId);
       await invoke<string>('chat_stream', {
         messages,
         ...aiParams,
@@ -821,12 +826,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  generateContent: async (authorNotes, currentContent) => {
+  generateContent: async (authorNotes, currentContent, aiServiceId) => {
     try {
       set({ isAiStreaming: true, error: null });
       // 注意：非流式模式下 aiStreamingTabId 由 ChatPanel 在调用前设置
 
-      const aiParams = getAIInvokeParams();
+      const aiParams = getAIInvokeParamsForService(aiServiceId);
       const generated = await invoke<string>('generate_content', {
         authorNotes,
         currentContent,
@@ -843,7 +848,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  generateContentStream: async (authorNotes, currentContent, onChunk, conversationHistory, enableWebSearch) => {
+  generateContentStream: async (authorNotes, currentContent, onChunk, conversationHistory, enableWebSearch, aiServiceId) => {
     const { aiStreamingTabId } = get();
     const tabId = aiStreamingTabId || 'default';
 
@@ -911,7 +916,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         content: msg.content
       }));
 
-      const aiParams = getAIInvokeParams();
+      const aiParams = getAIInvokeParamsForService(aiServiceId);
       const invokeParams = {
         authorNotes,
         currentContent,
