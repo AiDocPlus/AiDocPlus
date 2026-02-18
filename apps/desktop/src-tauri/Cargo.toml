@@ -32,6 +32,23 @@ quick-xml = "0.36"
 rusqlite = { version = "0.31", features = ["bundled"] }
 sha2 = "0.10"
 
+# 本地开发构建：快速编译，重在测试
+[profile.dev]
+incremental = true
+opt-level = 0
+
+# 本地开发时依赖库用 opt-level 1，避免运行太慢
+[profile.dev.package."*"]
+opt-level = 1
+
+# 发布构建：完全优化
+[profile.release]
+incremental = false
+lto = "thin"
+opt-level = 2
+strip = true
+codegen-units = 1
+
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
