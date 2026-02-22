@@ -6,6 +6,7 @@ import { isTauri } from '@/lib/isTauri';
 export function useWorkspaceAutosave() {
   const saveWorkspaceRef = useRef<(() => Promise<void>) | null>(null);
   const isRestoringRef = useRef(false);
+  const isClosingRef = useRef(false);
 
   // 更新 ref 引用
   useEffect(() => {
@@ -25,23 +26,25 @@ export function useWorkspaceAutosave() {
         return;
       }
 
+      // 防止 close() 再次触发 onCloseRequested 导致死循环
+      if (isClosingRef.current) {
+        return;
+      }
+
       event.preventDefault(); // 阻止默认关闭行为
+      isClosingRef.current = true;
 
       try {
         // 保存工作区状态
         if (saveWorkspaceRef.current) {
           await saveWorkspaceRef.current();
         }
-
-        // 延迟关闭以确保保存完成
-        setTimeout(() => {
-          getCurrentWindow().close();
-        }, 100);
       } catch (error) {
         console.error('[Workspace] Failed to save on close:', error);
-        // 即使保存失败也允许关闭
-        getCurrentWindow().close();
       }
+
+      // 保存完成后关闭窗口（使用 destroy 彻底关闭，避免再次触发事件）
+      getCurrentWindow().destroy();
     });
 
     return () => {

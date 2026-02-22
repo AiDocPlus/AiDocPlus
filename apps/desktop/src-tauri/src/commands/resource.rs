@@ -176,7 +176,17 @@ pub fn open_resource_manager(managerName: String) -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
-        let exe_path = managers_dir.join(format!("{}.exe", managerName));
+        // Windows 上 exe 文件名基于 Cargo package.name（英文），不是 productName（中文）
+        let exe_name = match managerName.as_str() {
+            "提示词模板管理器" => "prompt-templates-manager.exe",
+            "项目模板管理器" => "project-templates-manager.exe",
+            "文档模板管理器" => "doc-templates-manager.exe",
+            "角色管理器" => "roles-manager.exe",
+            "AI服务商管理器" => "ai-providers-manager.exe",
+            "插件管理器" => "plugins-manager.exe",
+            _ => return Err(format!("未知管理器: {}", managerName)),
+        };
+        let exe_path = managers_dir.join(exe_name);
         if !exe_path.exists() {
             return Err(format!("管理器未找到: {}", exe_path.display()));
         }
