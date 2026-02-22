@@ -169,21 +169,14 @@ jobs:
           cd AiDocPlus-ResourceManager
           pnpm install
 
-          # Build all manager frontends
+          # Build each manager with tauri build (embeds frontend dist into exe)
           MANAGERS="roles-manager ai-providers-manager prompt-templates-manager project-templates-manager doc-templates-manager plugins-manager"
-          for mgr in $MANAGERS; do
-            echo "[frontend] $mgr"
-            (cd apps/$mgr && npx vite build src-ui)
-          done
-
-          # Cargo workspace build (shared deps compiled once)
-          echo "[cargo] Building all managers..."
-          cargo build --release --target x86_64-pc-windows-msvc
-
-          # Copy exe files to bundled-resources/managers/
           TARGET_DIR="../AiDocPlus/apps/desktop/src-tauri/bundled-resources/managers"
           mkdir -p "$TARGET_DIR"
+
           for mgr in $MANAGERS; do
+            echo "[tauri build] $mgr"
+            (cd apps/$mgr && npx tauri build --target x86_64-pc-windows-msvc 2>&1 | tail -5)
             cp "target/x86_64-pc-windows-msvc/release/${mgr}.exe" "$TARGET_DIR/"
             echo "   [copy] ${mgr}.exe"
           done
