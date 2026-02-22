@@ -1,112 +1,121 @@
-# AiDocPlus - AI Document Editor
+<div align="center">
 
-A cross-platform AI document editor built with Tauri and React.
+# AiDocPlus
 
-Official Website: https://aidocplus.com
+**AI 驱动的跨平台文档桌面编辑器**
 
-## Status
+基于 Tauri 2 + React 19 构建，支持 macOS 和 Windows
 
-✅ **Initial Implementation Complete**
+[![Release](https://img.shields.io/github/v/release/AiDocPlus/AiDocPlus?style=flat-square)](https://github.com/AiDocPlus/AiDocPlus/releases)
+[![License](https://img.shields.io/github/license/AiDocPlus/AiDocPlus?style=flat-square)](LICENSE)
 
-The project has been successfully set up with the following features:
+[官网](https://aidocplus.github.io/AiDocPlus/) · [下载](https://github.com/AiDocPlus/AiDocPlus/releases) · [源码](https://github.com/AiDocPlus/AiDocPlus-Main)
 
-### Implemented Features
+</div>
 
-#### Core Architecture
-- ✅ **Monorepo Structure**: Turborepo-based monorepo with shared packages
-- ✅ **Tauri 2.x Backend**: Rust backend with all IPC commands
-- ✅ **React 19 Frontend**: TypeScript frontend with modern tooling
-- ✅ **Three-Panel Layout**: File tree, editor, and AI chat panels
+---
 
-#### Backend (Rust)
-- ✅ File system commands (read directory, file operations)
-- ✅ Project management (create, open, save, delete, list)
-- ✅ Document management (create, save, delete, get, list)
-- ✅ Version control (create, list versions)
-- ✅ Export functionality (Markdown, HTML, Text, JSON)
+## 功能概览
 
-#### Frontend (React)
-- ✅ Main layout with collapsible panels
-- ✅ File tree component with project/document navigation
-- ✅ Document editor with author notes and content sections
-- ✅ AI chat panel interface
-- ✅ Zustand state management
-- ✅ Dark mode support
+### AI 能力
+- **AI 内容生成** — 流式生成，支持停止，附件参考，982 个提示词模板（46 个分类）
+- **AI 聊天** — 流式对话，联网搜索，支持 OpenAI 兼容 API、智谱 GLM 等 13 个 AI 提供商
+- **AI 插件** — 21 个外部插件，涵盖摘要、翻译、PPT、图表、测试题、教案、表格等
 
-#### Shared Packages
-- ✅ `@aidocplus/shared-types`: Common TypeScript types
-- ✅ `@aidocplus/utils`: Utility functions
+### 编辑器
+- **Markdown 编辑** — CodeMirror 6，语法高亮、代码折叠、自动补全、实时预览
+- **三面板布局** — 文件树 + 编辑器（原始/AI 双栏）+ AI 聊天面板
+- **多标签页** — 同时编辑多个文档，每个标签页独立面板状态
+- **版本控制** — 自动版本保存，版本预览和恢复
 
-### Project Structure
+### 文档管理
+- **多项目管理** — 项目 CRUD，文档标签与收藏
+- **多格式导出** — Markdown、HTML、DOCX、TXT、PDF（原生 + Pandoc）
+- **20 个内置项目模板** — 学术、商务、技术、创意、教育、政务、通用 7 大类
+- **工作区自动保存** — 标签页、面板布局、项目状态持久化
 
-```
-aidocplus/
-├── apps/
-│   └── desktop/
-│       ├── src-tauri/          # Tauri backend (Rust)
-│       │   ├── src/
-│       │   │   ├── main.rs
-│       │   │   ├── commands/    # IPC command handlers
-│       │   │   ├── ai.rs        # AI HTTP & streaming
-│       │   │   ├── document.rs
-│       │   │   ├── plugin.rs    # Plugin manifest sync & management
-│       │   │   └── ...
-│       │   └── Cargo.toml
-│       └── src-ui/             # React frontend
-│           ├── src/
-│           │   ├── components/  # UI components (editor, chat, file-tree, tabs, settings)
-│           │   ├── plugins/     # Plugin system (21 external plugins, auto-discovery)
-│           │   │   ├── _framework/  # Plugin SDK
-│           │   │   ├── pluginStore.ts  # Plugin registry (registerPlugin)
-│           │   │   ├── loader.ts       # Auto-discovery (import.meta.glob)
-│           │   │   └── {name}/         # Individual plugins (manifest.json + index.ts + Panel)
-│           │   ├── stores/      # State management (Zustand)
-│           │   └── i18n/        # Internationalization
-│           └── package.json
-├── packages/
-│   ├── shared-types/           # Shared TypeScript types
-│   └── utils/                  # Utility functions
-├── docs/
-│   └── plugin-sdk/             # Plugin SDK documentation & examples
-└── turbo.json
-```
+### 插件系统
 
-### Development
+全外部插件架构，21 个插件通过自注册 + 自动发现机制加载：
+
+| 类别 | 插件 |
+|------|------|
+| **内容生成类** | 摘要、PPT、测试题、思维导图、翻译、平行翻译、图表、统计、教案、表格、时间线、审阅、写作统计 |
+| **功能执行类** | 邮件、文档对比、加密、水印、TTS 朗读、Office 预览、Pandoc 导出、发布 |
+
+### 资源管理
+
+6 个独立的资源管理器桌面应用，可视化管理所有内置资源：
+
+- 角色管理器 · AI 服务商管理器 · 提示词模板管理器
+- 项目模板管理器 · 文档模板管理器 · 插件管理器
+
+---
+
+## 下载安装
+
+从 [GitHub Releases](https://github.com/AiDocPlus/AiDocPlus/releases) 下载最新版本：
+
+| 平台 | 格式 | 架构 |
+|------|------|------|
+| macOS | `.dmg` | Apple Silicon (aarch64) |
+| Windows | `.exe` (NSIS 安装包) | x64 |
+
+---
+
+## 技术栈
+
+| 层 | 技术 |
+|----|------|
+| **桌面框架** | Tauri 2.x |
+| **前端** | React 19 + TypeScript 5.8+ |
+| **状态管理** | Zustand |
+| **UI** | Radix UI + Tailwind CSS 4 |
+| **编辑器** | CodeMirror 6 |
+| **构建** | Vite 7 + Turborepo + pnpm |
+| **后端** | Rust（文件系统、AI 流式、导出、资源引擎） |
+| **国际化** | i18next（中文/英文） |
+
+---
+
+## 多仓库架构
+
+AiDocPlus 采用多仓库架构，资源数据外部化到独立仓库：
+
+| 仓库 | 说明 |
+|------|------|
+| [AiDocPlus-Main](https://github.com/AiDocPlus/AiDocPlus-Main) | 主程序源码 |
+| [AiDocPlus-Roles](https://github.com/AiDocPlus/AiDocPlus-Roles) | 10 个内置角色 |
+| [AiDocPlus-PromptTemplates](https://github.com/AiDocPlus/AiDocPlus-PromptTemplates) | 982 个提示词模板（46 分类） |
+| [AiDocPlus-AIProviders](https://github.com/AiDocPlus/AiDocPlus-AIProviders) | 13 个 AI 提供商 |
+| [AiDocPlus-DocTemplates](https://github.com/AiDocPlus/AiDocPlus-DocTemplates) | PPT 主题 + 文档模板 |
+| [AiDocPlus-ProjectTemplates](https://github.com/AiDocPlus/AiDocPlus-ProjectTemplates) | 20 个项目模板 |
+| [AiDocPlus-Plugins](https://github.com/AiDocPlus/AiDocPlus-Plugins) | 21 个外部插件 |
+| [AiDocPlus-ResourceManager](https://github.com/AiDocPlus/AiDocPlus-ResourceManager) | 6 个资源管理器 |
+
+---
+
+## 开发
 
 ```bash
-# Install dependencies
+# 克隆源码仓库
+git clone https://github.com/AiDocPlus/AiDocPlus-Main.git
+
+# 安装依赖
+cd AiDocPlus-Main/apps/desktop
 pnpm install
 
-# Run development mode
-cd apps/desktop/src-ui
+# 开发模式
 pnpm tauri dev
 
-# Build for production
-pnpm build
+# 构建
+pnpm tauri build
 ```
 
-### Tech Stack
+详细开发文档请参考 [AiDocPlus-Main](https://github.com/AiDocPlus/AiDocPlus-Main)。
 
-- **Desktop Framework**: Tauri 2.x
-- **Frontend**: React 19 + TypeScript 5.8+
-- **State Management**: Zustand
-- **Styling**: Tailwind CSS 4
-- **UI Components**: Radix UI
-- **Build Tool**: Vite 7 + Turborepo
-- **Editor**: CodeMirror 6
-- **i18n**: i18next (zh/en/ja)
+---
 
-### Completed Features
+## 许可证
 
-- ✅ AI streaming chat & content generation (OpenAI-compatible API, GLM, etc.)
-- ✅ CodeMirror 6 Markdown editor with syntax highlighting, folding, autocomplete
-- ✅ Multi-format export (Markdown, HTML, DOCX, TXT, native + Pandoc)
-- ✅ Version control with preview and restore
-- ✅ Plugin system — 21 external plugins with auto-discovery, self-registration, and manifest-driven architecture
-- ✅ Prompt templates
-- ✅ Workspace autosave
-- ✅ Attachment system
-
-## License
-
-MIT
+[MIT](LICENSE)
