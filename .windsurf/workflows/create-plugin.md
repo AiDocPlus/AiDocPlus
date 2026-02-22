@@ -4,6 +4,8 @@ description: 创建 AiDocPlus 外部插件的完整流程和规范
 
 ## 创建新插件
 
+> **替代方式**：可使用插件管理器（`cd /Users/jdh/Code/AiDocPlus-ResourceManager && pnpm dev:plugins`）通过图形界面管理插件 manifest 元数据。注意：插件源码（index.ts、Panel 组件）仍需手动编写。
+
 > **⚠️ 所有插件代码必须在 AiDocPlus-Plugins 项目中操作（`/Users/jdh/Code/AiDocPlus-Plugins`），绝不在主程序 `src/plugins/` 下直接创建。**
 
 ### 1. 确定插件类型

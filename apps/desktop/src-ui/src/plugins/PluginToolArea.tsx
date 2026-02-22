@@ -412,14 +412,16 @@ export function PluginToolArea({ document, tabId, aiContent, isMaximized, onMaxi
               handleRequestSave={handleRequestSave}
               activePlugin={activePlugin}
             >
-              <activePlugin.PanelComponent
-                document={document}
-                tabId={tabId}
-                content={aiContent}
-                pluginData={document.pluginData?.[activePlugin.id] ?? null}
-                onPluginDataChange={handlePluginDataChange(activePlugin.id)}
-                onRequestSave={handleRequestSave}
-              />
+              <React.Suspense fallback={<div className="h-full flex items-center justify-center text-muted-foreground text-sm">加载插件...</div>}>
+                <activePlugin.PanelComponent
+                  document={document}
+                  tabId={tabId}
+                  content={aiContent}
+                  pluginData={document.pluginData?.[activePlugin.id] ?? null}
+                  onPluginDataChange={handlePluginDataChange(activePlugin.id)}
+                  onRequestSave={handleRequestSave}
+                />
+              </React.Suspense>
             </PluginHostProvider>
           </PluginErrorBoundary>
         ) : (

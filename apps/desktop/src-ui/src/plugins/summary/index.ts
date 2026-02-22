@@ -1,14 +1,14 @@
+import React from 'react';
 import { FileText } from 'lucide-react';
 import type { DocumentPlugin } from '../types';
 import { registerPluginI18n } from '../i18n-loader';
 import { registerPlugin } from '../pluginStore';
-import { SummaryPluginPanel } from './SummaryPluginPanel';
+const SummaryPluginPanel = React.lazy(() => import('./SummaryPluginPanel').then(m => ({ default: m.SummaryPluginPanel })));
 import manifest from './manifest.json';
 import zh from './i18n/zh.json';
 import en from './i18n/en.json';
-import ja from './i18n/ja.json';
 
-registerPluginI18n('plugin-summary', { zh, en, ja });
+registerPluginI18n('plugin-summary', { zh, en });
 
 export const summaryPlugin: DocumentPlugin = {
   id: manifest.id,

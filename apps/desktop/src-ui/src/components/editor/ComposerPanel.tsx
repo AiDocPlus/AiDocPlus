@@ -3,6 +3,7 @@ import { Maximize2, Minimize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/i18n';
 import { MarkdownEditor } from './MarkdownEditor';
+import type { ExportCallbacks } from './EditorToolbar';
 import type { Document } from '@aidocplus/shared-types';
 
 interface ComposerPanelProps {
@@ -17,6 +18,7 @@ interface ComposerPanelProps {
   onLeftSidebarToggle?: (open: boolean) => void;
   rightSidebarOpen?: boolean;
   onRightSidebarToggle?: (open: boolean) => void;
+  exportCallbacks?: ExportCallbacks;
 }
 
 export function ComposerPanel({
@@ -31,6 +33,7 @@ export function ComposerPanel({
   onLeftSidebarToggle,
   rightSidebarOpen,
   onRightSidebarToggle,
+  exportCallbacks,
 }: ComposerPanelProps) {
   const { t } = useTranslation();
 
@@ -78,6 +81,7 @@ export function ComposerPanel({
           showViewModeSwitch={true}
           editorId="composer-editor"
           importSources={{ aiContent, document }}
+          exportCallbacks={exportCallbacks}
         />
       </div>
     </div>

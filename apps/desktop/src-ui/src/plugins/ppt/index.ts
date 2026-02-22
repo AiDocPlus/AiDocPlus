@@ -1,15 +1,15 @@
+import React from 'react';
 import { Presentation } from 'lucide-react';
 import type { DocumentPlugin } from '../types';
 import { registerPluginI18n } from '../i18n-loader';
 import { registerPlugin } from '../pluginStore';
-import { PptPluginPanel } from './PptPluginPanel';
+const PptPluginPanel = React.lazy(() => import('./PptPluginPanel').then(m => ({ default: m.PptPluginPanel })));
 import manifest from './manifest.json';
 import type { Slide, SlidesDeck } from '@aidocplus/shared-types';
 import zh from './i18n/zh.json';
 import en from './i18n/en.json';
-import ja from './i18n/ja.json';
 
-registerPluginI18n('plugin-ppt', { zh, en, ja });
+registerPluginI18n('plugin-ppt', { zh, en });
 
 export const pptPlugin: DocumentPlugin = {
   id: manifest.id,

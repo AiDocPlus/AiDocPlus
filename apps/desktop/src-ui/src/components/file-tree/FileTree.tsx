@@ -1,5 +1,5 @@
 import { useAppStore } from '@/stores/useAppStore';
-import { File, Folder, FolderOpen, Plus, Trash2, X, Check, Edit2, Download, FilePlus, Copy, ArrowUpDown, ArrowUp, ArrowDown, GripVertical, ChevronsDownUp, ChevronsUpDown, LayoutTemplate } from 'lucide-react';
+import { File, Folder, FolderOpen, Plus, Trash2, X, Check, Edit2, Download, FilePlus, Copy, ArrowUpDown, ArrowUp, ArrowDown, GripVertical, ChevronsDownUp, ChevronsUpDown, LayoutTemplate, Star, Tag, Filter } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -38,7 +38,7 @@ type SortDirection = 'asc' | 'desc';
 
 export function FileTree({ sidebarOpen }: FileTreeProps) {
   const { t } = useTranslation();
-  const { projects, currentProject, documents, currentDocument, openProject, createProject, deleteProject, renameProject, openTab, renameDocument, deleteDocument, createDocument, loadDocuments, error, isLoading } = useAppStore();
+  const { projects, currentProject, documents, currentDocument, openProject, createProject, deleteProject, renameProject, openTab, renameDocument, deleteDocument, createDocument, loadDocuments, error, isLoading, allTags, loadAllTags, documentFilterTag, setDocumentFilterTag, toggleDocumentStarred } = useAppStore();
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [isCreating, setIsCreating] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
@@ -364,6 +364,13 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
     }
   }, [sidebarOpen, currentDocument?.id]);
 
+  // 当前项目变化时加载标签
+  useEffect(() => {
+    if (currentProject) {
+      loadAllTags(currentProject.id);
+    }
+  }, [currentProject?.id, documents]);
+
   // Drag and drop handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -500,6 +507,41 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant={documentFilterTag ? 'secondary' : 'ghost'}
+                size="icon"
+                className="h-6 w-6"
+                title={t('fileTree.filterByTag', { defaultValue: '按标签筛选' })}
+              >
+                <Filter className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40 max-h-60 overflow-y-auto">
+              <DropdownMenuItem onClick={() => setDocumentFilterTag(null)}>
+                <span className="flex-1">{t('fileTree.filterAll', { defaultValue: '全部文档' })}</span>
+                {!documentFilterTag && <Check className="h-3 w-3 ml-2" />}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setDocumentFilterTag('_starred')}>
+                <Star className="h-3 w-3 mr-1.5 text-yellow-500" />
+                <span className="flex-1">{t('fileTree.filterStarred', { defaultValue: '收藏文档' })}</span>
+                {documentFilterTag === '_starred' && <Check className="h-3 w-3 ml-2" />}
+              </DropdownMenuItem>
+              {allTags.length > 0 && (
+                <>
+                  <div className="h-px bg-border my-1" />
+                  {allTags.map(tag => (
+                    <DropdownMenuItem key={tag} onClick={() => setDocumentFilterTag(tag)}>
+                      <Tag className="h-3 w-3 mr-1.5 text-muted-foreground" />
+                      <span className="flex-1 truncate">{tag}</span>
+                      {documentFilterTag === tag && <Check className="h-3 w-3 ml-2" />}
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             variant="ghost"
             size="icon"
@@ -565,7 +607,16 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
         {sortedProjects.map(project => {
           const isExpanded = expandedProjects.has(project.id);
           const isActive = currentProject?.id === project.id;
-          const projectDocuments = sortDocuments(documents.filter(d => d.projectId === project.id), project.id);
+          const projectDocuments = sortDocuments(
+            documents.filter(d => {
+              if (d.projectId !== project.id) return false;
+              if (documentFilterTag) {
+                return (d.metadata?.tags || []).includes(documentFilterTag);
+              }
+              return true;
+            }),
+            project.id
+          );
 
           return (
             <SortableItem key={project.id} id={project.id} disabled={sortField !== 'custom'} showHandle={sortField === 'custom'}>
@@ -704,6 +755,8 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
                       {projectDocuments.map(doc => {
                         const isRenaming = renamingDocId === doc.id;
                         const isCurrent = currentDocument?.id === doc.id;
+                        const isStarred = (doc.metadata?.tags || []).includes('_starred');
+                        const visibleTags = (doc.metadata?.tags || []).filter((t: string) => !t.startsWith('_'));
                         return (
                           <SortableItem key={doc.id} id={doc.id} disabled={sortField !== 'custom'} showHandle={sortField === 'custom'}>
                           <div
@@ -714,9 +767,13 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
                               isCurrent && "bg-red-500/10 text-red-600 dark:text-red-400"
                             )}
                             onClick={() => handleSelectDocument(project.id, doc.id)}
-                            title={doc.title}
+                            title={doc.title + (visibleTags.length > 0 ? ` [${visibleTags.join(', ')}]` : '')}
                           >
-                            <File className="h-3 w-3 text-muted-foreground ml-1" />
+                            {isStarred ? (
+                              <Star className="h-3 w-3 text-yellow-500 fill-yellow-500 ml-1 flex-shrink-0" />
+                            ) : (
+                              <File className="h-3 w-3 text-muted-foreground ml-1 flex-shrink-0" />
+                            )}
 
                             {isRenaming ? (
                               <div className="flex-1 flex items-center gap-1">
@@ -746,6 +803,18 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
                                   {doc.title}
                                 </span>
                                 <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleDocumentStarred(project.id, doc.id);
+                                    }}
+                                    className="h-6 w-6 p-0"
+                                    title={t('fileTree.toggleStar', { defaultValue: '收藏/取消收藏' })}
+                                  >
+                                    <Star className={cn("h-3 w-3", isStarred ? "text-yellow-500 fill-yellow-500" : "")} />
+                                  </Button>
                                   <Button
                                     variant="ghost"
                                     size="icon"

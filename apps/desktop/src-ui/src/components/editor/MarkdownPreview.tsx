@@ -9,6 +9,14 @@ import rehypeRaw from 'rehype-raw';
 import mermaid from 'mermaid';
 import 'katex/dist/katex.min.css';
 
+// 模块级常量：避免每次渲染创建新数组引用
+const REMARK_PLUGINS = [remarkGfm, remarkMath] as const;
+const REHYPE_PLUGINS = [
+  rehypeRaw,
+  [rehypeKatex, { throwOnError: false, strict: false }],
+  [rehypeHighlight, { detect: true, subset: false }],
+] as const;
+
 interface MarkdownPreviewProps {
   content: string;
   theme?: 'light' | 'dark';
@@ -17,7 +25,7 @@ interface MarkdownPreviewProps {
   fontFamily?: string;
 }
 
-export const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({
+export const MarkdownPreview: React.FC<MarkdownPreviewProps> = React.memo(({
   content,
   theme = 'light',
   className = '',
@@ -92,18 +100,11 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({
       style={customStyle}
     >
       <ReactMarkdown
-        remarkPlugins={[
-          remarkGfm,
-          remarkMath,
-        ]}
-        rehypePlugins={[
-          rehypeRaw,
-          [rehypeKatex, { throwOnError: false, strict: false }],
-          [rehypeHighlight, { detect: true, subset: false }],
-        ]}
+        remarkPlugins={REMARK_PLUGINS as any}
+        rehypePlugins={REHYPE_PLUGINS as any}
       >
         {content}
       </ReactMarkdown>
     </div>
   );
-};
+});

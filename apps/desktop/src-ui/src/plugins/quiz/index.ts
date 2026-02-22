@@ -1,14 +1,14 @@
+import React from 'react';
 import { ClipboardList } from 'lucide-react';
 import type { DocumentPlugin } from '../types';
 import { registerPluginI18n } from '../i18n-loader';
 import { registerPlugin } from '../pluginStore';
-import { QuizPluginPanel } from './QuizPluginPanel';
+const QuizPluginPanel = React.lazy(() => import('./QuizPluginPanel').then(m => ({ default: m.QuizPluginPanel })));
 import manifest from './manifest.json';
 import zh from './i18n/zh.json';
 import en from './i18n/en.json';
-import ja from './i18n/ja.json';
 
-registerPluginI18n('plugin-quiz', { zh, en, ja });
+registerPluginI18n('plugin-quiz', { zh, en });
 
 export const quizPlugin: DocumentPlugin = {
   id: manifest.id,

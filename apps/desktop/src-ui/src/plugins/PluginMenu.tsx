@@ -48,12 +48,12 @@ export function PluginMenu({ pluginAreaOpen, onToggle, document }: PluginMenuPro
       disabled={!hasPlugins}
       onClick={onToggle}
       title={hasPlugins
-        ? t('toggle', { defaultValue: '展开/收起内容插件区' })
+        ? t('toggle', { defaultValue: '展开/收起内容区' })
         : t('allDisabled')}
       className={`gap-1 h-7 text-xs ${className}`}
     >
       <Puzzle className="h-3.5 w-3.5" />
-      {t('area', { defaultValue: '插件区' })}
+      {t('area', { defaultValue: '内容区' })}
     </Button>
   );
 }

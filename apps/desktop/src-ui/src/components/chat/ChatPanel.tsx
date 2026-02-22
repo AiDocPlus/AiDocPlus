@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, memo } from 'react';
 import { Send, Sparkles, X, ChevronDown, ChevronUp, FileText, BookOpen, Square, Eraser, Trash2, Copy, Check, ArrowUpToLine, MessageSquareText, PenLine, Wand2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useAppStore } from '@/stores/useAppStore';
@@ -143,6 +143,76 @@ function ContextReplyBox({
   );
 }
 
+/**
+ * Memo 化的单条聊天消息，避免流式更新时所有历史消息重渲染
+ */
+interface ChatMessageProps {
+  message: { role: string; content: string; timestamp?: number; contextMode?: ChatContextMode };
+  turnNumber: number;
+  totalMessages: number;
+  enableThinking: boolean;
+  onApplyToDocument?: (editedContent: string, mode: ChatContextMode) => void;
+}
+
+const ChatMessage = memo(function ChatMessage({
+  message, turnNumber, totalMessages, enableThinking, onApplyToDocument,
+}: ChatMessageProps) {
+  const { t } = useTranslation();
+  const isUserTurn = message.role === 'user';
+  const hasContextMode = !isUserTurn && message.contextMode && message.contextMode !== 'none';
+
+  if (hasContextMode) {
+    return (
+      <ContextReplyBox
+        content={message.content}
+        contextMode={message.contextMode!}
+        timestamp={message.timestamp}
+        onApply={(editedContent) => onApplyToDocument?.(editedContent, message.contextMode!)}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={`max-w-[80%] rounded-lg px-4 py-2 ${
+        isUserTurn ? 'bg-primary text-primary-foreground' : 'bg-muted'
+      }`}
+    >
+      <div className="flex items-start gap-2">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-medium opacity-70">
+              {isUserTurn ? t('chat.you', { defaultValue: '你' }) : t('chat.ai', { defaultValue: 'AI' })}
+            </span>
+            {totalMessages > 2 && (
+              <span className="text-xs opacity-50">
+                {t('chat.turnNumber', { defaultValue: '第 {{num}} 轮', num: turnNumber })}
+              </span>
+            )}
+          </div>
+          {isUserTurn ? (
+            <div className="text-sm whitespace-pre-wrap break-words">{message.content}</div>
+          ) : (
+            <div className="text-sm [&_.markdown-preview]:p-0 [&_.markdown-preview]:text-inherit">
+              <MarkdownPreview content={(() => {
+                const parsed = parseThinkTags(message.content);
+                if (!parsed.thinking) return message.content;
+                if (enableThinking) return message.content;
+                return `<details>\n<summary>${t('chat.thinkingCollapsed', { defaultValue: '💭 查看 AI 思考过程' })}</summary>\n\n${parsed.thinking}\n\n</details>\n\n${parsed.content}`;
+              })()} theme={resolveTheme()} className="!p-0" fontSize={13} />
+            </div>
+          )}
+        </div>
+      </div>
+      {message.timestamp && (
+        <div className="text-xs opacity-70 mt-1">
+          {timestampToDate(message.timestamp).toLocaleTimeString()}
+        </div>
+      )}
+    </div>
+  );
+});
+
 interface ChatPanelProps {
   tabId?: string;
   onClose?: () => void;
@@ -153,20 +223,18 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
   const { t } = useTranslation();
   const CONTEXT_MODES = getContextModes(t);
   const CONTEXT_MODE_LABELS = getContextModeLabels(t);
-  const {
-    tabs,
-    aiMessagesByTab,
-    aiStreamingTabId,
-    sendChatMessage,
-    generateContent,
-    generateContentStream,
-    stopAiStreaming,
-    setAiStreaming,
-    saveDocument,
-    clearAiMessages,
-    createVersion,
-    updateDocumentInMemory
-  } = useAppStore();
+  const tabs = useAppStore(s => s.tabs);
+  const aiMessagesByTab = useAppStore(s => s.aiMessagesByTab);
+  const aiStreamingTabId = useAppStore(s => s.aiStreamingTabId);
+  const sendChatMessage = useAppStore(s => s.sendChatMessage);
+  const generateContent = useAppStore(s => s.generateContent);
+  const generateContentStream = useAppStore(s => s.generateContentStream);
+  const stopAiStreaming = useAppStore(s => s.stopAiStreaming);
+  const setAiStreaming = useAppStore(s => s.setAiStreaming);
+  const saveDocument = useAppStore(s => s.saveDocument);
+  const clearAiMessages = useAppStore(s => s.clearAiMessages);
+  const createVersion = useAppStore(s => s.createVersion);
+  const updateDocumentInMemory = useAppStore(s => s.updateDocumentInMemory);
 
   const effectiveTabId = tabId || '';
   const aiMessages = aiMessagesByTab[effectiveTabId] || [];
@@ -175,17 +243,21 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
 
   const settingsStore = useSettingsStore();
 
-  // 获取当前 provider 的能力声明
-  const activeService = getActiveService(settingsStore.ai);
-  const providerConfig = activeService ? getProviderConfig(activeService.provider) : undefined;
-  const supportsWebSearch = providerConfig?.capabilities?.webSearch ?? false;
-  const supportsFunctionCalling = providerConfig?.capabilities?.functionCalling ?? false;
-
   // 获取当前标签对应的文档
   const currentTab = tabs.find(tab => tab.id === tabId);
   const currentDocument = currentTab
     ? useAppStore.getState().documents.find(d => d.id === currentTab.documentId)
     : null;
+
+  // 获取当前 provider 的能力声明（优先使用文档绑定的服务）
+  const enabledServices = settingsStore.ai.services.filter(s => s.enabled);
+  const docBoundService = currentDocument?.aiServiceId
+    ? enabledServices.find(s => s.id === currentDocument.aiServiceId)
+    : null;
+  const effectiveService = docBoundService || getActiveService(settingsStore.ai);
+  const providerConfig = effectiveService ? getProviderConfig(effectiveService.provider) : undefined;
+  const supportsWebSearch = providerConfig?.capabilities?.webSearch ?? false;
+  const supportsFunctionCalling = providerConfig?.capabilities?.functionCalling ?? false;
 
   const [input, setInput] = useState('');
   const [showAuthorNotes, setShowAuthorNotes] = useState(true);
@@ -216,6 +288,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const userMsgRef = useRef<HTMLDivElement>(null);
   const prevMessageCountRef = useRef(0);
+  const scrollThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const prevCount = prevMessageCountRef.current;
@@ -232,10 +305,22 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
         userMsgRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     } else if (newCount === prevCount && newCount > 0) {
-      // 流式更新（消息数量不变但内容变化）：滚到底部看最新内容
-      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      // 流式更新（消息数量不变但内容变化）：节流滚动，~200ms 一次
+      if (!scrollThrottleRef.current) {
+        scrollThrottleRef.current = setTimeout(() => {
+          scrollThrottleRef.current = null;
+          messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+        }, 200);
+      }
     }
   }, [aiMessages]);
+
+  // 清理 scrollThrottle 定时器
+  useEffect(() => {
+    return () => {
+      if (scrollThrottleRef.current) clearTimeout(scrollThrottleRef.current);
+    };
+  }, []);
 
   // Initialize author notes input from current document (only on document switch)
   useEffect(() => {
@@ -410,42 +495,40 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
         let lastUpdateTime = 0;
         let throttleTimer: ReturnType<typeof setTimeout> | null = null;
 
+        // 统一节流刷新：thinking 状态 + 编辑器内容
+        const flushGenChunk = () => {
+          throttleTimer = null;
+          lastUpdateTime = Date.now();
+          const parsed = parseThinkTags(accumulatedContent);
+          // 更新编辑器
+          useAppStore.getState().updateDocumentInMemory(docId, { aiGeneratedContent: parsed.content });
+          // 更新聊天区 thinking 状态
+          if (parsed.thinking) {
+            const thinkMsg = parsed.isThinking
+              ? t('chat.aiThinking', { defaultValue: '💭 **AI 正在思考...**\n\n{{thinking}}', thinking: parsed.thinking })
+              : t('chat.aiThinkingDone', { defaultValue: '💭 **AI 思考过程：**\n\n{{thinking}}', thinking: parsed.thinking });
+            const messages = useAppStore.getState().getAiMessages(effectiveTabId);
+            if (messages.length > 0) {
+              const lastMsg = messages[messages.length - 1];
+              if (lastMsg.role === 'assistant' && (lastMsg.content.includes('正在生成') || lastMsg.content.startsWith('💭') || lastMsg.content.includes('Generating'))) {
+                useAppStore.getState().updateLastAiMessage(effectiveTabId, { content: thinkMsg });
+              }
+            }
+          }
+        };
+
         await generateContentStream(
           notesToUse,
           contentForAI,
           (chunk) => {
             accumulatedContent += chunk;
-
-            // 解析 <think> 标签：分离思考内容和正文内容
-            const parsed = parseThinkTags(accumulatedContent);
-
-            // 实时更新聊天区的思考状态（模型可能强制返回思考内容）
-            if (parsed.thinking) {
-              const thinkMsg = parsed.isThinking
-                ? t('chat.aiThinking', { defaultValue: '💭 **AI 正在思考...**\n\n{{thinking}}', thinking: parsed.thinking })
-                : t('chat.aiThinkingDone', { defaultValue: '💭 **AI 思考过程：**\n\n{{thinking}}', thinking: parsed.thinking });
-              const messages = useAppStore.getState().getAiMessages(effectiveTabId);
-              if (messages.length > 0) {
-                const lastMsg = messages[messages.length - 1];
-                if (lastMsg.role === 'assistant' && (lastMsg.content.includes('正在生成') || lastMsg.content.startsWith('💭') || lastMsg.content.includes('Generating'))) {
-                  useAppStore.getState().updateLastAiMessage(effectiveTabId, { content: thinkMsg });
-                }
-              }
-            }
-
-            // 节流更新编辑器：只写入正文内容（不含 <think> 部分）
+            // 节流：~300ms 批量刷新一次
             const now = Date.now();
             if (now - lastUpdateTime > 300) {
-              lastUpdateTime = now;
               if (throttleTimer) { clearTimeout(throttleTimer); throttleTimer = null; }
-              useAppStore.getState().updateDocumentInMemory(docId, { aiGeneratedContent: parsed.content });
+              flushGenChunk();
             } else if (!throttleTimer) {
-              throttleTimer = setTimeout(() => {
-                throttleTimer = null;
-                lastUpdateTime = Date.now();
-                const latestParsed = parseThinkTags(accumulatedContent);
-                useAppStore.getState().updateDocumentInMemory(docId, { aiGeneratedContent: latestParsed.content });
-              }, 300);
+              throttleTimer = setTimeout(flushGenChunk, 300);
             }
           },
           [],  // 内容生成与聊天独立，不传聊天历史
@@ -601,7 +684,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
       {/* Header with close button */}
       <div className="flex items-center justify-between px-4 py-2 border-b bg-background flex-shrink-0">
         <div className="flex items-center gap-2">
-          <h2 className="font-semibold">{simpleMode ? t('chat.chatTitle', { defaultValue: '随便聊聊' }) : t('chat.aiAssistant', { defaultValue: 'AI 助手' })}</h2>
+          <h2 className="font-semibold">{simpleMode ? t('chat.chatTitle', { defaultValue: '随便聊聊' }) : t('chat.aiAssistant', { defaultValue: 'AI' })}</h2>
           {(() => {
             const activeRole = getActiveRole(settingsStore.role);
             if (!activeRole || !activeRole.systemPrompt) return null;
@@ -612,6 +695,60 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
               </span>
             );
           })()}
+          {/* 文档级 AI 服务选择器（≥2 个已启用服务时显示） */}
+          {!simpleMode && currentDocument && enabledServices.length >= 2 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="text-xs px-2 py-0.5 rounded-full bg-muted hover:bg-accent text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 max-w-[120px]"
+                  title={t('chat.switchAiService', { defaultValue: '切换 AI 服务' })}
+                >
+                  <span className="truncate">
+                    {docBoundService ? docBoundService.name : t('chat.globalDefault', { defaultValue: '全局默认' })}
+                  </span>
+                  <ChevronDown className="h-3 w-3 flex-shrink-0" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-[160px]">
+                <DropdownMenuLabel className="text-xs">{t('chat.docAiService', { defaultValue: '文档 AI 服务' })}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => {
+                    if (currentDocument) {
+                      updateDocumentInMemory(currentDocument.id, { aiServiceId: undefined });
+                    }
+                  }}
+                  className="text-xs"
+                >
+                  <span className="flex items-center gap-2">
+                    {!currentDocument?.aiServiceId && <Check className="h-3 w-3" />}
+                    {!currentDocument?.aiServiceId ? <span className="font-medium">{t('chat.useGlobalService', { defaultValue: '使用全局服务' })}</span> : <span className="ml-5">{t('chat.useGlobalService', { defaultValue: '使用全局服务' })}</span>}
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {enabledServices.map(svc => {
+                  const isSelected = currentDocument?.aiServiceId === svc.id;
+                  return (
+                    <DropdownMenuItem
+                      key={svc.id}
+                      onClick={() => {
+                        if (currentDocument) {
+                          updateDocumentInMemory(currentDocument.id, { aiServiceId: svc.id });
+                        }
+                      }}
+                      className="text-xs"
+                    >
+                      <span className="flex items-center gap-2">
+                        {isSelected && <Check className="h-3 w-3" />}
+                        {isSelected ? <span className="font-medium">{svc.name}</span> : <span className="ml-5">{svc.name}</span>}
+                      </span>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
         {onClose && (
           <Button
@@ -820,9 +957,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
             </div>
           ) : (
             aiMessages.map((message, index) => {
-            const turnNumber = Math.floor(index / 2) + 1;
             const isUserTurn = message.role === 'user';
-            const hasContextMode = !isUserTurn && message.contextMode && message.contextMode !== 'none';
 
             return (
               <div
@@ -839,56 +974,13 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
                 }
                 className={`flex ${isUserTurn ? 'justify-end' : 'justify-start'}`}
               >
-                {hasContextMode ? (
-                  /* 上下文模式 AI 回复：可编辑文本框 */
-                  <ContextReplyBox
-                    content={message.content}
-                    contextMode={message.contextMode!}
-                    timestamp={message.timestamp}
-                    onApply={(editedContent) => handleApplyToDocument(editedContent, message.contextMode!)}
-                  />
-                ) : (
-                <div
-                  className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                    isUserTurn
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted'
-                  }`}
-                >
-                  <div className="flex items-start gap-2">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-medium opacity-70">
-                          {isUserTurn ? t('chat.you', { defaultValue: '你' }) : t('chat.ai', { defaultValue: 'AI' })}
-                        </span>
-                        {aiMessages.length > 2 && (
-                          <span className="text-xs opacity-50">
-                            {t('chat.turnNumber', { defaultValue: '第 {{num}} 轮', num: turnNumber })}
-                          </span>
-                        )}
-                      </div>
-                      {isUserTurn ? (
-                        <div className="text-sm whitespace-pre-wrap break-words">{message.content}</div>
-                      ) : (
-                        <div className="text-sm [&_.markdown-preview]:p-0 [&_.markdown-preview]:text-inherit">
-                          <MarkdownPreview content={(() => {
-                            const parsed = parseThinkTags(message.content);
-                            if (!parsed.thinking) return message.content;
-                            if (settingsStore.ai.enableThinking) return message.content;
-                            // 未启用深度思考但模型返回了思考内容：折叠展示
-                            return `<details>\n<summary>${t('chat.thinkingCollapsed', { defaultValue: '💭 查看 AI 思考过程' })}</summary>\n\n${parsed.thinking}\n\n</details>\n\n${parsed.content}`;
-                          })()} theme={resolveTheme()} className="!p-0" fontSize={13} />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  {message.timestamp && (
-                    <div className="text-xs opacity-70 mt-1">
-                      {timestampToDate(message.timestamp).toLocaleTimeString()}
-                    </div>
-                  )}
-                </div>
-                )}
+                <ChatMessage
+                  message={message}
+                  turnNumber={Math.floor(index / 2) + 1}
+                  totalMessages={aiMessages.length}
+                  enableThinking={settingsStore.ai.enableThinking}
+                  onApplyToDocument={handleApplyToDocument}
+                />
               </div>
               );
             })

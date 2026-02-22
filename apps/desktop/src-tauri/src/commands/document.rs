@@ -33,6 +33,7 @@ pub fn save_document(
     pluginData: Option<serde_json::Value>,
     enabledPlugins: Option<Vec<String>>,
     composedContent: Option<String>,
+    aiServiceId: Option<String>,
 ) -> Result<Document> {
     let doc_path = state.get_document_path(&projectId, &documentId);
 
@@ -59,6 +60,7 @@ pub fn save_document(
     if let Some(cc) = composedContent {
         document.composed_content = Some(cc);
     }
+    document.ai_service_id = aiServiceId;
 
     // Update metadata
     document.metadata.updated_at = chrono::Utc::now().timestamp();
@@ -426,6 +428,116 @@ pub fn move_document(
 
     // 删除源文件
     std::fs::remove_file(&src_path).map_err(|e| e.to_string())?;
+
+    Ok(document)
+}
+
+/// 更新文档标签
+#[tauri::command]
+pub fn update_document_tags(
+    state: State<'_, AppState>,
+    projectId: String,
+    documentId: String,
+    tags: Vec<String>,
+) -> Result<Document> {
+    let doc_path = state.get_document_path(&projectId, &documentId);
+
+    if !doc_path.exists() {
+        return Err(format!("Document not found: {}", documentId));
+    }
+
+    let mut document = Document::load(&doc_path).map_err(|e| e.to_string())?;
+
+    // 去重、去空、trim
+    let clean_tags: Vec<String> = tags
+        .into_iter()
+        .map(|t| t.trim().to_string())
+        .filter(|t| !t.is_empty())
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect();
+
+    document.metadata.tags = clean_tags;
+    document.metadata.updated_at = chrono::Utc::now().timestamp();
+
+    document.save(&doc_path).map_err(|e| e.to_string())?;
+
+    Ok(document)
+}
+
+/// 获取项目内所有已使用的标签（去重）
+#[tauri::command]
+pub fn list_all_tags(
+    state: State<'_, AppState>,
+    projectId: Option<String>,
+) -> Result<Vec<String>> {
+    let mut all_tags = std::collections::HashSet::new();
+
+    let projects_dir = &state.config.projects_dir;
+
+    let project_ids: Vec<String> = if let Some(pid) = projectId {
+        vec![pid]
+    } else {
+        // 遍历所有项目
+        match std::fs::read_dir(projects_dir) {
+            Ok(entries) => entries
+                .filter_map(|e| e.ok())
+                .filter(|e| e.path().is_dir())
+                .filter_map(|e| e.file_name().into_string().ok())
+                .collect(),
+            Err(_) => Vec::new(),
+        }
+    };
+
+    for pid in project_ids {
+        let docs_dir = projects_dir.join(&pid).join("documents");
+        if !docs_dir.exists() {
+            continue;
+        }
+
+        if let Ok(entries) = std::fs::read_dir(&docs_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|s| s.to_str()) == Some("json") {
+                    if let Ok(doc) = Document::load(&path) {
+                        for tag in &doc.metadata.tags {
+                            all_tags.insert(tag.clone());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let mut sorted: Vec<String> = all_tags.into_iter().collect();
+    sorted.sort();
+    Ok(sorted)
+}
+
+/// 切换文档收藏状态（通过特殊标签 _starred 实现）
+#[tauri::command]
+pub fn toggle_document_starred(
+    state: State<'_, AppState>,
+    projectId: String,
+    documentId: String,
+) -> Result<Document> {
+    let doc_path = state.get_document_path(&projectId, &documentId);
+
+    if !doc_path.exists() {
+        return Err(format!("Document not found: {}", documentId));
+    }
+
+    let mut document = Document::load(&doc_path).map_err(|e| e.to_string())?;
+
+    let starred_tag = "_starred".to_string();
+    if document.metadata.tags.contains(&starred_tag) {
+        document.metadata.tags.retain(|t| t != &starred_tag);
+    } else {
+        document.metadata.tags.push(starred_tag);
+    }
+    document.metadata.updated_at = chrono::Utc::now().timestamp();
+
+    document.save(&doc_path).map_err(|e| e.to_string())?;
 
     Ok(document)
 }

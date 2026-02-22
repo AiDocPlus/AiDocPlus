@@ -4,6 +4,8 @@ description: 添加新的内置项目模板到 AiDocPlus-ProjectTemplates 仓库
 
 ## 添加新项目模板
 
+> **替代方式**：可使用项目模板管理器（`cd /Users/jdh/Code/AiDocPlus-ResourceManager && pnpm dev:project-templates`）通过图形界面创建和编辑项目模板，支持 AI 辅助生成。
+
 ### 1. 确定模板分类和 ID
 
 在 `AiDocPlus-ProjectTemplates/data/_meta.json` 中查看可用分类：

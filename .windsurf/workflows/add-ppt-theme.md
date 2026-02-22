@@ -4,6 +4,8 @@ description: 添加新的 PPT 主题到 AiDocPlus-DocTemplates 仓库
 
 ## 添加新 PPT 主题
 
+> **替代方式**：可使用文档模板管理器（`cd /Users/jdh/Code/AiDocPlus-ResourceManager && pnpm dev:doc-templates`）通过图形界面创建和编辑 PPT 主题，支持 AI 辅助生成。
+
 ### 1. 创建主题目录和 manifest
 
 在 `AiDocPlus-DocTemplates/data/ppt-theme/{id}/` 下创建 `manifest.json`：

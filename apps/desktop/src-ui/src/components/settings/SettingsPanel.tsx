@@ -1155,7 +1155,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                     <Input
                       type="number"
                       value={tempSettings.ai.maxTokens}
-                      onChange={(e) => updateTempAI({ maxTokens: parseInt(e.target.value) || 2000 })}
+                      onChange={(e) => updateTempAI({ maxTokens: parseInt(e.target.value) || 0 })}
                     />
                   </div>
 

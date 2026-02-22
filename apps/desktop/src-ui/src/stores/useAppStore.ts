@@ -5,7 +5,7 @@ import { buildPluginList, setPlugins } from '@/plugins/registry';
 import { syncManifestsToBackend } from '@/plugins/loader';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { useSettingsStore, getAIInvokeParams } from './useSettingsStore';
+import { useSettingsStore, getAIInvokeParamsForService } from './useSettingsStore';
 import { isTauri } from '@/lib/isTauri';
 import i18n from '@/i18n';
 
@@ -159,6 +159,19 @@ interface AppState {
   createVersion: (projectId: string, documentId: string, content: string, authorNotes: string, aiGeneratedContent: string, createdBy: string, changeDescription?: string, pluginData?: Record<string, unknown>, enabledPlugins?: string[], composedContent?: string) => Promise<string>;
   restoreVersion: (projectId: string, documentId: string, versionId: string, createBackup: boolean) => Promise<Document>;
 
+  // 文档标签管理
+  updateDocumentTags: (projectId: string, documentId: string, tags: string[]) => Promise<Document>;
+  loadAllTags: (projectId?: string) => Promise<string[]>;
+  allTags: string[];
+  toggleDocumentStarred: (projectId: string, documentId: string) => Promise<Document>;
+
+  // 文档排序与筛选
+  documentSortBy: 'updatedAt' | 'createdAt' | 'title' | 'wordCount';
+  documentSortOrder: 'asc' | 'desc';
+  documentFilterTag: string | null;
+  setDocumentSort: (sortBy: 'updatedAt' | 'createdAt' | 'title' | 'wordCount', sortOrder?: 'asc' | 'desc') => void;
+  setDocumentFilterTag: (tag: string | null) => void;
+
   // Convenience methods
   updateDocumentInMemory: (documentId: string, fields: Partial<Document>) => void;
   updateAiGeneratedContent: (aiContent: string, originalContent?: string) => Promise<void>;
@@ -205,6 +218,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   pluginManifests: [],
   templates: [],
   templateCategories: [],
+  allTags: [],
+  documentSortBy: 'updatedAt' as const,
+  documentSortOrder: 'desc' as const,
+  documentFilterTag: null,
 
   // Setters
   setProjects: (projects) => set({ projects }),
@@ -405,7 +422,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         attachments: document.attachments || undefined,
         pluginData: document.pluginData || undefined,
         enabledPlugins: document.enabledPlugins || undefined,
-        composedContent: document.composedContent || undefined
+        composedContent: document.composedContent || undefined,
+        aiServiceId: document.aiServiceId || undefined
       });
       set((state) => ({
         documents: state.documents.map(d => d.id === updated.id ? updated : d),
@@ -614,6 +632,58 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  // 文档标签管理
+  updateDocumentTags: async (projectId, documentId, tags) => {
+    try {
+      const updated = await invoke<Document>('update_document_tags', { projectId, documentId, tags });
+      set((state) => ({
+        documents: state.documents.map(d => d.id === updated.id ? updated : d),
+        currentDocument: state.currentDocument?.id === updated.id ? updated : state.currentDocument
+      }));
+      return updated;
+    } catch (error) {
+      console.error('Failed to update document tags:', error);
+      throw error;
+    }
+  },
+
+  loadAllTags: async (projectId) => {
+    try {
+      const tags = await invoke<string[]>('list_all_tags', { projectId: projectId ?? null });
+      // 过滤掉内部标签（以 _ 开头）
+      const visibleTags = tags.filter(t => !t.startsWith('_'));
+      set({ allTags: visibleTags });
+      return visibleTags;
+    } catch (error) {
+      console.error('Failed to load all tags:', error);
+      return [];
+    }
+  },
+
+  toggleDocumentStarred: async (projectId, documentId) => {
+    try {
+      const updated = await invoke<Document>('toggle_document_starred', { projectId, documentId });
+      set((state) => ({
+        documents: state.documents.map(d => d.id === updated.id ? updated : d),
+        currentDocument: state.currentDocument?.id === updated.id ? updated : state.currentDocument
+      }));
+      return updated;
+    } catch (error) {
+      console.error('Failed to toggle document starred:', error);
+      throw error;
+    }
+  },
+
+  // 文档排序与筛选
+  setDocumentSort: (sortBy, sortOrder) => {
+    set((state) => ({
+      documentSortBy: sortBy,
+      documentSortOrder: sortOrder ?? (state.documentSortBy === sortBy ? (state.documentSortOrder === 'asc' ? 'desc' : 'asc') : 'desc'),
+    }));
+  },
+
+  setDocumentFilterTag: (tag) => set({ documentFilterTag: tag }),
+
   // AI Setters
   getAiMessages: (tabId) => get().aiMessagesByTab[tabId] || [],
   setAiMessages: (tabId, messages) => set((state) => ({
@@ -698,6 +768,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
 
     let unlisten: (() => void) | null = null;
+    // 提前声明，供 try/catch 共用
+    let accumulatedContent = '';
+    let chatThrottleTimer: ReturnType<typeof setTimeout> | null = null;
+    const flushChatChunk = () => {
+      chatThrottleTimer = null;
+      const msgs = get().aiMessagesByTab[tabId] || [];
+      if (msgs.length === 0) return;
+      const updated = [...msgs];
+      updated[updated.length - 1] = { ...updated[updated.length - 1], content: accumulatedContent };
+      set((state) => ({
+        aiMessagesByTab: { ...state.aiMessagesByTab, [tabId]: updated }
+      }));
+    };
 
     try {
       set({ isAiStreaming: true, aiStreamingTabId: tabId, error: null });
@@ -741,8 +824,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         content: m.content
       })));
 
-      // 累积流式内容
-      let accumulatedContent = '';
       const assistantContextMode = contextInfo?.mode && contextInfo.mode !== 'none' ? contextInfo.mode : undefined;
 
       // 添加一条占位 assistant 消息，后续流式更新
@@ -754,21 +835,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
       get().addAiMessage(tabId, placeholderMessage);
 
-      // 设置流式事件监听
+      // 设置流式事件监听（节流：批量累积 chunk，~80ms 刷新一次 store）
       unlisten = await listen<{ request_id: string; content: string }>('ai:stream:chunk', (event) => {
         const streamState = get().streamStateByTab[tabId];
         if (!streamState || streamState.aborted || streamState.sessionId !== newSessionId) return;
         if (event.payload.request_id !== requestId) return;
         accumulatedContent += event.payload.content;
-        // 实时更新最后一条 assistant 消息
-        const msgs = get().aiMessagesByTab[tabId] || [];
-        const updated = [...msgs];
-        if (updated.length > 0) {
-          updated[updated.length - 1] = { ...updated[updated.length - 1], content: accumulatedContent };
+        // 节流更新 store
+        if (!chatThrottleTimer) {
+          chatThrottleTimer = setTimeout(flushChatChunk, 80);
         }
-        set((state) => ({
-          aiMessagesByTab: { ...state.aiMessagesByTab, [tabId]: updated }
-        }));
       });
 
       // 更新流状态中的 unlisten 函数
@@ -782,7 +858,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       }));
 
-      const aiParams = getAIInvokeParams();
+      // 获取文档级 AI 服务绑定
+      const chatTab = get().tabs.find(t => t.id === tabId);
+      const chatDoc = chatTab ? get().documents.find(d => d.id === chatTab.documentId) : null;
+      const aiParams = getAIInvokeParamsForService(chatDoc?.aiServiceId);
       await invoke<string>('chat_stream', {
         messages,
         ...aiParams,
@@ -792,9 +871,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         requestId
       });
 
+      // 刷新残余的节流 chunk
+      if (chatThrottleTimer) { clearTimeout(chatThrottleTimer); flushChatChunk(); }
+
       set({ isAiStreaming: false, aiStreamingTabId: null });
       return accumulatedContent;
     } catch (error) {
+      // 刷新残余的节流 chunk
+      if (chatThrottleTimer) { clearTimeout(chatThrottleTimer); flushChatChunk(); }
       set({ isAiStreaming: false, aiStreamingTabId: null });
       // 如果是被用户主动停止的，不抛错
       const streamState = get().streamStateByTab[tabId];
@@ -825,7 +909,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ isAiStreaming: true, error: null });
       // 注意：非流式模式下 aiStreamingTabId 由 ChatPanel 在调用前设置
 
-      const aiParams = getAIInvokeParams();
+      // 获取文档级 AI 服务绑定
+      const genTab = get().tabs.find(t => t.id === get().aiStreamingTabId);
+      const genDoc = genTab ? get().documents.find(d => d.id === genTab.documentId) : null;
+      const aiParams = getAIInvokeParamsForService(genDoc?.aiServiceId);
       const generated = await invoke<string>('generate_content', {
         authorNotes,
         currentContent,
@@ -910,7 +997,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         content: msg.content
       }));
 
-      const aiParams = getAIInvokeParams();
+      // 获取文档级 AI 服务绑定
+      const streamTab = get().tabs.find(t => t.id === tabId);
+      const streamDoc = streamTab ? get().documents.find(d => d.id === streamTab.documentId) : null;
+      const aiParams = getAIInvokeParamsForService(streamDoc?.aiServiceId);
       const invokeParams = {
         authorNotes,
         currentContent,
@@ -1190,11 +1280,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       currentProjectId: state.currentProject?.id ?? null,
       openDocumentIds: state.tabs.map(t => t.documentId),
       currentDocumentId: state.currentDocument?.id ?? null,
-      tabs: state.tabs.map(({ id, documentId, panelState }) => ({
-        id,
-        documentId,
-        panelState
-      })),
+      tabs: state.tabs.map(({ id, documentId, panelState }) => {
+        const doc = state.documents.find(d => d.id === documentId);
+        return { id, documentId, projectId: doc?.projectId, panelState };
+      }),
       activeTabId: state.activeTabId,
       uiState: {
         sidebarOpen: state.sidebarOpen,
@@ -1336,30 +1425,47 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (project) {
           await openProject(project.id);
 
-          // 收集所有标签涉及的项目 ID，加载跨项目文档
+          // 收集所有标签涉及的项目 ID，精准加载跨项目文档
           if (state.tabs && state.tabs.length > 0) {
-            // 先获取所有标签的 documentId，找出涉及的其他项目
             const currentDocs = get().documents;
             const loadedProjectIds = new Set(currentDocs.map(d => d.projectId));
 
-            // 从保存的 openDocumentIds 或 tabs 中推断需要加载的其他项目
-            // 尝试加载所有已知项目的文档（如果标签中有跨项目文档）
-            for (const p of allProjects) {
-              if (!loadedProjectIds.has(p.id)) {
+            // 从 tab 的 projectId 精准确定需要加载的其他项目（避免遍历所有项目）
+            const neededProjectIds = new Set<string>();
+            for (const tab of state.tabs) {
+              if (tab.projectId && !loadedProjectIds.has(tab.projectId)) {
+                neededProjectIds.add(tab.projectId);
+              }
+            }
+
+            // 并行加载所需的跨项目文档
+            if (neededProjectIds.size > 0) {
+              const loadPromises = [...neededProjectIds].map(async (pid) => {
                 try {
-                  const docs = await invoke<Document[]>('list_documents', { projectId: p.id });
-                  if (docs.length > 0) {
-                    // 检查是否有标签引用了这个项目的文档
-                    const tabDocIds = new Set(state.tabs.map(t => t.documentId));
-                    const hasRelevantDocs = docs.some(d => tabDocIds.has(d.id));
-                    if (hasRelevantDocs) {
-                      set((s) => ({
-                        documents: [...s.documents, ...docs]
-                      }));
-                    }
-                  }
+                  return await invoke<Document[]>('list_documents', { projectId: pid });
                 } catch (e) {
-                  console.error('[Workspace] Failed to load documents for project:', p.id, e);
+                  console.error('[Workspace] Failed to load documents for project:', pid, e);
+                  return [];
+                }
+              });
+              const results = await Promise.all(loadPromises);
+              const newDocs = results.flat();
+              if (newDocs.length > 0) {
+                set((s) => ({ documents: [...s.documents, ...newDocs] }));
+              }
+            } else if (!state.tabs.some(t => t.projectId)) {
+              // 兼容旧版 workspace 数据（没有 projectId），回退到遍历所有项目
+              const tabDocIds = new Set(state.tabs.map(t => t.documentId));
+              for (const p of allProjects) {
+                if (!loadedProjectIds.has(p.id)) {
+                  try {
+                    const docs = await invoke<Document[]>('list_documents', { projectId: p.id });
+                    if (docs.some(d => tabDocIds.has(d.id))) {
+                      set((s) => ({ documents: [...s.documents, ...docs] }));
+                    }
+                  } catch (e) {
+                    console.error('[Workspace] Failed to load documents for project:', p.id, e);
+                  }
                 }
               }
             }

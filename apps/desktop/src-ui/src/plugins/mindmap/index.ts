@@ -1,14 +1,14 @@
+import React from 'react';
 import { Brain } from 'lucide-react';
 import type { DocumentPlugin } from '../types';
 import { registerPluginI18n } from '../i18n-loader';
 import { registerPlugin } from '../pluginStore';
-import { MindMapPluginPanel } from './MindMapPluginPanel';
+const MindMapPluginPanel = React.lazy(() => import('./MindMapPluginPanel').then(m => ({ default: m.MindMapPluginPanel })));
 import manifest from './manifest.json';
 import zh from './i18n/zh.json';
 import en from './i18n/en.json';
-import ja from './i18n/ja.json';
 
-registerPluginI18n('plugin-mindmap', { zh, en, ja });
+registerPluginI18n('plugin-mindmap', { zh, en });
 
 export const mindmapPlugin: DocumentPlugin = {
   id: manifest.id,

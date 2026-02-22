@@ -52,6 +52,7 @@ export interface Document {
   pluginData?: Record<string, unknown>;  // 插件数据，key = 插件 UUID
   enabledPlugins?: string[];  // 该文档启用的插件 UUID 列表（顺序即标签栏顺序）
   composedContent?: string;  // 合并内容（Markdown），汇集正文+插件片段+外部导入
+  aiServiceId?: string;  // 文档级 AI 服务绑定（为空时使用全局 activeServiceId）
 }
 
 // ============================================================
@@ -695,7 +696,7 @@ export const DEFAULT_AI_SETTINGS: AISettings = {
   services: [],
   activeServiceId: '',
   temperature: 0.7,
-  maxTokens: 2000,
+  maxTokens: 0,
   streamEnabled: true,
   systemPrompt: '',
   maxContentLength: 0,
@@ -899,6 +900,7 @@ export interface EditorTab {
 export interface WorkspaceTabState {
   id: string;
   documentId: string;
+  projectId?: string;
   panelState: EditorTab['panelState'];
 }
 

@@ -1116,3 +1116,16 @@ fn get_ai_config(
         model,
     }
 }
+
+/// 导出全部 AI 服务列表到共享文件 ~/.aidocplus/ai-services.json
+/// 供资源管理器等外部工具读取，支持多服务切换
+#[tauri::command]
+pub fn export_ai_services(json: String) -> std::result::Result<(), String> {
+    let home = dirs::home_dir().ok_or("无法获取用户主目录")?;
+    let config_dir = home.join(".aidocplus");
+    std::fs::create_dir_all(&config_dir)
+        .map_err(|e| format!("创建配置目录失败: {}", e))?;
+    std::fs::write(config_dir.join("ai-services.json"), &json)
+        .map_err(|e| format!("写入 AI 服务列表失败: {}", e))?;
+    Ok(())
+}

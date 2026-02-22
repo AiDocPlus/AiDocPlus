@@ -11,7 +11,14 @@ interface EditorWorkspaceProps {
 }
 
 export function EditorWorkspace({ tab }: EditorWorkspaceProps) {
-  const { documents, setTabPanelState, updateDocumentInMemory } = useAppStore();
+  const documents = useAppStore(s => s.documents);
+  const setTabPanelState = useAppStore(s => s.setTabPanelState);
+  const updateDocumentInMemory = useAppStore(s => s.updateDocumentInMemory);
+  // 精确订阅当前文档的 aiGeneratedContent，避免其他文档变化触发重渲染
+  const storeAiContent = useAppStore(s => {
+    const doc = s.documents.find(d => d.id === tab.documentId);
+    return doc?.aiGeneratedContent || '';
+  });
   const [authorNotes, setAuthorNotes] = useState('');
   const [content, setContent] = useState('');
   const [aiContent, setAiContent] = useState('');
@@ -83,8 +90,6 @@ export function EditorWorkspace({ tab }: EditorWorkspaceProps) {
   }, [composedContent, tab.documentId, updateDocumentInMemory]);
 
   // 监听 store 中 aiGeneratedContent 的外部变化（如 ChatPanel AI 生成），同步到本地 state
-  const storeDoc = documents.find(d => d.id === tab.documentId);
-  const storeAiContent = storeDoc?.aiGeneratedContent || '';
   useEffect(() => {
     setAiContent(storeAiContent);
   // eslint-disable-next-line react-hooks/exhaustive-deps

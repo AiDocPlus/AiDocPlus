@@ -37,3 +37,4 @@ cd /Users/jdh/Code/AiDocPlus/apps/desktop && pnpm tauri dev
 - 总装脚本位于 `AiDocPlus-Main/scripts/assemble.sh`，不在构建目标中
 - `AiDocPlus-Main/scripts/deploy.sh` 使用 `rsync --delete`，但排除了 `generated/`、`bundled-resources/`、`plugins/*/` 防止其他仓库的产物被删除
 - 如果某个资源仓库没有 `scripts/build.sh` 或 `scripts/deploy.sh`，总装脚本会跳过该步骤
+- **资源管理器**（`AiDocPlus-ResourceManager`）是独立项目，不参与总装流程。管理器直接操作各资源仓库的 `data/` 目录，修改后需重新运行对应仓库的 `build.sh` + `deploy.sh` 才能生效到主程序

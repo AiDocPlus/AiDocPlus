@@ -44,6 +44,8 @@ pub struct Document {
     pub enabled_plugins: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "composedContent")]
     pub composed_content: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "aiServiceId")]
+    pub ai_service_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -125,6 +127,7 @@ impl Document {
             plugin_data: None,
             enabled_plugins: None,
             composed_content: None,
+            ai_service_id: None,
         }
     }
 

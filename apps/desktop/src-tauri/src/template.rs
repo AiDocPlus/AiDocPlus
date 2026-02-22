@@ -260,7 +260,90 @@ pub fn create_template(manifest: TemplateManifest, content: TemplateContent) -> 
     Ok(manifest)
 }
 
+/// COW: 从 bundled-resources 复制内置模板到用户目录
+fn cow_copy_builtin_template(template_id: &str, target_dir: &std::path::Path) -> Result<(), String> {
+    // 在 bundled-resources/project-templates 中查找
+    let exe_dir = std::env::current_exe()
+        .map_err(|e| format!("获取可执行文件路径失败: {}", e))?;
+    let exe_parent = exe_dir.parent().ok_or("无法获取可执行文件目录")?;
+    let bundled_dir = exe_parent.join("bundled-resources").join("project-templates");
+
+    if let Some(source_dir) = find_builtin_template_dir(&bundled_dir, template_id) {
+        // 创建目标目录
+        fs::create_dir_all(target_dir)
+            .map_err(|e| format!("创建模板目录失败: {}", e))?;
+
+        // 复制 manifest.json → template.json（字段适配）
+        let manifest_path = source_dir.join("manifest.json");
+        if manifest_path.exists() {
+            if let Ok(json) = fs::read_to_string(&manifest_path) {
+                if let Ok(value) = serde_json::from_str::<serde_json::Value>(&json) {
+                    let manifest = TemplateManifest {
+                        id: value.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                        name: value.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                        description: value.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                        icon: value.get("icon").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                        author: value.get("author").and_then(|v| v.as_str()).unwrap_or("AiDocPlus").to_string(),
+                        template_type: "custom".to_string(),
+                        category: value.get("majorCategory").and_then(|v| v.as_str()).unwrap_or("general").to_string(),
+                        tags: value.get("tags")
+                            .and_then(|v| v.as_array())
+                            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                            .unwrap_or_default(),
+                        created_at: chrono::Utc::now().timestamp(),
+                        updated_at: chrono::Utc::now().timestamp(),
+                        include_content: true,
+                        include_ai_content: false,
+                        enabled_plugins: Vec::new(),
+                        plugin_data: None,
+                        min_app_version: None,
+                    };
+                    let manifest_json = serde_json::to_string_pretty(&manifest)
+                        .map_err(|e| format!("序列化 manifest 失败: {}", e))?;
+                    fs::write(target_dir.join("template.json"), manifest_json)
+                        .map_err(|e| format!("写入 template.json 失败: {}", e))?;
+                }
+            }
+        }
+
+        // 复制 content.json
+        let content_path = source_dir.join("content.json");
+        if content_path.exists() {
+            fs::copy(&content_path, target_dir.join("content.json"))
+                .map_err(|e| format!("复制 content.json 失败: {}", e))?;
+        }
+    }
+
+    Ok(())
+}
+
+/// 在 bundled 目录中递归查找指定 ID 的模板目录
+fn find_builtin_template_dir(dir: &std::path::Path, template_id: &str) -> Option<PathBuf> {
+    let entries = fs::read_dir(dir).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            let manifest_path = path.join("manifest.json");
+            if manifest_path.exists() {
+                if let Ok(json) = fs::read_to_string(&manifest_path) {
+                    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&json) {
+                        if value.get("id").and_then(|v| v.as_str()) == Some(template_id) {
+                            return Some(path);
+                        }
+                    }
+                }
+            }
+            // 递归子目录
+            if let Some(found) = find_builtin_template_dir(&path, template_id) {
+                return Some(found);
+            }
+        }
+    }
+    None
+}
+
 /// 更新模板 manifest（可选更新 content）
+/// 支持 Copy-on-Write：如果用户目录不存在该模板，先从 bundled 复制再修改
 pub fn update_template(
     template_id: &str,
     name: Option<String>,
@@ -273,6 +356,11 @@ pub fn update_template(
     let templates_dir = get_templates_dir();
     let template_dir = templates_dir.join(template_id);
     let manifest_path = template_dir.join("template.json");
+
+    // COW: 如果用户目录不存在该模板，尝试从 bundled-resources 复制
+    if !manifest_path.exists() {
+        cow_copy_builtin_template(template_id, &template_dir)?;
+    }
 
     if !manifest_path.exists() {
         return Err(format!("Template not found: {}", template_id));

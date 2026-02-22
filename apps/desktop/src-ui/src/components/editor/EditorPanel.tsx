@@ -19,6 +19,7 @@ import {
 } from '../ui/dropdown-menu';
 import { ResizableHandle } from '../ui/resizable-handle';
 import { AttachmentPanel } from './AttachmentPanel';
+import { TagEditor } from './TagEditor';
 import type { Attachment } from '@aidocplus/shared-types';
 
 
@@ -410,7 +411,7 @@ export function EditorPanel({
           variant={activeView === 'editor' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setActiveView('editor')}
-          title={t('editor.contentArea', { defaultValue: '正文区' })}
+          title={t('editor.contentArea', { defaultValue: '生成区' })}
           className={`gap-1 h-7 text-xs ${
             activeView === 'editor'
               ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
@@ -418,11 +419,11 @@ export function EditorPanel({
           }`}
         >
           <PenLine className="h-3.5 w-3.5" />
-          {t('editor.contentArea', { defaultValue: '正文区' })}
+          {t('editor.contentArea', { defaultValue: '生成区' })}
         </Button>
         <PluginMenu
           pluginAreaOpen={pluginAreaOpen}
-          onToggle={() => setActiveView(pluginAreaOpen ? 'editor' : 'plugins')}
+          onToggle={() => { if (!pluginAreaOpen) setActiveView('plugins'); }}
           document={document}
         />
         <Button
@@ -441,7 +442,7 @@ export function EditorPanel({
         </Button>
         <FunctionalPluginMenu
           functionalAreaOpen={functionalAreaOpen}
-          onToggle={() => setActiveView(functionalAreaOpen ? 'editor' : 'functional')}
+          onToggle={() => { if (!functionalAreaOpen) setActiveView('functional'); }}
           document={document}
         />
         <div className="w-px h-4 bg-border mx-0.5" />
@@ -545,6 +546,8 @@ export function EditorPanel({
         >
           <History className="h-3.5 w-3.5" />
         </Button>
+        <div className="w-px h-4 bg-border mx-0.5" />
+        <TagEditor projectId={document.projectId} documentId={document.id} className="max-w-[300px] overflow-x-auto" />
 
         <div className="flex-1" />
 
@@ -624,6 +627,12 @@ export function EditorPanel({
             onRightSidebarToggle={(o) => {
               if (o && !chatOpen) onChatToggle?.();
               if (!o && chatOpen) onChatToggle?.();
+            }}
+            exportCallbacks={{
+              onNativeExport: handleNativeExport,
+              onNativeExportComposed: handleNativeExportComposed,
+              onExportAndOpen: handleExportAndOpen,
+              composedContent,
             }}
           />
         ) : (

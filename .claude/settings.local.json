@@ -49,7 +49,10 @@
       "Bash(gh release view:*)",
       "Bash(gh release edit:*)",
       "Bash(bash scripts/assemble.sh)",
-      "Bash(pnpm install)"
+      "Bash(pnpm install)",
+      "Bash(sudo:*)",
+      "Bash(ps:*)",
+      "Bash(du:*)"
     ]
   }
 }

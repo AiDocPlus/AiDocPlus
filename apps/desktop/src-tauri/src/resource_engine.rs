@@ -273,8 +273,8 @@ impl ResourceEngine {
                 self.load_categories_from_meta(&meta_path, resource_type)?;
             }
 
-            // 扫描资源目录
-            self.scan_resource_dir(&type_dir, resource_type, "builtin")?;
+            // 扫描资源目录（INSERT OR IGNORE：不覆盖用户已修改的记录）
+            self.scan_resource_dir_with_mode(&type_dir, resource_type, "builtin", true)?;
         }
 
         // 重建 FTS 索引
@@ -308,7 +308,19 @@ impl ResourceEngine {
     }
 
     /// 扫描目录中的资源
+    /// `ignore_existing`: true 时使用 INSERT OR IGNORE（bundled 不覆盖用户修改），
+    ///                    false 时使用 INSERT OR REPLACE（local 覆盖 bundled）
     fn scan_resource_dir(&self, dir: &Path, resource_type: &str, source: &str) -> SqlResult<()> {
+        self.scan_resource_dir_with_mode(dir, resource_type, source, false)
+    }
+
+    fn scan_resource_dir_with_mode(
+        &self,
+        dir: &Path,
+        resource_type: &str,
+        source: &str,
+        ignore_existing: bool,
+    ) -> SqlResult<()> {
         if !dir.is_dir() {
             return Ok(());
         }
@@ -316,6 +328,32 @@ impl ResourceEngine {
         let entries = match fs::read_dir(dir) {
             Ok(e) => e,
             Err(_) => return Ok(()),
+        };
+
+        let insert_sql = if ignore_existing {
+            "INSERT OR IGNORE INTO resources (
+                id, package_name, resource_type, name, description, icon,
+                author, version, major_category, sub_category, tags,
+                sort_order, enabled, source, created_at, updated_at,
+                installed_at, data_path, checksum, min_app_version, extra
+            ) VALUES (
+                ?1, ?2, ?3, ?4, ?5, ?6,
+                ?7, ?8, ?9, ?10, ?11,
+                ?12, ?13, ?14, ?15, ?16,
+                ?17, ?18, ?19, ?20, ?21
+            )"
+        } else {
+            "INSERT OR REPLACE INTO resources (
+                id, package_name, resource_type, name, description, icon,
+                author, version, major_category, sub_category, tags,
+                sort_order, enabled, source, created_at, updated_at,
+                installed_at, data_path, checksum, min_app_version, extra
+            ) VALUES (
+                ?1, ?2, ?3, ?4, ?5, ?6,
+                ?7, ?8, ?9, ?10, ?11,
+                ?12, ?13, ?14, ?15, ?16,
+                ?17, ?18, ?19, ?20, ?21
+            )"
         };
 
         for entry in entries.flatten() {
@@ -350,17 +388,7 @@ impl ResourceEngine {
                     let extra = content.clone();
 
                     self.db.execute(
-                        "INSERT OR REPLACE INTO resources (
-                            id, package_name, resource_type, name, description, icon,
-                            author, version, major_category, sub_category, tags,
-                            sort_order, enabled, source, created_at, updated_at,
-                            installed_at, data_path, checksum, min_app_version, extra
-                        ) VALUES (
-                            ?1, ?2, ?3, ?4, ?5, ?6,
-                            ?7, ?8, ?9, ?10, ?11,
-                            ?12, ?13, ?14, ?15, ?16,
-                            ?17, ?18, ?19, ?20, ?21
-                        )",
+                        insert_sql,
                         params![
                             manifest.id,
                             manifest.package_name,
@@ -675,6 +703,112 @@ impl ResourceEngine {
             results.push(row?);
         }
         Ok(results)
+    }
+
+    /// Copy-on-Write：保存用户对资源的修改
+    /// 如果资源是 builtin，将文件复制到用户本地目录，更新索引指向新路径
+    pub fn save_resource_cow(
+        &self,
+        id: &str,
+        manifest_json: &str,
+        content_files: &[(String, String)],
+    ) -> SqlResult<()> {
+        // 查询当前资源的 source 和 resource_type
+        let (current_source, resource_type, current_data_path): (String, String, String) = self.db.query_row(
+            "SELECT source, resource_type, data_path FROM resources WHERE id = ?1",
+            params![id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )?;
+
+        let target_dir = if current_source == "builtin" {
+            // COW: 复制到用户本地目录
+            let type_dir_name = match resource_type.as_str() {
+                "role" => "roles",
+                "prompt-template" => "prompt-templates",
+                "document-template" => "document-templates",
+                "project-template" => "project-templates",
+                "ai-provider" => "ai-providers",
+                "plugin" => "plugins",
+                _ => "misc",
+            };
+            let local_dir = self.data_root.join(type_dir_name).join("local").join(id);
+            fs::create_dir_all(&local_dir).map_err(|e| {
+                rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("创建 COW 目录失败: {}", e),
+                )))
+            })?;
+            local_dir
+        } else {
+            // 已经是用户资源，直接写入原路径
+            PathBuf::from(&current_data_path)
+        };
+
+        // 写入 manifest.json
+        fs::write(target_dir.join("manifest.json"), manifest_json).map_err(|e| {
+            rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("写入 manifest 失败: {}", e),
+            )))
+        })?;
+
+        // 写入内容文件
+        for (filename, content) in content_files {
+            fs::write(target_dir.join(filename), content).map_err(|e| {
+                rusqlite::Error::ToSqlConversionFailure(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("写入 {} 失败: {}", filename, e),
+                )))
+            })?;
+        }
+
+        // 更新索引
+        let new_data_path = target_dir.to_string_lossy().to_string();
+        let now = chrono::Utc::now().to_rfc3339();
+
+        // 解析 manifest 更新索引字段
+        if let Ok(manifest) = serde_json::from_str::<GenericManifest>(manifest_json) {
+            let author_str = match &manifest.author {
+                serde_json::Value::String(s) => s.clone(),
+                serde_json::Value::Object(obj) => {
+                    obj.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string()
+                }
+                _ => String::new(),
+            };
+            let tags_json = serde_json::to_string(&manifest.tags).unwrap_or_default();
+
+            self.db.execute(
+                "UPDATE resources SET
+                    name = ?1, description = ?2, icon = ?3,
+                    author = ?4, version = ?5,
+                    major_category = ?6, sub_category = ?7, tags = ?8,
+                    sort_order = ?9, enabled = ?10,
+                    source = ?11, updated_at = ?12,
+                    data_path = ?13, extra = ?14
+                 WHERE id = ?15",
+                params![
+                    manifest.name,
+                    manifest.description,
+                    manifest.icon,
+                    author_str,
+                    manifest.version,
+                    manifest.major_category,
+                    manifest.sub_category,
+                    tags_json,
+                    manifest.order,
+                    manifest.enabled as i32,
+                    if current_source == "builtin" { "local" } else { current_source.as_str() },
+                    now,
+                    new_data_path,
+                    manifest_json,
+                    id,
+                ],
+            )?;
+
+            self.rebuild_fts()?;
+        }
+
+        Ok(())
     }
 
     /// 删除资源

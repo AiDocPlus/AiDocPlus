@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { MainLayout } from './components/layout/MainLayout';
 import { useAppStore } from './stores/useAppStore';
 import { useSettingsStore } from './stores/useSettingsStore';
+import { useTemplatesStore } from './stores/useTemplatesStore';
 import { useWorkspaceAutosave } from './hooks/useWorkspaceAutosave';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import './i18n'; // Initialize i18n
@@ -33,14 +34,16 @@ function AppContent() {
       setRestoring(true);
 
       try {
-        // Load plugins from backend
-        await useAppStore.getState().loadPlugins();
+        // 第一批：互不依赖的操作并行执行
+        await Promise.all([
+          useAppStore.getState().loadPlugins(),
+          useAppStore.getState().loadTemplates(),
+          useAppStore.getState().loadTemplateCategories(),
+          useTemplatesStore.getState().loadBuiltInTemplates(),
+          useTemplatesStore.getState().loadBuiltInCategories(),
+        ]);
 
-        // Load templates and categories from backend
-        await useAppStore.getState().loadTemplates();
-        await useAppStore.getState().loadTemplateCategories();
-
-        // Restore workspace state (includes loading projects)
+        // 第二批：依赖第一批完成
         await restoreWorkspace();
       } catch (error) {
         console.error('[App] Failed to restore workspace, loading projects:', error);

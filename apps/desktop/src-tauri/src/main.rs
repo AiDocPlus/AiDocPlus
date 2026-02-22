@@ -27,6 +27,7 @@ use commands::{
     resource::*,
     search::*,
     template::*,
+    wechat::*,
     workspace::*,
 };
 use tauri::{Manager, Emitter};
@@ -223,6 +224,9 @@ fn main() {
             list_documents,
             move_document,
             copy_document,
+            update_document_tags,
+            list_all_tags,
+            toggle_document_starred,
 
             // Version commands
             create_version,
@@ -245,6 +249,7 @@ fn main() {
             generate_content_stream,
             stop_ai_stream,
             test_api_connection,
+            export_ai_services,
 
             // Import commands
             import_file,
@@ -294,6 +299,17 @@ fn main() {
             resource_stats,
             resource_categories,
             resource_rebuild_index,
+            resource_save,
+            open_resource_manager,
+            list_prompt_templates,
+            list_prompt_template_categories,
+            save_custom_prompt_template,
+            delete_custom_prompt_template,
+            export_custom_prompt_templates,
+            import_custom_prompt_templates,
+
+            // WeChat commands
+            wechat_http_request,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -11,7 +11,7 @@ echo "=== AiDocPlus Assembly Pipeline ==="
 echo "================================"
 
 # 部署顺序：Main 必须最先（提供基础框架），其余按依赖顺序
-REPOS=(Main Roles PromptTemplates DocTemplates ProjectTemplates AIProviders Plugins)
+REPOS=(Main Roles PromptTemplates DocTemplates ProjectTemplates AIProviders Plugins ResourceManager)
 
 for repo in "${REPOS[@]}"; do
   REPO_DIR="${PARENT_DIR}/AiDocPlus-${repo}"

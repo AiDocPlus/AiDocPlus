@@ -476,7 +476,7 @@ export const useSettingsStore = create<SettingsState>()(
               services,
               activeServiceId: services[0]?.id || '',
               temperature: oldAi.temperature ?? 0.7,
-              maxTokens: oldAi.maxTokens ?? 2000,
+              maxTokens: oldAi.maxTokens ?? 0,
               streamEnabled: oldAi.streamEnabled ?? true,
               systemPrompt: oldAi.systemPrompt || '',
               maxContentLength: oldAi.maxContentLength ?? 0,
@@ -515,6 +515,47 @@ export const usePluginsSettings = () => useSettingsStore((state) => state.plugin
 export function getAIInvokeParams() {
   const ai = useSettingsStore.getState().ai;
   const service = getActiveService(ai);
+  if (!service) {
+    return { provider: undefined, apiKey: undefined, model: undefined, baseUrl: undefined };
+  }
+  const providerConfig = getProviderConfig(service.provider);
+  return {
+    provider: service.provider || undefined,
+    apiKey: service.apiKey || undefined,
+    model: service.model || undefined,
+    baseUrl: service.baseUrl || providerConfig?.baseUrl || undefined,
+  };
+}
+
+/**
+ * 当 AI 服务配置变化时，自动导出到共享文件供资源管理器等外部工具使用。
+ * 文件路径: ~/.aidocplus/ai-services.json
+ */
+let _lastAiJson = '';
+useSettingsStore.subscribe((state) => {
+  const ai = state.ai;
+  const json = JSON.stringify({ services: ai.services, activeServiceId: ai.activeServiceId, temperature: ai.temperature, maxTokens: ai.maxTokens });
+  if (json === _lastAiJson) return;
+  _lastAiJson = json;
+  import('@tauri-apps/api/core').then(({ invoke }) => {
+    invoke('export_ai_services', { json }).catch(() => {});
+  });
+});
+
+/**
+ * 按指定 serviceId 获取 AI 服务的 invoke 调用参数。
+ * 为空时回退到全局 activeServiceId。
+ */
+export function getAIInvokeParamsForService(serviceId?: string) {
+  const ai = useSettingsStore.getState().ai;
+  let service;
+  if (serviceId) {
+    service = ai.services.find(s => s.id === serviceId && s.enabled);
+  }
+  // 回退到全局激活服务
+  if (!service) {
+    service = getActiveService(ai);
+  }
   if (!service) {
     return { provider: undefined, apiKey: undefined, model: undefined, baseUrl: undefined };
   }
