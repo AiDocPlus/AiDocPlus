@@ -163,24 +163,20 @@ jobs:
 
           echo "Assembly complete"
 
-      - name: Build resource managers (Windows exe)
+      - name: Build unified resource manager (Windows exe)
         shell: bash
         run: |
           cd AiDocPlus-ResourceManager
           pnpm install
 
-          # Build each manager with tauri build (embeds frontend dist into exe)
-          MANAGERS="roles-manager ai-providers-manager prompt-templates-manager project-templates-manager doc-templates-manager plugins-manager"
+          # Build the unified resource manager
+          echo "[tauri build] resource-manager"
+          (cd apps/resource-manager && npx tauri build --target x86_64-pc-windows-msvc 2>&1 | tail -5)
+
           TARGET_DIR="../AiDocPlus/apps/desktop/src-tauri/bundled-resources/managers"
           mkdir -p "$TARGET_DIR"
-
-          for mgr in $MANAGERS; do
-            echo "[tauri build] $mgr"
-            (cd apps/$mgr && npx tauri build --target x86_64-pc-windows-msvc 2>&1 | tail -5)
-            cp "target/x86_64-pc-windows-msvc/release/${mgr}.exe" "$TARGET_DIR/"
-            echo "   [copy] ${mgr}.exe"
-          done
-          echo "[done] Deployed 6 manager exe files"
+          cp "target/x86_64-pc-windows-msvc/release/resource-manager.exe" "$TARGET_DIR/"
+          echo "[done] Deployed unified resource-manager.exe"
 
       # ── 4. 安装依赖并构建 ──
       - name: Install frontend dependencies
