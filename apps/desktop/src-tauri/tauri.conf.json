@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
   "productName": "AiDocPlus",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "identifier": "com.aidocplus.app",
   "build": {
     "beforeDevCommand": "cd src-ui && pnpm dev",
@@ -30,9 +30,7 @@
   "bundle": {
     "active": true,
     "targets": ["dmg", "nsis"],
-    "resources": {
-      "bundled-resources/**/*": "bundled-resources/"
-    },
+    "resources": ["bundled-resources/"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

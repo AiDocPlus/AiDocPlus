@@ -113,8 +113,7 @@ pub fn list_templates() -> Vec<TemplateManifest> {
 
 /// 从 bundled-resources/project-templates 递归加载内置模板 manifest
 fn load_builtin_templates() -> Option<Vec<TemplateManifest>> {
-    let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
-    let bundled_dir = exe_dir.join("bundled-resources").join("project-templates");
+    let bundled_dir = crate::paths::bundled_sub_dir("project-templates")?;
     if !bundled_dir.exists() {
         return None;
     }
@@ -193,8 +192,7 @@ pub fn get_template_content(template_id: &str) -> Result<TemplateContent, String
 
 /// 在 bundled-resources/project-templates 中递归查找指定 ID 的 content.json
 fn find_builtin_template_content(template_id: &str) -> Option<TemplateContent> {
-    let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
-    let bundled_dir = exe_dir.join("bundled-resources").join("project-templates");
+    let bundled_dir = crate::paths::bundled_sub_dir("project-templates")?;
     find_content_recursive(&bundled_dir, template_id)
 }
 
@@ -263,10 +261,8 @@ pub fn create_template(manifest: TemplateManifest, content: TemplateContent) -> 
 /// COW: 从 bundled-resources 复制内置模板到用户目录
 fn cow_copy_builtin_template(template_id: &str, target_dir: &std::path::Path) -> Result<(), String> {
     // 在 bundled-resources/project-templates 中查找
-    let exe_dir = std::env::current_exe()
-        .map_err(|e| format!("获取可执行文件路径失败: {}", e))?;
-    let exe_parent = exe_dir.parent().ok_or("无法获取可执行文件目录")?;
-    let bundled_dir = exe_parent.join("bundled-resources").join("project-templates");
+    let bundled_dir = crate::paths::bundled_sub_dir("project-templates")
+        .unwrap_or_else(|| std::path::PathBuf::from(""));
 
     if let Some(source_dir) = find_builtin_template_dir(&bundled_dir, template_id) {
         // 创建目标目录
@@ -493,8 +489,7 @@ fn default_categories() -> Vec<TemplateCategory> {
 
 /// 从 bundled-resources 加载分类定义
 fn load_categories_from_bundled() -> Option<Vec<TemplateCategory>> {
-    let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
-    let meta_path = exe_dir.join("bundled-resources").join("document-templates").join("_meta.json");
+    let meta_path = crate::paths::bundled_sub_dir("document-templates")?.join("_meta.json");
     if !meta_path.exists() {
         return None;
     }

@@ -107,33 +107,9 @@ pub fn resource_rebuild_index(
 
 #[tauri::command]
 pub fn open_resource_manager(managerName: String) -> Result<(), String> {
-    let exe_dir = std::env::current_exe()
-        .map_err(|e| format!("获取可执行文件路径失败: {}", e))?;
-    let exe_parent = exe_dir.parent().ok_or("无法获取可执行文件目录")?;
-
-    // 查找 managers 目录：release 模式在 exe 同级，dev 模式在 src-tauri/ 下
-    let managers_dir = {
-        let primary = exe_parent.join("bundled-resources").join("managers");
-        if primary.exists() {
-            primary
-        } else {
-            // dev 模式回退：exe 在 target/debug/，向上找 src-tauri/bundled-resources/managers/
-            let mut dir = exe_parent.to_path_buf();
-            loop {
-                let candidate = dir.join("src-tauri").join("bundled-resources").join("managers");
-                if candidate.exists() {
-                    break candidate;
-                }
-                let candidate2 = dir.join("bundled-resources").join("managers");
-                if candidate2.exists() {
-                    break candidate2;
-                }
-                if !dir.pop() {
-                    break primary; // 回退到原始路径，让后续报错
-                }
-            }
-        }
-    };
+    // 通过集中式路径模块查找 managers 目录（跨平台兼容）
+    let managers_dir = crate::paths::bundled_sub_dir("managers")
+        .ok_or_else(|| "未找到 bundled-resources/managers 目录".to_string())?;
 
     // 计算用户数据目录：~/AiDocPlus/<resource-type>/
     // 管理器名称 → 资源子目录映射
@@ -293,31 +269,9 @@ struct CustomTemplateEntry {
     variables: Vec<String>,
 }
 
-/// 查找 bundled-resources/prompt-templates 目录（兼容 dev 和 release 模式）
+/// 查找 bundled-resources/prompt-templates 目录（通过集中式路径模块，跨平台兼容）
 fn find_prompt_templates_dir() -> Option<std::path::PathBuf> {
-    let exe_dir = std::env::current_exe().ok()?;
-    let exe_parent = exe_dir.parent()?;
-
-    let primary = exe_parent.join("bundled-resources").join("prompt-templates");
-    if primary.exists() {
-        return Some(primary);
-    }
-
-    // dev 模式回退
-    let mut dir = exe_parent.to_path_buf();
-    loop {
-        let candidate = dir.join("src-tauri").join("bundled-resources").join("prompt-templates");
-        if candidate.exists() {
-            return Some(candidate);
-        }
-        let candidate2 = dir.join("bundled-resources").join("prompt-templates");
-        if candidate2.exists() {
-            return Some(candidate2);
-        }
-        if !dir.pop() {
-            return None;
-        }
-    }
+    crate::paths::bundled_sub_dir("prompt-templates")
 }
 
 /// 获取用户自定义模板文件路径：~/AiDocPlus/PromptTemplates/custom.json

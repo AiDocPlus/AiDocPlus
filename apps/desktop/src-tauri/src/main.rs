@@ -7,6 +7,7 @@ mod config;
 mod document;
 mod error;
 mod native_export;
+mod paths;
 mod plugin;
 mod project;
 mod resource_engine;
@@ -45,6 +46,9 @@ fn main() {
             // Initialize app state
             app.manage(config::AppState::new());
 
+            // 初始化跨平台资源路径（必须在其他模块使用 bundled-resources 之前）
+            paths::init_bundled_resources_dir(app);
+
             // Initialize resource engine
             let resource_state = resource_engine::ResourceEngineState::new();
             let home = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
@@ -53,16 +57,13 @@ fn main() {
                 eprintln!("[ResourceEngine] 初始化失败: {}", e);
             } else {
                 // 从 bundled-resources 重建索引
-                let bundled_dir = std::env::current_exe()
-                    .ok()
-                    .and_then(|p| p.parent().map(|p| p.to_path_buf()))
-                    .unwrap_or_default()
-                    .join("bundled-resources");
-                if let Err(e) = resource_state.with_engine(|engine| {
-                    engine.rebuild_index_from_bundled(&bundled_dir)?;
-                    engine.rebuild_index_from_local()
-                }) {
-                    eprintln!("[ResourceEngine] 索引重建失败: {}", e);
+                if let Some(bundled_dir) = paths::bundled_resources_dir() {
+                    if let Err(e) = resource_state.with_engine(|engine| {
+                        engine.rebuild_index_from_bundled(&bundled_dir)?;
+                        engine.rebuild_index_from_local()
+                    }) {
+                        eprintln!("[ResourceEngine] 索引重建失败: {}", e);
+                    }
                 }
             }
             app.manage(resource_state);

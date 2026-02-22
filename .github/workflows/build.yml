@@ -72,6 +72,12 @@ jobs:
           repository: AiDocPlus/AiDocPlus-Plugins
           path: AiDocPlus-Plugins
 
+      - name: Checkout AiDocPlus-ResourceManager
+        uses: actions/checkout@v4
+        with:
+          repository: AiDocPlus/AiDocPlus-ResourceManager
+          path: AiDocPlus-ResourceManager
+
       # ── 2. 安装工具链 ──
       - name: Setup Python 3
         uses: actions/setup-python@v5
@@ -96,7 +102,9 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: './AiDocPlus/apps/desktop/src-tauri -> target'
+          workspaces: |
+            ./AiDocPlus/apps/desktop/src-tauri -> target
+            ./AiDocPlus-ResourceManager -> target
 
       - name: Cache pnpm store
         uses: actions/cache@v4
@@ -154,6 +162,32 @@ jobs:
           bash AiDocPlus-Plugins/scripts/deploy.sh
 
           echo "Assembly complete"
+
+      - name: Build resource managers (Windows exe)
+        shell: bash
+        run: |
+          cd AiDocPlus-ResourceManager
+          pnpm install
+
+          # Build all manager frontends
+          MANAGERS="roles-manager ai-providers-manager prompt-templates-manager project-templates-manager doc-templates-manager plugins-manager"
+          for mgr in $MANAGERS; do
+            echo "[frontend] $mgr"
+            (cd apps/$mgr && npx vite build src-ui)
+          done
+
+          # Cargo workspace build (shared deps compiled once)
+          echo "[cargo] Building all managers..."
+          cargo build --release --target x86_64-pc-windows-msvc
+
+          # Copy exe files to bundled-resources/managers/
+          TARGET_DIR="../AiDocPlus/apps/desktop/src-tauri/bundled-resources/managers"
+          mkdir -p "$TARGET_DIR"
+          for mgr in $MANAGERS; do
+            cp "target/x86_64-pc-windows-msvc/release/${mgr}.exe" "$TARGET_DIR/"
+            echo "   [copy] ${mgr}.exe"
+          done
+          echo "[done] Deployed 6 manager exe files"
 
       # ── 4. 安装依赖并构建 ──
       - name: Install frontend dependencies
