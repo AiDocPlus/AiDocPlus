@@ -158,11 +158,10 @@ jobs:
           cd AiDocPlus-ResourceManager
           pnpm install
 
-          # 使用共享 CARGO_TARGET_DIR（已通过 env 设置）
-          # ResourceManager 的 .cargo/config.toml 中的 target-dir 是本地开发路径，
-          # CI 中 CARGO_TARGET_DIR 环境变量优先级更高，会覆盖 config.toml
-          echo "[tauri build] resource-manager (shared target: $CARGO_TARGET_DIR)"
-          (cd apps/resource-manager && npx tauri build --target x86_64-pc-windows-msvc 2>&1 | tail -5)
+          # 使用 --no-bundle 跳过 WiX/MSI 打包，只需要 exe
+          # CARGO_TARGET_DIR 环境变量优先级高于 .cargo/config.toml 中的本地路径
+          echo "[tauri build] resource-manager --no-bundle (shared target: $CARGO_TARGET_DIR)"
+          (cd apps/resource-manager && npx tauri build --no-bundle --target x86_64-pc-windows-msvc 2>&1 | tail -10)
 
           TARGET_DIR="../AiDocPlus/apps/desktop/src-tauri/bundled-resources/managers"
           mkdir -p "$TARGET_DIR"
