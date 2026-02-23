@@ -125,6 +125,9 @@ pub fn open_resource_manager(managerName: String) -> Result<(), String> {
         _ => None,
     };
 
+    // DEBUG: 输出启动信息
+    eprintln!("[DEBUG] open_resource_manager: managerName={}, resource_type={}, data_dir={:?}", managerName, resource_type, data_dir);
+
     #[cfg(target_os = "macos")]
     {
         let app_path = managers_dir.join("资源管理器.app");
