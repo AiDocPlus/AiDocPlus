@@ -92,8 +92,14 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
+          # 声明两个 workspace，共享同一个 target 目录，避免重复编译
           workspaces: |
             ./AiDocPlus/apps/desktop/src-tauri -> ${{ github.workspace }}/rust-target
+            ./AiDocPlus-ResourceManager/apps/resource-manager/src-tauri -> ${{ github.workspace }}/rust-target
+          # 缓存所有 crate（包括 registry index），加速依赖下载
+          cache-all-crates: true
+          # 即使构建失败也保存缓存，下次可复用已编译的依赖
+          cache-on-failure: true
 
       - name: Cache pnpm store
         uses: actions/cache@v4
