@@ -179,13 +179,26 @@ jobs:
         working-directory: AiDocPlus
         run: pnpm install
 
+      - name: Determine version tag
+        id: version
+        shell: bash
+        run: |
+          # tag 触发时直接用 tag 名；手动触发时从 tauri.conf.json 读取版本号
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          else
+            VERSION=$(python -c "import json; print(json.load(open('AiDocPlus/apps/desktop/src-tauri/tauri.conf.json'))['version'])")
+            echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+          fi
+          echo "Resolved tag: $(cat $GITHUB_OUTPUT)"
+
       - name: Build Tauri app (Windows x64)
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: ./AiDocPlus/apps/desktop
-          tagName: ${{ github.ref_name }}
+          tagName: ${{ steps.version.outputs.tag }}
           releaseName: 'AiDocPlus __VERSION__'
           releaseBody: |
             ## AiDocPlus __VERSION__
