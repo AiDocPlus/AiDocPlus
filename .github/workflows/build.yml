@@ -36,12 +36,6 @@ jobs:
           repository: AiDocPlus/AiDocPlus-Main
           path: AiDocPlus-Main
 
-      - name: Checkout AiDocPlus-Roles
-        uses: actions/checkout@v4
-        with:
-          repository: AiDocPlus/AiDocPlus-Roles
-          path: AiDocPlus-Roles
-
       - name: Checkout AiDocPlus-PromptTemplates
         uses: actions/checkout@v4
         with:
@@ -53,12 +47,6 @@ jobs:
         with:
           repository: AiDocPlus/AiDocPlus-DocTemplates
           path: AiDocPlus-DocTemplates
-
-      - name: Checkout AiDocPlus-ProjectTemplates
-        uses: actions/checkout@v4
-        with:
-          repository: AiDocPlus/AiDocPlus-ProjectTemplates
-          path: AiDocPlus-ProjectTemplates
 
       - name: Checkout AiDocPlus-AIProviders
         uses: actions/checkout@v4
@@ -149,7 +137,7 @@ jobs:
       - name: Deploy resource repositories
         shell: bash
         run: |
-          for repo in Roles PromptTemplates DocTemplates ProjectTemplates AIProviders; do
+          for repo in PromptTemplates DocTemplates AIProviders; do
             REPO_DIR="AiDocPlus-${repo}"
             echo "Deploy ${REPO_DIR}..."
             if [ -f "${REPO_DIR}/scripts/build.sh" ]; then
