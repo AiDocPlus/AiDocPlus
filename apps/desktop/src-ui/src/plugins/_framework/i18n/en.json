@@ -1,5 +1,5 @@
 {
-  "area": "Plugins",
+  "area": "Content",
   "toggle": "Toggle plugin tool area",
   "allDisabled": "No plugins available",
   "manage": "Manage plugins",
@@ -62,7 +62,5 @@
   "majorCategories": {
     "content-generation": "Content Generation",
     "functional": "Functional"
-  },
-  "functionalArea": "Functional",
-  "functionalToggle": "Toggle functional plugin area"
+  }
 }

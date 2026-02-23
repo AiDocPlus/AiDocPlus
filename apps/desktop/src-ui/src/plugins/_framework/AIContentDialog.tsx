@@ -55,7 +55,7 @@ export function AIContentDialog({
   onGenerated,
   presetPrompts,
   defaultPrompt = '',
-  maxTokens = 4096,
+  maxTokens,
 }: AIContentDialogProps) {
   const { t } = useTranslation('plugin-framework');
   const host = usePluginHost();

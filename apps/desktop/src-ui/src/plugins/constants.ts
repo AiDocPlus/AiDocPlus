@@ -37,21 +37,6 @@ export const PLUGIN_SUB_CATEGORIES: Record<string, Array<{ key: string; label: s
   ],
 };
 
-/**
- * 兼容旧代码：扁平分类列表（deprecated，后续移除）
- */
-export const PLUGIN_CATEGORIES = [
-  { key: 'all',            label: '全部' },
-  { key: 'ai-text',        label: 'AI 文本' },
-  { key: 'visualization',  label: '可视化' },
-  { key: 'data',           label: '数据处理' },
-  { key: 'analysis',       label: '分析统计' },
-  { key: 'communication',  label: '通信协作' },
-  { key: 'export',          label: '导出发布' },
-] as const;
-
-export type PluginCategoryKey = typeof PLUGIN_CATEGORIES[number]['key'];
-
 // ============================================================
 // 合并内置分类 + 用户自定义分类
 // ============================================================

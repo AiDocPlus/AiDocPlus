@@ -1,5 +1,5 @@
 {
-  "area": "插件区",
+  "area": "内容区",
   "toggle": "展开/收起插件工具区",
   "allDisabled": "没有可用的插件",
   "manage": "管理插件",
@@ -62,7 +62,5 @@
   "majorCategories": {
     "content-generation": "内容生成",
     "functional": "功能执行"
-  },
-  "functionalArea": "功能区",
-  "functionalToggle": "展开/收起功能插件区"
+  }
 }
