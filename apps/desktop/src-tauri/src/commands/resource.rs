@@ -118,22 +118,11 @@ pub fn open_resource_manager(managerName: String) -> Result<(), String> {
         _ => return Err(format!("未知管理器: {}", managerName)),
     };
 
-    // 计算数据目录：提示词模板用 bundled-resources，其他用 ~/AiDocPlus/<subdir>/
-    let data_dir = if resource_type == "prompt-templates" {
-        find_prompt_templates_dir()
-    } else {
-        let subdir = match resource_type {
-            "doc-templates" => "DocTemplates",
-            _ => "",
-        };
-        if !subdir.is_empty() {
-            let home = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
-            let dir = home.join("AiDocPlus").join(subdir);
-            let _ = std::fs::create_dir_all(&dir);
-            Some(dir)
-        } else {
-            None
-        }
+    // 计算数据目录：均从 bundled-resources 中查找
+    let data_dir = match resource_type {
+        "prompt-templates" => find_prompt_templates_dir(),
+        "doc-templates" => crate::paths::bundled_sub_dir("document-templates"),
+        _ => None,
     };
 
     #[cfg(target_os = "macos")]
