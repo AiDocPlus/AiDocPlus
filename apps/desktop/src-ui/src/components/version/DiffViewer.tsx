@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { FileText, Columns, List } from 'lucide-react';
 import { useTranslation } from '@/i18n';
+import i18n from '@/i18n';
 import type { DocumentVersion } from '@aidocplus/shared-types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Button } from '../ui/button';
@@ -48,7 +49,7 @@ export function DiffViewer({
   const rightContent = rightVersion?.content ?? '';
 
   const formatDate = (timestamp: number) => {
-    const language = localStorage.getItem('aidocplus-language') || 'zh';
+    const language = i18n.language || 'zh';
     const locale = language === 'en' ? enUS : zhCN;
     try {
       return format(new Date(timestamp * 1000), 'PPp', { locale });

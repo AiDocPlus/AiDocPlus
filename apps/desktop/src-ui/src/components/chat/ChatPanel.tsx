@@ -5,7 +5,7 @@ import { useAppStore } from '@/stores/useAppStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { PromptTemplates } from '../templates/PromptTemplates';
 import { invoke } from '@tauri-apps/api/core';
-import { timestampToDate, getProviderConfig, getActiveService, getActiveRole } from '@aidocplus/shared-types';
+import { timestampToDate, getProviderConfig, getActiveService } from '@aidocplus/shared-types';
 import type { PromptTemplate, Attachment, ChatContextMode } from '@aidocplus/shared-types';
 import { useTemplatesStore } from '@/stores/useTemplatesStore';
 import { useTranslation } from '@/i18n';
@@ -685,16 +685,6 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
       <div className="flex items-center justify-between px-4 py-2 border-b bg-background flex-shrink-0">
         <div className="flex items-center gap-2">
           <h2 className="font-semibold">{simpleMode ? t('chat.chatTitle', { defaultValue: '随便聊聊' }) : t('chat.aiAssistant', { defaultValue: 'AI' })}</h2>
-          {(() => {
-            const activeRole = getActiveRole(settingsStore.role);
-            if (!activeRole || !activeRole.systemPrompt) return null;
-            return (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary flex items-center gap-1" title={activeRole.description}>
-                <span>{activeRole.icon}</span>
-                <span>{activeRole.name}</span>
-              </span>
-            );
-          })()}
           {/* 文档级 AI 服务选择器（≥2 个已启用服务时显示） */}
           {!simpleMode && currentDocument && enabledServices.length >= 2 && (
             <DropdownMenu>

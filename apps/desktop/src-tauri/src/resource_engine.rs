@@ -254,10 +254,8 @@ impl ResourceEngine {
 
         // 遍历资源类型目录
         let type_dirs = [
-            ("roles", "role"),
             ("prompt-templates", "prompt-template"),
             ("document-templates", "document-template"),
-            ("project-templates", "project-template"),
             ("ai-providers", "ai-provider"),
         ];
 
@@ -286,10 +284,8 @@ impl ResourceEngine {
     /// 从用户本地目录扫描资源
     pub fn rebuild_index_from_local(&self) -> SqlResult<()> {
         let resource_types = [
-            ("roles", "role"),
             ("prompt-templates", "prompt-template"),
             ("document-templates", "document-template"),
-            ("project-templates", "project-template"),
             ("ai-providers", "ai-provider"),
             ("plugins", "plugin"),
         ];
@@ -723,10 +719,8 @@ impl ResourceEngine {
         let target_dir = if current_source == "builtin" {
             // COW: 复制到用户本地目录
             let type_dir_name = match resource_type.as_str() {
-                "role" => "roles",
                 "prompt-template" => "prompt-templates",
                 "document-template" => "document-templates",
-                "project-template" => "project-templates",
                 "ai-provider" => "ai-providers",
                 "plugin" => "plugins",
                 _ => "misc",

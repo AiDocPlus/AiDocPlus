@@ -9,10 +9,8 @@
 
 /** 资源类型 */
 export type ResourceType =
-  | 'role'
   | 'prompt-template'
   | 'document-template'
-  | 'project-template'
   | 'ai-provider'
   | 'plugin'
   | 'theme'              // 未来扩展
@@ -83,21 +81,6 @@ export interface ResourceManifestBase {
 }
 
 // ============================================================
-// 角色 Manifest
-// ============================================================
-
-export interface RoleManifest extends ResourceManifestBase {
-  resourceType: 'role';
-  markdownModePrompt?: string;
-  suggestedTemperature?: number;
-  suggestedMaxTokens?: number;
-  recommendedTemplateCategories?: string[];
-  recommendedPlugins?: string[];
-  /** 角色能力声明（未来用于智能匹配） */
-  capabilities?: string[];
-}
-
-// ============================================================
 // 提示词模板 Manifest
 // ============================================================
 
@@ -133,26 +116,6 @@ export interface DocumentTemplateManifest extends ResourceManifestBase {
   pluginData?: Record<string, unknown>;
   /** 预览截图路径 */
   previewImage?: string;
-}
-
-// ============================================================
-// 项目模板 Manifest
-// ============================================================
-
-/** 项目结构中的单个文档定义 */
-export interface ProjectStructureItem {
-  title: string;
-  templateId?: string;              // 关联的文档模板 ID
-  order: number;
-  description?: string;
-  requiredPlugins?: string[];
-}
-
-export interface ProjectTemplateManifest extends ResourceManifestBase {
-  resourceType: 'project-template';
-  documentCount: number;
-  defaultPlugins: string[];
-  structure: ProjectStructureItem[];
 }
 
 // ============================================================

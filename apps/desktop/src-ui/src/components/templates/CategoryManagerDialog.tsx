@@ -22,7 +22,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { TemplateCategory } from '@aidocplus/shared-types';
+import type { DocTemplateCategory } from '@aidocplus/shared-types';
 
 interface CategoryManagerDialogProps {
   open: boolean;
@@ -34,8 +34,8 @@ function SortableCategoryItem({
   onEdit,
   onDelete,
 }: {
-  category: TemplateCategory;
-  onEdit: (cat: TemplateCategory) => void;
+  category: DocTemplateCategory;
+  onEdit: (cat: DocTemplateCategory) => void;
   onDelete: (key: string) => void;
 }) {
   const { t } = useTranslation();
@@ -127,11 +127,11 @@ function SortableCategoryItem({
 export function CategoryManagerDialog({ open, onOpenChange }: CategoryManagerDialogProps) {
   const { t } = useTranslation();
   const {
-    templateCategories,
-    createTemplateCategory,
-    updateTemplateCategory,
-    deleteTemplateCategory,
-    reorderTemplateCategories,
+    docTemplateCategories,
+    createDocTemplateCategory,
+    updateDocTemplateCategory,
+    deleteDocTemplateCategory,
+    reorderDocTemplateCategories,
   } = useAppStore();
 
   const [isAdding, setIsAdding] = useState(false);
@@ -151,7 +151,7 @@ export function CategoryManagerDialog({ open, onOpenChange }: CategoryManagerDia
     const label = newLabel.trim();
     if (!key || !label) return;
     try {
-      await createTemplateCategory(key, label);
+      await createDocTemplateCategory(key, label);
       setNewKey('');
       setNewLabel('');
       setIsAdding(false);
@@ -161,7 +161,7 @@ export function CategoryManagerDialog({ open, onOpenChange }: CategoryManagerDia
     }
   };
 
-  const handleStartEdit = (cat: TemplateCategory) => {
+  const handleStartEdit = (cat: DocTemplateCategory) => {
     setEditingKey(cat.key);
     setEditLabel(cat.label);
   };
@@ -171,7 +171,7 @@ export function CategoryManagerDialog({ open, onOpenChange }: CategoryManagerDia
     const label = editLabel.trim();
     if (!label) return;
     try {
-      await updateTemplateCategory(editingKey, label);
+      await updateDocTemplateCategory(editingKey, label);
       setEditingKey(null);
     } catch (err) {
       console.error('Failed to update category:', err);
@@ -180,7 +180,7 @@ export function CategoryManagerDialog({ open, onOpenChange }: CategoryManagerDia
 
   const handleDelete = async (key: string) => {
     try {
-      await deleteTemplateCategory(key);
+      await deleteDocTemplateCategory(key);
     } catch (err) {
       console.error('Failed to delete category:', err);
     }
@@ -190,18 +190,18 @@ export function CategoryManagerDialog({ open, onOpenChange }: CategoryManagerDia
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const oldIndex = templateCategories.findIndex(c => c.key === active.id);
-    const newIndex = templateCategories.findIndex(c => c.key === over.id);
+    const oldIndex = docTemplateCategories.findIndex(c => c.key === active.id);
+    const newIndex = docTemplateCategories.findIndex(c => c.key === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
 
-    const reordered = arrayMove(templateCategories, oldIndex, newIndex);
+    const reordered = arrayMove(docTemplateCategories, oldIndex, newIndex);
     const orderedKeys = reordered.map(c => c.key);
     try {
-      await reorderTemplateCategories(orderedKeys);
+      await reorderDocTemplateCategories(orderedKeys);
     } catch (err) {
       console.error('Failed to reorder categories:', err);
     }
-  }, [templateCategories, reorderTemplateCategories]);
+  }, [docTemplateCategories, reorderDocTemplateCategories]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -213,8 +213,8 @@ export function CategoryManagerDialog({ open, onOpenChange }: CategoryManagerDia
 
         <div className="flex-1 overflow-y-auto space-y-1.5 min-h-0">
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={templateCategories.map(c => c.key)} strategy={verticalListSortingStrategy}>
-              {templateCategories.map(cat => (
+            <SortableContext items={docTemplateCategories.map(c => c.key)} strategy={verticalListSortingStrategy}>
+              {docTemplateCategories.map(cat => (
                 editingKey === cat.key ? (
                   <div key={cat.key} className="flex items-center gap-2 px-2 py-2 rounded-md border border-primary bg-primary/5">
                     <Input
@@ -244,7 +244,7 @@ export function CategoryManagerDialog({ open, onOpenChange }: CategoryManagerDia
             </SortableContext>
           </DndContext>
 
-          {templateCategories.length === 0 && (
+          {docTemplateCategories.length === 0 && (
             <div className="text-center text-sm text-muted-foreground py-6">{t('templates.noCategories', { defaultValue: '暂无分类' })}</div>
           )}
         </div>

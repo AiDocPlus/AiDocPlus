@@ -11,4 +11,5 @@ pub mod resource;
 pub mod template;
 pub mod search;
 pub mod wechat;
+pub mod settings;
 pub mod workspace;

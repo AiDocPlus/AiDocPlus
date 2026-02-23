@@ -5,8 +5,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAppStore } from '@/stores/useAppStore';
-import type { TemplateManifest, TemplateCategory } from '@aidocplus/shared-types';
-import { getTemplateCategories } from './constants';
+import type { DocTemplateManifest, DocTemplateCategory } from '@aidocplus/shared-types';
+import { getDocTemplateCategories } from './constants';
 
 type ViewMode = 'templates' | 'categories';
 
@@ -17,13 +17,13 @@ interface TemplateManagerDialogProps {
 
 export function TemplateManagerDialog({ open, onOpenChange }: TemplateManagerDialogProps) {
   const {
-    templates, templateCategories,
-    deleteTemplate, duplicateTemplate, updateTemplate,
-    createTemplateCategory, updateTemplateCategory, deleteTemplateCategory,
-    reorderTemplateCategories,
+    docTemplates, docTemplateCategories,
+    deleteDocTemplate, duplicateDocTemplate, updateDocTemplate,
+    createDocTemplateCategory, updateDocTemplateCategory, deleteDocTemplateCategory,
+    reorderDocTemplateCategories,
   } = useAppStore();
   const { t } = useTranslation();
-  const categories = getTemplateCategories(templateCategories);
+  const categories = getDocTemplateCategories(docTemplateCategories);
 
   const [viewMode, setViewMode] = useState<ViewMode>('templates');
 
@@ -46,7 +46,7 @@ export function TemplateManagerDialog({ open, onOpenChange }: TemplateManagerDia
 
   // ── 模板过滤 ──
   const filteredTemplates = useMemo(() => {
-    let list = templates;
+    let list = docTemplates;
     if (selectedCategory !== 'all') {
       list = list.filter(t => (t.category || 'general') === selectedCategory);
     }
@@ -59,16 +59,16 @@ export function TemplateManagerDialog({ open, onOpenChange }: TemplateManagerDia
       );
     }
     return list;
-  }, [templates, selectedCategory, searchQuery]);
+  }, [docTemplates, selectedCategory, searchQuery]);
 
   const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: templates.length };
-    for (const t of templates) {
+    const counts: Record<string, number> = { all: docTemplates.length };
+    for (const t of docTemplates) {
       const cat = t.category || 'general';
       counts[cat] = (counts[cat] || 0) + 1;
     }
     return counts;
-  }, [templates]);
+  }, [docTemplates]);
 
   const getCategoryLabel = (key: string) => {
     const cat = categories.find((c: { key: string; label: string }) => c.key === key);
@@ -76,7 +76,7 @@ export function TemplateManagerDialog({ open, onOpenChange }: TemplateManagerDia
   };
 
   // ── 模板操作 ──
-  const handleStartEdit = (template: TemplateManifest) => {
+  const handleStartEdit = (template: DocTemplateManifest) => {
     setEditingId(template.id);
     setEditName(template.name);
     setEditDescription(template.description);
@@ -86,7 +86,7 @@ export function TemplateManagerDialog({ open, onOpenChange }: TemplateManagerDia
   const handleSaveEdit = async () => {
     if (!editingId) return;
     try {
-      await updateTemplate(editingId, {
+      await updateDocTemplate(editingId, {
         name: editName.trim(),
         description: editDescription.trim(),
         category: editCategory,
@@ -101,7 +101,7 @@ export function TemplateManagerDialog({ open, onOpenChange }: TemplateManagerDia
 
   const handleDeleteTemplate = async (templateId: string) => {
     try {
-      await deleteTemplate(templateId);
+      await deleteDocTemplate(templateId);
       setConfirmingDeleteId(null);
     } catch (err) {
       console.error('Failed to delete template:', err);
@@ -110,7 +110,7 @@ export function TemplateManagerDialog({ open, onOpenChange }: TemplateManagerDia
 
   const handleDuplicate = async (templateId: string, templateName: string) => {
     try {
-      await duplicateTemplate(templateId, `${templateName} ${t('settings.templateManager.copySuffix', { defaultValue: '(副本)' })}`);
+      await duplicateDocTemplate(templateId, `${templateName} ${t('settings.templateManager.copySuffix', { defaultValue: '(副本)' })}`);
     } catch (err) {
       console.error('Failed to duplicate template:', err);
     }
@@ -129,7 +129,7 @@ export function TemplateManagerDialog({ open, onOpenChange }: TemplateManagerDia
     const label = newCatLabel.trim();
     if (!key || !label) return;
     try {
-      await createTemplateCategory(key, label);
+      await createDocTemplateCategory(key, label);
       setNewCatKey(''); setNewCatLabel(''); setIsAddingCat(false);
     } catch (err) {
       console.error('Failed to create category:', err);
@@ -141,7 +141,7 @@ export function TemplateManagerDialog({ open, onOpenChange }: TemplateManagerDia
     const label = editCatLabel.trim();
     if (!label) return;
     try {
-      await updateTemplateCategory(editingCatKey, label);
+      await updateDocTemplateCategory(editingCatKey, label);
       setEditingCatKey(null);
     } catch (err) {
       console.error('Failed to update category:', err);
@@ -150,7 +150,7 @@ export function TemplateManagerDialog({ open, onOpenChange }: TemplateManagerDia
 
   const handleDeleteCategory = async (key: string) => {
     try {
-      await deleteTemplateCategory(key);
+      await deleteDocTemplateCategory(key);
       setConfirmingDeleteCatKey(null);
     } catch (err) {
       console.error('Failed to delete category:', err);
@@ -159,11 +159,11 @@ export function TemplateManagerDialog({ open, onOpenChange }: TemplateManagerDia
 
   const handleMoveCat = async (index: number, direction: 'up' | 'down') => {
     const newIndex = direction === 'up' ? index - 1 : index + 1;
-    if (newIndex < 0 || newIndex >= templateCategories.length) return;
-    const keys = templateCategories.map((c: TemplateCategory) => c.key);
+    if (newIndex < 0 || newIndex >= docTemplateCategories.length) return;
+    const keys = docTemplateCategories.map((c: DocTemplateCategory) => c.key);
     [keys[index], keys[newIndex]] = [keys[newIndex], keys[index]];
     try {
-      await reorderTemplateCategories(keys);
+      await reorderDocTemplateCategories(keys);
     } catch (err) {
       console.error('Failed to reorder categories:', err);
     }
@@ -231,11 +231,11 @@ export function TemplateManagerDialog({ open, onOpenChange }: TemplateManagerDia
 
                 {filteredTemplates.length === 0 && (
                   <div className="text-center text-sm text-muted-foreground py-8">
-                    {templates.length === 0 ? t('settings.templateManager.noTemplates', { defaultValue: '暂无模板' }) : t('settings.templateManager.noMatchingTemplates', { defaultValue: '没有匹配的模板' })}
+                    {docTemplates.length === 0 ? t('settings.templateManager.noTemplates', { defaultValue: '暂无模板' }) : t('settings.templateManager.noMatchingTemplates', { defaultValue: '没有匹配的模板' })}
                   </div>
                 )}
 
-                {filteredTemplates.map((template: TemplateManifest) => (
+                {filteredTemplates.map((template: DocTemplateManifest) => (
                   <div
                     key={template.id}
                     className="flex items-start gap-3 p-3 rounded-lg border border-border mb-2 hover:border-muted-foreground/30 transition-colors"
@@ -308,7 +308,7 @@ export function TemplateManagerDialog({ open, onOpenChange }: TemplateManagerDia
             </DialogHeader>
 
             <div className="flex-1 overflow-y-auto space-y-1.5 min-h-0">
-              {templateCategories.map((cat: TemplateCategory, index: number) => (
+              {docTemplateCategories.map((cat: DocTemplateCategory, index: number) => (
                 editingCatKey === cat.key ? (
                   <div key={cat.key} className="flex items-center gap-2 px-2 py-2 rounded-md border border-primary bg-primary/5">
                     <Input
@@ -342,7 +342,7 @@ export function TemplateManagerDialog({ open, onOpenChange }: TemplateManagerDia
                     </span>
                     <div className="flex items-center gap-0.5 flex-shrink-0">
                       <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title={t('settings.templateManager.moveUp', { defaultValue: '上移' })} disabled={index === 0} onClick={() => handleMoveCat(index, 'up')}>↑</Button>
-                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title={t('settings.templateManager.moveDown', { defaultValue: '下移' })} disabled={index === templateCategories.length - 1} onClick={() => handleMoveCat(index, 'down')}>↓</Button>
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title={t('settings.templateManager.moveDown', { defaultValue: '下移' })} disabled={index === docTemplateCategories.length - 1} onClick={() => handleMoveCat(index, 'down')}>↓</Button>
                       <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title={t('settings.templateManager.edit', { defaultValue: '编辑' })} onClick={() => { setEditingCatKey(cat.key); setEditCatLabel(cat.label); }}><Pencil className="h-3.5 w-3.5" /></Button>
                       <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive hover:text-destructive" title={t('settings.templateManager.delete', { defaultValue: '删除' })} onClick={() => setConfirmingDeleteCatKey(cat.key)}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
@@ -350,7 +350,7 @@ export function TemplateManagerDialog({ open, onOpenChange }: TemplateManagerDia
                 )
               ))}
 
-              {templateCategories.length === 0 && (
+              {docTemplateCategories.length === 0 && (
                 <div className="text-center text-sm text-muted-foreground py-6">{t('settings.templateManager.noCategories', { defaultValue: '暂无分类' })}</div>
               )}
             </div>

@@ -1,11 +1,52 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { invoke } from '@tauri-apps/api/core';
 
 /**
  * 插件独立持久化存储
  * 所有插件的设置和状态通过此 store 独立存储，按 pluginId 命名空间隔离。
  * 数据结构：{ [pluginId]: { [key]: value } }
+ * 存储位置：~/AiDocPlus/plugin-storage.json
  */
+
+/**
+ * 底层 storage adapter：通过 Tauri 后端读写 ~/AiDocPlus/plugin-storage.json
+ */
+const tauriPluginRawStorage: {
+  getItem: (name: string) => string | null | Promise<string | null>;
+  setItem: (name: string, value: string) => void | Promise<void>;
+  removeItem: (name: string) => void | Promise<void>;
+} = {
+  getItem: async (name: string): Promise<string | null> => {
+    try {
+      const json = await invoke<string | null>('load_plugin_storage');
+      if (json) return json;
+      const legacy = localStorage.getItem(name);
+      if (legacy) {
+        await invoke('save_plugin_storage', { json: legacy }).catch(() => {});
+        localStorage.removeItem(name);
+        return legacy;
+      }
+      return null;
+    } catch {
+      return localStorage.getItem(name);
+    }
+  },
+  setItem: async (name: string, value: string): Promise<void> => {
+    try {
+      await invoke('save_plugin_storage', { json: value });
+    } catch {
+      localStorage.setItem(name, value);
+    }
+  },
+  removeItem: async (name: string): Promise<void> => {
+    try {
+      await invoke('save_plugin_storage', { json: '{}' });
+    } catch {
+      localStorage.removeItem(name);
+    }
+  },
+};
 
 interface PluginStorageState {
   data: Record<string, Record<string, unknown>>;
@@ -66,13 +107,10 @@ export const usePluginStorageStore = create<PluginStorageState>()(
     }),
     {
       name: 'aidocplus-plugin-storage',
-      storage: createJSONStorage(() => localStorage),
-      version: 1,
-      migrate: (persistedState: unknown, version: number) => {
-        if (version < 1 || !persistedState || typeof persistedState !== 'object') {
-          return { data: {} };
-        }
-        return persistedState as PluginStorageState;
+      storage: createJSONStorage(() => tauriPluginRawStorage),
+      merge: (persisted, current) => {
+        const saved = (persisted || {}) as Record<string, any>;
+        return { ...current, data: saved.data || {} };
       },
     }
   )

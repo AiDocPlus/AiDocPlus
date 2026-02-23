@@ -37,8 +37,8 @@ function AppContent() {
         // 第一批：互不依赖的操作并行执行
         await Promise.all([
           useAppStore.getState().loadPlugins(),
-          useAppStore.getState().loadTemplates(),
-          useAppStore.getState().loadTemplateCategories(),
+          useAppStore.getState().loadDocTemplates(),
+          useAppStore.getState().loadDocTemplateCategories(),
           useTemplatesStore.getState().loadBuiltInTemplates(),
           useTemplatesStore.getState().loadBuiltInCategories(),
         ]);

@@ -65,17 +65,12 @@ i18n
     }
   });
 
-// 同步 aidocplus-language 供直接读 localStorage 的组件使用
-localStorage.setItem('aidocplus-language', detectedLng);
-
 /**
- * 切换语言并同步所有存储
- * - 调用 i18n.changeLanguage 实现即时切换
- * - 同步 aidocplus-language localStorage key
+ * 切换语言
+ * 组件中通过 i18n.language 获取当前语言，无需额外 localStorage key
  */
 export async function changeAppLanguage(lang: SupportedLanguage): Promise<void> {
   await i18n.changeLanguage(lang);
-  localStorage.setItem('aidocplus-language', lang);
 }
 
 export default i18n;

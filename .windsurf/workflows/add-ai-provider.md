@@ -4,8 +4,6 @@ description: 添加新的 AI 服务提供商到 AiDocPlus-AIProviders 仓库
 
 ## 添加新 AI 提供商
 
-> **替代方式**：可使用 AI 服务商管理器（`cd /Users/jdh/Code/AiDocPlus-ResourceManager && pnpm dev:ai-providers`）通过图形界面创建和编辑 AI 提供商，支持 AI 辅助生成。
-
 ### 1. 创建提供商目录和 manifest
 
 在 `AiDocPlus-AIProviders/data/{category}/{id}/` 下创建 `manifest.json`：

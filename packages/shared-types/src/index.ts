@@ -1,7 +1,6 @@
 /**
  * Shared type definitions for AiDocPlus
  */
-import { BUILT_IN_ROLES as _BUILT_IN_ROLES } from './generated/roles.generated';
 
 // ============================================================
 // Project Types
@@ -84,10 +83,10 @@ export interface PluginManifest {
 }
 
 // ============================================================
-// Template Types
+// Doc Template Types
 // ============================================================
 
-export interface TemplateManifest {
+export interface DocTemplateManifest {
   id: string;
   name: string;
   description: string;
@@ -105,14 +104,14 @@ export interface TemplateManifest {
   minAppVersion?: string;
 }
 
-export interface TemplateContent {
+export interface DocTemplateContent {
   authorNotes: string;
   aiGeneratedContent: string;
   content: string;
   pluginData?: Record<string, unknown>;
 }
 
-export interface TemplateCategory {
+export interface DocTemplateCategory {
   key: string;
   label: string;
   order: number;
@@ -562,65 +561,12 @@ export function getActiveEmailAccount(email: EmailSettings): EmailAccountConfig 
   return email.accounts.find(a => a.id === email.activeAccountId && a.enabled);
 }
 
-// ============================================================
-// User Role Types
-// ============================================================
-
-export interface UserRole {
-  id: string;
-  name: string;
-  icon: string;
-  description: string;
-  isBuiltIn: boolean;
-  /** 角色专属 System Prompt（拼接在用户自定义 prompt 之前） */
-  systemPrompt: string;
-  /** 可选：覆盖 markdownModePrompt */
-  markdownModePrompt?: string;
-  /** 可选：推荐的 AI temperature */
-  suggestedTemperature?: number;
-  /** 可选：推荐的 AI maxTokens */
-  suggestedMaxTokens?: number;
-  /** 可选：推荐的模板分类 key */
-  recommendedTemplateCategories?: string[];
-  /** 可选：推荐的插件 ID */
-  recommendedPlugins?: string[];
-}
-
-export interface RoleSettings {
-  /** 当前激活角色 ID，'' 表示无角色 */
-  activeRoleId: string;
-  /** 自定义角色列表（内置角色不持久化） */
-  customRoles: UserRole[];
-}
-
-// BUILT_IN_ROLES 已外部化到 AiDocPlus-Roles
-export const BUILT_IN_ROLES = _BUILT_IN_ROLES;
-
-export const DEFAULT_ROLE_SETTINGS: RoleSettings = {
-  activeRoleId: '',
-  customRoles: [],
-};
-
-/** 获取当前激活的角色 */
-export function getActiveRole(role: RoleSettings): UserRole | undefined {
-  if (!role.activeRoleId) return undefined;
-  const builtIn = BUILT_IN_ROLES.find(r => r.id === role.activeRoleId);
-  if (builtIn) return builtIn;
-  return role.customRoles.find(r => r.id === role.activeRoleId);
-}
-
-/** 获取所有角色（内置 + 自定义） */
-export function getAllRoles(role: RoleSettings): UserRole[] {
-  return [...BUILT_IN_ROLES, ...role.customRoles];
-}
-
 export interface AppSettings {
   editor: EditorSettings;
   ui: UISettings;
   file: FileSettings;
   ai: AISettings;
   email: EmailSettings;
-  role: RoleSettings;
   shortcuts: Record<string, string>;
 }
 
@@ -716,7 +662,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   file: DEFAULT_FILE_SETTINGS,
   ai: DEFAULT_AI_SETTINGS,
   email: DEFAULT_EMAIL_SETTINGS,
-  role: DEFAULT_ROLE_SETTINGS,
   shortcuts: {
     'search': 'CmdOrCtrl+Shift+F',
     'save': 'CmdOrCtrl+S',

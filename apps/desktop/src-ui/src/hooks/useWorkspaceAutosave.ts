@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '@/stores/useAppStore';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { exit } from '@tauri-apps/plugin-process';
 import { isTauri } from '@/lib/isTauri';
 
 export function useWorkspaceAutosave() {
@@ -43,8 +44,8 @@ export function useWorkspaceAutosave() {
         console.error('[Workspace] Failed to save on close:', error);
       }
 
-      // 保存完成后关闭窗口（使用 destroy 彻底关闭，避免再次触发事件）
-      getCurrentWindow().destroy();
+      // 保存完成后退出进程（destroy 在 Windows 上可能只销毁窗口不终止进程）
+      await exit(0);
     });
 
     return () => {

@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import type { Project, Document, DocumentVersion, AIMessage, ChatContextMode, WorkspaceState, EditorTab, PluginManifest, TemplateManifest, TemplateCategory } from '@aidocplus/shared-types';
-import { getActiveRole } from '@aidocplus/shared-types';
+import type { Project, Document, DocumentVersion, AIMessage, ChatContextMode, WorkspaceState, EditorTab, PluginManifest, DocTemplateManifest, DocTemplateCategory } from '@aidocplus/shared-types';
 import { buildPluginList, setPlugins } from '@/plugins/registry';
 import { syncManifestsToBackend } from '@/plugins/loader';
 import { invoke } from '@tauri-apps/api/core';
@@ -13,13 +12,6 @@ import i18n from '@/i18n';
 function getMarkdownModePrompt(): string {
   const ai = useSettingsStore.getState().ai;
   return ai.markdownModePrompt || '';
-}
-
-// 角色 System Prompt：从当前激活角色获取
-function getRoleSystemPrompt(): string {
-  const role = useSettingsStore.getState().role;
-  const activeRole = getActiveRole(role);
-  return activeRole?.systemPrompt?.trim() || '';
 }
 
 // 标签页面板状态类型
@@ -118,20 +110,20 @@ interface AppState {
   loadPlugins: () => Promise<PluginManifest[]>;
   pluginManifests: PluginManifest[];
 
-  // Template Actions
-  templates: TemplateManifest[];
-  templateCategories: TemplateCategory[];
-  loadTemplates: () => Promise<TemplateManifest[]>;
-  loadTemplateCategories: () => Promise<TemplateCategory[]>;
-  createDocumentFromTemplate: (projectId: string, templateId: string, title: string, author?: string) => Promise<Document>;
-  saveAsTemplate: (projectId: string, documentId: string, name: string, description: string, category: string, includeContent: boolean, includeAiContent: boolean, includePluginData: boolean) => Promise<TemplateManifest>;
-  deleteTemplate: (templateId: string) => Promise<void>;
-  duplicateTemplate: (templateId: string, newName: string) => Promise<TemplateManifest>;
-  updateTemplate: (templateId: string, fields: { name?: string; description?: string; category?: string; icon?: string; tags?: string[] }) => Promise<TemplateManifest>;
-  createTemplateCategory: (key: string, label: string) => Promise<TemplateCategory[]>;
-  updateTemplateCategory: (key: string, label?: string, newKey?: string) => Promise<TemplateCategory[]>;
-  deleteTemplateCategory: (key: string) => Promise<TemplateCategory[]>;
-  reorderTemplateCategories: (orderedKeys: string[]) => Promise<TemplateCategory[]>;
+  // Doc Template Actions
+  docTemplates: DocTemplateManifest[];
+  docTemplateCategories: DocTemplateCategory[];
+  loadDocTemplates: () => Promise<DocTemplateManifest[]>;
+  loadDocTemplateCategories: () => Promise<DocTemplateCategory[]>;
+  createDocumentFromDocTemplate: (projectId: string, templateId: string, title: string, author?: string) => Promise<Document>;
+  saveAsDocTemplate: (projectId: string, documentId: string, name: string, description: string, category: string, includeContent: boolean, includeAiContent: boolean, includePluginData: boolean) => Promise<DocTemplateManifest>;
+  deleteDocTemplate: (templateId: string) => Promise<void>;
+  duplicateDocTemplate: (templateId: string, newName: string) => Promise<DocTemplateManifest>;
+  updateDocTemplate: (templateId: string, fields: { name?: string; description?: string; category?: string; icon?: string; tags?: string[] }) => Promise<DocTemplateManifest>;
+  createDocTemplateCategory: (key: string, label: string) => Promise<DocTemplateCategory[]>;
+  updateDocTemplateCategory: (key: string, label?: string, newKey?: string) => Promise<DocTemplateCategory[]>;
+  deleteDocTemplateCategory: (key: string) => Promise<DocTemplateCategory[]>;
+  reorderDocTemplateCategories: (orderedKeys: string[]) => Promise<DocTemplateCategory[]>;
 
   // API Actions
   loadProjects: () => Promise<void>;
@@ -216,8 +208,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   aiStreamingTabId: null,
   streamStateByTab: {},
   pluginManifests: [],
-  templates: [],
-  templateCategories: [],
+  docTemplates: [],
+  docTemplateCategories: [],
   allTags: [],
   documentSortBy: 'updatedAt' as const,
   documentSortOrder: 'desc' as const,
@@ -797,12 +789,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       const tabMessages = get().aiMessagesByTab[tabId] || [];
       const aiSettings = useSettingsStore.getState().ai;
 
-      // 构建消息列表，包含可选的 角色prompt + 用户prompt + markdownMode 格式约束
+      // 构建消息列表，包含可选的 用户prompt + markdownMode 格式约束
       const messages: { role: string; content: string }[] = [];
-      const rolePrompt = getRoleSystemPrompt();
       const userSystemPrompt = aiSettings.systemPrompt?.trim() || '';
       const mdPrompt = aiSettings.markdownMode ? getMarkdownModePrompt() : '';
-      const combinedSystemPrompt = [rolePrompt, userSystemPrompt, mdPrompt].filter(Boolean).join('\n\n');
+      const combinedSystemPrompt = [userSystemPrompt, mdPrompt].filter(Boolean).join('\n\n');
       if (combinedSystemPrompt) {
         messages.push({ role: 'system', content: combinedSystemPrompt });
       }
@@ -1007,10 +998,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         ...aiParams,
         conversationHistory: historyForBackend || undefined,
         systemPrompt: (() => {
-          const roleSp = getRoleSystemPrompt();
           const userSp = aiSettings.systemPrompt?.trim() || '';
           const mdSp = aiSettings.markdownMode ? getMarkdownModePrompt() : '';
-          const combined = [roleSp, userSp, mdSp].filter(Boolean).join('\n\n');
+          const combined = [userSp, mdSp].filter(Boolean).join('\n\n');
           return combined || undefined;
         })(),
         enableWebSearch: enableWebSearch || undefined,
@@ -1139,22 +1129,22 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  // Template methods
-  loadTemplates: async () => {
+  // Doc template methods
+  loadDocTemplates: async () => {
     try {
-      const templates = await invoke<TemplateManifest[]>('list_templates');
-      set({ templates });
-      return templates;
+      const docTemplates = await invoke<DocTemplateManifest[]>('list_doc_templates');
+      set({ docTemplates });
+      return docTemplates;
     } catch (error) {
-      console.error('Failed to load templates:', error);
+      console.error('Failed to load doc templates:', error);
       return [];
     }
   },
 
-  createDocumentFromTemplate: async (projectId, templateId, title, author = 'User') => {
+  createDocumentFromDocTemplate: async (projectId, templateId, title, author = 'User') => {
     try {
       set({ isLoading: true, error: null });
-      const document = await invoke<Document>('create_document_from_template', {
+      const document = await invoke<Document>('create_document_from_doc_template', {
         projectId, templateId, title, author,
       });
       // 重新加载文档列表
@@ -1167,9 +1157,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  saveAsTemplate: async (projectId, documentId, name, description, category, includeContent, includeAiContent, includePluginData) => {
+  saveAsDocTemplate: async (projectId, documentId, name, description, category, includeContent, includeAiContent, includePluginData) => {
     try {
-      const template = await invoke<TemplateManifest>('save_template_from_document', {
+      const template = await invoke<DocTemplateManifest>('save_doc_template_from_document', {
         projectId, documentId,
         templateName: name,
         templateDescription: description,
@@ -1177,41 +1167,41 @@ export const useAppStore = create<AppState>((set, get) => ({
         includeContent, includeAiContent, includePluginData,
       });
       // 刷新模板列表
-      const templates = await invoke<TemplateManifest[]>('list_templates');
-      set({ templates });
+      const docTemplates = await invoke<DocTemplateManifest[]>('list_doc_templates');
+      set({ docTemplates });
       return template;
     } catch (error) {
-      console.error('Failed to save as template:', error);
+      console.error('Failed to save as doc template:', error);
       throw error;
     }
   },
 
-  deleteTemplate: async (templateId) => {
+  deleteDocTemplate: async (templateId) => {
     try {
-      await invoke('delete_template', { templateId });
-      const templates = await invoke<TemplateManifest[]>('list_templates');
-      set({ templates });
+      await invoke('delete_doc_template', { templateId });
+      const docTemplates = await invoke<DocTemplateManifest[]>('list_doc_templates');
+      set({ docTemplates });
     } catch (error) {
-      console.error('Failed to delete template:', error);
+      console.error('Failed to delete doc template:', error);
       throw error;
     }
   },
 
-  duplicateTemplate: async (templateId, newName) => {
+  duplicateDocTemplate: async (templateId, newName) => {
     try {
-      const template = await invoke<TemplateManifest>('duplicate_template', { templateId, newName });
-      const templates = await invoke<TemplateManifest[]>('list_templates');
-      set({ templates });
+      const template = await invoke<DocTemplateManifest>('duplicate_doc_template', { templateId, newName });
+      const docTemplates = await invoke<DocTemplateManifest[]>('list_doc_templates');
+      set({ docTemplates });
       return template;
     } catch (error) {
-      console.error('Failed to duplicate template:', error);
+      console.error('Failed to duplicate doc template:', error);
       throw error;
     }
   },
 
-  updateTemplate: async (templateId, fields) => {
+  updateDocTemplate: async (templateId, fields) => {
     try {
-      const template = await invoke<TemplateManifest>('update_template', {
+      const template = await invoke<DocTemplateManifest>('update_doc_template', {
         templateId,
         name: fields.name ?? null,
         description: fields.description ?? null,
@@ -1220,51 +1210,51 @@ export const useAppStore = create<AppState>((set, get) => ({
         tags: fields.tags ?? null,
         content: null,
       });
-      const templates = await invoke<TemplateManifest[]>('list_templates');
-      set({ templates });
+      const docTemplates = await invoke<DocTemplateManifest[]>('list_doc_templates');
+      set({ docTemplates });
       return template;
     } catch (error) {
-      console.error('Failed to update template:', error);
+      console.error('Failed to update doc template:', error);
       throw error;
     }
   },
 
-  // Template category methods
-  loadTemplateCategories: async () => {
+  // Doc template category methods
+  loadDocTemplateCategories: async () => {
     try {
-      const templateCategories = await invoke<TemplateCategory[]>('list_template_categories');
-      set({ templateCategories });
-      return templateCategories;
+      const docTemplateCategories = await invoke<DocTemplateCategory[]>('list_doc_template_categories');
+      set({ docTemplateCategories });
+      return docTemplateCategories;
     } catch (error) {
-      console.error('Failed to load template categories:', error);
+      console.error('Failed to load doc template categories:', error);
       return [];
     }
   },
 
-  createTemplateCategory: async (key, label) => {
-    const templateCategories = await invoke<TemplateCategory[]>('create_template_category', { key, label });
-    set({ templateCategories });
-    return templateCategories;
+  createDocTemplateCategory: async (key, label) => {
+    const docTemplateCategories = await invoke<DocTemplateCategory[]>('create_doc_template_category', { key, label });
+    set({ docTemplateCategories });
+    return docTemplateCategories;
   },
 
-  updateTemplateCategory: async (key, label, newKey) => {
-    const templateCategories = await invoke<TemplateCategory[]>('update_template_category', {
+  updateDocTemplateCategory: async (key, label, newKey) => {
+    const docTemplateCategories = await invoke<DocTemplateCategory[]>('update_doc_template_category', {
       key, label: label ?? null, newKey: newKey ?? null,
     });
-    set({ templateCategories });
-    return templateCategories;
+    set({ docTemplateCategories });
+    return docTemplateCategories;
   },
 
-  deleteTemplateCategory: async (key) => {
-    const templateCategories = await invoke<TemplateCategory[]>('delete_template_category', { key });
-    set({ templateCategories });
-    return templateCategories;
+  deleteDocTemplateCategory: async (key) => {
+    const docTemplateCategories = await invoke<DocTemplateCategory[]>('delete_doc_template_category', { key });
+    set({ docTemplateCategories });
+    return docTemplateCategories;
   },
 
-  reorderTemplateCategories: async (orderedKeys) => {
-    const templateCategories = await invoke<TemplateCategory[]>('reorder_template_categories', { orderedKeys });
-    set({ templateCategories });
-    return templateCategories;
+  reorderDocTemplateCategories: async (orderedKeys) => {
+    const docTemplateCategories = await invoke<DocTemplateCategory[]>('reorder_doc_template_categories', { orderedKeys });
+    set({ docTemplateCategories });
+    return docTemplateCategories;
   },
 
   // Workspace persistence methods
@@ -1293,14 +1283,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       lastSavedAt: Date.now(),
     };
 
-    // 始终保存到 localStorage 作为备用
-    try {
-      localStorage.setItem('aidocplus-workspace', JSON.stringify(workspaceState));
-    } catch (e) {
-      console.error('[Workspace] Failed to save to localStorage:', e);
-    }
-
-    // Tauri 环境额外保存到后端
+    // 保存到 Tauri 后端 JSON 文件
     if (isTauri()) {
       try {
         await invoke('save_workspace', {
@@ -1318,7 +1301,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   loadWorkspaceState: async () => {
-    // 优先从 Tauri 后端加载
     if (isTauri()) {
       try {
         const state = await invoke<WorkspaceState | null>('load_workspace');
@@ -1329,17 +1311,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         console.error('[Workspace] Failed to load from Tauri:', error);
       }
     }
-
-    // 备用：从 localStorage 加载
-    try {
-      const saved = localStorage.getItem('aidocplus-workspace');
-      if (saved) {
-        return JSON.parse(saved) as WorkspaceState;
-      }
-    } catch (error) {
-      console.error('[Workspace] Failed to load from localStorage:', error);
-    }
-
     return null;
   },
 
@@ -1552,14 +1523,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   clearWorkspaceState: async () => {
-    // 清理 localStorage
-    try {
-      localStorage.removeItem('aidocplus-workspace');
-    } catch (e) {
-      console.error('[Workspace] Failed to clear localStorage:', e);
-    }
-
-    // Tauri 环境额外清理后端
     if (isTauri()) {
       try {
         await invoke('clear_workspace');

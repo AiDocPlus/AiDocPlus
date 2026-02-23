@@ -27,6 +27,7 @@ use commands::{
     project::*,
     resource::*,
     search::*,
+    settings::*,
     template::*,
     wechat::*,
     workspace::*,
@@ -42,6 +43,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             // Initialize app state
             app.manage(config::AppState::new());
@@ -72,7 +74,7 @@ fn main() {
             plugin::ensure_plugins_dir();
 
             // Ensure templates directory exists
-            template::ensure_templates_dir();
+            template::ensure_doc_templates_dir();
 
             // ── 构建原生系统菜单 ──
             let handle = app.handle();
@@ -264,25 +266,31 @@ fn main() {
             load_workspace,
             clear_workspace,
 
+            // Settings commands
+            save_settings,
+            load_settings,
+            save_plugin_storage,
+            load_plugin_storage,
+
             // Plugin commands
             list_plugins,
             set_plugin_enabled,
             sync_plugin_manifests,
 
-            // Template commands
-            list_templates,
-            get_template_content,
-            create_template,
-            update_template,
-            delete_template,
-            duplicate_template,
-            save_template_from_document,
-            create_document_from_template,
-            list_template_categories,
-            create_template_category,
-            update_template_category,
-            delete_template_category,
-            reorder_template_categories,
+            // Doc template commands
+            list_doc_templates,
+            get_doc_template_content,
+            create_doc_template,
+            update_doc_template,
+            delete_doc_template,
+            duplicate_doc_template,
+            save_doc_template_from_document,
+            create_document_from_doc_template,
+            list_doc_template_categories,
+            create_doc_template_category,
+            update_doc_template_category,
+            delete_doc_template_category,
+            reorder_doc_template_categories,
 
             // Email commands
             test_smtp_connection,

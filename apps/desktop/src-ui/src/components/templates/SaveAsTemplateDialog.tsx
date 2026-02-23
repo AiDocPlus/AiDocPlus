@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { useAppStore } from '@/stores/useAppStore';
 import { useTranslation } from '@/i18n';
-import { getTemplateCategories } from './constants';
+import { getDocTemplateCategories } from './constants';
 
 interface SaveAsTemplateDialogProps {
   open: boolean;
@@ -17,8 +17,8 @@ interface SaveAsTemplateDialogProps {
 
 export function SaveAsTemplateDialog({ open, onOpenChange, projectId, documentId, documentTitle }: SaveAsTemplateDialogProps) {
   const { t } = useTranslation();
-  const { saveAsTemplate, templateCategories } = useAppStore();
-  const categories = getTemplateCategories(templateCategories);
+  const { saveAsDocTemplate, docTemplateCategories } = useAppStore();
+  const categories = getDocTemplateCategories(docTemplateCategories);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('general');
@@ -31,7 +31,7 @@ export function SaveAsTemplateDialog({ open, onOpenChange, projectId, documentId
     const templateName = name.trim() || documentTitle;
     setIsSaving(true);
     try {
-      await saveAsTemplate(projectId, documentId, templateName, description.trim(), category, includeContent, includeAiContent, includePluginData);
+      await saveAsDocTemplate(projectId, documentId, templateName, description.trim(), category, includeContent, includeAiContent, includePluginData);
       onOpenChange(false);
       resetState();
     } catch (err) {

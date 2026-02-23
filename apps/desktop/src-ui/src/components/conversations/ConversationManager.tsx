@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { MessageSquare, Plus, Trash2, Edit2, Search, Pin, PinOff, Clock } from 'lucide-react';
 import { useTranslation } from '@/i18n';
+import i18n from '@/i18n';
 import { useConversationsStore } from '@/stores/useConversationsStore';
 import { useAppStore } from '@/stores/useAppStore';
 import { CONVERSATION_GROUPS } from '@aidocplus/shared-types';
@@ -77,7 +78,7 @@ export function ConversationManager({ open, onClose, onSelectConversation }: Con
   };
 
   const formatTimestamp = (timestamp: number) => {
-    const language = localStorage.getItem('aidocplus-language') || 'zh';
+    const language = i18n.language || 'zh';
     const locale = language === 'en' ? enUS : zhCN;
 
     try {

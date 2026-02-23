@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { invoke } from '@tauri-apps/api/core';
 import type { AppSettings } from '@aidocplus/shared-types';
 import {
   DEFAULT_SETTINGS,
@@ -8,10 +9,71 @@ import {
   DEFAULT_FILE_SETTINGS,
   DEFAULT_AI_SETTINGS,
   DEFAULT_EMAIL_SETTINGS,
-  DEFAULT_ROLE_SETTINGS,
   getProviderConfig,
   getActiveService,
 } from '@aidocplus/shared-types';
+
+/**
+ * 底层 storage adapter：通过 Tauri 后端读写 ~/AiDocPlus/settings.json
+ * 首次启动时自动从 localStorage 迁移数据
+ */
+const tauriRawStorage: {
+  getItem: (name: string) => string | null | Promise<string | null>;
+  setItem: (name: string, value: string) => void | Promise<void>;
+  removeItem: (name: string) => void | Promise<void>;
+} = {
+  getItem: async (name: string): Promise<string | null> => {
+    try {
+      const json = await invoke<string | null>('load_settings');
+      if (json) return json;
+      // 首次启动：从 localStorage 迁移
+      const legacy = localStorage.getItem(name);
+      if (legacy) {
+        await invoke('save_settings', { json: legacy }).catch(() => {});
+        localStorage.removeItem(name);
+        return legacy;
+      }
+      return null;
+    } catch {
+      return localStorage.getItem(name);
+    }
+  },
+  setItem: async (name: string, value: string): Promise<void> => {
+    try {
+      await invoke('save_settings', { json: value });
+    } catch {
+      localStorage.setItem(name, value);
+    }
+  },
+  removeItem: async (name: string): Promise<void> => {
+    try {
+      await invoke('save_settings', { json: '{}' });
+    } catch {
+      localStorage.removeItem(name);
+    }
+  },
+};
+
+/**
+ * 深度合并：将 saved 的值覆盖到 defaults 上，缺失字段自动用默认值填充。
+ * 这替代了旧的 version + migrate() 机制。
+ */
+function deepMergeDefaults<T extends Record<string, any>>(defaults: T, saved: Partial<T>): T {
+  const result = { ...defaults };
+  for (const key of Object.keys(saved) as (keyof T)[]) {
+    const savedVal = saved[key];
+    const defaultVal = defaults[key];
+    if (savedVal !== undefined && savedVal !== null) {
+      if (typeof defaultVal === 'object' && !Array.isArray(defaultVal) && defaultVal !== null
+          && typeof savedVal === 'object' && !Array.isArray(savedVal) && savedVal !== null) {
+        result[key] = deepMergeDefaults(defaultVal, savedVal as any);
+      } else {
+        result[key] = savedVal as T[keyof T];
+      }
+    }
+  }
+  return result;
+}
 
 /** 分类节点 */
 export interface CategoryItem {
@@ -66,7 +128,6 @@ interface SettingsState extends AppSettings {
   updateFileSettings: (settings: Partial<typeof DEFAULT_FILE_SETTINGS>) => void;
   updateAISettings: (settings: Partial<typeof DEFAULT_AI_SETTINGS>) => void;
   updateEmailSettings: (settings: Partial<typeof DEFAULT_EMAIL_SETTINGS>) => void;
-  updateRoleSettings: (settings: Partial<typeof DEFAULT_ROLE_SETTINGS>) => void;
   updateShortcut: (key: string, value: string) => void;
   resetSettings: () => void;
   resetCategory: (category: 'editor' | 'ui' | 'file' | 'ai') => void;
@@ -83,7 +144,6 @@ export const useSettingsStore = create<SettingsState>()(
       file: { ...DEFAULT_FILE_SETTINGS },
       ai: { ...DEFAULT_AI_SETTINGS },
       email: { ...DEFAULT_EMAIL_SETTINGS },
-      role: { ...DEFAULT_ROLE_SETTINGS },
       shortcuts: { ...DEFAULT_SETTINGS.shortcuts },
       plugins: { ...DEFAULT_PLUGINS_SETTINGS },
       isLoading: false,
@@ -97,7 +157,6 @@ export const useSettingsStore = create<SettingsState>()(
           file: settings.file ?? state.file,
           ai: settings.ai ?? state.ai,
           email: settings.email ?? state.email,
-          role: settings.role ?? state.role,
           shortcuts: settings.shortcuts ?? state.shortcuts
         }));
       },
@@ -134,13 +193,6 @@ export const useSettingsStore = create<SettingsState>()(
       updateEmailSettings: (settings) => {
         set((state) => ({
           email: { ...state.email, ...settings }
-        }));
-      },
-
-      // Update role settings
-      updateRoleSettings: (settings) => {
-        set((state) => ({
-          role: { ...state.role, ...settings }
         }));
       },
 
@@ -400,8 +452,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'aidocplus-settings',
-      storage: createJSONStorage(() => localStorage),
-      // Partial persist - don't persist loading/error states
+      storage: createJSONStorage(() => tauriRawStorage),
       partialize: (state) => ({
         editor: state.editor,
         ui: state.ui,
@@ -410,91 +461,25 @@ export const useSettingsStore = create<SettingsState>()(
         email: state.email,
         shortcuts: state.shortcuts,
         plugins: state.plugins,
-        role: state.role,
       }),
-      version: 10,
-      migrate: (persistedState: any, version: number) => {
-        if (version < 10) {
-          // 迁移: 新增 role 字段
-          if (!persistedState.role) {
-            persistedState.role = { ...DEFAULT_ROLE_SETTINGS };
-          }
-        }
-        if (version < 9) {
-          // 迁移: 确保 ai.enableThinking 字段存在
-          if (persistedState.ai && persistedState.ai.enableThinking === undefined) {
-            persistedState.ai.enableThinking = false;
-          }
-        }
-        if (version < 8) {
-          // 迁移: 更新 markdownModePrompt（旧版含“加粗”指令导致 AI 输出不当加粗）
-          if (persistedState.ai) {
-            persistedState.ai.markdownModePrompt = DEFAULT_AI_SETTINGS.markdownModePrompt;
-          }
-        }
-        if (version < 6) {
-          // 迁移: 工具栏按钮全部强制开启
-          if (persistedState.editor) {
-            persistedState.editor.toolbarButtons = { ...DEFAULT_EDITOR_SETTINGS.toolbarButtons };
-          }
-        }
-        if (version < 5) {
-          // 迁移: 确保 ai.markdownMode 字段存在
-          if (persistedState.ai && persistedState.ai.markdownMode === undefined) {
-            persistedState.ai.markdownMode = true;
-          }
-        }
-        if (version < 4) {
-          // 迁移: 确保 email 字段存在
-          if (!persistedState.email) {
-            persistedState.email = { accounts: [], activeAccountId: '' };
-          }
-        }
-        if (version < 3) {
-          // 迁移 v1/v2 -> v3: 将旧的单服务配置转为 services 数组
-          const oldAi = persistedState?.ai;
-          if (oldAi && !oldAi.services) {
-            const provider = oldAi.provider || 'glm';
-            // 兼容 v1 (apiKey) 和 v2 (apiKeys)
-            const apiKey = oldAi.apiKey || (oldAi.apiKeys && oldAi.apiKeys[provider]) || '';
-            const model = oldAi.model || '';
-            const baseUrl = oldAi.baseUrl || '';
-            const services: any[] = [];
-            if (apiKey) {
-              services.push({
-                id: `svc_${Date.now()}`,
-                name: provider,
-                provider,
-                apiKey,
-                model,
-                baseUrl,
-                enabled: true,
-              });
-            }
-            persistedState.ai = {
-              ...DEFAULT_AI_SETTINGS,
-              services,
-              activeServiceId: services[0]?.id || '',
-              temperature: oldAi.temperature ?? 0.7,
-              maxTokens: oldAi.maxTokens ?? 0,
-              streamEnabled: oldAi.streamEnabled ?? true,
-              systemPrompt: oldAi.systemPrompt || '',
-              maxContentLength: oldAi.maxContentLength ?? 0,
-            };
-          }
-        }
-        // 确保 plugins 字段存在（旧版本持久化数据可能缺失）
-        if (!persistedState.plugins) {
-          persistedState.plugins = { enabled: {}, usageCount: {} };
-        } else {
-          if (!persistedState.plugins.usageCount) {
-            persistedState.plugins.usageCount = {};
-          }
-          if (!persistedState.plugins.enabled) {
-            persistedState.plugins.enabled = {};
-          }
-        }
-        return persistedState;
+      // 用深度合并替代版本迁移：缺失字段自动用默认值填充，无需 version + migrate()
+      merge: (persisted, current) => {
+        const saved = (persisted || {}) as Record<string, any>;
+        return {
+          ...current,
+          editor: deepMergeDefaults(DEFAULT_EDITOR_SETTINGS, saved.editor || {}),
+          ui: deepMergeDefaults(DEFAULT_UI_SETTINGS, saved.ui || {}),
+          file: deepMergeDefaults(DEFAULT_FILE_SETTINGS, saved.file || {}),
+          ai: deepMergeDefaults(DEFAULT_AI_SETTINGS, saved.ai || {}),
+          email: deepMergeDefaults(DEFAULT_EMAIL_SETTINGS, saved.email || {}),
+          shortcuts: { ...DEFAULT_SETTINGS.shortcuts, ...(saved.shortcuts || {}) },
+          plugins: {
+            enabled: saved.plugins?.enabled || {},
+            usageCount: saved.plugins?.usageCount || {},
+            customCategories: saved.plugins?.customCategories,
+            pluginOrder: saved.plugins?.pluginOrder,
+          },
+        };
       },
     }
   )

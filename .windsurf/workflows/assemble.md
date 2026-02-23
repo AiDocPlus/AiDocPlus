@@ -6,7 +6,7 @@ description: 一键总装所有资源仓库并验证编译
 
 ### 1. 运行总装脚本
 
-总装脚本按顺序执行所有仓库的 build + deploy：Main → Roles → PromptTemplates → DocTemplates → ProjectTemplates → AIProviders → Plugins
+总装脚本按顺序执行所有仓库的 build + deploy：Main → PromptTemplates → DocTemplates → AIProviders → Plugins → ResourceManager
 
 ```bash
 bash /Users/jdh/Code/AiDocPlus-Main/scripts/assemble.sh

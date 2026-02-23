@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Clock, Eye, RotateCcw, GitBranch, X, GitCompare } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
 import { useTranslation } from '@/i18n';
+import i18n from '@/i18n';
 import type { DocumentVersion } from '@aidocplus/shared-types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Button } from '../ui/button';
@@ -138,7 +139,7 @@ export function VersionHistoryPanel({ open, onClose, projectId, documentId }: Ve
   };
 
   const getLocale = () => {
-    const language = localStorage.getItem('aidocplus-language') || 'zh';
+    const language = i18n.language || 'zh';
     switch (language) {
       case 'en': return enUS;
       case 'ja': return ja;

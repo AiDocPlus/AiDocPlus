@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAppStore } from '@/stores/useAppStore';
 import { useTranslation } from '@/i18n';
-import type { TemplateManifest } from '@aidocplus/shared-types';
-import { getTemplateCategories } from './constants';
+import type { DocTemplateManifest } from '@aidocplus/shared-types';
+import { getDocTemplateCategories } from './constants';
 
 interface TemplatePickerDialogProps {
   open: boolean;
@@ -17,28 +17,28 @@ interface TemplatePickerDialogProps {
 
 export function TemplatePickerDialog({ open, onOpenChange, projectId, onCreated }: TemplatePickerDialogProps) {
   const { t } = useTranslation();
-  const { templates, templateCategories, createDocumentFromTemplate, createDocument, openTab } = useAppStore();
-  const categories = getTemplateCategories(templateCategories);
+  const { docTemplates, docTemplateCategories, createDocumentFromDocTemplate, createDocument, openTab } = useAppStore();
+  const categories = getDocTemplateCategories(docTemplateCategories);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [selectedTemplate, setSelectedTemplate] = useState<TemplateManifest | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<DocTemplateManifest | null>(null);
   const [title, setTitle] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
   // 按分类分组模板
   const groupedTemplates = useMemo(() => {
-    const groups: Record<string, TemplateManifest[]> = {};
-    for (const t of templates) {
+    const groups: Record<string, DocTemplateManifest[]> = {};
+    for (const t of docTemplates) {
       const cat = t.category || 'general';
       if (!groups[cat]) groups[cat] = [];
       groups[cat].push(t);
     }
     return groups;
-  }, [templates]);
+  }, [docTemplates]);
 
   // 过滤模板
   const filteredTemplates = useMemo(() => {
-    let list = templates;
+    let list = docTemplates;
     if (selectedCategory !== 'all') {
       list = list.filter(t => (t.category || 'general') === selectedCategory);
     }
@@ -51,17 +51,17 @@ export function TemplatePickerDialog({ open, onOpenChange, projectId, onCreated 
       );
     }
     return list;
-  }, [templates, selectedCategory, searchQuery]);
+  }, [docTemplates, selectedCategory, searchQuery]);
 
   // 分类计数
   const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: templates.length };
-    for (const t of templates) {
+    const counts: Record<string, number> = { all: docTemplates.length };
+    for (const t of docTemplates) {
       const cat = t.category || 'general';
       counts[cat] = (counts[cat] || 0) + 1;
     }
     return counts;
-  }, [templates]);
+  }, [docTemplates]);
 
   const handleCreateBlank = async () => {
     const docTitle = title.trim() || t('templates.untitledDocument', { defaultValue: '未命名文档' });
@@ -86,7 +86,7 @@ export function TemplatePickerDialog({ open, onOpenChange, projectId, onCreated 
     const docTitle = title.trim() || selectedTemplate.name;
     setIsCreating(true);
     try {
-      const doc = await createDocumentFromTemplate(projectId, selectedTemplate.id, docTitle);
+      const doc = await createDocumentFromDocTemplate(projectId, selectedTemplate.id, docTitle);
       if (doc) {
         await openTab(doc.id);
         onCreated?.(doc.id);
@@ -193,13 +193,13 @@ export function TemplatePickerDialog({ open, onOpenChange, projectId, onCreated 
             </button>
 
             {/* 模板卡片列表 */}
-            {filteredTemplates.length === 0 && templates.length > 0 && (
+            {filteredTemplates.length === 0 && docTemplates.length > 0 && (
               <div className="text-center text-sm text-muted-foreground py-8">
                 {t('templates.noMatchingTemplates', { defaultValue: '没有匹配的模板' })}
               </div>
             )}
 
-            {filteredTemplates.length === 0 && templates.length === 0 && (
+            {filteredTemplates.length === 0 && docTemplates.length === 0 && (
               <div className="text-center text-sm text-muted-foreground py-8">
                 {t('templates.noTemplatesHint', { defaultValue: '暂无模板，可通过“存为模板”创建' })}
               </div>

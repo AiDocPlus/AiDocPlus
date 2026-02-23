@@ -22,6 +22,7 @@
     "fs:allow-read-dir",
     "fs:allow-remove",
     "fs:allow-mkdir",
-    "core:webview:allow-webview-close"
+    "core:webview:allow-webview-close",
+    "process:default"
   ]
 }
