@@ -17,6 +17,8 @@ permissions:
 env:
   PYTHONIOENCODING: utf-8
   PYTHONUTF8: '1'
+  # 共享 Rust target 目录：ResourceManager 和主程序 99.6% 依赖相同，避免重复编译
+  CARGO_TARGET_DIR: ${{ github.workspace }}/rust-target
 
 jobs:
   build-windows:
@@ -91,8 +93,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: |
-            ./AiDocPlus/apps/desktop/src-tauri -> target
-            ./AiDocPlus-ResourceManager -> target
+            ./AiDocPlus/apps/desktop/src-tauri -> ${{ github.workspace }}/rust-target
 
       - name: Cache pnpm store
         uses: actions/cache@v4
@@ -157,13 +158,15 @@ jobs:
           cd AiDocPlus-ResourceManager
           pnpm install
 
-          # Build the unified resource manager
-          echo "[tauri build] resource-manager"
+          # 使用共享 CARGO_TARGET_DIR（已通过 env 设置）
+          # ResourceManager 的 .cargo/config.toml 中的 target-dir 是本地开发路径，
+          # CI 中 CARGO_TARGET_DIR 环境变量优先级更高，会覆盖 config.toml
+          echo "[tauri build] resource-manager (shared target: $CARGO_TARGET_DIR)"
           (cd apps/resource-manager && npx tauri build --target x86_64-pc-windows-msvc 2>&1 | tail -5)
 
           TARGET_DIR="../AiDocPlus/apps/desktop/src-tauri/bundled-resources/managers"
           mkdir -p "$TARGET_DIR"
-          cp "target/x86_64-pc-windows-msvc/release/resource-manager.exe" "$TARGET_DIR/"
+          cp "${CARGO_TARGET_DIR}/x86_64-pc-windows-msvc/release/resource-manager.exe" "$TARGET_DIR/"
           echo "[done] Deployed unified resource-manager.exe"
 
       # ── 4. 安装依赖并构建 ──
