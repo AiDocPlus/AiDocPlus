@@ -1,0 +1,56 @@
+{
+  "key": "article",
+  "name": "文章",
+  "icon": "📰",
+  "order": 1,
+  "templates": [
+    {
+      "id": "doc-academic-paper",
+      "name": "学术论文",
+      "description": "标准学术论文结构，含摘要、引言、方法、结果、讨论",
+      "authorNotes": "请帮我撰写一篇学术论文，要求：\n1. 包含完整论文结构\n2. 使用学术规范语言\n3. 引言需阐明研究背景、目的和意义",
+      "content": "# [论文标题]\n\n**作者：** [姓名]　**单位：** [机构]\n\n## 摘要\n\n[200-300字摘要]\n\n**关键词：** [关键词1]；[关键词2]；[关键词3]\n\n## 1 引言\n\n### 1.1 研究背景\n\n### 1.2 研究目的与意义\n\n## 2 文献综述\n\n## 3 研究方法\n\n### 3.1 研究设计\n\n### 3.2 数据收集\n\n## 4 结果与分析\n\n## 5 讨论\n\n## 6 结论\n\n## 参考文献\n\n[1] \n[2] ",
+      "tags": [],
+      "order": 0,
+      "enabledPlugins": [],
+      "includeContent": true,
+      "includeAiContent": false
+    },
+    {
+      "id": "doc-tech-blog",
+      "name": "技术博客",
+      "description": "技术文章/博客，适合分享技术经验、解决方案和最佳实践",
+      "authorNotes": "请帮我撰写一篇技术博客文章，要求：\n1. 开头说明文章解决的问题\n2. 循序渐进讲解技术内容\n3. 包含代码示例\n4. 结尾总结要点",
+      "content": "# [文章标题]\n\n> [一句话概括文章核心价值]\n\n## 背景与问题\n\n[描述遇到的问题或需求背景]\n\n## 解决方案\n\n**步骤一：**\n\n```\n[代码示例]\n```\n\n**步骤二：**\n\n## 核心原理\n\n## 注意事项\n\n- \n- \n\n## 总结\n\n## 参考资料\n\n- ",
+      "tags": [],
+      "order": 1,
+      "enabledPlugins": [],
+      "includeContent": true,
+      "includeAiContent": false
+    },
+    {
+      "id": "doc-wechat-article",
+      "name": "公众号文章",
+      "description": "微信公众号文章，注重可读性和传播性",
+      "authorNotes": "请帮我撰写一篇公众号文章，要求：\n1. 标题吸引眼球\n2. 开头迅速抓住读者注意力\n3. 内容有价值、有观点\n4. 结尾有互动引导",
+      "content": "# [吸引眼球的标题]\n\n[开头：用故事、问题或数据抓住读者]\n\n---\n\n## [核心观点一]\n\n[展开论述，配合案例或数据]\n\n## [核心观点二]\n\n[展开论述]\n\n---\n\n## 总结\n\n[提炼核心价值]\n\n---\n\n*如果觉得有用，欢迎转发 👇*",
+      "tags": [],
+      "order": 2,
+      "enabledPlugins": [],
+      "includeContent": true,
+      "includeAiContent": false
+    },
+    {
+      "id": "doc-press-release",
+      "name": "新闻稿",
+      "description": "企业/活动新闻稿，规范的新闻写作格式",
+      "authorNotes": "请帮我撰写一篇新闻稿，要求：\n1. 标题简洁有力\n2. 导语包含5W\n3. 正文按重要性递减\n4. 包含引语和背景信息",
+      "content": "# [新闻标题]\n\n**[城市]，[日期]** — [导语：一段话概括最重要的新闻事实]\n\n[正文第一段]\n\n> [引语：相关负责人的话]\n\n[正文第二段：补充背景]\n\n---\n\n**关于[公司/组织]**\n\n[公司简介，2-3句话]\n\n**媒体联系：** [姓名] | [电话] | [邮箱]",
+      "tags": [],
+      "order": 3,
+      "enabledPlugins": [],
+      "includeContent": true,
+      "includeAiContent": false
+    }
+  ]
+}

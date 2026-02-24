@@ -1,0 +1,32 @@
+{
+  "key": "general",
+  "name": "通用",
+  "icon": "📄",
+  "order": 6,
+  "templates": [
+    {
+      "id": "doc-blank",
+      "name": "空白文档",
+      "description": "空白文档，从零开始创作",
+      "authorNotes": "请帮我撰写文档内容。",
+      "content": "# [文档标题]\n\n[在此开始写作...]\n",
+      "tags": [],
+      "order": 0,
+      "enabledPlugins": [],
+      "includeContent": true,
+      "includeAiContent": false
+    },
+    {
+      "id": "doc-reading-notes",
+      "name": "读书笔记",
+      "description": "读书笔记模板，记录阅读感悟和核心观点",
+      "authorNotes": "请帮我整理读书笔记，要求：\n1. 概括书籍核心内容\n2. 提炼关键观点和金句\n3. 记录个人感悟和思考\n4. 总结可实践的行动点",
+      "content": "# 《[书名]》读书笔记\n\n**作者：** [作者]　**阅读时间：** [日期]\n\n## 一、书籍概述\n\n[一段话概括这本书的核心内容和价值]\n\n## 二、核心观点\n\n### 观点一：[标题]\n\n[内容摘要]\n\n> [金句摘录]\n\n### 观点二：[标题]\n\n[内容摘要]\n\n## 三、个人感悟\n\n[结合自身经历的思考和感悟]\n\n## 四、行动计划\n\n- [ ] \n- [ ] \n- [ ] \n\n## 五、推荐指数\n\n⭐⭐⭐⭐⭐ [推荐理由]",
+      "tags": [],
+      "order": 1,
+      "enabledPlugins": [],
+      "includeContent": true,
+      "includeAiContent": false
+    }
+  ]
+}

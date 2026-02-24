@@ -118,17 +118,22 @@ pub fn open_resource_manager(managerName: String) -> Result<(), String> {
         _ => return Err(format!("未知管理器: {}", managerName)),
     };
 
-    // 计算数据目录：
-    // - 开发模式（debug）：不传 --data-dir，让管理器使用 configs.ts 中的源仓库路径
-    // - 发布模式（release）：传入 bundled-resources 路径
-    let data_dir = if cfg!(debug_assertions) {
-        None
-    } else {
-        match resource_type {
-            "prompt-templates" => find_prompt_templates_dir(),
-            "doc-templates" => crate::paths::bundled_sub_dir("document-templates"),
-            _ => None,
+    // 计算数据目录（find_prompt_templates_dir 已处理 dev/release 模式切换）
+    let data_dir = match resource_type {
+        "prompt-templates" => find_prompt_templates_dir(),
+        "doc-templates" => {
+            if cfg!(debug_assertions) {
+                let src_repo = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .parent().and_then(|p| p.parent()).and_then(|p| p.parent())
+                    .map(|workspace_root| workspace_root.parent().unwrap_or(workspace_root).to_path_buf())
+                    .map(|parent| parent.join("AiDocPlus-DocTemplates").join("dist").join("json"));
+                src_repo.filter(|p| p.exists())
+                    .or_else(|| crate::paths::bundled_sub_dir("document-templates"))
+            } else {
+                crate::paths::bundled_sub_dir("document-templates")
+            }
         }
+        _ => None,
     };
 
     // DEBUG: 输出启动信息
@@ -274,8 +279,21 @@ struct CustomTemplateEntry {
     variables: Vec<String>,
 }
 
-/// 查找 bundled-resources/prompt-templates 目录（通过集中式路径模块，跨平台兼容）
+/// 查找提示词模板数据目录：
+/// - 开发模式：优先使用源仓库 AiDocPlus-PromptTemplates/data/
+/// - 发布模式：使用 bundled-resources/prompt-templates/
 fn find_prompt_templates_dir() -> Option<std::path::PathBuf> {
+    if cfg!(debug_assertions) {
+        let src_repo = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent().and_then(|p| p.parent()).and_then(|p| p.parent())
+            .map(|workspace_root| workspace_root.parent().unwrap_or(workspace_root).to_path_buf())
+            .map(|parent| parent.join("AiDocPlus-PromptTemplates").join("data"));
+        if let Some(ref path) = src_repo {
+            if path.exists() {
+                return src_repo;
+            }
+        }
+    }
     crate::paths::bundled_sub_dir("prompt-templates")
 }
 
