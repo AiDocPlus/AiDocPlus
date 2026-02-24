@@ -118,11 +118,17 @@ pub fn open_resource_manager(managerName: String) -> Result<(), String> {
         _ => return Err(format!("未知管理器: {}", managerName)),
     };
 
-    // 计算数据目录：均从 bundled-resources 中查找
-    let data_dir = match resource_type {
-        "prompt-templates" => find_prompt_templates_dir(),
-        "doc-templates" => crate::paths::bundled_sub_dir("document-templates"),
-        _ => None,
+    // 计算数据目录：
+    // - 开发模式（debug）：不传 --data-dir，让管理器使用 configs.ts 中的源仓库路径
+    // - 发布模式（release）：传入 bundled-resources 路径
+    let data_dir = if cfg!(debug_assertions) {
+        None
+    } else {
+        match resource_type {
+            "prompt-templates" => find_prompt_templates_dir(),
+            "doc-templates" => crate::paths::bundled_sub_dir("document-templates"),
+            _ => None,
+        }
     };
 
     // DEBUG: 输出启动信息
