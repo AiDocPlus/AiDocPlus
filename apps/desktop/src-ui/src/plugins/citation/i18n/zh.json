@@ -1,0 +1,21 @@
+{
+  "title": "引用管理",
+  "description": "AI 识别文档中的引用和参考文献，支持格式转换、完整性检查和导出",
+  "generate": "AI 提取引用",
+  "generating": "提取中...",
+  "stopGenerate": "中断提取",
+  "promptPlaceholder": "描述引用提取需求...",
+  "welcomeDesc": "AI 识别文档中的引用和参考文献，支持格式转换、完整性检查和导出",
+  "emptyContent": "文档内容为空，无法提取引用",
+  "generateFailed": "提取失败：{{error}}",
+  "generateSuccess": "引用提取完成",
+  "exportBib": "导出 BibTeX",
+  "exportCsv": "导出 CSV",
+  "editCitation": "编辑引用",
+  "deleteCitation": "删除引用",
+  "save": "保存",
+  "cancel": "取消",
+  "citationCount": "共 {{count}} 条引用",
+  "issueCount": "{{count}} 条有问题",
+  "styleLabel": "引用格式"
+}

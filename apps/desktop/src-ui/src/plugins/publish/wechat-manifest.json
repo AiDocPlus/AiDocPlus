@@ -1,0 +1,23 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440020",
+  "name": "微信公众号发布",
+  "version": "1.0.0",
+  "description": "将文档内容直接发布到微信公众号草稿箱，支持 AI 优化排版",
+  "icon": "Send",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "functional",
+  "subCategory": "export",
+  "category": "export",
+  "tags": [
+    "wechat",
+    "微信",
+    "公众号",
+    "发布"
+  ],
+  "roles": [
+    "content-creator",
+    "marketing"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440020",
+  "name": "文档加密",
+  "version": "1.0.0",
+  "description": "对文档内容进行 AES 加密保护，支持密码加密和解密",
+  "icon": "Shield",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "functional",
+  "subCategory": "export",
+  "category": "export",
+  "tags": [
+    "encrypt",
+    "加密",
+    "安全",
+    "密码"
+  ],
+  "roles": [
+    "lawyer",
+    "civil-servant"
+  ]
+}

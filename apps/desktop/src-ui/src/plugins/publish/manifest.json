@@ -1,0 +1,24 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440019",
+  "name": "内容发布",
+  "version": "1.0.0",
+  "description": "将文档内容格式化并发布到微信公众号、知乎、掘金等主流内容平台",
+  "icon": "Share2",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "functional",
+  "subCategory": "export",
+  "category": "export",
+  "tags": [
+    "publish",
+    "发布",
+    "公众号",
+    "知乎",
+    "掘金"
+  ],
+  "roles": [
+    "content-creator",
+    "marketing"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "title": "结构化数据提取",
+  "description": "从文档中智能提取结构化信息，支持表格编辑和导出",
+  "generate": "AI 提取数据",
+  "generating": "提取中...",
+  "stopGenerate": "中断提取",
+  "promptPlaceholder": "描述提取需求...",
+  "welcomeDesc": "选择提取模板，AI 将从文档中提取结构化信息，支持编辑和导出",
+  "emptyContent": "文档内容为空，无法提取",
+  "generateFailed": "提取失败：{{error}}",
+  "generateSuccess": "提取完成",
+  "exportCsv": "导出 CSV",
+  "exportJson": "导出 JSON",
+  "addRow": "添加行",
+  "deleteRow": "删除此行",
+  "editCell": "编辑单元格",
+  "confirm": "确认",
+  "cancel": "取消",
+  "records": "共 {{count}} 条记录",
+  "clickToEdit": "点击单元格可编辑"
+}

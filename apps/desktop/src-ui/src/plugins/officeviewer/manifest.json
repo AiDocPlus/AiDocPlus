@@ -1,0 +1,24 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440017",
+  "name": "Office 文档预览",
+  "version": "1.0.0",
+  "description": "预览 PDF、DOCX、XLSX 等 Office 文档",
+  "icon": "FileSpreadsheet",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "functional",
+  "subCategory": "visualization",
+  "category": "visualization",
+  "tags": [
+    "office",
+    "预览",
+    "pdf",
+    "docx",
+    "xlsx"
+  ],
+  "roles": [
+    "civil-servant",
+    "product-manager"
+  ]
+}

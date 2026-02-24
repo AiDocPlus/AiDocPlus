@@ -1,0 +1,25 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440001",
+  "name": "生成 PPT",
+  "version": "1.0.0",
+  "description": "根据文档内容 AI 生成演示文稿",
+  "icon": "Presentation",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "content-generation",
+  "subCategory": "visualization",
+  "category": "visualization",
+  "tags": [
+    "ppt",
+    "演示文稿",
+    "presentation",
+    "slides"
+  ],
+  "roles": [
+    "teacher",
+    "product-manager",
+    "marketing",
+    "content-creator"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440033",
+  "name": "合规检查",
+  "version": "1.0.0",
+  "description": "AI 检查文档是否符合特定写作规范，输出结构化检查报告",
+  "icon": "ShieldCheck",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "content-generation",
+  "subCategory": "analysis",
+  "category": "analysis",
+  "tags": [
+    "compliance",
+    "合规",
+    "检查",
+    "规范",
+    "审核"
+  ],
+  "roles": [
+    "editor",
+    "reviewer",
+    "manager"
+  ]
+}
