@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { useAppStore } from '@/stores/useAppStore';
 import { useTranslation } from '@/i18n';
 import { useMenuEvents } from '@/hooks/useMenuEvents';
@@ -11,7 +12,6 @@ import { ShortcutsDialog } from '../dialogs/ShortcutsDialog';
 import { AboutDialog } from '../dialogs/AboutDialog';
 import { TemplatePickerDialog } from '../templates/TemplatePickerDialog';
 import { SaveAsTemplateDialog } from '../templates/SaveAsTemplateDialog';
-import { TemplateManagerDialog } from '../templates/TemplateManagerDialog';
 import { cn } from '@/lib/utils';
 import { Menu, X } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -26,7 +26,6 @@ export function MainLayout() {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [saveAsTemplateOpen, setSaveAsTemplateOpen] = useState(false);
-  const [templateManagerOpen, setTemplateManagerOpen] = useState(false);
 
   // 监听原生系统菜单事件
   useMenuEvents(useCallback(() => setSettingsOpen(true), []));
@@ -39,7 +38,11 @@ export function MainLayout() {
     const onAbout = () => setAboutOpen(true);
     const onNewFromTemplate = () => setTemplatePickerOpen(true);
     const onSaveAsTemplate = () => setSaveAsTemplateOpen(true);
-    const onManageTemplates = () => setTemplateManagerOpen(true);
+    const onManageTemplates = () => {
+      invoke('open_resource_manager', { managerName: '文档模板管理器' }).catch(err => {
+        console.error('Failed to open resource manager:', err);
+      });
+    };
     window.addEventListener('menu-doc-move-to', onMoveTo);
     window.addEventListener('menu-doc-copy-to', onCopyTo);
     window.addEventListener('menu-shortcuts-ref', onShortcuts);
@@ -166,11 +169,6 @@ export function MainLayout() {
         );
       })()}
 
-      {/* 模板管理 */}
-      <TemplateManagerDialog
-        open={templateManagerOpen}
-        onOpenChange={setTemplateManagerOpen}
-      />
     </div>
   );
 }

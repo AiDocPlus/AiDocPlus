@@ -82,6 +82,7 @@ pub fn save_doc_template_from_document(
         enabled_plugins: document.enabled_plugins.clone().unwrap_or_default(),
         plugin_data: if includePluginData { document.plugin_data.clone() } else { None },
         min_app_version: None,
+        is_built_in: false,
     };
 
     let content = DocTemplateContent {
@@ -103,19 +104,12 @@ pub fn create_document_from_doc_template(
     title: String,
     author: String,
 ) -> Result<Document> {
-    // 读取模板
-    let templates_dir = template::get_doc_templates_dir();
-    let manifest_path = templates_dir.join(&templateId).join("template.json");
-    if !manifest_path.exists() {
-        return Err(format!("Template not found: {}", templateId));
-    }
+    // 从合并列表中查找模板 manifest
+    let all_templates = template::list_doc_templates();
+    let manifest = all_templates.iter().find(|t| t.id == templateId)
+        .ok_or_else(|| format!("Template not found: {}", templateId))?;
 
-    let manifest_json = std::fs::read_to_string(&manifest_path)
-        .map_err(|e| format!("Failed to read template manifest: {}", e))?;
-    let manifest: DocTemplateManifest = serde_json::from_str(&manifest_json)
-        .map_err(|e| format!("Failed to parse template manifest: {}", e))?;
-
-    // 读取模板内容
+    // 读取模板内容（从 bundled JSON 或 custom.json）
     let template_content = template::get_doc_template_content(&templateId)?;
 
     // 创建新文档
@@ -134,7 +128,7 @@ pub fn create_document_from_doc_template(
 
     // 应用插件设置
     if !manifest.enabled_plugins.is_empty() {
-        document.enabled_plugins = Some(manifest.enabled_plugins);
+        document.enabled_plugins = Some(manifest.enabled_plugins.clone());
     }
     if template_content.plugin_data.is_some() {
         document.plugin_data = template_content.plugin_data;

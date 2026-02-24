@@ -966,6 +966,40 @@ env:
 3. **禁止 `rsync`**：Windows 无 rsync，CI 中 AiDocPlus-Main 部署使用 `find + cp` 替代
 4. **`deploy.sh` 中的箭头符号**：使用 `->` 替代 `→`（Unicode 箭头）
 
+### 代码跨平台规范
+
+所有 Rust 后端和 TypeScript 前端代码必须遵守以下规范，确保在 macOS、Windows、Linux 上正确运行：
+
+#### Rust 路径处理
+1. **必须使用 `PathBuf::join()`**：禁止用 `format!("{}/{}", dir, name)` 拼接文件路径，`join()` 会自动使用平台正确的分隔符
+2. **bundled-resources 查找**：优先使用 Tauri `app.path().resource_dir()`（跨平台正确解析），回退到 exe 向上遍历
+3. **平台分支**：使用 `#[cfg(target_os = "...")]` 处理平台差异（如进程启动、文件打开方式）
+4. **路径转字符串**：使用 `path.display()` 用于日志，`path.to_string_lossy()` 用于传递给前端
+
+#### TypeScript 路径处理
+1. **禁止硬编码 `/` 作为路径分隔符**：Windows 路径使用 `\`，正则表达式必须同时匹配 `/` 和 `\`
+   - 错误：`path.replace(/\/[^/]+\/?$/, '')`
+   - 正确：`path.replace(/[/\\][^/\\]+[/\\]?$/, '')`
+2. **路径拼接**：检测原始路径的分隔符后拼接，或使用 Tauri 后端命令处理路径
+   - 正确：`const sep = path.includes('\\') ? '\\' : '/'; \`${parentDir}${sep}${subDir}\``
+3. **前端尽量不做路径操作**：复杂路径逻辑应放在 Rust 后端，前端只传递和显示路径字符串
+
+#### 字体
+1. **中文字体必须提供跨平台 fallback 链**：
+   - 宋体：`"Songti SC", "SimSun", "STSong", serif`（macOS → Windows → 备选）
+   - 黑体：`"PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif`
+   - 楷体：`"Kaiti SC", "STKaiti", "KaiTi", serif`
+2. **禁止单独使用中文字体名**（如 `'宋体'`），必须包含 fallback
+
+#### 资源管理器启动
+- macOS：`.app` bundle，通过 `open` 命令启动
+- Windows：`.exe`，直接启动并设置 `CREATE_NEW_PROCESS_GROUP` + WebView2 用户数据目录（`LOCALAPPDATA`）
+- Linux：无后缀二进制文件，直接启动
+
+#### deploy.sh 平台说明
+- `AiDocPlus-ResourceManager/scripts/deploy.sh` 仅处理 macOS `.app` bundle
+- Windows CI 在 `build.yml` 中单独处理 exe 复制（`tauri build --no-bundle` → 复制 exe 到 `bundled-resources/managers/`）
+
 ### 重要经验教训
 
 1. **pnpm 版本**：GitHub Actions 中使用 `pnpm/action-setup@v4` 并指定 `version: 10`

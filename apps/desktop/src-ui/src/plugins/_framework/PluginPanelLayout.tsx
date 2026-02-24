@@ -219,7 +219,7 @@ export function PluginPanelLayout({
                 onChange={e => onPromptChange(e.target.value)}
                 placeholder={placeholder}
                 className="w-full h-14 px-3 py-2 text-sm border rounded-md bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-                style={{ fontFamily: '宋体', fontSize: '16px' }}
+                style={{ fontFamily: '"Songti SC", "SimSun", "STSong", serif', fontSize: '16px' }}
                 spellCheck={false}
                 autoCorrect="off"
                 autoCapitalize="off"
@@ -254,7 +254,7 @@ export function PluginPanelLayout({
             <div
               ref={statusScrollRef}
               className="max-h-[150px] overflow-y-auto px-2 py-1.5 text-xs whitespace-pre-wrap border-b"
-              style={{ fontFamily: '宋体', fontSize: '12px' }}
+              style={{ fontFamily: '"Songti SC", "SimSun", "STSong", serif', fontSize: '12px' }}
             >
               {statusLogs.map((log, i) => (
                 <div key={i} className={log.isError ? 'text-destructive' : 'text-green-600 dark:text-green-400'}>
@@ -319,7 +319,7 @@ export function PluginPanelLayout({
                 onChange={e => onPromptChange(e.target.value)}
                 placeholder={placeholder}
                 className="w-full h-14 px-2 py-1.5 text-sm border rounded-md bg-background resize-none focus:outline-none focus:ring-1 focus:ring-ring"
-                style={{ fontFamily: '宋体', fontSize: '16px' }}
+                style={{ fontFamily: '"Songti SC", "SimSun", "STSong", serif', fontSize: '16px' }}
                 spellCheck={false}
                 autoCorrect="off"
                 autoCapitalize="off"
@@ -411,7 +411,7 @@ export function PluginPanelLayout({
           <div
             ref={statusScrollRef}
             className="max-h-[150px] overflow-y-auto px-2 py-1.5 text-xs whitespace-pre-wrap border-b"
-            style={{ fontFamily: '宋体', fontSize: '12px' }}
+            style={{ fontFamily: '"Songti SC", "SimSun", "STSong", serif', fontSize: '12px' }}
           >
             {statusLogs.map((log, i) => (
               <div key={i} className={log.isError ? 'text-destructive' : 'text-green-600 dark:text-green-400'}>

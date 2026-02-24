@@ -62,7 +62,7 @@ export function PluginPromptBuilderDialog({
             <label className="text-xs font-medium text-muted-foreground">{t('promptPreview')}</label>
             <div
               className="w-full min-h-[80px] max-h-[200px] overflow-y-auto px-3 py-2 text-sm border rounded-md bg-muted/30 whitespace-pre-wrap"
-              style={{ fontFamily: '宋体', fontSize: '16px' }}
+              style={{ fontFamily: '"Songti SC", "SimSun", "STSong", serif', fontSize: '16px' }}
             >
               {previewPrompt || <span className="text-muted-foreground italic">{t('promptPreviewEmpty')}</span>}
             </div>

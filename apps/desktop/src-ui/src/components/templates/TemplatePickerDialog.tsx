@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Search, FileText, FolderOpen, Puzzle, FilePlus } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
+import { Search, FileText, FolderOpen, Puzzle, FilePlus, ExternalLink } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -238,7 +239,21 @@ export function TemplatePickerDialog({ open, onOpenChange, projectId, onCreated 
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex items-center justify-between sm:justify-between">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
+            onClick={() => {
+              invoke('open_resource_manager', { managerName: '文档模板管理器' }).catch(err => {
+                console.error('Failed to open resource manager:', err);
+              });
+            }}
+          >
+            <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+            打开文档模板管理器
+          </Button>
+          <div className="flex gap-2">
           <Button variant="outline" onClick={() => { onOpenChange(false); resetState(); }}>
             {t('templates.cancel', { defaultValue: '取消' })}
           </Button>
@@ -251,6 +266,7 @@ export function TemplatePickerDialog({ open, onOpenChange, projectId, onCreated 
               {isCreating ? t('templates.creating', { defaultValue: '创建中...' }) : t('templates.createBlankDoc', { defaultValue: '创建空白文档' })}
             </Button>
           )}
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

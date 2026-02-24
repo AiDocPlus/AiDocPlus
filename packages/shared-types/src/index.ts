@@ -102,6 +102,7 @@ export interface DocTemplateManifest {
   enabledPlugins: string[];      // 预设插件列表
   pluginData?: Record<string, unknown>;
   minAppVersion?: string;
+  isBuiltIn: boolean;            // 是否为内置模板
 }
 
 export interface DocTemplateContent {

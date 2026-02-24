@@ -212,7 +212,7 @@ export function ToolPluginLayout({
           <div
             ref={statusScrollRef}
             className="max-h-[150px] overflow-y-auto px-3 py-1.5 text-xs whitespace-pre-wrap border-b"
-            style={{ fontFamily: '宋体', fontSize: '12px' }}
+            style={{ fontFamily: '"Songti SC", "SimSun", "STSong", serif', fontSize: '12px' }}
           >
             {statusLogs.map((log, i) => (
               <div key={i} className={log.isError ? 'text-destructive' : 'text-muted-foreground'}>

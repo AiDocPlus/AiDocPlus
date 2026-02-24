@@ -2,6 +2,10 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+// ═══════════════════════════════════════════════════════════════
+// 公开数据结构（前端交互用）
+// ═══════════════════════════════════════════════════════════════
+
 /// 文档模板 Manifest — 轻量元数据，用于列表展示
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DocTemplateManifest {
@@ -33,6 +37,8 @@ pub struct DocTemplateManifest {
     pub plugin_data: Option<serde_json::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "minAppVersion")]
     pub min_app_version: Option<String>,
+    #[serde(rename = "isBuiltIn", default)]
+    pub is_built_in: bool,
 }
 
 /// 文档模板内容 — 按需加载
@@ -52,13 +58,90 @@ fn default_template_type() -> String {
     "custom".to_string()
 }
 
-/// 获取文档模板目录路径
-pub fn get_doc_templates_dir() -> PathBuf {
-    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-    home.join("AiDocPlus").join("Templates")
+// ═══════════════════════════════════════════════════════════════
+// 内置模板 JSON 文件结构（bundled-resources/document-templates/*.json）
+// ═══════════════════════════════════════════════════════════════
+
+#[derive(Debug, Clone, Deserialize)]
+struct CategoryJsonFile {
+    key: String,
+    name: String,
+    #[serde(default)]
+    icon: String,
+    #[serde(default)]
+    order: i32,
+    #[serde(default)]
+    templates: Vec<BuiltinJsonTemplate>,
 }
 
-/// 确保文档模板目录存在（应用启动时调用）
+#[derive(Debug, Clone, Deserialize)]
+struct BuiltinJsonTemplate {
+    id: String,
+    #[serde(default)]
+    name: String,
+    #[serde(default)]
+    description: String,
+    #[serde(rename = "authorNotes", default)]
+    author_notes: String,
+    #[serde(default)]
+    content: String,
+    #[serde(default)]
+    tags: Vec<String>,
+    #[serde(default)]
+    order: i32,
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 自定义模板 JSON 文件结构（~/AiDocPlus/DocTemplates/custom.json）
+// ═══════════════════════════════════════════════════════════════
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CustomDocTemplatesFile {
+    #[serde(default)]
+    templates: Vec<CustomDocTemplateEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CustomDocTemplateEntry {
+    id: String,
+    name: String,
+    #[serde(default)]
+    description: String,
+    #[serde(default)]
+    category: String,
+    #[serde(rename = "authorNotes", default)]
+    author_notes: String,
+    #[serde(default)]
+    content: String,
+    #[serde(rename = "aiGeneratedContent", default)]
+    ai_generated_content: String,
+    #[serde(rename = "includeContent", default)]
+    include_content: bool,
+    #[serde(rename = "includeAiContent", default)]
+    include_ai_content: bool,
+    #[serde(rename = "enabledPlugins", default)]
+    enabled_plugins: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "pluginData")]
+    plugin_data: Option<serde_json::Value>,
+    #[serde(default)]
+    tags: Vec<String>,
+    #[serde(rename = "createdAt", default)]
+    created_at: i64,
+    #[serde(rename = "updatedAt", default)]
+    updated_at: i64,
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 路径工具
+// ═══════════════════════════════════════════════════════════════
+
+/// 用户自定义文档模板目录
+pub fn get_doc_templates_dir() -> PathBuf {
+    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+    home.join("AiDocPlus").join("DocTemplates")
+}
+
+/// 确保文档模板目录存在
 pub fn ensure_doc_templates_dir() {
     let templates_dir = get_doc_templates_dir();
     if let Err(e) = fs::create_dir_all(&templates_dir) {
@@ -66,80 +149,193 @@ pub fn ensure_doc_templates_dir() {
     }
 }
 
-/// 扫描文档模板目录，返回所有用户自定义文档模板
-pub fn list_doc_templates() -> Vec<DocTemplateManifest> {
-    let mut templates = Vec::new();
-    let templates_dir = get_doc_templates_dir();
-    if templates_dir.exists() {
-        if let Ok(entries) = fs::read_dir(&templates_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if !path.is_dir() {
-                    continue;
-                }
-                let manifest_path = path.join("template.json");
-                if !manifest_path.exists() {
-                    continue;
-                }
-                match fs::read_to_string(&manifest_path) {
-                    Ok(json) => match serde_json::from_str::<DocTemplateManifest>(&json) {
-                        Ok(manifest) => {
-                            templates.push(manifest);
-                        }
-                        Err(e) => eprintln!("Failed to parse doc template manifest {:?}: {}", manifest_path, e),
-                    },
-                    Err(e) => eprintln!("Failed to read doc template manifest {:?}: {}", manifest_path, e),
+fn custom_templates_path() -> PathBuf {
+    get_doc_templates_dir().join("custom.json")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 内置模板加载（从 bundled-resources/document-templates/*.json）
+// ═══════════════════════════════════════════════════════════════
+
+fn find_bundled_dir() -> Option<PathBuf> {
+    crate::paths::bundled_sub_dir("document-templates")
+}
+
+/// 从 bundled-resources 加载所有内置分类 JSON 文件
+fn load_bundled_category_files() -> Vec<CategoryJsonFile> {
+    let mut result = Vec::new();
+    let dir = match find_bundled_dir() {
+        Some(d) if d.exists() => d,
+        _ => return result,
+    };
+    if let Ok(entries) = fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                continue;
+            }
+            if let Ok(json_str) = fs::read_to_string(&path) {
+                match serde_json::from_str::<CategoryJsonFile>(&json_str) {
+                    Ok(cat_file) => result.push(cat_file),
+                    Err(e) => eprintln!("Failed to parse bundled doc template {:?}: {}", path, e),
                 }
             }
         }
     }
+    result.sort_by_key(|c| c.order);
+    result
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 自定义模板读写（~/AiDocPlus/DocTemplates/custom.json）
+// ═══════════════════════════════════════════════════════════════
+
+fn read_custom_templates() -> CustomDocTemplatesFile {
+    let path = custom_templates_path();
+    if path.exists() {
+        if let Ok(json_str) = fs::read_to_string(&path) {
+            if let Ok(file) = serde_json::from_str::<CustomDocTemplatesFile>(&json_str) {
+                return file;
+            }
+        }
+    }
+    CustomDocTemplatesFile { templates: Vec::new() }
+}
+
+fn write_custom_templates(file: &CustomDocTemplatesFile) -> Result<(), String> {
+    ensure_doc_templates_dir();
+    let json = serde_json::to_string_pretty(file)
+        .map_err(|e| format!("Failed to serialize custom templates: {}", e))?;
+    fs::write(custom_templates_path(), json)
+        .map_err(|e| format!("Failed to write custom.json: {}", e))?;
+    Ok(())
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 公开 API：模板列表 / 内容读取
+// ═══════════════════════════════════════════════════════════════
+
+/// 列出所有文档模板（内置 + 自定义）
+pub fn list_doc_templates() -> Vec<DocTemplateManifest> {
+    let mut templates = Vec::new();
+
+    // 1. 加载内置模板
+    for cat_file in load_bundled_category_files() {
+        for tmpl in &cat_file.templates {
+            templates.push(DocTemplateManifest {
+                id: tmpl.id.clone(),
+                name: tmpl.name.clone(),
+                description: tmpl.description.clone(),
+                icon: String::new(),
+                author: "AiDocPlus".to_string(),
+                template_type: "builtin".to_string(),
+                category: cat_file.key.clone(),
+                tags: tmpl.tags.clone(),
+                created_at: 0,
+                updated_at: 0,
+                include_content: true,
+                include_ai_content: false,
+                enabled_plugins: Vec::new(),
+                plugin_data: None,
+                min_app_version: None,
+                is_built_in: true,
+            });
+        }
+    }
+
+    // 2. 加载自定义模板
+    let custom = read_custom_templates();
+    for entry in &custom.templates {
+        templates.push(DocTemplateManifest {
+            id: entry.id.clone(),
+            name: entry.name.clone(),
+            description: entry.description.clone(),
+            icon: String::new(),
+            author: String::new(),
+            template_type: "custom".to_string(),
+            category: entry.category.clone(),
+            tags: entry.tags.clone(),
+            created_at: entry.created_at,
+            updated_at: entry.updated_at,
+            include_content: entry.include_content,
+            include_ai_content: entry.include_ai_content,
+            enabled_plugins: entry.enabled_plugins.clone(),
+            plugin_data: entry.plugin_data.clone(),
+            min_app_version: None,
+            is_built_in: false,
+        });
+    }
+
     templates
 }
 
 /// 读取指定文档模板的内容
 pub fn get_doc_template_content(template_id: &str) -> Result<DocTemplateContent, String> {
-    let templates_dir = get_doc_templates_dir();
-    let content_path = templates_dir.join(template_id).join("content.json");
-    if content_path.exists() {
-        let json = fs::read_to_string(&content_path)
-            .map_err(|e| format!("Failed to read doc template content: {}", e))?;
-        let content: DocTemplateContent = serde_json::from_str(&json)
-            .map_err(|e| format!("Failed to parse doc template content: {}", e))?;
-        return Ok(content);
+    // 1. 先在内置模板中查找
+    for cat_file in load_bundled_category_files() {
+        if let Some(tmpl) = cat_file.templates.iter().find(|t| t.id == template_id) {
+            return Ok(DocTemplateContent {
+                author_notes: tmpl.author_notes.clone(),
+                ai_generated_content: String::new(),
+                content: tmpl.content.clone(),
+                plugin_data: None,
+            });
+        }
     }
+
+    // 2. 在自定义模板中查找
+    let custom = read_custom_templates();
+    if let Some(entry) = custom.templates.iter().find(|t| t.id == template_id) {
+        return Ok(DocTemplateContent {
+            author_notes: entry.author_notes.clone(),
+            ai_generated_content: entry.ai_generated_content.clone(),
+            content: entry.content.clone(),
+            plugin_data: entry.plugin_data.clone(),
+        });
+    }
+
     Err(format!("Doc template content not found: {}", template_id))
 }
 
-/// 创建文档模板（写入 manifest 和 content）
+// ═══════════════════════════════════════════════════════════════
+// 公开 API：自定义模板 CRUD
+// ═══════════════════════════════════════════════════════════════
+
+/// 创建文档模板（保存到 custom.json）
 pub fn create_doc_template(manifest: DocTemplateManifest, content: DocTemplateContent) -> Result<DocTemplateManifest, String> {
-    let templates_dir = get_doc_templates_dir();
-    let template_dir = templates_dir.join(&manifest.id);
-    fs::create_dir_all(&template_dir)
-        .map_err(|e| format!("Failed to create template dir: {}", e))?;
-
-    let mut manifest = manifest;
+    let mut custom = read_custom_templates();
     let now = chrono::Utc::now().timestamp();
-    if manifest.created_at == 0 {
-        manifest.created_at = now;
+
+    let entry = CustomDocTemplateEntry {
+        id: manifest.id.clone(),
+        name: manifest.name.clone(),
+        description: manifest.description.clone(),
+        category: manifest.category.clone(),
+        author_notes: content.author_notes,
+        content: content.content,
+        ai_generated_content: content.ai_generated_content,
+        include_content: manifest.include_content,
+        include_ai_content: manifest.include_ai_content,
+        enabled_plugins: manifest.enabled_plugins.clone(),
+        plugin_data: content.plugin_data.or(manifest.plugin_data.clone()),
+        tags: manifest.tags.clone(),
+        created_at: if manifest.created_at == 0 { now } else { manifest.created_at },
+        updated_at: now,
+    };
+
+    custom.templates.push(entry);
+    write_custom_templates(&custom)?;
+
+    let mut result = manifest;
+    if result.created_at == 0 {
+        result.created_at = now;
     }
-    manifest.updated_at = now;
-
-    // 写入 manifest
-    let manifest_json = serde_json::to_string_pretty(&manifest)
-        .map_err(|e| format!("Failed to serialize template manifest: {}", e))?;
-    fs::write(template_dir.join("template.json"), manifest_json)
-        .map_err(|e| format!("Failed to write template manifest: {}", e))?;
-
-    // 写入 content
-    let content_json = serde_json::to_string_pretty(&content)
-        .map_err(|e| format!("Failed to serialize template content: {}", e))?;
-    fs::write(template_dir.join("content.json"), content_json)
-        .map_err(|e| format!("Failed to write template content: {}", e))?;
-
-    Ok(manifest)
+    result.updated_at = now;
+    result.is_built_in = false;
+    Ok(result)
 }
 
-/// 更新文档模板 manifest（可选更新 content）
+/// 更新文档模板（仅自定义模板）
 pub fn update_doc_template(
     template_id: &str,
     name: Option<String>,
@@ -149,103 +345,83 @@ pub fn update_doc_template(
     tags: Option<Vec<String>>,
     content: Option<DocTemplateContent>,
 ) -> Result<DocTemplateManifest, String> {
-    let templates_dir = get_doc_templates_dir();
-    let template_dir = templates_dir.join(template_id);
-    let manifest_path = template_dir.join("template.json");
+    let mut custom = read_custom_templates();
+    let entry = custom.templates.iter_mut().find(|t| t.id == template_id)
+        .ok_or_else(|| format!("自定义模板未找到: {}", template_id))?;
 
-    if !manifest_path.exists() {
-        return Err(format!("Doc template not found: {}", template_id));
-    }
-
-    let json = fs::read_to_string(&manifest_path)
-        .map_err(|e| format!("Failed to read doc template manifest: {}", e))?;
-    let mut manifest: DocTemplateManifest = serde_json::from_str(&json)
-        .map_err(|e| format!("Failed to parse doc template manifest: {}", e))?;
-
-    if let Some(n) = name { manifest.name = n; }
-    if let Some(d) = description { manifest.description = d; }
-    if let Some(c) = category { manifest.category = c; }
-    if let Some(i) = icon { manifest.icon = i; }
-    if let Some(t) = tags { manifest.tags = t; }
-    manifest.updated_at = chrono::Utc::now().timestamp();
-
-    let manifest_json = serde_json::to_string_pretty(&manifest)
-        .map_err(|e| format!("Failed to serialize template manifest: {}", e))?;
-    fs::write(&manifest_path, manifest_json)
-        .map_err(|e| format!("Failed to write template manifest: {}", e))?;
-
-    // 可选更新 content
+    if let Some(n) = name { entry.name = n; }
+    if let Some(d) = description { entry.description = d; }
+    if let Some(c) = category { entry.category = c; }
+    if let Some(t) = tags { entry.tags = t; }
     if let Some(c) = content {
-        let content_json = serde_json::to_string_pretty(&c)
-            .map_err(|e| format!("Failed to serialize template content: {}", e))?;
-        fs::write(template_dir.join("content.json"), content_json)
-            .map_err(|e| format!("Failed to write template content: {}", e))?;
+        entry.author_notes = c.author_notes;
+        entry.content = c.content;
+        entry.ai_generated_content = c.ai_generated_content;
+        entry.plugin_data = c.plugin_data;
     }
+    entry.updated_at = chrono::Utc::now().timestamp();
 
-    Ok(manifest)
+    let result = DocTemplateManifest {
+        id: entry.id.clone(),
+        name: entry.name.clone(),
+        description: entry.description.clone(),
+        icon: icon.unwrap_or_default(),
+        author: String::new(),
+        template_type: "custom".to_string(),
+        category: entry.category.clone(),
+        tags: entry.tags.clone(),
+        created_at: entry.created_at,
+        updated_at: entry.updated_at,
+        include_content: entry.include_content,
+        include_ai_content: entry.include_ai_content,
+        enabled_plugins: entry.enabled_plugins.clone(),
+        plugin_data: entry.plugin_data.clone(),
+        min_app_version: None,
+        is_built_in: false,
+    };
+
+    write_custom_templates(&custom)?;
+    Ok(result)
 }
 
-/// 删除文档模板
+/// 删除文档模板（仅自定义模板）
 pub fn delete_doc_template(template_id: &str) -> Result<(), String> {
-    let templates_dir = get_doc_templates_dir();
-    let template_dir = templates_dir.join(template_id);
-
-    if !template_dir.exists() {
-        return Err(format!("Doc template not found: {}", template_id));
+    let mut custom = read_custom_templates();
+    let before = custom.templates.len();
+    custom.templates.retain(|t| t.id != template_id);
+    if custom.templates.len() == before {
+        return Err(format!("自定义模板未找到: {}", template_id));
     }
-
-    fs::remove_dir_all(&template_dir)
-        .map_err(|e| format!("Failed to delete doc template: {}", e))?;
-
+    write_custom_templates(&custom)?;
     Ok(())
 }
 
-/// 复制文档模板
+/// 复制文档模板（内置或自定义 → 新的自定义模板）
 pub fn duplicate_doc_template(template_id: &str, new_name: &str) -> Result<DocTemplateManifest, String> {
-    let templates_dir = get_doc_templates_dir();
-    let source_dir = templates_dir.join(template_id);
+    // 读取源模板内容
+    let source_content = get_doc_template_content(template_id)?;
 
-    if !source_dir.exists() {
-        return Err(format!("Doc template not found: {}", template_id));
-    }
+    // 读取源 manifest 信息
+    let all = list_doc_templates();
+    let source = all.iter().find(|t| t.id == template_id)
+        .ok_or_else(|| format!("模板未找到: {}", template_id))?;
 
-    // 读取源 manifest
-    let manifest_json = fs::read_to_string(source_dir.join("template.json"))
-        .map_err(|e| format!("Failed to read source manifest: {}", e))?;
-    let source_manifest: DocTemplateManifest = serde_json::from_str(&manifest_json)
-        .map_err(|e| format!("Failed to parse source manifest: {}", e))?;
-
-    // 读取源 content
-    let content = if source_dir.join("content.json").exists() {
-        let content_json = fs::read_to_string(source_dir.join("content.json"))
-            .map_err(|e| format!("Failed to read source content: {}", e))?;
-        serde_json::from_str::<DocTemplateContent>(&content_json)
-            .map_err(|e| format!("Failed to parse source content: {}", e))?
-    } else {
-        DocTemplateContent {
-            author_notes: String::new(),
-            ai_generated_content: String::new(),
-            content: String::new(),
-            plugin_data: None,
-        }
-    };
-
-    // 创建新文档模板
     let new_id = uuid::Uuid::new_v4().to_string();
     let new_manifest = DocTemplateManifest {
         id: new_id,
         name: new_name.to_string(),
         template_type: "custom".to_string(),
-        created_at: 0, // will be set by create_template
+        created_at: 0,
         updated_at: 0,
-        ..source_manifest
+        is_built_in: false,
+        ..source.clone()
     };
 
-    create_doc_template(new_manifest, content)
+    create_doc_template(new_manifest, source_content)
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 文档模板分类管理（持久化到 ~/AiDocPlus/Templates/categories.json）
+// 文档模板分类管理
 // ═══════════════════════════════════════════════════════════════
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -262,13 +438,25 @@ fn default_category_type() -> String {
     "custom".to_string()
 }
 
-/// 内置默认分类（优先从 bundled-resources 读取，fallback 到硬编码）
+/// 从 bundled JSON 文件提取内置分类
+fn builtin_categories_from_json() -> Vec<DocTemplateCategory> {
+    let mut cats = Vec::new();
+    for cat_file in load_bundled_category_files() {
+        cats.push(DocTemplateCategory {
+            key: cat_file.key,
+            label: cat_file.name,
+            order: cat_file.order,
+            category_type: "builtin".to_string(),
+        });
+    }
+    cats
+}
+
+/// 内置默认分类（从 bundled JSON 文件提取，fallback 到硬编码）
 fn default_categories() -> Vec<DocTemplateCategory> {
-    // 尝试从 bundled-resources/document-templates/_meta.json 读取
-    if let Some(cats) = load_categories_from_bundled() {
-        if !cats.is_empty() {
-            return cats;
-        }
+    let cats = builtin_categories_from_json();
+    if !cats.is_empty() {
+        return cats;
     }
     // Fallback: 硬编码默认分类
     vec![
@@ -280,30 +468,6 @@ fn default_categories() -> Vec<DocTemplateCategory> {
         DocTemplateCategory { key: "technical".into(),    label: "技术文档".into(), order: 5, category_type: "builtin".into() },
         DocTemplateCategory { key: "general".into(),      label: "通用".into(),     order: 6, category_type: "builtin".into() },
     ]
-}
-
-/// 从 bundled-resources 加载分类定义
-fn load_categories_from_bundled() -> Option<Vec<DocTemplateCategory>> {
-    let meta_path = crate::paths::bundled_sub_dir("document-templates")?.join("_meta.json");
-    if !meta_path.exists() {
-        return None;
-    }
-    let content = fs::read_to_string(&meta_path).ok()?;
-    let meta: serde_json::Value = serde_json::from_str(&content).ok()?;
-    let categories = meta.get("categories")?.as_array()?;
-    let mut result = Vec::new();
-    for cat in categories {
-        let key = cat.get("key")?.as_str()?.to_string();
-        let name = cat.get("name")?.as_str()?.to_string();
-        let order = cat.get("order").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
-        result.push(DocTemplateCategory {
-            key,
-            label: name,
-            order,
-            category_type: "builtin".to_string(),
-        });
-    }
-    Some(result)
 }
 
 fn categories_path() -> PathBuf {

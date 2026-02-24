@@ -265,16 +265,18 @@ export function TemplateManagerDialog({ open, onOpenChange }: TemplateManagerDia
                           {template.description && <div className="text-xs text-muted-foreground truncate mt-0.5">{template.description}</div>}
                           <div className="flex items-center gap-2 mt-1">
                             <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{getCategoryLabel(template.category || 'general')}</span>
-                            <span className={`text-xs px-1.5 py-0.5 rounded ${template.type === 'builtin' ? 'bg-green-500/10 text-green-600' : 'bg-blue-500/10 text-blue-600'}`}>
-                              {template.type === 'builtin' ? t('settings.templateManager.builtin', { defaultValue: '内置' }) : t('settings.templateManager.custom', { defaultValue: '自定义' })}
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${template.isBuiltIn ? 'bg-green-500/10 text-green-600' : 'bg-blue-500/10 text-blue-600'}`}>
+                              {template.isBuiltIn ? t('settings.templateManager.builtin', { defaultValue: '内置' }) : t('settings.templateManager.custom', { defaultValue: '自定义' })}
                             </span>
                             {template.createdAt > 0 && <span className="text-xs text-muted-foreground">{formatDate(template.createdAt)}</span>}
                           </div>
                         </div>
                         <div className="flex items-center gap-0.5 flex-shrink-0">
-                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title={t('settings.templateManager.edit', { defaultValue: '编辑' })} onClick={() => handleStartEdit(template)}><Pencil className="h-3.5 w-3.5" /></Button>
+                          {!template.isBuiltIn && (
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title={t('settings.templateManager.edit', { defaultValue: '编辑' })} onClick={() => handleStartEdit(template)}><Pencil className="h-3.5 w-3.5" /></Button>
+                          )}
                           <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title={t('settings.templateManager.copy', { defaultValue: '复制' })} onClick={() => handleDuplicate(template.id, template.name)}><Copy className="h-3.5 w-3.5" /></Button>
-                          {template.type !== 'builtin' && (
+                          {!template.isBuiltIn && (
                             confirmingDeleteId === template.id ? (
                               <div className="flex items-center gap-1">
                                 <Button size="sm" variant="destructive" className="h-7 px-2 text-xs" onClick={() => handleDeleteTemplate(template.id)}>{t('settings.templateManager.confirmDelete', { defaultValue: '确认删除' })}</Button>
