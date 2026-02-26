@@ -5,7 +5,7 @@ import i18n from '@/i18n';
  * 每个插件自带翻译文件，通过此函数注册到全局 i18n 实例
  *
  * @param namespace - 命名空间，如 'plugin-summary'
- * @param translations - { zh: {...}, en: {...}, ja: {...} }
+ * @param translations - { zh: {...}, en: {...} }
  */
 export function registerPluginI18n(
   namespace: string,

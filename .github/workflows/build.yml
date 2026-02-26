@@ -171,8 +171,10 @@ jobs:
 
           TARGET_DIR="../AiDocPlus/apps/desktop/src-tauri/bundled-resources/managers"
           mkdir -p "$TARGET_DIR"
+          # 清理 macOS .app（从 Git 仓库带来的，Windows 上不需要）
+          rm -rf "$TARGET_DIR/资源管理器.app"
           cp "${CARGO_TARGET_DIR}/x86_64-pc-windows-msvc/release/resource-manager.exe" "$TARGET_DIR/"
-          echo "[done] Deployed unified resource-manager.exe"
+          echo "[done] Deployed unified resource-manager.exe (cleaned macOS .app)"
 
       # ── 4. 安装依赖并构建 ──
       - name: Install frontend dependencies

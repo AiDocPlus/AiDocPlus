@@ -16,11 +16,5 @@
     "发送",
     "smtp",
     "协作"
-  ],
-  "roles": [
-    "lawyer",
-    "civil-servant",
-    "product-manager",
-    "marketing"
   ]
 }

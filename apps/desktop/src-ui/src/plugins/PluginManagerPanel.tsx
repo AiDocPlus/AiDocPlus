@@ -134,8 +134,12 @@ export function PluginManagerPanel({
   const getManifest = (pluginId: string): PluginManifest | undefined =>
     pluginManifests.find(m => m.id === pluginId);
 
-  // 合并后的分类
-  const mergedMajors = useMemo(() => getMergedMajorCategories(), [pluginsSettings?.customCategories]);
+  // 合并后的分类（根据 filterCategory 过滤）
+  const mergedMajors = useMemo(() => {
+    const all = getMergedMajorCategories();
+    if (!filterCategory) return all;
+    return all.filter(m => m.key === filterCategory);
+  }, [pluginsSettings?.customCategories, filterCategory]);
 
   // 构建树结构数据
   const treeData = useMemo(() => {
@@ -151,8 +155,12 @@ export function PluginManagerPanel({
       if (sub) subCounts[major][sub] = (subCounts[major][sub] || 0) + 1;
     }
 
-    return { majorCounts, subCounts, total: allPlugins.length };
-  }, [pluginManifests, allPlugins]);
+    // total 也需根据 filterCategory 过滤
+    const total = filterCategory
+      ? pluginManifests.filter(m => m.enabled && (m.majorCategory || 'content-generation') === filterCategory).length
+      : allPlugins.length;
+    return { majorCounts, subCounts, total };
+  }, [pluginManifests, allPlugins, filterCategory]);
 
   // 过滤插件
   const filteredPlugins = useMemo(() => {
@@ -384,10 +392,13 @@ export function PluginManagerPanel({
             const isMajorSelected = selectedNode === major.key;
             const subCategories = getMergedSubCategories(major.key);
             const isEditingMajor = editingNode === `major:${major.key}`;
+            // 单大类模式：filterCategory 指定时只有一个大类，隐藏大类节点，子类平铺
+            const singleMajorMode = !!filterCategory;
 
             return (
               <div key={major.key}>
-                {/* 大类节点 */}
+                {/* 大类节点（单大类模式下隐藏） */}
+                {!singleMajorMode && (
                 <div className="flex items-center group">
                   <button
                     onClick={() => toggleMajor(major.key)}
@@ -448,9 +459,10 @@ export function PluginManagerPanel({
                     )}
                   </div>
                 </div>
+                )}
 
-                {/* 子类节点 */}
-                {isExpanded && subCategories.map(sub => {
+                {/* 子类节点（单大类模式下始终展开、减少缩进） */}
+                {(singleMajorMode || isExpanded) && subCategories.map(sub => {
                   const subCount = treeData.subCounts[major.key]?.[sub.key] || 0;
                   const nodeKey = `${major.key}:${sub.key}`;
                   const isSubSelected = selectedNode === nodeKey;
@@ -468,14 +480,14 @@ export function PluginManagerPanel({
                             if (e.key === 'Enter') handleFinishRename('sub', major.key, sub.key);
                             if (e.key === 'Escape') setEditingNode(null);
                           }}
-                          className="flex-1 min-w-0 ml-8 mr-2 px-1 py-1 text-sm bg-background border rounded outline-none"
+                          className={`flex-1 min-w-0 ${singleMajorMode ? 'ml-3' : 'ml-8'} mr-2 px-1 py-1 text-sm bg-background border rounded outline-none`}
                         />
                       ) : (
                         <button
                           onClick={() => setSelectedNode(nodeKey)}
                           onDoubleClick={() => handleStartRename(`sub:${nodeKey}`, sub.label)}
                           className={`
-                            flex-1 text-left pl-8 pr-2 py-1.5 text-sm transition-colors truncate
+                            flex-1 text-left ${singleMajorMode ? 'pl-3' : 'pl-8'} pr-2 py-1.5 text-sm transition-colors truncate
                             ${isSubSelected
                               ? 'bg-red-500/10 text-red-600 dark:text-red-400 font-medium border-r-2 border-red-500'
                               : subCount === 0
@@ -505,8 +517,8 @@ export function PluginManagerPanel({
                 })}
 
                 {/* 新建子分类输入框 */}
-                {isExpanded && addingTo?.type === 'sub' && addingTo.majorKey === major.key && (
-                  <div className="pl-8 pr-2 py-1">
+                {(singleMajorMode || isExpanded) && addingTo?.type === 'sub' && addingTo.majorKey === major.key && (
+                  <div className={`${singleMajorMode ? 'pl-3' : 'pl-8'} pr-2 py-1`}>
                     <input
                       autoFocus
                       value={newCategoryLabel}
@@ -521,12 +533,23 @@ export function PluginManagerPanel({
                     />
                   </div>
                 )}
+
+                {/* 单大类模式下的添加子分类按钮（大类节点被隐藏，需要替代入口） */}
+                {singleMajorMode && !(addingTo?.type === 'sub' && addingTo.majorKey === major.key) && (
+                  <button
+                    onClick={() => handleStartAdd('sub', major.key)}
+                    className="w-full text-left pl-3 pr-2 py-1.5 text-xs text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/30 transition-colors flex items-center gap-1"
+                  >
+                    <Plus className="h-3 w-3" />
+                    {t('addSubCategory', { defaultValue: '添加子分类' })}
+                  </button>
+                )}
               </div>
             );
           })}
 
-          {/* 新建大类输入框 */}
-          {addingTo?.type === 'major' && (
+          {/* 新建大类输入框（单大类模式下隐藏） */}
+          {!filterCategory && addingTo?.type === 'major' && (
             <div className="px-3 py-1">
               <input
                 autoFocus
@@ -543,7 +566,8 @@ export function PluginManagerPanel({
             </div>
           )}
 
-          {/* 添加大类按钮 */}
+          {/* 添加大类按钮（单大类模式下隐藏） */}
+          {!filterCategory && (
           <button
             onClick={() => handleStartAdd('major', null)}
             className="w-full text-left px-3 py-1.5 text-xs text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/30 transition-colors flex items-center gap-1"
@@ -551,6 +575,7 @@ export function PluginManagerPanel({
             <Plus className="h-3 w-3" />
             {t('addMajorCategory', { defaultValue: '添加大类' })}
           </button>
+          )}
         </div>
 
         {/* 右侧插件列表 */}

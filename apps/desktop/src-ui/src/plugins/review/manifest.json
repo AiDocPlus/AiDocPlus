@@ -16,10 +16,5 @@
     "审阅",
     "建议",
     "评分"
-  ],
-  "roles": [
-    "lawyer",
-    "researcher",
-    "civil-servant"
   ]
 }

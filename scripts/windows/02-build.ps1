@@ -96,6 +96,14 @@ if (-not $SkipCopy) {
         exit 1
     }
     $LASTEXITCODE = 0
+
+    # Clean up macOS .app from bundled-resources/managers/ (not needed on Windows)
+    $macosApp = "$LocalPath\apps\desktop\src-tauri\bundled-resources\managers\资源管理器.app"
+    if (Test-Path $macosApp) {
+        Remove-Item -Recurse -Force $macosApp
+        Write-Host "  Cleaned macOS .app from bundled-resources/managers/" -ForegroundColor Gray
+    }
+
     Write-Host "  OK - source copied" -ForegroundColor Green
 } else {
     Write-Host "[2/4] Skipping copy (-SkipCopy)" -ForegroundColor Gray

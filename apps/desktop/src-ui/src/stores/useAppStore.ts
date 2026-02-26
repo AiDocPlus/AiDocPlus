@@ -765,13 +765,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     let chatThrottleTimer: ReturnType<typeof setTimeout> | null = null;
     const flushChatChunk = () => {
       chatThrottleTimer = null;
-      const msgs = get().aiMessagesByTab[tabId] || [];
-      if (msgs.length === 0) return;
-      const updated = [...msgs];
-      updated[updated.length - 1] = { ...updated[updated.length - 1], content: accumulatedContent };
-      set((state) => ({
-        aiMessagesByTab: { ...state.aiMessagesByTab, [tabId]: updated }
-      }));
+      set((state) => {
+        const msgs = state.aiMessagesByTab[tabId] || [];
+        if (msgs.length === 0) return state;
+        const updated = [...msgs];
+        updated[updated.length - 1] = { ...updated[updated.length - 1], content: accumulatedContent };
+        return { aiMessagesByTab: { ...state.aiMessagesByTab, [tabId]: updated } };
+      });
     };
 
     try {
@@ -1332,27 +1332,59 @@ export const useAppStore = create<AppState>((set, get) => ({
             '',
             '这是一篇示例文档，帮助您快速了解 AiDocPlus 的核心功能。',
             '',
-            '## 什么是 AiDocPlus？',
+            '## 界面说明',
             '',
-            'AiDocPlus 是一款 AI 辅助文档创作工具。您可以在左侧的**素材内容**区域撰写文稿，然后通过 AI 助手对内容进行润色、扩写、翻译等操作，AI 生成的结果会显示在**正文内容**区域。',
+            '- **左侧文件树**：管理项目和文档，可通过 `Cmd/Ctrl + B` 显示/隐藏',
+            '- **中间编辑器**：您正在阅读的区域，支持 Markdown 编辑',
+            '- **右侧 AI 助手**：与 AI 实时对话，可通过 `Cmd/Ctrl + J` 显示/隐藏',
             '',
             '## 快速开始',
             '',
-            '1. 在下方的**素材内容**编辑器中编写或修改文字',
-            '2. 点击右上角的 💬 按钮打开 **AI 助手**面板',
-            '3. 在 AI 助手中输入指令，例如"帮我润色这段文字"',
-            '4. AI 生成的内容会出现在上方的 **正文内容**区域',
-            '5. 如果满意，可以点击"采纳"将 AI 内容替换或追加到素材内容',
+            '### 1. 配置 AI 服务',
             '',
-            '## 使用前准备',
+            '- 点击标签栏右侧的 ⚙️ 按钮打开**设置面板**',
+            '- 切换到 **AI** 标签页，点击「创建 API 服务」',
+            '- 推荐使用**智谱 AI**（新用户赠送 2000 万免费 Tokens）',
+            '- 填入 API Key，选择模型，测试连接后保存',
             '',
-            '请先在**设置**中配置您的 AI 服务 API：',
+            '### 2. 使用 AI 助手',
             '',
-            '- 点击右上角的 ⚙️ 设置按钮',
-            '- 在 **AI 设置**中填入 API 地址和密钥',
-            '- 选择合适的模型',
+            '- 按 `Cmd/Ctrl + J` 打开右侧 AI 助手面板',
+            '- 在输入框中输入指令，例如"帮我润色下面这段文字"',
+            '- AI 会以流式方式实时回复',
             '',
-            '配置完成后，回到本文档即可开始体验！',
+            '### 3. 双栏布局',
+            '',
+            '按 `Cmd/Ctrl + L` 可切换编辑器布局：',
+            '- **左栏**：您的原始内容',
+            '- **右栏**：AI 生成的内容',
+            '',
+            '### 4. 五大工作区',
+            '',
+            '- **生成区**：Markdown 编辑器 + AI 助手，核心写作区域（当前所在）',
+            '- **内容区**：内容生成类插件（翻译、扩写、PPT 等）',
+            '- **合并区**：将多个内容来源整合为终稿',
+            '- **功能区**：功能类插件（格式转换、OCR 等）',
+            '- **编程区**：多语言代码编辑与执行，AI 辅助编程',
+            '',
+            '通过工具栏按钮或菜单 **视图** 切换工作区。',
+            '',
+            '### 5. 更多功能',
+            '',
+            '- **版本历史**：`Cmd/Ctrl + H` 查看文档的历史版本',
+            '- **导出**：菜单 **文件 → 导出**，支持 Markdown、HTML、Word、PDF',
+            '',
+            '## 常用快捷键',
+            '',
+            '| 快捷键 | 功能 |',
+            '|--------|------|',
+            '| `Cmd/Ctrl + Shift + N` | 新建项目 |',
+            '| `Cmd/Ctrl + N` | 新建文档 |',
+            '| `Cmd/Ctrl + S` | 保存文档 |',
+            '| `Cmd/Ctrl + J` | AI 助手 |',
+            '| `Cmd/Ctrl + L` | 切换布局 |',
+            '| `Cmd/Ctrl + B` | 侧边栏 |',
+            '| `Cmd/Ctrl + H` | 版本历史 |',
             '',
             '---',
             '',

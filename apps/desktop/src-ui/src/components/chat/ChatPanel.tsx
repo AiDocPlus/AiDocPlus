@@ -162,13 +162,29 @@ const ChatMessage = memo(function ChatMessage({
   const hasContextMode = !isUserTurn && message.contextMode && message.contextMode !== 'none';
 
   if (hasContextMode) {
+    const parsed = parseThinkTags(message.content);
     return (
-      <ContextReplyBox
-        content={message.content}
-        contextMode={message.contextMode!}
-        timestamp={message.timestamp}
-        onApply={(editedContent) => onApplyToDocument?.(editedContent, message.contextMode!)}
-      />
+      <div className="w-full space-y-2">
+        {parsed.thinking && (
+          <div className="max-w-[80%] rounded-lg px-4 py-2 bg-muted">
+            <div className="text-xs font-medium opacity-70 mb-1">{t('chat.ai', { defaultValue: 'AI' })}</div>
+            <div className="text-sm [&_.markdown-preview]:p-0 [&_.markdown-preview]:text-inherit">
+              <MarkdownPreview
+                content={`<details>\n<summary>${t('chat.thinkingCollapsed', { defaultValue: '\ud83d\udcad \u67e5\u770b AI \u601d\u8003\u8fc7\u7a0b' })}</summary>\n\n${parsed.thinking}\n\n</details>`}
+                theme={resolveTheme()}
+                className="!p-0"
+                fontSize={13}
+              />
+            </div>
+          </div>
+        )}
+        <ContextReplyBox
+          content={parsed.content}
+          contextMode={message.contextMode!}
+          timestamp={message.timestamp}
+          onApply={(editedContent) => onApplyToDocument?.(editedContent, message.contextMode!)}
+        />
+      </div>
     );
   }
 
@@ -321,6 +337,26 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
       if (scrollThrottleRef.current) clearTimeout(scrollThrottleRef.current);
     };
   }, []);
+
+  // AI 生成完成后自动切换聊天上下文到「正文」模式
+  const wasStreamingRef = useRef(false);
+  useEffect(() => {
+    if (isCurrentTabStreaming) {
+      wasStreamingRef.current = true;
+    } else if (wasStreamingRef.current) {
+      // 从 streaming → 非 streaming：生成刚完成
+      wasStreamingRef.current = false;
+      if (!simpleMode) {
+        const doc = currentTab
+          ? useAppStore.getState().documents.find(d => d.id === currentTab.documentId)
+          : null;
+        if (doc?.aiGeneratedContent?.trim()) {
+          _setContextMode('generated');
+        }
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCurrentTabStreaming]);
 
   // Initialize author notes input from current document (only on document switch)
   useEffect(() => {
@@ -605,6 +641,9 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
         };
 
         useAppStore.getState().addAiMessage(effectiveTabId, assistantMessage);
+
+        // 非流式生成完成后自动切换聊天上下文到「正文」
+        _setContextMode('generated');
 
         // Auto-create version after generation（使用过滤后的正文内容）
         if (latestDoc && generated) {

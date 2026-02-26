@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { X, Monitor, Type, Globe, Zap, Download, Upload, RotateCcw, Loader2, Puzzle, Plus, Pencil, Trash2, Check, Power, Mail, Search, ChevronDown, ChevronRight, LayoutTemplate } from 'lucide-react';
+import { X, Monitor, Type, Globe, Zap, Download, Upload, RotateCcw, Loader2, Puzzle, Plus, Pencil, Trash2, Check, Power, Mail, Search, ChevronDown, ChevronRight, LayoutTemplate, Gift, ExternalLink } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
 import { invoke } from '@tauri-apps/api/core';
+import { getVersion } from '@tauri-apps/api/app';
 import { useTranslation } from '../../i18n';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import { AI_PROVIDERS, getProviderConfig, EMAIL_PROVIDER_PRESETS, getEmailPreset } from '@aidocplus/shared-types';
@@ -20,10 +21,20 @@ import { Separator } from '../ui/separator';
 interface SettingsPanelProps {
   open: boolean;
   onClose: () => void;
+  defaultTab?: string;
 }
 
-export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
+export function SettingsPanel({ open, onClose, defaultTab }: SettingsPanelProps) {
   const { t } = useTranslation();
+  const [appVersion, setAppVersion] = useState('');
+  const [activeTab, setActiveTab] = useState(defaultTab || 'editor');
+
+  useEffect(() => {
+    if (open) {
+      setActiveTab(defaultTab || 'editor');
+      getVersion().then(setAppVersion).catch(() => setAppVersion('0.3.0'));
+    }
+  }, [open, defaultTab]);
   const {
     editor,
     ui,
@@ -388,7 +399,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
           </Button>
         </DialogHeader>
 
-        <Tabs defaultValue="editor" className="flex-1 overflow-hidden flex flex-col">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
           <TabsList className="grid grid-cols-9 w-full bg-muted">
             <TabsTrigger value="editor">
               <Type className="w-4 h-4 mr-1" />
@@ -940,9 +951,41 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
 
                 {/* 服务列表 */}
                 {tempSettings.ai.services.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <p className="text-sm">{t('settings.noAiServices', { defaultValue: '还没有配置任何 AI 服务' })}</p>
-                    <p className="text-xs mt-1">{t('settings.noAiServicesHint', { defaultValue: '点击上方「创建 API 服务」按钮添加一个' })}</p>
+                  <div className="space-y-4">
+                    {/* 新用户引导卡片 */}
+                    <div className="rounded-lg border bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 p-4">
+                      <div className="flex items-start gap-3">
+                        <Gift className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-sm">
+                            {t('settings.glmGuide.title', { defaultValue: '🎁 新用户福利：智谱 AI 2000万免费 Tokens' })}
+                          </h4>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {t('settings.glmGuide.subtitle', { defaultValue: '注册智谱开放平台，获取免费 API Key 即可开始体验' })}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* 步骤指南 */}
+                      <div className="mt-3 space-y-1.5 text-xs text-muted-foreground bg-background/50 rounded-md p-3">
+                        <p><span className="text-primary font-semibold">1.</span> {t('settings.glmGuide.step1', { defaultValue: '访问智谱开放平台' })} <a href="https://open.bigmodel.cn/" target="_blank" rel="noopener noreferrer" className="text-primary underline hover:no-underline">open.bigmodel.cn</a></p>
+                        <p><span className="text-primary font-semibold">2.</span> {t('settings.glmGuide.step2', { defaultValue: '点击右上角「注册/登录」，使用微信或手机号完成注册' })}</p>
+                        <p><span className="text-primary font-semibold">3.</span> {t('settings.glmGuide.step3', { defaultValue: '进入「用户中心」→「API Keys」→ 点击「创建新的 API Key」' })}</p>
+                        <p><span className="text-primary font-semibold">4.</span> {t('settings.glmGuide.step4', { defaultValue: '复制 API Key，点击下方「立即配置」按钮粘贴即可' })}</p>
+                      </div>
+
+                      {/* 快捷按钮 */}
+                      <div className="flex gap-2 mt-3">
+                        <Button variant="outline" size="sm" onClick={() => window.open('https://open.bigmodel.cn/', '_blank')}>
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          {t('settings.glmGuide.openPlatform', { defaultValue: '打开智谱平台' })}
+                        </Button>
+                        <Button variant="default" size="sm" onClick={handleCreateService}>
+                          <Plus className="h-3 w-3 mr-1" />
+                          {t('settings.glmGuide.configureNow', { defaultValue: '立即配置' })}
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -1491,7 +1534,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                 <h3 className="text-lg font-semibold mb-4">{t('settings.about.title')}</h3>
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <p>{t('settings.about.description')}</p>
-                  <p>{t('settings.about.version')}: 0.1.0</p>
+                  <p>{t('settings.about.version')}: {appVersion}</p>
                 </div>
               </div>
             </TabsContent>

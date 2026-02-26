@@ -1,5 +1,5 @@
 import { useAppStore } from '@/stores/useAppStore';
-import { Save, SaveAll, FileText, PenLine, Columns, Rows, History, MessageSquare, FilePlus, Search, X, XCircle, Square, Copy, Minus, LayoutTemplate, ChevronDown } from 'lucide-react';
+import { Save, SaveAll, FileText, PenLine, Columns, Rows, History, MessageSquare, FilePlus, Search, X, XCircle, Square, Copy, Minus, LayoutTemplate, ChevronDown, Terminal } from 'lucide-react';
 import { Button } from '../ui/button';
 import { PluginMenu, FunctionalPluginMenu } from '@/plugins/PluginMenu';
 import { PluginToolArea } from '@/plugins/PluginToolArea';
@@ -20,6 +20,7 @@ import {
 import { ResizableHandle } from '../ui/resizable-handle';
 import { AttachmentPanel } from './AttachmentPanel';
 import { TagEditor } from './TagEditor';
+import { CodingPanel } from '../coding/CodingPanel';
 import type { Attachment } from '@aidocplus/shared-types';
 
 
@@ -42,7 +43,7 @@ interface EditorPanelProps {
   onAttachmentsChange: (attachments: Attachment[]) => void;
   composedContent: string;
   onComposedContentChange: (value: string) => void;
-  onActiveViewChange?: (view: 'editor' | 'plugins' | 'composer' | 'functional') => void;
+  onActiveViewChange?: (view: 'editor' | 'plugins' | 'composer' | 'functional' | 'coding') => void;
 }
 
 export function EditorPanel({
@@ -69,7 +70,7 @@ export function EditorPanel({
   const { t } = useTranslation();
   const { documents, tabs, saveDocument, markTabAsDirty, markTabAsClean, createDocument, openTab, closeTab, closeAllTabs, aiStreamingTabId, sidebarOpen, setSidebarOpen } = useAppStore();
   const isAiStreaming = aiStreamingTabId === tabId;
-  type ActiveView = 'editor' | 'plugins' | 'composer' | 'functional';
+  type ActiveView = 'editor' | 'plugins' | 'composer' | 'functional' | 'coding';
   const [activeView, _setActiveView] = useState<ActiveView>('editor');
   const setActiveView = (v: ActiveView) => { _setActiveView(v); onActiveViewChange?.(v); };
   const pluginAreaOpen = activeView === 'plugins';
@@ -91,7 +92,7 @@ export function EditorPanel({
     const handler = (e: Event) => {
       if (!isActive()) return;
       const detail = (e as CustomEvent).detail;
-      if (detail === 'editor' || detail === 'plugins' || detail === 'composer' || detail === 'functional') {
+      if (detail === 'editor' || detail === 'plugins' || detail === 'composer' || detail === 'functional' || detail === 'coding') {
         setActiveView(detail);
       }
     };
@@ -406,7 +407,7 @@ export function EditorPanel({
       {/* Toolbar（插件最大化时隐藏） */}
       {!pluginMaximized && (
       <div className="flex items-center gap-1 px-2 py-1 border-b bg-background flex-shrink-0">
-        {/* ── 三区切换按钮（正文区/插件区/合并区） ── */}
+        {/* ── 五区切换按钮（生成区/内容区/合并区/功能区/编程区） ── */}
         <Button
           variant={activeView === 'editor' ? 'default' : 'outline'}
           size="sm"
@@ -445,6 +446,20 @@ export function EditorPanel({
           onToggle={() => { if (!functionalAreaOpen) setActiveView('functional'); }}
           document={document}
         />
+        <Button
+          variant={activeView === 'coding' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setActiveView(activeView === 'coding' ? 'editor' : 'coding')}
+          title={t('editor.codingArea', { defaultValue: '编程区' })}
+          className={`gap-1 h-7 text-xs ${
+            activeView === 'coding'
+              ? 'bg-blue-600 hover:bg-blue-700 text-white'
+              : 'border-blue-500 text-blue-500 hover:bg-blue-500/10'
+          }`}
+        >
+          <Terminal className="h-3.5 w-3.5" />
+          {t('editor.codingArea', { defaultValue: '编程区' })}
+        </Button>
         <div className="w-px h-4 bg-border mx-0.5" />
 
         {/* ── 文档操作组 ── */}
@@ -611,6 +626,9 @@ export function EditorPanel({
             }}
             filterCategory="functional"
           />
+        ) : activeView === 'coding' ? (
+          /* 编程区 */
+          <CodingPanel />
         ) : activeView === 'composer' && document ? (
           /* 合并内容面板 */
           <ComposerPanel

@@ -16,10 +16,5 @@
     "检查",
     "规范",
     "审核"
-  ],
-  "roles": [
-    "editor",
-    "reviewer",
-    "manager"
   ]
 }

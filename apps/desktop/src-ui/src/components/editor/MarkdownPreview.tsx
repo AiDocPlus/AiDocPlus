@@ -81,7 +81,7 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = React.memo(({
       const href = anchor.getAttribute('href');
       if (!href || !(/^https?:\/\//.test(href))) return;
       e.preventDefault();
-      invoke('plugin:shell|open', { path: href }).catch(console.error);
+      invoke('open_file_with_app', { path: href, appName: null }).catch(console.error);
     };
     el.addEventListener('click', handleClick);
     return () => el.removeEventListener('click', handleClick);

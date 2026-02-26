@@ -15,11 +15,5 @@
     "导图",
     "结构",
     "脑图"
-  ],
-  "roles": [
-    "student",
-    "researcher",
-    "programmer",
-    "product-manager"
   ]
 }

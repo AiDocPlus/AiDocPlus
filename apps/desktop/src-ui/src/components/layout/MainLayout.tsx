@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useAppStore } from '@/stores/useAppStore';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useTranslation } from '@/i18n';
 import { useMenuEvents } from '@/hooks/useMenuEvents';
 import { FileTree } from '../file-tree/FileTree';
@@ -10,6 +11,7 @@ import { SearchPanel } from '../search/SearchPanel';
 import { ProjectPickerDialog } from '../dialogs/ProjectPickerDialog';
 import { ShortcutsDialog } from '../dialogs/ShortcutsDialog';
 import { AboutDialog } from '../dialogs/AboutDialog';
+import { FirstRunGuideDialog } from '../dialogs/FirstRunGuideDialog';
 import { TemplatePickerDialog } from '../templates/TemplatePickerDialog';
 import { SaveAsTemplateDialog } from '../templates/SaveAsTemplateDialog';
 import { cn } from '@/lib/utils';
@@ -20,12 +22,44 @@ import { ResizableHandle } from '../ui/resizable-handle';
 export function MainLayout() {
   const { t } = useTranslation();
   const { sidebarOpen, toggleSidebar, theme, sidebarWidth, setSidebarWidth } = useAppStore();
+  const { ai } = useSettingsStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsDefaultTab, setSettingsDefaultTab] = useState<string | undefined>(undefined);
   const [docPickerMode, setDocPickerMode] = useState<'move' | 'copy' | null>(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [saveAsTemplateOpen, setSaveAsTemplateOpen] = useState(false);
+
+  // 首次启动引导对话框状态
+  const [showFirstRunGuide, setShowFirstRunGuide] = useState(false);
+  const [firstRunPaused, setFirstRunPaused] = useState(false);
+  const [firstRunIsAuto, setFirstRunIsAuto] = useState(false);
+
+  // 检测是否为新用户（无 AI 服务配置）
+  useEffect(() => {
+    if (ai.services.length === 0) {
+      // 未配置 AI 服务时，清除旧标记并显示引导
+      localStorage.removeItem('aidocplus-first-run-guide-shown');
+      const timer = setTimeout(() => {
+        setFirstRunIsAuto(true);
+        setShowFirstRunGuide(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [ai.services.length]);
+
+  const handleFirstRunGuideClose = () => {
+    setShowFirstRunGuide(false);
+    if (firstRunIsAuto) {
+      // 只有用户已配置 AI 服务时才标记为已完成
+      // 未配置时关闭引导，下次启动仍会弹出
+      if (ai.services.length > 0) {
+        localStorage.setItem('aidocplus-first-run-guide-shown', 'true');
+      }
+      setFirstRunIsAuto(false);
+    }
+  };
 
   // 监听原生系统菜单事件
   useMenuEvents(useCallback(() => setSettingsOpen(true), []));
@@ -43,6 +77,7 @@ export function MainLayout() {
         console.error('Failed to open resource manager:', err);
       });
     };
+    const onFirstRunGuide = () => setShowFirstRunGuide(true);
     window.addEventListener('menu-doc-move-to', onMoveTo);
     window.addEventListener('menu-doc-copy-to', onCopyTo);
     window.addEventListener('menu-shortcuts-ref', onShortcuts);
@@ -50,6 +85,7 @@ export function MainLayout() {
     window.addEventListener('menu-new-from-template', onNewFromTemplate);
     window.addEventListener('menu-save-as-template', onSaveAsTemplate);
     window.addEventListener('menu-manage-templates', onManageTemplates);
+    window.addEventListener('menu-first-run-guide', onFirstRunGuide);
     return () => {
       window.removeEventListener('menu-doc-move-to', onMoveTo);
       window.removeEventListener('menu-doc-copy-to', onCopyTo);
@@ -58,6 +94,7 @@ export function MainLayout() {
       window.removeEventListener('menu-new-from-template', onNewFromTemplate);
       window.removeEventListener('menu-save-as-template', onSaveAsTemplate);
       window.removeEventListener('menu-manage-templates', onManageTemplates);
+      window.removeEventListener('menu-first-run-guide', onFirstRunGuide);
     };
   }, []);
 
@@ -129,7 +166,15 @@ export function MainLayout() {
       </main>
 
       {/* Settings Panel */}
-      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsPanel open={settingsOpen} defaultTab={settingsDefaultTab} onClose={() => {
+        setSettingsOpen(false);
+        setSettingsDefaultTab(undefined);
+        if (firstRunPaused) {
+          setFirstRunPaused(false);
+          setFirstRunIsAuto(true);
+          setShowFirstRunGuide(true);
+        }
+      }} />
 
       {/* Search Panel */}
       <SearchPanel />
@@ -146,6 +191,18 @@ export function MainLayout() {
 
       {/* 关于对话框 */}
       <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
+
+      {/* 首次启动引导对话框 */}
+      <FirstRunGuideDialog
+        open={showFirstRunGuide}
+        onClose={handleFirstRunGuideClose}
+        onOpenSettings={() => {
+          setShowFirstRunGuide(false);
+          setFirstRunPaused(true);
+          setSettingsDefaultTab('ai');
+          setSettingsOpen(true);
+        }}
+      />
 
       {/* 模板选择器 */}
       <TemplatePickerDialog

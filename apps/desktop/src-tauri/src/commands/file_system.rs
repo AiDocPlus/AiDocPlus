@@ -178,6 +178,17 @@ pub fn read_file_base64(path: String) -> Result<String> {
     Ok(format!("data:{};base64,{}", mime, b64))
 }
 
+/// 读取文本文件内容
+#[tauri::command]
+pub fn read_text_file(path: String) -> Result<String> {
+    let file_path = Path::new(&path);
+    if !file_path.exists() {
+        return Err(format!("文件不存在: {}", path));
+    }
+
+    fs::read_to_string(file_path).map_err(|e| format!("读取文件失败: {}", e))
+}
+
 #[tauri::command]
 pub fn create_directory(path: String) -> Result<()> {
     let path = Path::new(&path);

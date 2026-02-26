@@ -10,7 +10,7 @@ import {
 } from '../_framework/ui';
 import { EMAIL_PROVIDER_PRESETS } from '@aidocplus/shared-types';
 import type { EmailProviderPreset } from '@aidocplus/shared-types';
-import { Mail, Send, Loader2, Wand2, Trash2, Plus, Settings, FileText, History, ChevronDown, ChevronUp, Users, Bookmark } from 'lucide-react';
+import { Mail, Send, Loader2, Wand2, Trash2, Plus, Settings, FileText, History, ChevronDown, ChevronUp, Users, Bookmark, Newspaper, FileUp } from 'lucide-react';
 import { EmailBodyEditor } from './EmailBodyEditor';
 import { looksLikeMarkdown, convertMarkdownToHtml } from './markdownToHtml';
 
@@ -39,11 +39,112 @@ interface Contact {
   name: string;
   email: string;
   note?: string;
+  // 额外字段（如机构、电话、地址等，从 CSV 导入保留）
+  extraFields?: Record<string, string>;
 }
 
 interface SavedSubject {
   id: string;
   text: string;
+}
+
+// ── 投稿模板相关类型 ──
+
+// 文本片段
+interface TextSnippet {
+  id: string;
+  name: string;
+  content: string;
+  category?: string;
+}
+
+// 变量定义
+interface VariableDef {
+  name: string;
+  label: string;
+  defaultValue?: string;
+  source: 'document' | 'user' | 'ai';
+}
+
+// 投稿模板
+interface SubmissionTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  recipients: string[];
+  cc?: string[];
+  bcc?: string[];
+  subjectTemplate: string;
+  bodyTemplate: string;
+  variables: VariableDef[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+// 预置变量
+const PRESET_VARIABLES: VariableDef[] = [
+  { name: 'title', label: '文章标题', source: 'document' },
+  { name: 'content', label: '文章正文', source: 'document' },
+  { name: 'date', label: '日期', source: 'document' },
+];
+
+// 预置文本片段
+const PRESET_SNIPPETS: TextSnippet[] = [
+  { id: 'greeting_formal', name: '问候语-正式', category: '问候', content: '尊敬的编辑您好：' },
+  { id: 'greeting_general', name: '问候语-通用', category: '问候', content: '您好：' },
+  { id: 'closing_formal', name: '结尾语-正式', category: '结尾', content: '此致<br/>敬礼' },
+  { id: 'closing_await', name: '结尾语-期待回复', category: '结尾', content: '期待您的回复，谢谢！' },
+];
+
+// CSV 解析函数
+function parseCSV(text: string): string[][] {
+  const lines = text.split(/\r?\n/);
+  const result: string[][] = [];
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const row: string[] = [];
+    let cell = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          cell += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        row.push(cell.trim());
+        cell = '';
+      } else {
+        cell += char;
+      }
+    }
+    row.push(cell.trim());
+    if (row.some(c => c)) result.push(row); // 跳过空行
+  }
+  return result;
+}
+
+// 自动识别邮箱列索引
+function detectEmailColumn(headers: string[]): number {
+  const keywords = ['邮箱', 'email', 'e-mail', '邮件', '电子邮件'];
+  for (let i = 0; i < headers.length; i++) {
+    const h = headers[i].toLowerCase();
+    if (keywords.some(k => h.includes(k))) return i;
+  }
+  return -1;
+}
+
+// 自动识别姓名列索引
+function detectNameColumn(headers: string[]): number {
+  const keywords = ['姓名', 'name', '称呼', '名字', '联系人'];
+  for (let i = 0; i < headers.length; i++) {
+    const h = headers[i].toLowerCase();
+    if (keywords.some(k => h.includes(k))) return i;
+  }
+  return -1;
 }
 
 interface EmailStorageData {
@@ -57,6 +158,8 @@ interface EmailStorageData {
   sendAsHtml?: boolean;
   contacts?: Contact[];
   savedSubjects?: SavedSubject[];
+  submissionTemplates?: SubmissionTemplate[];
+  textSnippets?: TextSnippet[];
   sendHistory?: Array<{
     timestamp: number;
     to: string[];
@@ -82,6 +185,38 @@ const EMAIL_STYLES = [
 ];
 
 const DEFAULT_PROMPT = '根据本文档的正文内容，撰写一封简洁明了的邮件正文，概括文档的核心内容。';
+
+// 变量替换函数
+function replaceVariables(
+  template: string,
+  variables: VariableDef[],
+  context: {
+    title: string;
+    content: string;
+    date: string;
+  }
+): string {
+  let result = template;
+
+  // 替换预置变量
+  result = result.replace(/\{\{title\}\}/g, context.title);
+  result = result.replace(/\{\{content\}\}/g, context.content);
+  result = result.replace(/\{\{date\}\}/g, context.date);
+
+  // 替换自定义变量
+  for (const v of variables) {
+    const regex = new RegExp(`\\{\\{${v.name}\\}\\}`, 'g');
+    result = result.replace(regex, v.defaultValue || '');
+  }
+
+  return result;
+}
+
+// 获取当前日期字符串
+function getCurrentDateString(): string {
+  const now = new Date();
+  return `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`;
+}
 
 function makeAccountId() {
   return `acct_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -132,10 +267,25 @@ export function EmailPluginPanel(_props: PluginPanelProps) {
   const [subjectsDialogOpen, setSubjectsDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set());
+  const [contactSearchText, setContactSearchText] = useState('');
+  const [clearContactsDialogOpen, setClearContactsDialogOpen] = useState(false);
   const [newSubjectText, setNewSubjectText] = useState('');
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [historyPreviewIdx, setHistoryPreviewIdx] = useState<number | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // ── 投稿模板状态 ──
+  const [templatesDialogOpen, setTemplatesDialogOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<SubmissionTemplate | null>(null);
+  const [editingSnippet, setEditingSnippet] = useState<TextSnippet | null>(null);
+  const [templateDialogTab, setTemplateDialogTab] = useState<'templates' | 'snippets'>('templates');
+
+  // ── CSV 导入状态 ──
+  const [csvImportDialogOpen, setCsvImportDialogOpen] = useState(false);
+  const [csvData, setCsvData] = useState<string[][]>([]);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [csvEmailColumn, setCsvEmailColumn] = useState<number>(-1);
+  const [csvNameColumn, setCsvNameColumn] = useState<number>(-1);
 
   // ── 工作状态区域 ──
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -278,6 +428,76 @@ export function EmailPluginPanel(_props: PluginPanelProps) {
     }
   }, [accounts, selectedAccountId, recipients, cc, bcc, subject, emailBody, sendHistory, saveToStorage, showStatus, appendLog, t, host.platform]);
 
+  // ── CSV 导入处理 ──
+  const handleCsvFileSelect = useCallback(async () => {
+    try {
+      // 使用 Tauri 文件对话框
+      const selected = await host.ui.showOpenDialog({
+        filters: [{ name: 'CSV', extensions: ['csv'] }],
+      });
+      if (!selected) return;
+
+      // 读取文件内容
+      const content = await host.platform.invoke<string>('read_text_file', { path: selected });
+      const rows = parseCSV(content);
+      if (rows.length < 2) {
+        showStatus(t('csvEmptyOrNoData'), true);
+        return;
+      }
+
+      const headers = rows[0];
+      const data = rows.slice(1);
+
+      setCsvHeaders(headers);
+      setCsvData(data);
+      setCsvEmailColumn(detectEmailColumn(headers));
+      setCsvNameColumn(detectNameColumn(headers));
+      setCsvImportDialogOpen(true);
+    } catch (err) {
+      showStatus(t('csvReadFailed') + ': ' + (err instanceof Error ? err.message : String(err)), true);
+    }
+  }, [host, showStatus, t]);
+
+  const handleCsvImport = useCallback(() => {
+    if (csvEmailColumn < 0) {
+      showStatus(t('csvSelectEmailColumn'), true);
+      return;
+    }
+
+    const current = host.storage.get<EmailStorageData>('emailData') || {};
+    const existingContacts = current.contacts || [];
+
+    const newContacts: Contact[] = csvData.map(row => {
+      const email = row[csvEmailColumn] || '';
+      const name = csvNameColumn >= 0 ? row[csvNameColumn] || '' : '';
+
+      // 收集额外字段
+      const extraFields: Record<string, string> = {};
+      csvHeaders.forEach((header, idx) => {
+        if (idx !== csvEmailColumn && idx !== csvNameColumn && row[idx]) {
+          extraFields[header] = row[idx];
+        }
+      });
+
+      return {
+        id: `ct_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        email,
+        name,
+        extraFields: Object.keys(extraFields).length > 0 ? extraFields : undefined,
+      };
+    }).filter(c => c.email.trim());
+
+    // 合并（跳过已存在的邮箱）
+    const existingEmails = new Set(existingContacts.map(c => c.email.toLowerCase()));
+    const toAdd = newContacts.filter(c => !existingEmails.has(c.email.toLowerCase()));
+    const updated = [...existingContacts, ...toAdd];
+
+    saveToStorage({ contacts: updated });
+    setCsvImportDialogOpen(false);
+    setCsvData([]);
+    showStatus(t('csvImportSuccess', { count: toAdd.length, total: newContacts.length }));
+  }, [csvData, csvEmailColumn, csvNameColumn, csvHeaders, host.storage, saveToStorage, showStatus, t]);
+
   const referenceContent = host.content.getAIContent() || host.content.getDocumentContent();
 
   return (
@@ -327,6 +547,11 @@ export function EmailPluginPanel(_props: PluginPanelProps) {
           <Button variant="outline" size="sm" className="gap-1 h-7 text-xs" onClick={() => setAiDialogOpen(true)}>
             <Wand2 className="h-3 w-3" />
             {t('aiGenerate')}
+          </Button>
+
+          <Button variant="outline" size="sm" className="gap-1 h-7 text-xs" onClick={() => setTemplatesDialogOpen(true)}>
+            <Newspaper className="h-3 w-3" />
+            {t('submissionTemplate')}
           </Button>
 
           <Button variant="outline" size="sm" className="gap-1 h-7 text-xs text-destructive hover:text-destructive"
@@ -638,18 +863,44 @@ export function EmailPluginPanel(_props: PluginPanelProps) {
           setSelectedContactIds(ids);
         }
       }}>
-        <DialogContent className="sm:max-w-[520px] max-h-[80vh] overflow-hidden flex flex-col" style={{ fontFamily: '宋体', fontSize: '16px' }}>
+        <DialogContent className="sm:max-w-[640px] max-h-[85vh] overflow-hidden flex flex-col" style={{ fontFamily: '宋体', fontSize: '16px' }}>
           <DialogHeader>
             <div className="flex items-center justify-between">
               <DialogTitle>联系人管理</DialogTitle>
-              <Button variant="outline" size="sm" className="gap-1 h-7 text-xs"
-                onClick={() => setEditingContact({ id: `ct_${Date.now()}`, name: '', email: '', note: '' })}>
-                <Plus className="h-3 w-3" />
-                新建联系人
-              </Button>
+              <div className="flex gap-1">
+                <Button variant="outline" size="sm" className="gap-1 h-7 text-xs"
+                  onClick={handleCsvFileSelect}>
+                  <FileUp className="h-3 w-3" />
+                  {t('importCsv')}
+                </Button>
+                <Button variant="outline" size="sm" className="gap-1 h-7 text-xs"
+                  onClick={() => setEditingContact({ id: `ct_${Date.now()}`, name: '', email: '', note: '' })}>
+                  <Plus className="h-3 w-3" />
+                  新建联系人
+                </Button>
+                <Button variant="outline" size="sm" className="gap-1 h-7 text-xs text-destructive hover:text-destructive"
+                  onClick={() => {
+                    const current = host.storage.get<EmailStorageData>('emailData') || {};
+                    if ((current.contacts || []).length === 0) return;
+                    setClearContactsDialogOpen(true);
+                  }}>
+                  <Trash2 className="h-3 w-3" />
+                  清除全部
+                </Button>
+              </div>
             </div>
             <DialogDescription>勾选联系人后点击"使用所选"填入收件人</DialogDescription>
           </DialogHeader>
+
+          {/* 搜索框 */}
+          <div className="flex-shrink-0">
+            <Input
+              placeholder="搜索联系人（姓名、邮箱、备注）..."
+              value={contactSearchText}
+              onChange={e => setContactSearchText(e.target.value)}
+              className="h-8 text-sm"
+            />
+          </div>
 
           {/* 联系人编辑表单 */}
           {editingContact && (
@@ -695,52 +946,16 @@ export function EmailPluginPanel(_props: PluginPanelProps) {
             </div>
           )}
 
-          {/* 联系人列表（可勾选） */}
-          <div className="flex-1 min-h-0 overflow-y-auto space-y-0.5">
-            {(() => {
-              const contacts: Contact[] = (host.storage.get<EmailStorageData>('emailData') || {}).contacts || [];
-              return contacts.length > 0 ? contacts.map(c => (
-                <div key={c.id}
-                  className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-sm ${selectedContactIds.has(c.id) ? 'bg-pink-500/10' : 'hover:bg-muted/50'}`}
-                  onClick={() => {
-                    setSelectedContactIds(prev => {
-                      const next = new Set(prev);
-                      next.has(c.id) ? next.delete(c.id) : next.add(c.id);
-                      return next;
-                    });
-                  }}>
-                  <input type="checkbox"
-                    checked={selectedContactIds.has(c.id)}
-                    readOnly
-                    className="h-4 w-4 rounded border-gray-300 flex-shrink-0 pointer-events-none"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-medium">{c.name || '未命名'}</span>
-                      <span className="text-xs text-muted-foreground font-mono truncate">{c.email}</span>
-                    </div>
-                    {c.note && <span className="text-xs text-muted-foreground">{c.note}</span>}
-                  </div>
-                  <Button variant="ghost" size="sm" className="h-6 px-1.5 text-xs flex-shrink-0"
-                    onClick={(e) => { e.stopPropagation(); setEditingContact({ ...c }); }}>
-                    编辑
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-6 px-1.5 text-xs text-destructive hover:text-destructive flex-shrink-0"
-                    onClick={(e) => { e.stopPropagation();
-                      const current = host.storage.get<EmailStorageData>('emailData') || {};
-                      const updated = (current.contacts || []).filter(x => x.id !== c.id);
-                      saveToStorage({ contacts: updated });
-                      setSelectedContactIds(prev => { const next = new Set(prev); next.delete(c.id); return next; });
-                      showStatus('已删除');
-                    }}>
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              )) : (
-                <p className="text-xs text-muted-foreground text-center py-4">暂无联系人，点击右上角新建</p>
-              );
-            })()}
-          </div>
+          {/* 联系人列表 */}
+          <ContactListSection
+            host={host}
+            saveToStorage={saveToStorage}
+            showStatus={showStatus}
+            selectedContactIds={selectedContactIds}
+            setSelectedContactIds={setSelectedContactIds}
+            setEditingContact={setEditingContact}
+            searchText={contactSearchText}
+          />
 
           {/* 底部操作 */}
           <div className="flex items-center justify-between pt-2 border-t flex-shrink-0">
@@ -759,6 +974,34 @@ export function EmailPluginPanel(_props: PluginPanelProps) {
               }}>
               <Users className="h-3 w-3" />
               使用所选
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 清除联系人确认对话框 */}
+      <Dialog open={clearContactsDialogOpen} onOpenChange={setClearContactsDialogOpen}>
+        <DialogContent className="sm:max-w-[400px]" style={{ fontFamily: '宋体', fontSize: '16px' }}>
+          <DialogHeader>
+            <DialogTitle>确认清除</DialogTitle>
+            <DialogDescription>
+              确定要清除所有联系人吗？此操作不可撤销。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={() => setClearContactsDialogOpen(false)}>
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                saveToStorage({ contacts: [] });
+                setSelectedContactIds(new Set());
+                setClearContactsDialogOpen(false);
+                showStatus('已清除所有联系人');
+              }}
+            >
+              确认清除
             </Button>
           </div>
         </DialogContent>
@@ -842,6 +1085,146 @@ export function EmailPluginPanel(_props: PluginPanelProps) {
                 <p className="text-xs text-muted-foreground text-center py-2">暂无保存的主题</p>
               );
             })()}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 投稿模板管理弹窗 */}
+      <Dialog open={templatesDialogOpen} onOpenChange={setTemplatesDialogOpen}>
+        <DialogContent className="sm:max-w-[900px] max-h-[85vh] overflow-hidden flex flex-col" style={{ fontFamily: '宋体', fontSize: '16px' }}>
+          <DialogHeader>
+            <DialogTitle>{t('submissionTemplate')}</DialogTitle>
+            <DialogDescription>{t('submissionTemplateDesc')}</DialogDescription>
+          </DialogHeader>
+
+          {/* 选项卡 */}
+          <div className="flex border-b flex-shrink-0">
+            <button
+              className={`px-4 py-2 text-sm border-b-2 transition-colors ${templateDialogTab === 'templates' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+              onClick={() => setTemplateDialogTab('templates')}>
+              {t('templates')}
+            </button>
+            <button
+              className={`px-4 py-2 text-sm border-b-2 transition-colors ${templateDialogTab === 'snippets' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+              onClick={() => setTemplateDialogTab('snippets')}>
+              {t('textSnippets')}
+            </button>
+          </div>
+
+          {/* 选项卡内容 */}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            {templateDialogTab === 'templates' ? (
+              <SubmissionTemplatesTab
+                stored={stored}
+                saveToStorage={saveToStorage}
+                showStatus={showStatus}
+                editingTemplate={editingTemplate}
+                setEditingTemplate={setEditingTemplate}
+                setRecipients={setRecipients}
+                setCc={setCc}
+                setBcc={setBcc}
+                setSubject={setSubject}
+                setEmailBody={setEmailBody}
+                setTemplatesDialogOpen={setTemplatesDialogOpen}
+                t={t}
+                docTitle={host.content.getDocumentMeta?.()?.title || ''}
+                docContent={convertMarkdownToHtml(referenceContent)}
+              />
+            ) : (
+              <TextSnippetsTab
+                stored={stored}
+                saveToStorage={saveToStorage}
+                showStatus={showStatus}
+                editingSnippet={editingSnippet}
+                setEditingSnippet={setEditingSnippet}
+                t={t}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* CSV 导入预览对话框 */}
+      <Dialog open={csvImportDialogOpen} onOpenChange={setCsvImportDialogOpen}>
+        <DialogContent className="sm:max-w-[900px] w-[95vw] h-[85vh] flex flex-col p-0" style={{ fontFamily: '宋体', fontSize: '16px' }}>
+          <DialogHeader className="px-6 pt-6 pb-2 flex-shrink-0">
+            <DialogTitle>{t('csvImportTitle')}</DialogTitle>
+            <DialogDescription>{t('csvImportDesc', { count: csvData.length - 1 })}</DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-4 space-y-4">
+            {/* 列映射 */}
+            <div className="flex gap-6 flex-shrink-0">
+              <div className="flex-1 space-y-2">
+                <Label className="text-sm font-medium">{t('csvEmailColumn')} *</Label>
+                <Select value={String(csvEmailColumn)} onValueChange={v => setCsvEmailColumn(parseInt(v))}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder={t('csvSelectColumn')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {csvHeaders.map((h, i) => (
+                      <SelectItem key={i} value={String(i)}>{h}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex-1 space-y-2">
+                <Label className="text-sm font-medium">{t('csvNameColumn')}</Label>
+                <Select value={String(csvNameColumn)} onValueChange={v => setCsvNameColumn(parseInt(v))}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder={t('csvSelectColumn')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="-1">{t('csvNone')}</SelectItem>
+                    {csvHeaders.map((h, i) => (
+                      <SelectItem key={i} value={String(i)}>{h}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* 数据预览 */}
+            <div className="flex-1 min-h-0 border rounded-md overflow-auto" style={{ maxHeight: 'calc(85vh - 220px)' }}>
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-muted z-10">
+                  <tr>
+                    {csvHeaders.map((h, i) => (
+                      <th key={i} className={`px-3 py-2 text-left font-medium border-b whitespace-nowrap ${i === csvEmailColumn ? 'bg-blue-500/20' : i === csvNameColumn ? 'bg-green-500/20' : ''}`}>
+                        {h}
+                        {i === csvEmailColumn && <span className="ml-1 text-blue-600 text-xs">({t('csvEmail')})</span>}
+                        {i === csvNameColumn && <span className="ml-1 text-green-600 text-xs">({t('csvName')})</span>}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {csvData.slice(1, 21).map((row, ri) => (
+                    <tr key={ri} className="border-b last:border-0 hover:bg-muted/30">
+                      {row.map((cell, ci) => (
+                        <td key={ci} className={`px-3 py-2 ${ci === csvEmailColumn ? 'bg-blue-500/10' : ci === csvNameColumn ? 'bg-green-500/10' : ''}`}>
+                          {cell}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {csvData.length > 21 && (
+                <div className="text-sm text-muted-foreground text-center py-3 bg-muted/50 sticky bottom-0">
+                  {t('csvMoreRows', { count: csvData.length - 21 })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 px-6 py-4 border-t flex-shrink-0 bg-muted/30">
+            <Button variant="outline" onClick={() => setCsvImportDialogOpen(false)}>
+              {t('cancel')}
+            </Button>
+            <Button onClick={handleCsvImport} disabled={csvEmailColumn < 0}>
+              {t('csvImportButton')}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -950,6 +1333,489 @@ function AccountForm({ account, t, onSave, onCancel }: {
           disabled={!form.email.trim() || !form.smtpHost.trim() || !form.password.trim()}>
           {t('saveAccount')}
         </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── 投稿模板选项卡组件 ──
+
+function SubmissionTemplatesTab({
+  stored,
+  saveToStorage,
+  showStatus,
+  editingTemplate,
+  setEditingTemplate,
+  setRecipients,
+  setCc,
+  setBcc,
+  setSubject,
+  setEmailBody,
+  setTemplatesDialogOpen,
+  t,
+  docTitle,
+  docContent,
+}: {
+  stored: EmailStorageData;
+  saveToStorage: (updates: Partial<EmailStorageData>) => void;
+  showStatus: (msg: string, isError?: boolean) => void;
+  editingTemplate: SubmissionTemplate | null;
+  setEditingTemplate: (t: SubmissionTemplate | null) => void;
+  setRecipients: (v: string) => void;
+  setCc: (v: string) => void;
+  setBcc: (v: string) => void;
+  setSubject: (v: string) => void;
+  setEmailBody: (v: string) => void;
+  setTemplatesDialogOpen: (v: boolean) => void;
+  t: (key: string, params?: Record<string, string | number>) => string;
+  docTitle: string;
+  docContent: string;
+}) {
+  const templates: SubmissionTemplate[] = stored.submissionTemplates || [];
+
+  const handleNewTemplate = () => {
+    setEditingTemplate({
+      id: `tpl_${Date.now()}`,
+      name: '',
+      recipients: [],
+      subjectTemplate: '',
+      bodyTemplate: '',
+      variables: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+  };
+
+  const handleSaveTemplate = () => {
+    if (!editingTemplate || !editingTemplate.name.trim()) {
+      showStatus('请输入模板名称', true);
+      return;
+    }
+    const updated = templates.find(t => t.id === editingTemplate.id)
+      ? templates.map(t => t.id === editingTemplate.id ? { ...editingTemplate, updatedAt: Date.now() } : t)
+      : [...templates, editingTemplate];
+    saveToStorage({ submissionTemplates: updated });
+    setEditingTemplate(null);
+    showStatus(t('templateSaved'));
+  };
+
+  const handleDeleteTemplate = (id: string) => {
+    const updated = templates.filter(t => t.id !== id);
+    saveToStorage({ submissionTemplates: updated });
+    showStatus(t('templateDeleted'));
+  };
+
+  const handleUseTemplate = (tpl: SubmissionTemplate) => {
+    // 准备变量上下文
+    const context = {
+      title: docTitle,
+      content: docContent,
+      date: getCurrentDateString(),
+    };
+
+    // 替换变量
+    const processedSubject = replaceVariables(tpl.subjectTemplate, tpl.variables, context);
+    const processedBody = replaceVariables(tpl.bodyTemplate, tpl.variables, context);
+
+    // 填充收件人
+    setRecipients(tpl.recipients.join(', '));
+    setCc((tpl.cc || []).join(', '));
+    setBcc((tpl.bcc || []).join(', '));
+    setSubject(processedSubject);
+    setEmailBody(processedBody);
+    saveToStorage({
+      recipients: tpl.recipients,
+      cc: tpl.cc || [],
+      bcc: tpl.bcc || [],
+      subject: processedSubject,
+      emailBody: processedBody,
+    });
+    setTemplatesDialogOpen(false);
+    showStatus(t('templateApplied'));
+  };
+
+  return (
+    <div className="flex gap-4 h-full min-h-[400px]">
+      {/* 左侧：模板列表 */}
+      <div className="w-1/3 border rounded-md overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30">
+          <span className="text-sm font-medium">{t('templateList')}</span>
+          <Button variant="outline" size="sm" className="h-6 text-xs gap-1" onClick={handleNewTemplate}>
+            <Plus className="h-3 w-3" />
+            {t('newTemplate')}
+          </Button>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {templates.length > 0 ? templates.map(tpl => (
+            <div key={tpl.id}
+              className={`flex items-center justify-between px-3 py-2 border-b cursor-pointer hover:bg-muted/50 ${editingTemplate?.id === tpl.id ? 'bg-accent/50' : ''}`}
+              onClick={() => setEditingTemplate({ ...tpl })}>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm truncate">{tpl.name}</div>
+                <div className="text-xs text-muted-foreground truncate">{tpl.recipients.join(', ')}</div>
+              </div>
+              <div className="flex gap-1 flex-shrink-0">
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={(e) => { e.stopPropagation(); handleUseTemplate(tpl); }}>
+                  {t('use')}
+                </Button>
+                <Button variant="ghost" size="sm" className="h-6 px-1.5 text-xs text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteTemplate(tpl.id); }}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          )) : (
+            <div className="text-xs text-muted-foreground text-center py-8">{t('noTemplates')}</div>
+          )}
+        </div>
+      </div>
+
+      {/* 右侧：编辑区 */}
+      <div className="flex-1 border rounded-md overflow-y-auto">
+        {editingTemplate ? (
+          <div className="p-3 space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">{t('templateName')} *</Label>
+              <Input value={editingTemplate.name} onChange={e => setEditingTemplate({ ...editingTemplate, name: e.target.value })} placeholder={t('templateNamePlaceholder')} className="h-8 text-sm" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t('description')}</Label>
+              <Input value={editingTemplate.description || ''} onChange={e => setEditingTemplate({ ...editingTemplate, description: e.target.value })} placeholder={t('descriptionPlaceholder')} className="h-8 text-sm" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t('recipients')} *</Label>
+              <Input value={editingTemplate.recipients.join(', ')} onChange={e => setEditingTemplate({ ...editingTemplate, recipients: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} placeholder={t('recipientsPlaceholder')} className="h-8 text-sm font-mono" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">{t('cc')}</Label>
+                <Input value={(editingTemplate.cc || []).join(', ')} onChange={e => setEditingTemplate({ ...editingTemplate, cc: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} placeholder={t('ccPlaceholder')} className="h-8 text-sm font-mono" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t('bcc')}</Label>
+                <Input value={(editingTemplate.bcc || []).join(', ')} onChange={e => setEditingTemplate({ ...editingTemplate, bcc: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} placeholder={t('bccPlaceholder')} className="h-8 text-sm font-mono" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t('subjectTemplate')}</Label>
+              <div className="flex gap-2">
+                <Input value={editingTemplate.subjectTemplate} onChange={e => setEditingTemplate({ ...editingTemplate, subjectTemplate: e.target.value })} placeholder={t('subjectTemplatePlaceholder')} className="h-8 text-sm flex-1" />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-8 text-xs">{t('insertVar')}</Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    {PRESET_VARIABLES.map(v => {
+                      const varStr = '{{' + v.name + '}}';
+                      return (
+                        <DropdownMenuItem key={v.name} onClick={() => setEditingTemplate({ ...editingTemplate, subjectTemplate: editingTemplate.subjectTemplate + varStr })}>
+                          {v.label} ({varStr})
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              <p className="text-xs text-muted-foreground">{t('subjectTemplateHint')}</p>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t('bodyTemplate')}</Label>
+              <textarea
+                value={editingTemplate.bodyTemplate}
+                onChange={e => setEditingTemplate({ ...editingTemplate, bodyTemplate: e.target.value })}
+                placeholder={t('bodyTemplatePlaceholder')}
+                className="w-full h-[200px] p-2 text-sm border rounded-md resize-none font-mono"
+              />
+              <p className="text-xs text-muted-foreground">{t('bodyTemplateHint')}</p>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setEditingTemplate(null)}>{t('cancel')}</Button>
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleSaveTemplate}>{t('save')}</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+            {t('selectOrCreateTemplate')}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── 文本片段选项卡组件 ──
+
+function TextSnippetsTab({
+  stored,
+  saveToStorage,
+  showStatus,
+  editingSnippet,
+  setEditingSnippet,
+  t,
+}: {
+  stored: EmailStorageData;
+  saveToStorage: (updates: Partial<EmailStorageData>) => void;
+  showStatus: (msg: string, isError?: boolean) => void;
+  editingSnippet: TextSnippet | null;
+  setEditingSnippet: (s: TextSnippet | null) => void;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  const userSnippets: TextSnippet[] = stored.textSnippets || [];
+  const allSnippets = [...PRESET_SNIPPETS, ...userSnippets];
+
+  // 按分类分组
+  const groupedSnippets: Record<string, TextSnippet[]> = {};
+  for (const s of allSnippets) {
+    const cat = s.category || t('uncategorized');
+    if (!groupedSnippets[cat]) groupedSnippets[cat] = [];
+    groupedSnippets[cat].push(s);
+  }
+
+  const handleNewSnippet = () => {
+    setEditingSnippet({
+      id: `snippet_${Date.now()}`,
+      name: '',
+      content: '',
+      category: '',
+    });
+  };
+
+  const handleSaveSnippet = () => {
+    if (!editingSnippet || !editingSnippet.name.trim()) {
+      showStatus(t('pleaseEnterName'), true);
+      return;
+    }
+    const updated = userSnippets.find(s => s.id === editingSnippet.id)
+      ? userSnippets.map(s => s.id === editingSnippet.id ? editingSnippet : s)
+      : [...userSnippets, editingSnippet];
+    saveToStorage({ textSnippets: updated });
+    setEditingSnippet(null);
+    showStatus(t('snippetSaved'));
+  };
+
+  const handleDeleteSnippet = (id: string) => {
+    // 不能删除预置片段
+    if (PRESET_SNIPPETS.find(s => s.id === id)) {
+      showStatus(t('cannotDeletePreset'), true);
+      return;
+    }
+    const updated = userSnippets.filter(s => s.id !== id);
+    saveToStorage({ textSnippets: updated });
+    showStatus(t('snippetDeleted'));
+  };
+
+  const handleCopySnippet = (content: string) => {
+    navigator.clipboard.writeText(content);
+    showStatus(t('copied'));
+  };
+
+  return (
+    <div className="flex gap-4 h-full min-h-[400px]">
+      {/* 左侧：片段列表 */}
+      <div className="w-1/3 border rounded-md overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30">
+          <span className="text-sm font-medium">{t('snippetList')}</span>
+          <Button variant="outline" size="sm" className="h-6 text-xs gap-1" onClick={handleNewSnippet}>
+            <Plus className="h-3 w-3" />
+            {t('newSnippet')}
+          </Button>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          {Object.entries(groupedSnippets).map(([category, snippets]) => (
+            <div key={category}>
+              <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground bg-muted/30">{category}</div>
+              {snippets.map(s => (
+                <div key={s.id}
+                  className={`flex items-center justify-between px-3 py-2 border-b cursor-pointer hover:bg-muted/50 ${editingSnippet?.id === s.id ? 'bg-accent/50' : ''}`}
+                  onClick={() => setEditingSnippet({ ...s })}>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm truncate">{s.name}</div>
+                    <div className="text-xs text-muted-foreground truncate">{s.content.replace(/<br\/>/g, ' ').slice(0, 30)}...</div>
+                  </div>
+                  <div className="flex gap-1 flex-shrink-0">
+                    <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={(e) => { e.stopPropagation(); handleCopySnippet(s.content); }}>
+                      {t('copy')}
+                    </Button>
+                    {!PRESET_SNIPPETS.find(p => p.id === s.id) && (
+                      <Button variant="ghost" size="sm" className="h-6 px-1.5 text-xs text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteSnippet(s.id); }}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 右侧：编辑区 */}
+      <div className="flex-1 border rounded-md overflow-y-auto">
+        {editingSnippet ? (
+          <div className="p-3 space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">{t('snippetName')} *</Label>
+              <Input value={editingSnippet.name} onChange={e => setEditingSnippet({ ...editingSnippet, name: e.target.value })} placeholder={t('snippetNamePlaceholder')} className="h-8 text-sm" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t('category')}</Label>
+              <Input value={editingSnippet.category || ''} onChange={e => setEditingSnippet({ ...editingSnippet, category: e.target.value })} placeholder={t('categoryPlaceholder')} className="h-8 text-sm" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t('content')}</Label>
+              <textarea
+                value={editingSnippet.content}
+                onChange={e => setEditingSnippet({ ...editingSnippet, content: e.target.value })}
+                placeholder={t('snippetContentPlaceholder')}
+                className="w-full h-[150px] p-2 text-sm border rounded-md resize-none font-mono"
+              />
+              <p className="text-xs text-muted-foreground">{t('snippetContentHint')}</p>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setEditingSnippet(null)}>{t('cancel')}</Button>
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleSaveSnippet} disabled={!editingSnippet.name.trim()}>{t('save')}</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+            {t('selectOrCreateSnippet')}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── 联系人列表组件 ──
+function ContactListSection({
+  host,
+  saveToStorage,
+  showStatus,
+  selectedContactIds,
+  setSelectedContactIds,
+  setEditingContact,
+  searchText,
+}: {
+  host: ReturnType<typeof usePluginHost>;
+  saveToStorage: (data: Partial<EmailStorageData>) => void;
+  showStatus: (msg: string, isError?: boolean) => void;
+  selectedContactIds: Set<string>;
+  setSelectedContactIds: React.Dispatch<React.SetStateAction<Set<string>>>;
+  setEditingContact: React.Dispatch<React.SetStateAction<Contact | null>>;
+  searchText: string;
+}) {
+  const allContacts: Contact[] = (host.storage.get<EmailStorageData>('emailData') || {}).contacts || [];
+
+  // 搜索过滤
+  const contacts = searchText.trim()
+    ? allContacts.filter(c => {
+        const query = searchText.toLowerCase();
+        return (
+          c.name.toLowerCase().includes(query) ||
+          c.email.toLowerCase().includes(query) ||
+          (c.note || '').toLowerCase().includes(query) ||
+          (c.extraFields && Object.values(c.extraFields).some(v => v.toLowerCase().includes(query)))
+        );
+      })
+    : allContacts;
+
+  return (
+    <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+      {/* 联系人数量 */}
+      {allContacts.length > 0 && (
+        <div className="px-3 py-1 border-b flex-shrink-0 bg-muted/30 text-xs text-muted-foreground">
+          {searchText.trim() ? (
+            <>找到 {contacts.length} / {allContacts.length} 位联系人</>
+          ) : (
+            <>共 {allContacts.length} 位联系人</>
+          )}
+        </div>
+      )}
+
+      {/* 联系人列表 */}
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-1 p-1">
+        {contacts.length > 0 ? (
+          contacts.map(c => (
+            <div
+              key={c.id}
+              className={`flex items-start gap-2 px-3 py-2 rounded cursor-pointer text-sm border ${
+                selectedContactIds.has(c.id)
+                  ? 'bg-pink-500/10 border-pink-500/30'
+                  : 'hover:bg-muted/50 border-transparent'
+              }`}
+              onClick={() => {
+                setSelectedContactIds(prev => {
+                  const next = new Set(prev);
+                  next.has(c.id) ? next.delete(c.id) : next.add(c.id);
+                  return next;
+                });
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={selectedContactIds.has(c.id)}
+                readOnly
+                className="h-4 w-4 rounded border-gray-300 flex-shrink-0 mt-0.5 pointer-events-none"
+              />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{c.name || '未命名'}</span>
+                  <span className="text-xs text-muted-foreground font-mono">{c.email}</span>
+                </div>
+                {c.note && <div className="text-xs text-muted-foreground mt-0.5">{c.note}</div>}
+                {c.extraFields && Object.keys(c.extraFields).length > 0 && (
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-xs text-muted-foreground">
+                    {Object.entries(c.extraFields).map(
+                      ([key, value]) =>
+                        value && (
+                          <span key={key}>
+                            <span className="font-medium">{key}:</span> {value}
+                          </span>
+                        )
+                    )}
+                  </div>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-1.5 text-xs flex-shrink-0"
+                onClick={e => {
+                  e.stopPropagation();
+                  setEditingContact({ ...c });
+                }}
+              >
+                编辑
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-1.5 text-xs text-destructive hover:text-destructive flex-shrink-0"
+                onClick={e => {
+                  e.stopPropagation();
+                  const current = host.storage.get<EmailStorageData>('emailData') || {};
+                  const updated = (current.contacts || []).filter(x => x.id !== c.id);
+                  saveToStorage({ contacts: updated });
+                  setSelectedContactIds(prev => {
+                    const next = new Set(prev);
+                    next.delete(c.id);
+                    return next;
+                  });
+                  showStatus('已删除');
+                }}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          ))
+        ) : searchText.trim() ? (
+          <p className="text-xs text-muted-foreground text-center py-4">
+            未找到匹配的联系人
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground text-center py-4">
+            暂无联系人，点击右上角新建或导入 CSV
+          </p>
+        )}
       </div>
     </div>
   );

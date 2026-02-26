@@ -16,10 +16,5 @@
     "流程图",
     "mermaid",
     "时序图"
-  ],
-  "roles": [
-    "programmer",
-    "product-manager",
-    "researcher"
   ]
 }

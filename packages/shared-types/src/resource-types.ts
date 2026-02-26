@@ -286,7 +286,7 @@ export interface ResourceFilter {
   sortOrder?: 'asc' | 'desc';
 }
 
-/** 资源摘要（列表展示用，从 SQLite 索引读取） */
+/** 资源摘要（列表展示用） */
 export interface ResourceSummary {
   id: string;
   packageName?: string;

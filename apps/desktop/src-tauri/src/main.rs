@@ -10,7 +10,6 @@ mod native_export;
 mod paths;
 mod plugin;
 mod project;
-mod resource_engine;
 mod template;
 mod tools;
 mod workspace;
@@ -31,7 +30,14 @@ use commands::{
     template::*,
     wechat::*,
     workspace::*,
+    tts::*,
+    python::*,
+    nodejs::*,
+    coding::*,
+    script_runner::*,
 };
+use commands::tts::TtsState;
+use commands::script_runner::RunningScriptState;
 use tauri::{Manager, Emitter};
 use tauri::menu::{
     MenuBuilder, SubmenuBuilder, MenuItem,
@@ -47,28 +53,11 @@ fn main() {
         .setup(|app| {
             // Initialize app state
             app.manage(config::AppState::new());
+            app.manage(TtsState(std::sync::Mutex::new(None)));
+            app.manage(RunningScriptState::default());
 
             // 初始化跨平台资源路径（必须在其他模块使用 bundled-resources 之前）
             paths::init_bundled_resources_dir(app);
-
-            // Initialize resource engine
-            let resource_state = resource_engine::ResourceEngineState::new();
-            let home = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
-            let resources_root = home.join("AiDocPlus").join("Resources");
-            if let Err(e) = resource_state.init(resources_root.clone()) {
-                eprintln!("[ResourceEngine] 初始化失败: {}", e);
-            } else {
-                // 从 bundled-resources 重建索引
-                if let Some(bundled_dir) = paths::bundled_resources_dir() {
-                    if let Err(e) = resource_state.with_engine(|engine| {
-                        engine.rebuild_index_from_bundled(&bundled_dir)?;
-                        engine.rebuild_index_from_local()
-                    }) {
-                        eprintln!("[ResourceEngine] 索引重建失败: {}", e);
-                    }
-                }
-            }
-            app.manage(resource_state);
 
             // Ensure plugins directory exists
             plugin::ensure_plugins_dir();
@@ -160,14 +149,21 @@ fn main() {
                 .item(&MenuItem::with_id(handle, "toggle_layout", "切换布局", true, Some("CmdOrCtrl+L"))?)
                 .item(&MenuItem::with_id(handle, "version_history", "版本历史", true, Some("CmdOrCtrl+H"))?)
                 .separator()
-                .item(&MenuItem::with_id(handle, "view_editor", "正文区", true, None::<&str>)?)
-                .item(&MenuItem::with_id(handle, "view_plugins", "插件区", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "view_editor", "生成区", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "view_plugins", "内容区", true, None::<&str>)?)
                 .item(&MenuItem::with_id(handle, "view_composer", "合并区", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "view_functional", "功能区", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "view_coding", "编程区", true, None::<&str>)?)
                 .build()?;
 
             // 帮助菜单
             let help_menu = SubmenuBuilder::new(handle, "帮助")
                 .item(&MenuItem::with_id(handle, "shortcuts_ref", "快捷键参考", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "first_run_guide", "新手引导", true, None::<&str>)?)
+                .separator()
+                .item(&MenuItem::with_id(handle, "help_website", "AiDocPlus 官网", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "help_docs", "使用文档", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "help_feedback", "反馈与建议", true, None::<&str>)?)
                 .separator()
                 .item(&MenuItem::with_id(handle, "about", "关于 AiDocPlus", true, None::<&str>)?)
                 .build()?;
@@ -204,6 +200,7 @@ fn main() {
             read_directory,
             read_file,
             read_file_base64,
+            read_text_file,
             write_file,
             delete_file,
             create_directory,
@@ -271,6 +268,10 @@ fn main() {
             load_settings,
             save_plugin_storage,
             load_plugin_storage,
+            save_conversations,
+            load_conversations,
+            save_ui_preferences,
+            load_ui_preferences,
 
             // Plugin commands
             list_plugins,
@@ -300,15 +301,7 @@ fn main() {
             check_pandoc,
             pandoc_export,
 
-            // Resource engine commands
-            resource_list,
-            resource_search,
-            resource_get,
-            resource_set_enabled,
-            resource_stats,
-            resource_categories,
-            resource_rebuild_index,
-            resource_save,
+            // Resource commands
             open_resource_manager,
             list_prompt_templates,
             list_prompt_template_categories,
@@ -319,6 +312,51 @@ fn main() {
 
             // WeChat commands
             wechat_http_request,
+
+            // TTS commands
+            tts_capabilities,
+            tts_speak,
+            tts_stop,
+            tts_is_speaking,
+            tts_set_rate,
+            tts_set_pitch,
+            tts_set_volume,
+            tts_get_params,
+            tts_get_param_ranges,
+            tts_list_voices,
+            tts_set_voice,
+
+            // Python 脚本执行
+            check_python,
+            discover_pythons,
+            run_python_script,
+
+            // Node.js 脚本执行
+            check_nodejs,
+            run_node_script,
+
+            // 流式脚本运行 + 终止
+            run_script_stream,
+            kill_running_script,
+
+            // 编程区文件管理
+            get_coding_scripts_dir,
+            list_coding_scripts,
+            list_coding_file_tree,
+            read_coding_script,
+            save_coding_script,
+            delete_coding_script,
+            rename_coding_script,
+            create_coding_folder,
+            delete_coding_folder,
+            move_coding_item,
+            read_external_file,
+            search_coding_files,
+            load_coding_state,
+            save_coding_state,
+            pip_install,
+            pip_list,
+
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

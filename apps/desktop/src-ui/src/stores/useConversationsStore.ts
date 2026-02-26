@@ -1,7 +1,53 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { invoke } from '@tauri-apps/api/core';
 import type { Conversation, ConversationGroup, AIMessage } from '@aidocplus/shared-types';
 import { CONVERSATION_GROUPS } from '@aidocplus/shared-types';
+
+/**
+ * 底层 storage adapter：通过 Tauri 后端读写 ~/AiDocPlus/conversations.json
+ * 首次启动时自动从 localStorage 迁移数据
+ */
+const tauriConversationsStorage: {
+  getItem: (name: string) => string | null | Promise<string | null>;
+  setItem: (name: string, value: string) => void | Promise<void>;
+  removeItem: (name: string) => void | Promise<void>;
+} = {
+  getItem: async (name: string): Promise<string | null> => {
+    try {
+      const json = await invoke<string | null>('load_conversations');
+      if (json) {
+        // 已有 Tauri 文件数据，清理 localStorage 残留
+        localStorage.removeItem(name);
+        return json;
+      }
+      // 首次启动：从 localStorage 迁移
+      const legacy = localStorage.getItem(name);
+      if (legacy) {
+        await invoke('save_conversations', { json: legacy }).catch(() => {});
+        localStorage.removeItem(name);
+        return legacy;
+      }
+      return null;
+    } catch {
+      return localStorage.getItem(name);
+    }
+  },
+  setItem: async (name: string, value: string): Promise<void> => {
+    try {
+      await invoke('save_conversations', { json: value });
+    } catch {
+      localStorage.setItem(name, value);
+    }
+  },
+  removeItem: async (name: string): Promise<void> => {
+    try {
+      await invoke('save_conversations', { json: '{}' });
+    } catch {
+      localStorage.removeItem(name);
+    }
+  },
+};
 
 interface ConversationsState {
   conversations: Conversation[];
@@ -204,6 +250,7 @@ export const useConversationsStore = create<ConversationsState>()(
     }),
     {
       name: 'aidocplus-conversations',
+      storage: createJSONStorage(() => tauriConversationsStorage),
       partialize: (state) => ({
         conversations: state.conversations,
         currentConversationId: state.currentConversationId

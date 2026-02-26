@@ -13,3 +13,8 @@ pub mod search;
 pub mod wechat;
 pub mod settings;
 pub mod workspace;
+pub mod tts;
+pub mod python;
+pub mod nodejs;
+pub mod coding;
+pub mod script_runner;

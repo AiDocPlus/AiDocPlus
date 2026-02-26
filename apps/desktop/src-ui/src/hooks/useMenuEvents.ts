@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { open, save, message, confirm } from '@tauri-apps/plugin-dialog';
+import { invoke } from '@tauri-apps/api/core';
 import { useAppStore } from '@/stores/useAppStore';
 import i18n from '@/i18n';
 
@@ -84,6 +85,12 @@ export function useMenuEvents(onSettingsOpen: () => void) {
         case 'view_composer':
           window.dispatchEvent(new CustomEvent('menu-view-switch', { detail: 'composer' }));
           break;
+        case 'view_functional':
+          window.dispatchEvent(new CustomEvent('menu-view-switch', { detail: 'functional' }));
+          break;
+        case 'view_coding':
+          window.dispatchEvent(new CustomEvent('menu-view-switch', { detail: 'coding' }));
+          break;
 
         // ── 项目管理 ──
         case 'project_rename':
@@ -133,6 +140,18 @@ export function useMenuEvents(onSettingsOpen: () => void) {
         // ── 帮助菜单 ──
         case 'shortcuts_ref':
           window.dispatchEvent(new CustomEvent('menu-shortcuts-ref'));
+          break;
+        case 'first_run_guide':
+          window.dispatchEvent(new CustomEvent('menu-first-run-guide'));
+          break;
+        case 'help_website':
+          invoke('open_file_with_app', { path: 'https://AiDocPlus.com', appName: null }).catch(() => {});
+          break;
+        case 'help_docs':
+          invoke('open_file_with_app', { path: 'https://AiDocPlus.com/docs', appName: null }).catch(() => {});
+          break;
+        case 'help_feedback':
+          invoke('open_file_with_app', { path: 'https://github.com/AiDocPlus/AiDocPlus/issues', appName: null }).catch(() => {});
           break;
         case 'about':
           window.dispatchEvent(new CustomEvent('menu-about'));

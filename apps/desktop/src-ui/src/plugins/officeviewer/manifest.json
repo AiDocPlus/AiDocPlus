@@ -16,9 +16,5 @@
     "pdf",
     "docx",
     "xlsx"
-  ],
-  "roles": [
-    "civil-servant",
-    "product-manager"
   ]
 }

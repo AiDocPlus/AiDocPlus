@@ -93,7 +93,7 @@ export function FunctionalPluginMenu({ functionalAreaOpen, onToggle, document }:
       disabled={!hasPlugins}
       onClick={onToggle}
       title={hasPlugins
-        ? t('functionalToggle', { defaultValue: '展开/收起功能插件区' })
+        ? t('functionalToggle', { defaultValue: '展开/收起功能区' })
         : t('allDisabled')}
       className={`gap-1 h-7 text-xs ${className}`}
     >

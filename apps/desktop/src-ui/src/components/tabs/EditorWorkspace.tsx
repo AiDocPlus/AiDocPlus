@@ -24,7 +24,7 @@ export function EditorWorkspace({ tab }: EditorWorkspaceProps) {
   const [aiContent, setAiContent] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [composedContent, setComposedContent] = useState('');
-  const [activeView, setActiveView] = useState<'editor' | 'plugins' | 'composer' | 'functional'>('editor');
+  const [activeView, setActiveView] = useState<'editor' | 'plugins' | 'composer' | 'functional' | 'coding'>('editor');
 
   const tabLayoutMode = tab.panelState.layoutMode ?? 'vertical';
   const tabChatPanelWidth = tab.panelState.chatPanelWidth ?? 320;
@@ -148,13 +148,13 @@ export function EditorWorkspace({ tab }: EditorWorkspaceProps) {
         />
       </div>
 
-      {/* 聊天面板拖拽手柄 */}
-      {tab.panelState.chatOpen && (
+      {/* 聊天面板拖拽手柄（编程区自带AI助手，不显示外部聊天面板） */}
+      {tab.panelState.chatOpen && activeView !== 'coding' && (
         <ResizableHandle direction="horizontal" onResize={handleChatResize} />
       )}
 
-      {/* 右侧聊天面板 */}
-      {tab.panelState.chatOpen && (
+      {/* 右侧聊天面板（编程区自带AI助手，不显示外部聊天面板） */}
+      {tab.panelState.chatOpen && activeView !== 'coding' && (
         <div
           className="border-l flex-shrink-0 overflow-hidden h-full flex flex-col"
           style={{ width: tabChatPanelWidth }}

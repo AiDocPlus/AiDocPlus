@@ -27,6 +27,7 @@ import { useState, useCallback, useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { confirm } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
+import { loadUIPreferences, saveProjectOrder, saveDocOrders } from '@/lib/uiPreferences';
 import { useTranslation } from '@/i18n';
 
 interface FileTreeProps {
@@ -55,14 +56,12 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
   const [projectOrder, setProjectOrder] = useState<string[]>([]);
   const [docOrders, setDocOrders] = useState<Record<string, string[]>>({});
 
-  // 从 localStorage 加载自定义排序
+  // 从 Tauri 后端加载自定义排序（自动从 localStorage 迁移）
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('aidoc-project-order');
-      if (saved) setProjectOrder(JSON.parse(saved));
-      const savedDoc = localStorage.getItem('aidoc-doc-orders');
-      if (savedDoc) setDocOrders(JSON.parse(savedDoc));
-    } catch { /* ignore */ }
+    loadUIPreferences().then(prefs => {
+      if (prefs.projectOrder) setProjectOrder(prefs.projectOrder);
+      if (prefs.docOrders) setDocOrders(prefs.docOrders);
+    }).catch(() => {});
   }, []);
 
   // dnd-kit sensors
@@ -127,7 +126,7 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
     if (oldIndex === -1 || newIndex === -1) return;
     const newOrder = arrayMove(currentIds, oldIndex, newIndex);
     setProjectOrder(newOrder);
-    localStorage.setItem('aidoc-project-order', JSON.stringify(newOrder));
+    saveProjectOrder(newOrder);
     setSortField('custom');
   }, [sortedProjects]);
 
@@ -143,7 +142,7 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
     const newOrder = arrayMove(currentIds, oldIndex, newIndex);
     const updated = { ...docOrders, [projectId]: newOrder };
     setDocOrders(updated);
-    localStorage.setItem('aidoc-doc-orders', JSON.stringify(updated));
+    saveDocOrders(updated);
     setSortField('custom');
   }, [documents, sortDocuments, docOrders]);
 

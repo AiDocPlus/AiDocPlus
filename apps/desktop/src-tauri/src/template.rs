@@ -171,6 +171,10 @@ fn load_bundled_category_files() -> Vec<CategoryJsonFile> {
     if let Ok(entries) = fs::read_dir(&dir) {
         for entry in entries.flatten() {
             let path = entry.path();
+            // 跳过 _meta.json 文件（格式不同，不是分类文件）
+            if path.file_name().and_then(|n| n.to_str()) == Some("_meta.json") {
+                continue;
+            }
             if path.extension().and_then(|e| e.to_str()) != Some("json") {
                 continue;
             }
