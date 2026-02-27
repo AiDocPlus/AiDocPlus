@@ -1,0 +1,20 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440006",
+  "name": "Mermaid 图表",
+  "version": "1.0.0",
+  "description": "AI 生成流程图、时序图、类图等 Mermaid 图表",
+  "icon": "GitBranch",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "content-generation",
+  "subCategory": "visualization",
+  "category": "visualization",
+  "tags": [
+    "diagram",
+    "图表",
+    "流程图",
+    "mermaid",
+    "时序图"
+  ]
+}

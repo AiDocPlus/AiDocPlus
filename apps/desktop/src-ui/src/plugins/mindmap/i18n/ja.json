@@ -1,0 +1,19 @@
+{
+  "title": "マインドマップ",
+  "description": "AIがドキュメント構造を分析し、マインドマップを生成",
+  "generate": "生成",
+  "generating": "生成中...",
+  "regenerate": "再生成",
+  "copy": "コピー",
+  "copied": "コピー済み",
+  "copiedToClipboard": "クリップボードにコピーしました",
+  "export": "エクスポート",
+  "emptyContent": "❌ ドキュメント内容が空のため、マインドマップを生成できません。",
+  "generateFailed": "❌ マインドマップ生成に失敗しました：{{error}}",
+  "generateSuccess": "マインドマップを生成しました",
+  "promptPlaceholder": "必要なマインドマップを記述...",
+  "defaultPrompt": "ドキュメント内容から構造化マインドマップを生成",
+  "welcome": "マインドマップ",
+  "welcomeDesc": "AIがドキュメント構造を分析し、Markdown形式のマインドマップを自動生成します。",
+  "systemPrompt": "あなたはプロのドキュメント分析アシスタントです。ドキュメント内容を構造化マインドマップに変換してください。Markdownインデントリスト形式で出力してください。"
+}

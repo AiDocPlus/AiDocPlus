@@ -1,0 +1,20 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440013",
+  "name": "写作统计仪表盘",
+  "version": "1.0.0",
+  "description": "追踪写作进度、目标达成率、每日产出等关键指标",
+  "icon": "BarChart3",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "functional",
+  "subCategory": "analysis",
+  "category": "analysis",
+  "tags": [
+    "statistics",
+    "统计",
+    "写作",
+    "进度",
+    "目标"
+  ]
+}

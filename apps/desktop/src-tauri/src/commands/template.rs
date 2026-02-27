@@ -1,0 +1,169 @@
+#![allow(non_snake_case)]
+
+use crate::config::AppState;
+use crate::document::Document;
+use crate::template::{self, DocTemplateManifest, DocTemplateContent, DocTemplateCategory};
+use crate::error::Result;
+use tauri::State;
+
+#[tauri::command]
+pub fn list_doc_templates() -> Result<Vec<DocTemplateManifest>> {
+    Ok(template::list_doc_templates())
+}
+
+#[tauri::command]
+pub fn get_doc_template_content(templateId: String) -> Result<DocTemplateContent> {
+    template::get_doc_template_content(&templateId)
+}
+
+#[tauri::command]
+pub fn create_doc_template(manifest: DocTemplateManifest, content: DocTemplateContent) -> Result<DocTemplateManifest> {
+    template::create_doc_template(manifest, content)
+}
+
+#[tauri::command]
+pub fn update_doc_template(
+    templateId: String,
+    name: Option<String>,
+    description: Option<String>,
+    category: Option<String>,
+    icon: Option<String>,
+    tags: Option<Vec<String>>,
+    content: Option<DocTemplateContent>,
+) -> Result<DocTemplateManifest> {
+    template::update_doc_template(&templateId, name, description, category, icon, tags, content)
+}
+
+#[tauri::command]
+pub fn delete_doc_template(templateId: String) -> Result<()> {
+    template::delete_doc_template(&templateId)
+}
+
+#[tauri::command]
+pub fn duplicate_doc_template(templateId: String, newName: String) -> Result<DocTemplateManifest> {
+    template::duplicate_doc_template(&templateId, &newName)
+}
+
+/// 从现有文档创建文档模板
+#[tauri::command]
+pub fn save_doc_template_from_document(
+    state: State<'_, AppState>,
+    projectId: String,
+    documentId: String,
+    templateName: String,
+    templateDescription: String,
+    templateCategory: String,
+    includeContent: bool,
+    includeAiContent: bool,
+    includePluginData: bool,
+) -> Result<DocTemplateManifest> {
+    // 加载文档
+    let doc_path = state.get_document_path(&projectId, &documentId);
+    if !doc_path.exists() {
+        return Err(format!("Document not found: {}", documentId));
+    }
+    let document = Document::load(&doc_path).map_err(|e| e.to_string())?;
+
+    let template_id = uuid::Uuid::new_v4().to_string();
+
+    let manifest = DocTemplateManifest {
+        id: template_id,
+        name: templateName,
+        description: templateDescription,
+        icon: String::new(),
+        author: document.metadata.author.clone(),
+        template_type: "custom".to_string(),
+        category: templateCategory,
+        tags: document.metadata.tags.clone(),
+        created_at: 0,
+        updated_at: 0,
+        include_content: includeContent,
+        include_ai_content: includeAiContent,
+        enabled_plugins: document.enabled_plugins.clone().unwrap_or_default(),
+        plugin_data: if includePluginData { document.plugin_data.clone() } else { None },
+        min_app_version: None,
+        is_built_in: false,
+    };
+
+    let content = DocTemplateContent {
+        author_notes: document.author_notes.clone(), // 提示词始终保留
+        ai_generated_content: if includeAiContent { document.ai_generated_content.clone() } else { String::new() },
+        content: if includeContent { document.content.clone() } else { String::new() },
+        plugin_data: if includePluginData { document.plugin_data.clone() } else { None },
+    };
+
+    template::create_doc_template(manifest, content)
+}
+
+/// 从文档模板创建新文档
+#[tauri::command]
+pub fn create_document_from_doc_template(
+    state: State<'_, AppState>,
+    projectId: String,
+    templateId: String,
+    title: String,
+    author: String,
+) -> Result<Document> {
+    // 从合并列表中查找模板 manifest
+    let all_templates = template::list_doc_templates();
+    let manifest = all_templates.iter().find(|t| t.id == templateId)
+        .ok_or_else(|| format!("Template not found: {}", templateId))?;
+
+    // 读取模板内容（从 bundled JSON 或 custom.json）
+    let template_content = template::get_doc_template_content(&templateId)?;
+
+    // 创建新文档
+    let mut document = Document::new(projectId.clone(), title, author);
+
+    // 提示词始终继承
+    document.author_notes = template_content.author_notes;
+
+    // 素材内容按选项继承
+    if manifest.include_content {
+        document.content = template_content.content;
+    }
+    if manifest.include_ai_content {
+        document.ai_generated_content = template_content.ai_generated_content;
+    }
+
+    // 应用插件设置
+    if !manifest.enabled_plugins.is_empty() {
+        document.enabled_plugins = Some(manifest.enabled_plugins.clone());
+    }
+    if template_content.plugin_data.is_some() {
+        document.plugin_data = template_content.plugin_data;
+    }
+
+    // 保存文档
+    let doc_path = state.get_document_path(&projectId, &document.id);
+    document.save(&doc_path).map_err(|e| e.to_string())?;
+
+    Ok(document)
+}
+
+// ── 模板分类命令 ──
+
+#[tauri::command]
+pub fn list_doc_template_categories() -> Result<Vec<DocTemplateCategory>> {
+    Ok(template::list_doc_template_categories())
+}
+
+#[tauri::command]
+pub fn create_doc_template_category(key: String, label: String) -> Result<Vec<DocTemplateCategory>> {
+    template::create_doc_template_category(&key, &label)
+}
+
+#[tauri::command]
+pub fn update_doc_template_category(key: String, label: Option<String>, newKey: Option<String>) -> Result<Vec<DocTemplateCategory>> {
+    template::update_doc_template_category(&key, label, newKey)
+}
+
+#[tauri::command]
+pub fn delete_doc_template_category(key: String) -> Result<Vec<DocTemplateCategory>> {
+    template::delete_doc_template_category(&key)
+}
+
+#[tauri::command]
+pub fn reorder_doc_template_categories(orderedKeys: Vec<String>) -> Result<Vec<DocTemplateCategory>> {
+    template::reorder_doc_template_categories(&orderedKeys)
+}

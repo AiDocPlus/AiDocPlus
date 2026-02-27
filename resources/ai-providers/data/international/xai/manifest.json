@@ -1,0 +1,42 @@
+{
+  "id": "xai",
+  "name": "xAI (Grok)",
+  "description": "xAI (Grok) AI 服务",
+  "icon": "⚡",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "ai-provider",
+  "majorCategory": "international",
+  "subCategory": "general",
+  "tags": [
+    "xAI (Grok)"
+  ],
+  "order": 3,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z",
+  "baseUrl": "https://api.x.ai/v1",
+  "defaultModel": "grok-4-0709",
+  "models": [
+    {
+      "id": "grok-4-0709",
+      "name": "Grok 4"
+    },
+    {
+      "id": "grok-3",
+      "name": "Grok 3"
+    },
+    {
+      "id": "grok-3-mini",
+      "name": "Grok 3 Mini"
+    }
+  ],
+  "authHeader": "bearer",
+  "capabilities": {
+    "webSearch": true,
+    "thinking": true,
+    "functionCalling": true,
+    "vision": false
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "id": "doc-work-summary",
+  "name": "工作总结报告",
+  "description": "年度/季度/月度工作总结，梳理成果、问题与计划",
+  "icon": "📊",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "document-template",
+  "majorCategory": "report",
+  "subCategory": "general",
+  "tags": [],
+  "roles": [
+    "civil-servant",
+    "product-manager"
+  ],
+  "order": 0,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

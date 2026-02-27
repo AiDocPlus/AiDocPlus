@@ -1,0 +1,20 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440016",
+  "name": "多版本对照翻译",
+  "version": "1.0.0",
+  "description": "AI 将文档翻译为多种语言，支持原文与译文左右对照显示",
+  "icon": "Languages",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "content-generation",
+  "subCategory": "ai-text",
+  "category": "ai-text",
+  "tags": [
+    "translation",
+    "翻译",
+    "对照",
+    "多语言",
+    "双语"
+  ]
+}

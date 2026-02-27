@@ -1,0 +1,20 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440012",
+  "name": "文档对比",
+  "version": "1.0.0",
+  "description": "对比文档不同版本或不同来源的内容差异，直观展示增删改",
+  "icon": "GitCompareArrows",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "functional",
+  "subCategory": "analysis",
+  "category": "analysis",
+  "tags": [
+    "diff",
+    "对比",
+    "差异",
+    "版本",
+    "比较"
+  ]
+}

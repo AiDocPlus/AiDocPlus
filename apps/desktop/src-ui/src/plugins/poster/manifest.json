@@ -1,0 +1,20 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440035",
+  "name": "信息图海报",
+  "version": "1.0.0",
+  "description": "AI 将文档内容转化为可视化信息图海报，支持多种主题和 HTML 导出",
+  "icon": "Image",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "content-generation",
+  "subCategory": "visualization",
+  "category": "visualization",
+  "tags": [
+    "poster",
+    "海报",
+    "信息图",
+    "可视化",
+    "infographic"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "id": "doc-tech-plan",
+  "name": "技术方案",
+  "description": "技术架构设计方案，含技术选型、架构设计和实施计划",
+  "icon": "🏗️",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "document-template",
+  "majorCategory": "technical",
+  "subCategory": "general",
+  "tags": [],
+  "roles": [
+    "programmer",
+    "product-manager"
+  ],
+  "order": 2,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

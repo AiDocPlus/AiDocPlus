@@ -1,0 +1,58 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/schema.json",
+  "productName": "AiDocPlus",
+  "version": "0.3.0",
+  "identifier": "com.aidocplus.app",
+  "build": {
+    "beforeDevCommand": "cd src-ui && pnpm dev",
+    "beforeBuildCommand": "cd src-ui && pnpm build",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../src-ui/dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "AiDocPlus - AI Document Editor",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 1000,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["dmg", "nsis"],
+    "createUpdaterArtifacts": true,
+    "resources": ["bundled-resources/"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.13",
+      "signingIdentity": "Developer ID Application: 德华 江 (3VA3JP25LX)"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEU5NjNCQjAwNjEzNkE5ODEKUldTQnFUWmhBTHRqNllsSmw4L3lnZExDTXpiWG5nTkRJa2hHM2dEcFdobytkaU45VGJicEVhY3MK",
+      "endpoints": [
+        "https://github.com/AiDocPlus/AiDocPlus/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

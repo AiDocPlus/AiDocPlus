@@ -1,0 +1,21 @@
+{
+  "id": "doc-ad-copy",
+  "name": "广告文案",
+  "description": "营销广告文案，突出产品卖点和用户价值",
+  "icon": "🎯",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "document-template",
+  "majorCategory": "creative",
+  "subCategory": "general",
+  "tags": [],
+  "roles": [
+    "marketing",
+    "content-creator"
+  ],
+  "order": 1,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

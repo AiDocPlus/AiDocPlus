@@ -1,0 +1,20 @@
+{
+  "id": "doc-tech-blog",
+  "name": "技术博客",
+  "description": "技术文章/博客，适合分享技术经验、解决方案和最佳实践",
+  "icon": "💻",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "document-template",
+  "majorCategory": "article",
+  "subCategory": "general",
+  "tags": [],
+  "roles": [
+    "programmer"
+  ],
+  "order": 1,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

@@ -1,0 +1,61 @@
+# AiDocPlus-PromptTemplates
+
+AiDocPlus 提示词模板资源仓库，包含 982 个内置提示词模板（46 个分类）。
+
+## 数据模式
+
+采用 **JSON 文件模式**：每个分类一个 JSON 文件，包含分类元信息和所有模板。
+
+## 目录结构
+
+```
+data/                              # 每个分类一个 JSON 文件
+├── academic.json                  # 学术写作（12 个模板）
+├── business.json                  # 商务写作
+├── ...                            # 共 46 个分类 JSON 文件
+scripts/
+├── build.py                       # 读取 data/*.json → dist/*.generated.ts
+├── deploy.sh                      # 部署 JSON 到 bundled-resources + generated TS 到 shared-types
+└── convert_to_json.py             # 一次性转换脚本（从旧目录结构转为 JSON）
+dist/                              # 构建产物（.gitignore 忽略）
+```
+
+## 构建和部署
+
+```bash
+python3 scripts/build.py    # 生成 prompt-templates.generated.ts + template-categories.generated.ts
+bash scripts/deploy.sh      # 部署到 AiDocPlus 构建目标（双目标：generated TS + bundled-resources JSON）
+```
+
+## 数据格式
+
+每个分类 JSON 文件格式：
+```json
+{
+  "key": "academic",
+  "name": "学术写作",
+  "icon": "🎓",
+  "order": 7,
+  "templates": [
+    {
+      "id": "template-id",
+      "name": "模板名称",
+      "description": "模板描述",
+      "content": "模板内容，支持 {{变量名}} 占位符",
+      "variables": ["变量1", "变量2"],
+      "order": 0
+    }
+  ]
+}
+```
+
+## 部署产物
+
+| 产物 | 部署位置 | 用途 |
+|------|----------|------|
+| `*.generated.ts` | `AiDocPlus/packages/shared-types/src/generated/` | 编译时静态 fallback |
+| `data/*.json` | `AiDocPlus/apps/desktop/src-tauri/bundled-resources/prompt-templates/` | 运行时动态加载（优先） |
+
+## 46 个分类
+
+报告写作、文章创作、邮件撰写、会议纪要、创意写作、技术文档、学术写作、翻译润色、数据分析、营销文案、教育培训、法律文书、公文写作、日常办公、通用、SEO优化、社交媒体、产品文案、内容策略、代码辅助、对话模拟、情感社交、亲子教育、故事写作、AI与数据、客户服务、设计创意、金融财务、美食餐饮、游戏电竞、人力资源、医疗健康、公益组织、宠物、心理咨询、房产置业、体育运动 等

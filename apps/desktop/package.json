@@ -1,0 +1,40 @@
+{
+  "name": "@aidocplus/desktop",
+  "private": true,
+  "version": "0.3.0",
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm tauri dev",
+    "build": "pnpm tauri build",
+    "build:ui": "cd src-ui && pnpm build",
+    "dev:ui": "cd src-ui && pnpm dev",
+    "tauri": "tauri",
+    "lint": "eslint src-ui/src",
+    "clean": "rm -rf src-ui/dist src-tauri/target"
+  },
+  "dependencies": {
+    "@aidocplus/shared-types": "workspace:*",
+    "@aidocplus/utils": "workspace:*",
+    "@tauri-apps/api": "^2.10.1",
+    "@tiptap/extension-code-block-lowlight": "^3.19.0",
+    "@tiptap/extension-image": "^3.19.0",
+    "@tiptap/extension-link": "^3.19.0",
+    "@tiptap/extension-placeholder": "^3.19.0",
+    "@tiptap/extension-table": "^3.19.0",
+    "@tiptap/extension-table-cell": "^3.19.0",
+    "@tiptap/extension-table-header": "^3.19.0",
+    "@tiptap/extension-table-row": "^3.19.0",
+    "@tiptap/extension-task-item": "^3.19.0",
+    "@tiptap/extension-task-list": "^3.19.0",
+    "@tiptap/extension-text-align": "^3.19.0",
+    "@tiptap/extension-underline": "^3.19.0",
+    "@tiptap/pm": "^3.19.0",
+    "@tiptap/react": "^3.19.0",
+    "@tiptap/starter-kit": "^3.19.0",
+    "lowlight": "^3.3.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.10.0",
+    "typescript": "~5.9.3"
+  }
+}

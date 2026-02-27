@@ -1,0 +1,19 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440003",
+  "name": "文档摘要",
+  "version": "1.0.0",
+  "description": "AI 提炼文档要点、生成多种风格摘要",
+  "icon": "FileText",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "content-generation",
+  "subCategory": "ai-text",
+  "category": "ai-text",
+  "tags": [
+    "summary",
+    "摘要",
+    "要点",
+    "概括"
+  ]
+}

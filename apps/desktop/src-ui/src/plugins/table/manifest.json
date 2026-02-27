@@ -1,0 +1,20 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440009",
+  "name": "表格编辑器",
+  "version": "1.0.0",
+  "description": "创建和编辑表格，支持导出为 Excel 文件",
+  "icon": "Table2",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "content-generation",
+  "subCategory": "data",
+  "category": "data",
+  "tags": [
+    "table",
+    "表格",
+    "excel",
+    "xlsx",
+    "数据"
+  ]
+}

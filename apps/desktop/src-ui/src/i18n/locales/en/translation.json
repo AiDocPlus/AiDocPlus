@@ -1,0 +1,1911 @@
+{
+  "app": {
+    "name": "AI Document Editor",
+    "title": "AiDocPlus",
+    "description": "AI-powered intelligent document creation tool"
+  },
+  "firstRun": {
+    "title": "Welcome to AiDocPlus",
+    "welcomeDesc": "AI-powered intelligent document creation tool for efficient writing",
+    "description": "Get started with AI features by configuring an API Key",
+    "feature1Title": "AI Smart Writing",
+    "feature1Desc": "AI chat, content generation, polishing & rewriting — comprehensive writing assistance",
+    "feature2Title": "Rich Plugin Ecosystem",
+    "feature2Desc": "21 built-in plugins covering translation, summary, PPT, email and more",
+    "feature3Title": "Professional Editing",
+    "feature3Desc": "Markdown editor, multi-format export, version history, coding area",
+    "configTitle": "Configure AI Service",
+    "bonusTitle": "🎁 New User Bonus",
+    "bonusDesc": "Zhipu AI offers 20M free tokens for new users, enough to experience all AI features",
+    "configureZhipu": "Configure Zhipu AI (Recommended)",
+    "viewTutorial": "View Tutorial",
+    "coreTitle": "Core Features Overview",
+    "coreDesc": "Explore the five workspaces of AiDocPlus",
+    "area1Title": "📝 Generator — Smart Writing",
+    "area1Desc": "Markdown editor + AI assistant sidebar for real-time chat and content generation",
+    "area2Title": "🧩 Content — Content Generation",
+    "area2Desc": "Translation, summary, expansion, PPT generation, email composition and more content plugins",
+    "area3Title": "📋 Composer — Content Integration",
+    "area3Desc": "Intelligently merge materials, AI-generated content and manual edits into final document",
+    "area4Title": "🔧 Functional — Utility Tools",
+    "area4Desc": "Format conversion, OCR, code tools and other functional plugins",
+    "area5Title": "💻 Coding — Code Execution",
+    "area5Desc": "Integrated multi-language code editing and execution environment with AI assistance",
+    "tipsTitle": "Pro Tips",
+    "tipsDesc": "Master these tips to double your productivity",
+    "tip1Title": "Keyboard Shortcuts",
+    "tip1Desc": "Cmd/Ctrl+J to open AI assistant, Cmd/Ctrl+B to toggle sidebar",
+    "tip2Title": "Multi-format Export",
+    "tip2Desc": "Export to Markdown, HTML, Word, PDF, and plain text",
+    "tip3Title": "Version History",
+    "tip3Desc": "Auto-creates version snapshots on each save, compare and restore anytime",
+    "moreInfo": "Learn more at",
+    "prev": "Previous",
+    "next": "Next",
+    "start": "Get Started",
+    "skip": "Configure Later"
+  },
+  "menu": {
+    "file": "File",
+    "edit": "Edit",
+    "view": "View",
+    "help": "Help",
+    "settings": "Settings",
+    "exportProject": "Export Project",
+    "exportProjectZip": "Export Project as ZIP",
+    "zipFilter": "ZIP Archive",
+    "exportedTo": "Project exported to:\n{{path}}",
+    "exportSuccess": "Export Successful",
+    "exportFailed": "Export failed: {{error}}",
+    "exportError": "Export Error",
+    "importProjectZip": "Import Project (ZIP)",
+    "importSuccess": "Project \"{{name}}\" imported successfully",
+    "importSuccessTitle": "Import Successful",
+    "importFailed": "Import failed: {{error}}",
+    "importError": "Import Error",
+    "backupProject": "Backup Project",
+    "backedUpTo": "Project backed up to:\n{{path}}",
+    "backupSuccess": "Backup Successful",
+    "backupFailed": "Backup failed: {{error}}",
+    "backupError": "Backup Error",
+    "renameProject": "Rename Project",
+    "renameProjectPrompt": "Enter new project name:",
+    "projectRenamed": "Project renamed to \"{{name}}\"",
+    "renameSuccess": "Rename Successful",
+    "renameFailed": "Rename failed: {{error}}",
+    "renameError": "Rename Error",
+    "deleteProject": "Delete Project",
+    "deleteProjectConfirm": "Are you sure you want to delete project \"{{name}}\"?\n\nThis will delete the project and all its documents. This action cannot be undone.",
+    "deleteLabel": "Delete",
+    "cancelLabel": "Cancel",
+    "projectDeleted": "Project deleted",
+    "deleteSuccess": "Delete Successful",
+    "deleteFailed": "Delete failed: {{error}}",
+    "deleteError": "Delete Error",
+    "renameDocument": "Rename Document",
+    "renameDocPrompt": "Enter new document title:",
+    "docRenamed": "Document renamed to \"{{title}}\"",
+    "docRenameFailed": "Rename failed: {{error}}",
+    "deleteDocument": "Delete Document",
+    "deleteDocConfirm": "Are you sure you want to delete document \"{{title}}\"? This action cannot be undone.",
+    "docDeleted": "Document deleted",
+    "docDeleteFailed": "Delete failed: {{error}}",
+    "openProjectFirst": "Please open a project first",
+    "openDocFirst": "Please open a document first",
+    "duplicateDocument": "Duplicate Document",
+    "duplicateSuffix": "(Copy)",
+    "duplicateFailed": "Duplicate failed: {{error}}",
+    "duplicateError": "Duplicate Error"
+  },
+  "store": {
+    "exportProjectFailed": "Failed to export project",
+    "importProjectFailed": "Failed to import project",
+    "moveDocFailed": "Failed to move document",
+    "copyDocFailed": "Failed to copy document",
+    "contextMaterial": "Material content",
+    "contextPrompt": "Prompt",
+    "contextGenerated": "AI generated content",
+    "contextDefault": "Document content",
+    "contextUserLabel": "The following is the user's {{label}}:"
+  },
+  "common": {
+    "save": "Save",
+    "saveAndClose": "Save & Close",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "rename": "Rename",
+    "create": "Create",
+    "edit": "Edit",
+    "search": "Search",
+    "export": "Export",
+    "import": "Import",
+    "confirm": "Confirm",
+    "close": "Close",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "warning": "Warning",
+    "info": "Info",
+    "yes": "Yes",
+    "no": "No",
+    "ok": "OK",
+    "apply": "Apply",
+    "reset": "Reset",
+    "default": "Default",
+    "custom": "Custom",
+    "name": "Name",
+    "title": "Title",
+    "description": "Description",
+    "content": "Content",
+    "author": "Author",
+    "createdAt": "Created",
+    "updatedAt": "Updated",
+    "actions": "Actions",
+    "select": "Select",
+    "selectAll": "Select All",
+    "clear": "Clear",
+    "refresh": "Refresh",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "finish": "Finish",
+    "copy": "Copy",
+    "send": "Send",
+    "noContent": "No content",
+    "unsavedChanges": "Unsaved changes"
+  },
+  "fileTree": {
+    "title": "Files",
+    "sidebarTitle": "Projects - Documents",
+    "newProject": "New Project",
+    "newDocument": "New Document",
+    "deleteProject": "Delete Project",
+    "renameProject": "Rename Project",
+    "duplicateDocument": "Duplicate Document",
+    "deleteDocument": "Delete Document",
+    "renameDocument": "Rename Document",
+    "openProject": "Open Project",
+    "closeProject": "Close Project",
+    "projectCount": "{{count}} project(s)",
+    "documentCount": "{{count}} document(s)",
+    "noProjects": "No projects",
+    "noDocuments": "No documents",
+    "confirmDeleteProject": "Are you sure you want to delete project \"{{name}}\"? This action cannot be undone.",
+    "confirmDeleteDocument": "Are you sure you want to delete document \"{{title}}\"? This action cannot be undone.",
+    "projectCreated": "Project created",
+    "documentCreated": "Document created",
+    "projectDeleted": "Project deleted",
+    "documentDeleted": "Document deleted",
+    "documentRenamed": "Document renamed",
+    "selectedCount": "{{count}} selected",
+    "batchDeleteConfirm": "Delete {{count}} selected document(s)?",
+    "batchExport": "Export selected",
+    "batchDelete": "Delete selected",
+    "sort": "Sort",
+    "sortByName": "By Name",
+    "sortByCreated": "By Created",
+    "sortByUpdated": "By Updated",
+    "createProject": "Create new project",
+    "needProjectForImport": "Please open a project first to import files",
+    "noMarkdownFiles": "No markdown files found. Please drop .md or .markdown files.",
+    "importSuccess": "Successfully imported {{count}} file(s)",
+    "importError": "Failed to import files",
+    "dropToImport": "Drop markdown files to import",
+    "importing": "Importing files...",
+    "selectExportFolder": "Select export folder",
+    "exportSuccess": "Exported {{count}} document(s)",
+    "expandAll": "Expand All",
+    "collapseAll": "Collapse All",
+    "sortCustom": "Custom (Drag)",
+    "newFromTemplate": "New from Template",
+    "description": "Description",
+    "filterByTag": "Filter by Tag",
+    "filterAll": "All Documents",
+    "filterStarred": "Starred",
+    "toggleStar": "Star/Unstar",
+    "addTag": "Add Tag",
+    "removeTag": "Remove Tag",
+    "tagPlaceholder": "Enter tag..."
+  },
+  "editor": {
+    "originalContent": "Source Material",
+    "aiGeneratedContent": "Main Content",
+    "originalContentPlaceholder": "Enter source material here... (Markdown supported)",
+    "aiContentPlaceholder": "Main content will appear here...",
+    "save": "Save Document",
+    "export": "Export Document",
+    "autoSave": "Auto Save",
+    "autoSaving": "Auto saving...",
+    "saved": "Saved",
+    "newDocument": "New Document",
+    "enterTitle": "Enter document title",
+    "startWriting": "Start writing...",
+    "wordCount": "{{count}} words",
+    "charCount": "{{count}} characters",
+    "lineCount": "{{count}} lines",
+    "exportAsMarkdown": "Export as Markdown",
+    "exportAsHTML": "Export as HTML",
+    "exportAsText": "Export as Plain Text",
+    "exportSuccess": "Export successful",
+    "newDocumentInProject": "New Document",
+    "deleteCurrentDocument": "Delete Current Document",
+    "untitledDocument": "Untitled Document",
+    "versionHistory": "Version History",
+    "layoutHorizontal": "Switch to Side by Side",
+    "layoutVertical": "Switch to Top and Bottom",
+    "saveCurrent": "Save Current Document",
+    "saveAll": "Save All Documents",
+    "closeAI": "Close AI Assistant",
+    "openAI": "Open AI Assistant",
+    "splitVertical": "Vertical Split",
+    "splitHorizontal": "Horizontal Split",
+    "noDocument": "No document selected",
+    "selectDocument": "Please select a document from the left panel to start editing",
+    "goToTop": "Scroll to Top",
+    "goToBottom": "Scroll to Bottom",
+    "exportContent": "Export Content",
+    "exportAndOpen": "Export & Open with External App",
+    "exportAsMd": "Export as Markdown (.md)",
+    "exportAsHtml": "Export as HTML (.html)",
+    "exportAsDocx": "Export as Word (.docx)",
+    "exportAsPdf": "Export as PDF (.pdf)",
+    "exportAsTxt": "Export as Plain Text (.txt)",
+    "exportComposed": "Export Composed Content",
+    "composedMd": "Composed → Markdown",
+    "composedHtml": "Composed → HTML",
+    "composedDocx": "Composed → Word",
+    "composedPdf": "Composed → PDF",
+    "exportPdfHint": "The document has been opened in the browser in official format. Please use the browser's \"Print\" function and select \"Save as PDF\" to export.\n\nFile location: {{path}}",
+    "exportPdfTitle": "Export as PDF",
+    "exportSuccessMsg": "Export successful: {{path}}",
+    "exportSuccessTitle": "Export Successful",
+    "exportErrorTitle": "Export Error",
+    "exportFailedMsg": "Export failed: {{error}}",
+    "exportOpenFailed": "Export & open failed: {{error}}",
+    "contentArea": "Generate",
+    "composerArea": "Composer",
+    "newBlankDocument": "New Blank Document",
+    "newFromTemplate": "New from Template",
+    "saveAsTemplate": "Save as Template",
+    "wordOpenWps": "Word → Open in WPS",
+    "wordOpenWord": "Word → Open in Word",
+    "htmlOpenEdge": "HTML → Open in Edge",
+    "htmlOpenChrome": "HTML → Open in Chrome",
+    "htmlOpenSafari": "HTML → Open in Safari",
+    "mdOpenDefault": "Markdown → Open with Default",
+    "wordOpenDefault": "Word → Open with Default",
+    "htmlOpenDefault": "HTML → Open in Default Browser",
+    "positionAbove": "(above)",
+    "positionRight": "(right)",
+    "positionBelow": "(below)",
+    "positionLeft": "(left)",
+    "maximize": "Maximize",
+    "restore": "Restore",
+    "minimize": "Minimize",
+    "composedSuffix": "_composed",
+    "aiSuffix": "_AI",
+    "codingArea": "Coding",
+    "attachment": {
+      "title": "Attachments",
+      "titleCount": "Attachments ({{count}})",
+      "add": "Add",
+      "noAttachments": "No attachments. Click \"Add\" to select files",
+      "previewContent": "Preview content",
+      "removeAttachment": "Remove attachment",
+      "converting": "Converting...",
+      "contentTruncated": "\n\n... (Content too long, showing first 2000 characters only)"
+    },
+    "composer": {
+      "exitMaximize": "Exit Maximize",
+      "maximize": "Maximize",
+      "placeholder": "Compose document content here... Import from content, plugins, or files via the toolbar import button, or edit directly."
+    },
+    "outline": {
+      "title": "Outline",
+      "titleCount": "Outline ({{count}})",
+      "noHeadings": "No headings"
+    },
+    "statusBar": {
+      "stats": "{{lines}} lines · {{words}} words · {{chars}} chars · ~{{readingTime}} min",
+      "selected": " · Selected {{count}}",
+      "cursor": "Ln {{line}}, Col {{col}}"
+    },
+    "toolbar": {
+      "undo": "Undo (Cmd+Z)",
+      "undoDone": "Undone",
+      "redo": "Redo (Cmd+Shift+Z)",
+      "redoDone": "Redone",
+      "copy": "Copy (Cmd+C)",
+      "copyDone": "Copied",
+      "cut": "Cut (Cmd+X)",
+      "cutDone": "Cut",
+      "paste": "Paste (Cmd+V)",
+      "pasteDone": "Pasted",
+      "clearAll": "Clear All Content",
+      "clearAllDone": "Cleared",
+      "heading": "Heading",
+      "heading1": "Heading 1",
+      "heading2": "Heading 2",
+      "heading3": "Heading 3",
+      "heading4": "Heading 4",
+      "heading5": "Heading 5",
+      "heading6": "Heading 6",
+      "bold": "Bold",
+      "boldCmd": "Bold (Cmd+B)",
+      "boldDone": "Bolded",
+      "boldPlaceholder": "bold text",
+      "italic": "Italic",
+      "italicCmd": "Italic (Cmd+I)",
+      "italicDone": "Italicized",
+      "italicPlaceholder": "italic text",
+      "strikethrough": "Strikethrough",
+      "strikethroughCmd": "Strikethrough (Cmd+Shift+X)",
+      "strikethroughDone": "Strikethrough added",
+      "strikethroughPlaceholder": "strikethrough text",
+      "clearFormat": "Clear Formatting",
+      "clearFormatDone": "Cleared",
+      "unorderedList": "Unordered List",
+      "orderedList": "Ordered List",
+      "taskList": "Task List",
+      "quote": "Quote",
+      "horizontalRule": "Horizontal Rule",
+      "inserted": "Inserted",
+      "footnote": "Insert Footnote",
+      "footnoteDone": "Footnote inserted",
+      "footnotePlaceholder": "footnote content",
+      "inlineCode": "Inline Code",
+      "inlineCodeCmd": "Inline Code (Cmd+E)",
+      "inlineCodeDone": "Code added",
+      "inlineCodePlaceholder": "code",
+      "codeBlock": "Code Block",
+      "plainCodeBlock": "Plain Code Block",
+      "mermaidChart": "Mermaid Chart",
+      "mermaidFlowchart": "Flowchart",
+      "mermaidSequence": "Sequence Diagram",
+      "mermaidClass": "Class Diagram",
+      "mermaidState": "State Diagram",
+      "mermaidER": "ER Diagram",
+      "mermaidPie": "Pie Chart",
+      "mermaidGantt": "Gantt Chart",
+      "mermaidMindmap": "Mind Map",
+      "mermaidTimeline": "Timeline",
+      "mermaidGit": "Git Graph",
+      "mermaidJourney": "User Journey",
+      "mermaidQuadrant": "Quadrant Chart",
+      "mermaidXY": "XY Chart",
+      "mermaidSankey": "Sankey Diagram",
+      "mermaidBlock": "Block Diagram",
+      "mermaidArchitecture": "Architecture Diagram",
+      "mathFormula": "Math Formula",
+      "inlineFormula": "Inline Formula $...$",
+      "blockFormula": "Block Formula $$...$$",
+      "scrollToTop": "Scroll to Top",
+      "scrollToBottom": "Scroll to Bottom",
+      "openOutline": "Open Outline",
+      "closeOutline": "Close Outline",
+      "editMode": "Edit Mode",
+      "edit": "Edit",
+      "previewMode": "Preview Mode",
+      "preview": "Preview",
+      "splitMode": "Split Mode",
+      "split": "Split",
+      "insertLink": "Insert Link",
+      "insertLinkCmd": "Insert Link (Cmd+K)",
+      "linkText": "Link Text",
+      "linkTextPlaceholder": "Link text (optional, uses selected text)",
+      "linkTextDefault": "link text",
+      "urlAddress": "URL",
+      "cancel": "Cancel",
+      "insert": "Insert",
+      "insertImage": "Insert Image",
+      "imageDescription": "Image Description",
+      "imageDescPlaceholder": "Image description (alt text)",
+      "imageDescDefault": "image",
+      "imageUrl": "Image URL",
+      "decreaseFont": "Decrease font (current {{size}}px)",
+      "increaseFont": "Increase font (current {{size}}px)",
+      "currentFontSize": "Current font size",
+      "import": "Import",
+      "importFromFile": "Import from file (txt, md, docx, csv, html...)",
+      "importFromContent": "Import from content",
+      "insertAll": "Insert All",
+      "importFailed": "Import failed: {{error}}",
+      "documentFiles": "Document Files",
+      "wordFiles": "Word Documents",
+      "textFiles": "Text Files",
+      "allFiles": "All Files",
+      "insertTable": "Insert Table",
+      "tableHeader": "Header",
+      "tableContent": "Content"
+    },
+    "attachAllFiles": "All Files",
+    "attachDocFiles": "Document Files",
+    "attachTextFiles": "Text Files",
+    "attachWordDoc": "Word Documents",
+    "clickToOpen": "Click to open",
+    "imagePreview": "Image preview",
+    "lint": {
+      "duplicateHeading": "Duplicate heading: same as heading on line {{line}}",
+      "emptyLinkText": "Empty link: link text is empty",
+      "emptyLinkUrl": "Empty link: URL is empty",
+      "headingLevelSkip": "Heading level skip: from H{{from}} to H{{to}}, suggest using H{{suggest}}",
+      "unclosedCodeBlock": "Unclosed code block: missing closing ```"
+    },
+    "previewFailed": "Cannot preview: {{error}}",
+    "taskCompleted": "Completed",
+    "taskIncomplete": "Incomplete"
+  },
+  "chat": {
+    "title": "AI Assistant",
+    "authorNotes": "Prompt",
+    "authorNotesPlaceholder": "Enter a prompt to tell AI what content you want to generate...",
+    "generate": "Generate AI Content",
+    "regenerate": "Regenerate",
+    "stopGeneration": "Stop Generation",
+    "settings": "AI Settings",
+    "provider": "AI Provider",
+    "apiKey": "API Key",
+    "model": "Model",
+    "messagePlaceholder": "Type a message...",
+    "sendMessage": "Send",
+    "clearHistory": "Clear History",
+    "conversationHistory": "Conversation History",
+    "newConversation": "New Conversation",
+    "deleteConversation": "Delete Conversation",
+    "renameConversation": "Rename Conversation",
+    "streamingEnabled": "Streaming Generation",
+    "streamingStatus": "Generating content...",
+    "templates": "Prompt Templates",
+    "selectTemplate": "Select Template",
+    "noTemplate": "No Template",
+    "chatPlaceholder": "Chat with AI assistant...",
+    "user": "User",
+    "assistant": "Assistant",
+    "contextNone": "Just Chat",
+    "contextMaterial": "Material",
+    "contextPrompt": "Prompt",
+    "contextGenerated": "Content",
+    "labelMaterial": "Material Content",
+    "labelPrompt": "Prompt",
+    "labelGenerated": "Main Content",
+    "labelDocument": "Document Content",
+    "aiReply": "AI Reply (regarding: {{label}})",
+    "applied": "Applied",
+    "applyTo": "Apply to {{label}}",
+    "copied": "Copied",
+    "copy": "Copy",
+    "editMode": "Edit",
+    "previewMode": "Preview",
+    "attachmentLabel": "[Attachment: {{name}}]",
+    "attachmentError": "[Attachment: {{name}}]\n(Failed to read: {{error}})",
+    "sendFailed": "Send failed: {{error}}",
+    "contentApplied": "✅ Content applied to \"{{label}}\"",
+    "configureApiKeyMsg": "Please configure your API Key first to use AI generation.\n\nClick the \"Settings\" button at the bottom of the chat panel, then configure your API Key in the AI tab.",
+    "aiGenerateTitle": "AI Generated Content (auto-saved before generation)",
+    "aiGenerateContent": "AI Generated Content",
+    "generating": "Generating content...\n\n(Streaming in progress, content will appear gradually)",
+    "aiThinking": "💭 **AI is thinking...**\n\n{{thinking}}",
+    "aiThinkingDone": "💭 **AI thought process:**\n\n{{thinking}}",
+    "generationComplete": "Content generated based on your prompt.\n\nThe generated content has been automatically updated in the editor's AI content panel.",
+    "unknownError": "Unknown error",
+    "networkError": "Network connection failed: {{error}}\n\nPlease check your network connection or try again later.",
+    "apiKeyError": "API Key is invalid or not configured.\n\nClick the \"Settings\" button at the bottom of the chat panel, then configure your API Key in the AI tab.",
+    "rateLimitError": "API rate limit exceeded. Please try again later.",
+    "generateFailed": "Generation failed: {{error}}",
+    "chatTitle": "Just Chat",
+    "aiAssistant": "AI",
+    "promptLabel": "Prompt",
+    "promptPlaceholder": "Enter a prompt to tell AI how to expand or improve your content...\n\nExamples:\n- Please expand this prose into a more detailed description\n- Maintain the original literary style, add more details\n- Reorganize paragraph structure for better logic",
+    "templateManage": "Template Manager",
+    "quickTemplate": "Quick Templates",
+    "clearPrompt": "Clear Prompt",
+    "charCount": "{{count}} chars",
+    "webSearch": "Web Search",
+    "webSearchUnsupported": "Current model does not support web search",
+    "tools": "Tool Calls",
+    "toolsHint": "When enabled, AI can use built-in tools (search documents, etc.)",
+    "toolsUnsupported": "Current model does not support tool calls",
+    "switchAiService": "Switch AI Service",
+    "globalDefault": "Global Default",
+    "docAiService": "Document AI Service",
+    "useGlobalService": "Use Global Service",
+    "thinkingCollapsed": "💭 View AI thinking process",
+    "generateHint": "Generate content based on prompt, auto-update to AI content panel",
+    "configureApiWarning": "⚠️ Please configure API service first",
+    "chatHistory": "Chat History ({{count}})",
+    "clearChat": "Clear Chat",
+    "startChat": "Start a conversation with AI assistant",
+    "configureApiFirst": "Please configure API service in settings first",
+    "you": "You",
+    "ai": "AI",
+    "turnNumber": "Turn {{num}}",
+    "aiReplying": "AI is replying...",
+    "contextHintNone": "No document content attached",
+    "contextHintWith": "Use \"{{label}}\" as AI context",
+    "chatPlaceholderContext": "Chat about \"{{label}}\"...",
+    "chatPlaceholderNone": "Just chat...",
+    "attachmentRef": "Attachment reference materials"
+  },
+  "settings": {
+    "title": "Settings",
+    "editor": "Editor",
+    "appearance": "Appearance",
+    "language": "Language",
+    "theme": "Theme",
+    "advanced": "Advanced",
+    "aboutTab": "About",
+    "editorSettings": {
+      "title": "Editor Settings",
+      "fontSize": "Font Size",
+      "lineHeight": "Line Height",
+      "tabSize": "Tab Size",
+      "autoSave": "Auto Save",
+      "autoSaveInterval": "Auto Save Interval",
+      "seconds": "seconds",
+      "showLineNumbers": "Show Line Numbers",
+      "wordWrap": "Word Wrap",
+      "spellCheck": "Spell Check"
+    },
+    "appearanceSettings": {
+      "title": "Appearance Settings",
+      "theme": "Theme",
+      "themeLight": "Light",
+      "themeDark": "Dark",
+      "themeAuto": "Auto",
+      "layout": "Layout",
+      "layoutVertical": "Vertical",
+      "layoutHorizontal": "Horizontal",
+      "fontSize": "UI Font Size",
+      "sidebarWidth": "Sidebar Width",
+      "chatPanelWidth": "Chat Panel Width"
+    },
+    "languageSettings": {
+      "title": "Language Settings",
+      "select": "Select Language",
+      "chinese": "中文",
+      "english": "English",
+      "japanese": "日本語",
+      "restartRequired": "It's recommended to restart the app after changing language for best experience"
+    },
+    "advancedSettings": {
+      "title": "Advanced Settings",
+      "dataPath": "Data Path",
+      "logPath": "Log Path",
+      "version": "Version",
+      "debugMode": "Debug Mode",
+      "experimentalFeatures": "Experimental Features",
+      "clearCache": "Clear Cache",
+      "resetSettings": "Reset Settings",
+      "exportSettings": "Export Settings",
+      "importSettings": "Import Settings"
+    },
+    "about": {
+      "title": "About AiDocPlus",
+      "version": "Version",
+      "description": "AI-powered intelligent document creation tool",
+      "website": "Official Website",
+      "websiteUrl": "https://AiDocPlus.com",
+      "docs": "Documentation",
+      "github": "GitHub Repository",
+      "license": "License"
+    },
+    "saved": "Settings saved",
+    "reset": "Settings reset",
+    "importSuccess": "Settings imported",
+    "exportSuccess": "Settings exported",
+    "cacheCleared": "Cache cleared",
+    "templateTab": "Templates",
+    "emailTab": "Email",
+    "templateManagement": "Template Management",
+    "templateManagementDesc": "Manage document templates. Save current document as template via \"File → Save as Template\", or create documents from templates via \"File → New from Template\".",
+    "openTemplateManager": "Open Template Manager",
+    "templateUsage": "How to Use",
+    "templateUsageStep1": "1. After editing a document, click the template button in toolbar or menu \"File → Save as Template\"",
+    "templateUsageStep2": "2. Set template name, category, and choose content to retain",
+    "templateUsageStep3": "3. When creating a new document, use \"File → New from Template\" (⌘⇧T) to select a template",
+    "templateUsageStep4": "4. Templates are stored in ~/AiDocPlus/Templates/ directory",
+    "editorFont": "Editor Font",
+    "fontSystemDefault": "System Default",
+    "fontPingFang": "PingFang / Microsoft YaHei",
+    "fontNotoSans": "Noto Sans",
+    "fontNotoSerif": "Noto Serif",
+    "fontSongti": "Songti",
+    "fontKaiti": "Kaiti",
+    "fontJetBrains": "Monospace (JetBrains Mono)",
+    "fontCascadia": "Monospace (Cascadia Code)",
+    "fontApplyHint": "Applied to editor and preview areas",
+    "editorFeatures": "Editor Features",
+    "highlightActiveLine": "Highlight Active Line",
+    "highlightActiveLineDesc": "Highlight the line where the cursor is",
+    "bracketMatching": "Bracket Matching",
+    "bracketMatchingDesc": "Highlight matching brackets",
+    "closeBrackets": "Auto Close Brackets",
+    "closeBracketsDesc": "Automatically close brackets when typing",
+    "codeFolding": "Code Folding",
+    "codeFoldingDesc": "Show fold/unfold buttons next to line numbers",
+    "highlightSelMatches": "Highlight Selection Matches",
+    "highlightSelMatchesDesc": "Highlight text matching the current selection",
+    "autocompletion": "Auto Completion",
+    "autocompletionDesc": "Show Markdown syntax suggestions while typing",
+    "multiCursor": "Multi-Cursor Editing",
+    "multiCursorDesc": "Hold Alt and drag to create rectangular selections",
+    "scrollPastEnd": "Scroll Past End",
+    "scrollPastEndDesc": "Allow scrolling past the last line of the document",
+    "indentOnInput": "Auto Indent",
+    "indentOnInputDesc": "Automatically adjust indentation when typing certain characters",
+    "markdownLint": "Markdown Lint",
+    "markdownLintDesc": "Check heading levels, empty links, unclosed code blocks in real-time",
+    "defaultViewMode": "Default View Mode",
+    "viewEdit": "Edit",
+    "viewPreview": "Preview",
+    "viewSplit": "Split",
+    "defaultViewModeDesc": "Default display mode when opening documents",
+    "toolbarButtons": "Toolbar Buttons",
+    "toolbarButtonsDesc": "Choose which button groups to show in the editor toolbar",
+    "toolbar": {
+      "undo": "Undo",
+      "redo": "Redo",
+      "copy": "Copy",
+      "cut": "Cut",
+      "paste": "Paste",
+      "clearAll": "Clear All",
+      "headings": "Headings",
+      "bold": "Bold",
+      "italic": "Italic",
+      "strikethrough": "Strikethrough",
+      "inlineCode": "Inline Code",
+      "clearFormat": "Clear Format",
+      "unorderedList": "Unordered List",
+      "orderedList": "Ordered List",
+      "taskList": "Task List",
+      "quote": "Quote",
+      "horizontalRule": "Horizontal Rule",
+      "link": "Link",
+      "image": "Image",
+      "table": "Table",
+      "footnote": "Footnote",
+      "codeBlock": "Code Block",
+      "mermaid": "Mermaid Diagram",
+      "math": "Math Formula",
+      "importFile": "Import File",
+      "goToTop": "Scroll to Top",
+      "goToBottom": "Scroll to Bottom"
+    },
+    "aiServiceConfig": "AI Service Configuration",
+    "createApiService": "Create API Service",
+    "noAiServices": "No AI services configured yet",
+    "noAiServicesHint": "Click \"Create API Service\" button above to add one",
+    "glmGuide": {
+      "title": "🎁 New User Bonus: 20M Free Tokens from Zhipu AI",
+      "subtitle": "Register on Zhipu AI platform to get a free API Key and start exploring",
+      "step1": "Visit Zhipu AI Platform",
+      "step2": "Click 'Register/Login' in the top right corner, sign up with WeChat or phone",
+      "step3": "Go to 'User Center' → 'API Keys' → Click 'Create New API Key'",
+      "step4": "Copy the API Key and click 'Configure Now' below to paste it",
+      "openPlatform": "Open Zhipu Platform",
+      "configureNow": "Configure Now"
+    },
+    "inUse": "In Use",
+    "modelLabel": "Model: {{model}}",
+    "defaultModel": "Default Model",
+    "noKeyWarning": "⚠️ No Key configured",
+    "enable": "Enable",
+    "disable": "Disable",
+    "edit": "Edit",
+    "delete": "Delete",
+    "globalSettings": "Global Settings",
+    "streamingOutput": "Streaming Output",
+    "streamingOutputDesc": "AI replies will be displayed word by word when enabled",
+    "enableThinking": "Deep Thinking",
+    "enableThinkingDesc": "When enabled, supported models will show reasoning/thinking process (Qwen/DeepSeek/Claude, etc.)",
+    "forceMarkdown": "Force Markdown Output",
+    "forceMarkdownDesc": "AI will always return content in clean Markdown format without unnecessary preamble",
+    "markdownPromptPlaceholder": "Markdown format constraint prompt...",
+    "systemPromptLabel": "System Prompt",
+    "systemPromptOptional": "(Optional)",
+    "systemPromptPlaceholder": "Optional, leave empty to not add extra system prompt...",
+    "pluginContentLimit": "Plugin Content Limit",
+    "pluginContentLimitDesc": "Max characters of content sent to AI by plugins, 0 means no limit",
+    "pluginContentLimitPlaceholder": "0 (No limit)",
+    "createApiServiceTitle": "Create API Service",
+    "editApiServiceTitle": "Edit API Service",
+    "serviceNameLabel": "Service Name",
+    "serviceNameOptional": "(Optional, auto-named if empty)",
+    "serviceNamePlaceholder": "e.g., My GPT Service",
+    "providerLabel": "Provider",
+    "apiKeyRequired": "API Key",
+    "apiKeyRequiredMark": "*Required",
+    "modelSelectPlaceholder": "Select preset model...",
+    "customModel": "Custom model...",
+    "modelIdLabel": "Model ID (actual API value, can be manually edited)",
+    "modelIdPlaceholder": "Enter model ID, e.g. kimi-k2.5",
+    "baseUrlPlaceholder": "Enter Base URL",
+    "testing": "Testing...",
+    "testConnection": "Test Connection",
+    "cancel": "Cancel",
+    "save": "Save",
+    "emailAccountConfig": "Email Account Configuration",
+    "addEmailAccount": "Add Email Account",
+    "noEmailAccounts": "No email accounts configured yet",
+    "noEmailAccountsHint": "Click \"Add Email Account\" button above to add one",
+    "emailProviderSupport": "Supports NetEase 163, 126, China Mobile 139, QQ Mail, Gmail, Outlook, etc.",
+    "customProvider": "Custom",
+    "noEmailConfigured": "No email address configured",
+    "noAuthCodeWarning": "⚠️ No auth code configured",
+    "emailUsageTitle": "Instructions",
+    "emailUsageStep1": "1. SMTP server address and port will auto-fill after selecting a provider",
+    "emailUsageStep2": "2. Most email services require enabling SMTP and obtaining an auth code (not login password)",
+    "emailUsageStep3": "3. After configuration, click \"Test Connection\" to verify settings",
+    "emailUsageStep4": "4. Configured accounts can be used directly in the email sending plugin",
+    "addEmailAccountTitle": "Add Email Account",
+    "editEmailAccountTitle": "Edit Email Account",
+    "accountNameLabel": "Account Name",
+    "accountNameOptional": "(Optional, auto-named if empty)",
+    "accountNamePlaceholder": "e.g., My Work Email",
+    "emailProviderLabel": "Email Provider",
+    "emailAddressLabel": "Email Address",
+    "emailAddressRequired": "*Required",
+    "smtpAuthCodeLabel": "SMTP Auth Code",
+    "smtpAuthCodeRequired": "*Required",
+    "smtpAuthCodePlaceholder": "SMTP auth code (not login password)",
+    "senderNameLabel": "Sender Display Name",
+    "senderNameOptional": "(Optional)",
+    "senderNamePlaceholder": "Name shown to recipients",
+    "smtpServerSettings": "SMTP Server Settings (auto-filled after selecting provider, can be manually edited)",
+    "smtpAddress": "SMTP Address",
+    "smtpPort": "Port",
+    "smtpEncryption": "Encryption",
+    "noEncryption": "No Encryption",
+    "pluginCategoryContentGen": "Content Generation",
+    "pluginCategoryFunctional": "Functional",
+    "pluginUsageCount": "Used {{count}} time(s)",
+    "noMatchingPlugins": "No matching plugins found",
+    "plugins": "Plugins",
+    "pluginsSettings": {
+      "builtin": "Built-in",
+      "custom": "Custom",
+      "description": "Manage document processing plugins. Plugins can post-process document content, such as generating PPT, mind maps, etc.",
+      "enabled": "Enabled",
+      "noPlugins": "No plugins available",
+      "searchPlaceholder": "Search plugins...",
+      "title": "Plugin Management",
+      "usage": "How to use",
+      "usageStep1": "1. Click the 🧩 plugin button in the editor toolbar",
+      "usageStep2": "2. Select a plugin from the dropdown menu",
+      "usageStep3": "3. The plugin panel will replace the editor area. Click \"Back to Editor\" to exit"
+    },
+    "resetConfirm": "Are you sure you want to reset all settings to default?",
+    "templateManager": {
+      "add": "Add",
+      "addCategory": "Add Category",
+      "all": "All",
+      "builtin": "Built-in",
+      "cancel": "Cancel",
+      "categoryKeyPlaceholder": "Category key (e.g. proposal)",
+      "categoryLabelPlaceholder": "Display name (e.g. Proposal)",
+      "categoryNamePlaceholder": "Category name",
+      "confirmDelete": "Confirm Delete",
+      "confirmDeleteCategory": "Delete \"{{name}}\"?",
+      "copy": "Copy",
+      "copySuffix": "(Copy)",
+      "custom": "Custom",
+      "delete": "Delete",
+      "descriptionPlaceholder": "Description (optional)",
+      "edit": "Edit",
+      "manageCategories": "Manage Categories",
+      "manageCategoriesDesc": "Create, edit, reorder or delete template categories",
+      "moveDown": "Move Down",
+      "moveUp": "Move Up",
+      "noCategories": "No categories",
+      "noMatchingTemplates": "No matching templates",
+      "noTemplates": "No templates",
+      "searchPlaceholder": "Search templates...",
+      "templateNamePlaceholder": "Template name",
+      "title": "Manage Templates"
+    }
+  },
+  "search": {
+    "title": "Search",
+    "placeholder": "Search documents...",
+    "searchInContent": "Search in Content",
+    "searchInTitles": "Search in Titles",
+    "matchCase": "Match Case",
+    "matchWholeWord": "Match Whole Word",
+    "useRegex": "Use Regex",
+    "results": "Results",
+    "noResults": "No results found",
+    "searching": "Searching...",
+    "foundResults": "Found {{count}} result(s)",
+    "searchHistory": "Search History",
+    "clearHistory": "Clear History",
+    "openFile": "Open File",
+    "openInNewTab": "Open in New Tab"
+  },
+  "version": {
+    "title": "Version History",
+    "currentVersion": "Current Version",
+    "versionCount": "{{count}} version(s)",
+    "noVersions": "No version history",
+    "createdAt": "Created",
+    "createdBy": "Created By",
+    "changeDescription": "Change Description",
+    "preview": "Preview",
+    "restore": "Restore",
+    "compare": "Compare",
+    "restoreConfirm": "Are you sure you want to restore to this version?",
+    "restoreBackup": "Create a backup for current state before restoring?",
+    "restoring": "Restoring...",
+    "restored": "Restored to version {{version}}",
+    "compareWith": "Compare with {{version}}",
+    "diffViewer": "Diff Viewer",
+    "noChanges": "No changes",
+    "additions": "Additions",
+    "deletions": "Deletions",
+    "changes": "Changes",
+    "clearSelection": "Clear Selection",
+    "create": "Create Version",
+    "leftVersion": "Earlier Version",
+    "restoreToThis": "Restore to this version",
+    "restoreVersion": "Restore Version",
+    "rightVersion": "Later Version",
+    "selectForCompare": "Select for comparison",
+    "selectToPreview": "Select a version to preview",
+    "sideBySide": "Side by Side",
+    "switchToLeft": "Switch to left version",
+    "unified": "Unified View"
+  },
+  "templates": {
+    "title": "Prompt Templates",
+    "builtin": "Built-in Templates",
+    "custom": "Custom Templates",
+    "createTemplate": "Create Template",
+    "editTemplate": "Edit Template",
+    "deleteTemplate": "Delete Template",
+    "importTemplate": "Import Template",
+    "exportTemplate": "Export Template",
+    "templateName": "Template Name",
+    "templateCategory": "Category",
+    "templateContent": "Template Content",
+    "variables": "Variables",
+    "noTemplates": "No templates",
+    "templateDeleted": "Template deleted",
+    "templateSaved": "Template saved",
+    "templateImported": "Template imported",
+    "templateExported": "Template exported",
+    "allCategories": "All",
+    "category": "Category",
+    "manageCategories": "Manage Categories",
+    "categoryKey": "Category Key (English)",
+    "categoryDisplayName": "Display Name",
+    "categoryIcon": "Icon",
+    "confirmDeleteCategory": "Are you sure you want to delete this category? Templates in this category will not be deleted.",
+    "clickToPreview": "Click a template to preview",
+    "useTemplate": "Use This Template",
+    "openManager": "Manage Prompt Templates",
+    "import": "Import",
+    "export": "Export",
+    "importTitle": "Import Templates (ZIP)",
+    "exportTitle": "Export Custom Templates",
+    "importFailed": "Import failed",
+    "exportFailed": "Export failed",
+    "importResult": "Import complete: {{total}} templates total, {{imported}} imported, {{skipped}} skipped (already exist)",
+    "noCustomTemplates": "No custom templates",
+    "confirmDelete": "Are you sure you want to delete this template?",
+    "saveAsTemplate": "Save as Template",
+    "saveAsDescription": "Save the current document as a reusable template",
+    "templateNameLabel": "Template Name",
+    "templateNamePlaceholder": "Enter template name",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "Brief description of template purpose (optional)",
+    "categoryLabel": "Category",
+    "retainContent": "Retain Content",
+    "retainPrompt": "Prompt",
+    "retainPluginSettings": "Plugin Settings",
+    "retainMaterial": "Material Content",
+    "retainMainContent": "Main Content",
+    "retainPluginData": "Plugin Data",
+    "cancel": "Cancel",
+    "saving": "Saving...",
+    "saveTemplate": "Save Template",
+    "creating": "Creating...",
+    "createFromTemplate": "Create from Template",
+    "createBlankDoc": "Create Blank Document",
+    "confirmDeleteCategoryNamed": "Delete \"{{name}}\"?",
+    "delete": "Delete",
+    "builtinTag": "Built-in",
+    "customTag": "Custom",
+    "editCategory": "Edit",
+    "deleteCategory": "Delete",
+    "createFailed": "Creation failed: {{error}}",
+    "manageCategoriesTitle": "Manage Template Categories",
+    "manageCategoriesDesc": "Create, edit, sort, or delete template categories. Drag to reorder.",
+    "categoryNamePlaceholder": "Category name",
+    "noCategories": "No categories",
+    "categoryKeyPlaceholder": "Category key (e.g. proposal)",
+    "categoryLabelPlaceholder": "Display name (e.g. Proposal)",
+    "addCategory": "Add Category",
+    "add": "Add",
+    "promptPlaceholder": "Enter prompt template content...",
+    "newFromTemplate": "New Document from Template",
+    "docTitle": "Document Title",
+    "docTitlePlaceholder": "Enter document title (leave empty to use template name)",
+    "all": "All",
+    "searchPlaceholder": "Search templates...",
+    "blankDocument": "Blank Document",
+    "blankDocumentDesc": "Create a blank document",
+    "noMatchingTemplates": "No matching templates",
+    "noTemplatesHint": "No templates yet. Create one via \"Save as Template\"",
+    "pluginCount": "{{count}} plugin(s)",
+    "untitledDocument": "Untitled Document",
+    "categories": {
+      "editing": "Editing & Processing",
+      "official": "Official Documents",
+      "travel": "Travel",
+      "creative": "Creative Writing",
+      "humor": "Humor",
+      "business": "Business & Office",
+      "learning": "Learning & Education",
+      "daily": "Daily Life",
+      "translation": "Translation",
+      "speech": "Speech & Presentation",
+      "marketing": "Marketing Copy",
+      "academic": "Academic Writing",
+      "tech": "Technical Docs",
+      "life": "Life Journal",
+      "career": "Career Growth",
+      "event": "Event Planning",
+      "essay": "Essay",
+      "exam-grad": "Graduate Exam",
+      "exam-civil": "Civil Service Exam",
+      "exam-abroad": "Study Abroad Exam",
+      "health": "Health & Wellness",
+      "literature": "Literature"
+    },
+    "builtinTemplates": {
+      "polish-pro": {
+        "name": "Professional Polish",
+        "description": "Professional text polishing to enhance language quality and expression"
+      },
+      "summarize-pro": {
+        "name": "Smart Summary",
+        "description": "Multi-level structured summary with one-sentence overview and key points"
+      },
+      "expand": {
+        "name": "Expand Content",
+        "description": "Expand brief content into more detailed descriptions"
+      },
+      "rewrite": {
+        "name": "Rewrite Content",
+        "description": "Rephrase content in a different way"
+      },
+      "translate": {
+        "name": "Translate Content",
+        "description": "Translate content to specified language"
+      },
+      "translate-polish": {
+        "name": "Translation Polish",
+        "description": "Polish translated text to make it more natural and native"
+      },
+      "business-email-formal": {
+        "name": "Formal Business Email",
+        "description": "Formal business email for client communication and partnerships"
+      },
+      "business-weekly-report": {
+        "name": "Weekly Report",
+        "description": "Structured weekly report with completed work, issues, and plans"
+      },
+      "business-project-proposal": {
+        "name": "Project Proposal",
+        "description": "Complete project plan with background, goals, implementation, and risks"
+      },
+      "business-resume": {
+        "name": "Job Resume",
+        "description": "Professional resume highlighting core strengths and quantified achievements"
+      },
+      "marketing-product-desc": {
+        "name": "Product Description",
+        "description": "E-commerce product copy highlighting selling points and use cases"
+      },
+      "marketing-social-media": {
+        "name": "Social Media Copy",
+        "description": "Social media copy adapted for WeChat/Weibo/Xiaohongshu platforms"
+      },
+      "marketing-ad-copy": {
+        "name": "Ad Copy",
+        "description": "SEM/feed advertising copy focused on conversion"
+      },
+      "academic-paper-outline": {
+        "name": "Paper Outline",
+        "description": "Academic paper outline with complete chapter structure"
+      },
+      "academic-literature-review": {
+        "name": "Literature Review",
+        "description": "Systematic literature review analyzing research status and gaps"
+      },
+      "daily-cover-letter": {
+        "name": "Cover Letter",
+        "description": "Cover letter highlighting capability match and motivation"
+      },
+      "daily-complaint-letter": {
+        "name": "Complaint Letter",
+        "description": "Reasonable complaint letter with well-founded demands"
+      },
+      "tech-api-doc": {
+        "name": "API Documentation",
+        "description": "RESTful API documentation with parameters, examples, and error codes"
+      },
+      "tech-readme": {
+        "name": "Project README",
+        "description": "Open source README with installation, usage, and contribution guide"
+      },
+      "gongwen": {
+        "name": "Official Document (General)",
+        "description": "Official document following GB/T 9704 formatting standards"
+      },
+      "gongwen-personal-summary": {
+        "name": "Annual Personal Summary",
+        "description": "Annual personal work summary with review, achievements, and plans"
+      },
+      "gongwen-unit-summary": {
+        "name": "Annual Unit Summary",
+        "description": "Annual department/unit work summary"
+      },
+      "gongwen-meeting-statement": {
+        "name": "Meeting Statement",
+        "description": "Meeting statement speech with clear stance and specific measures"
+      },
+      "gongwen-meeting-typical": {
+        "name": "Typical Experience Speech",
+        "description": "Experience sharing speech with replicable practices"
+      },
+      "gongwen-work-report": {
+        "name": "Work Report",
+        "description": "Progressive work report"
+      },
+      "gongwen-notice": {
+        "name": "Notice",
+        "description": "Work arrangement/notification"
+      },
+      "lit-prose": {
+        "name": "Prose",
+        "description": "Lyrical or narrative prose with beautiful language"
+      },
+      "lit-novel-chapter": {
+        "name": "Novel Chapter",
+        "description": "Novel chapter with vivid characters and engaging plot"
+      },
+      "lit-poem-modern": {
+        "name": "Modern Poetry",
+        "description": "Free verse poetry with novel imagery"
+      },
+      "lit-book-review": {
+        "name": "Book Review",
+        "description": "Book review with analysis and insights"
+      },
+      "essay-narrative": {
+        "name": "Narrative Essay",
+        "description": "Narrative essay with complete elements and vivid descriptions"
+      },
+      "essay-argumentative": {
+        "name": "Argumentative Essay",
+        "description": "Argumentative essay with clear thesis and supporting evidence"
+      },
+      "essay-descriptive": {
+        "name": "Descriptive Essay",
+        "description": "Descriptive essay with detailed observations"
+      },
+      "essay-letter": {
+        "name": "Letter/Application",
+        "description": "Letter or application with proper format"
+      },
+      "humor-sketch": {
+        "name": "Comedy Sketch",
+        "description": "Comedy sketch script with punchlines and twists"
+      },
+      "humor-roast": {
+        "name": "Roast Jokes",
+        "description": "Roast-style jokes collection with sharp observations"
+      },
+      "humor-parody": {
+        "name": "Parody",
+        "description": "Parody of classic works with modern twist"
+      },
+      "humor-crosstalk": {
+        "name": "Crosstalk/Stand-up",
+        "description": "Crosstalk or stand-up comedy script with well-timed punchlines"
+      },
+      "editing-grammar-check": {
+        "name": "Grammar Check",
+        "description": "Grammar error detection and correction"
+      },
+      "editing-rewrite-plagiarism": {
+        "name": "Plagiarism Rewrite",
+        "description": "Paper plagiarism reduction rewriting"
+      },
+      "editing-style-convert": {
+        "name": "Style Conversion",
+        "description": "Formal/casual/academic style conversion"
+      },
+      "editing-proofread": {
+        "name": "Content Proofreading",
+        "description": "Fact checking and logical proofreading"
+      },
+      "editing-keywords": {
+        "name": "Keyword Extraction",
+        "description": "Extract article keywords"
+      },
+      "editing-title-generate": {
+        "name": "Title Generation",
+        "description": "Generate title from content"
+      },
+      "business-meeting-minutes": {
+        "name": "Meeting Minutes",
+        "description": "Meeting records and key points"
+      },
+      "business-invitation": {
+        "name": "Business Invitation",
+        "description": "Business event invitation letter"
+      },
+      "business-partnership": {
+        "name": "Partnership Proposal",
+        "description": "Partnership/business plan"
+      },
+      "business-contract-review": {
+        "name": "Contract Review",
+        "description": "Contract key points review"
+      },
+      "business-prd": {
+        "name": "Product Requirements Doc",
+        "description": "PRD document template"
+      },
+      "business-user-research": {
+        "name": "User Research",
+        "description": "User research report"
+      },
+      "business-competitor-analysis": {
+        "name": "Competitor Analysis",
+        "description": "Competitor analysis report"
+      },
+      "business-data-report": {
+        "name": "Data Report",
+        "description": "Business data analysis report"
+      },
+      "learning-paper-writing": {
+        "name": "Paper Writing",
+        "description": "Academic paper writing guide"
+      },
+      "learning-citation": {
+        "name": "Citation Format",
+        "description": "Literature citation format standards"
+      },
+      "learning-lab-report": {
+        "name": "Lab Report",
+        "description": "Lab report template"
+      },
+      "learning-online-notes": {
+        "name": "Online Learning Notes",
+        "description": "Online course note-taking methods"
+      },
+      "daily-leave-request": {
+        "name": "Leave Request",
+        "description": "Various leave applications"
+      },
+      "daily-thank-you": {
+        "name": "Thank You Letter",
+        "description": "Thank you letter/email"
+      },
+      "daily-apology": {
+        "name": "Apology Letter",
+        "description": "Apology letter/email"
+      },
+      "daily-invitation-personal": {
+        "name": "Personal Invitation",
+        "description": "Personal event invitation"
+      },
+      "daily-congratulation": {
+        "name": "Congratulation Letter",
+        "description": "Congratulation letter/email"
+      },
+      "daily-recommendation-personal": {
+        "name": "Personal Recommendation",
+        "description": "Personal recommendation letter"
+      },
+      "daily-sympathy": {
+        "name": "Sympathy Letter",
+        "description": "Sympathy letter/message"
+      },
+      "daily-lost-found": {
+        "name": "Lost & Found Notice",
+        "description": "Lost item/found item notice"
+      },
+      "translation-terminology": {
+        "name": "Terminology Translation",
+        "description": "Professional terminology translation"
+      },
+      "translation-colloquial": {
+        "name": "Colloquial Translation",
+        "description": "Natural colloquial translation"
+      },
+      "translation-subtitle": {
+        "name": "Subtitle Translation",
+        "description": "Video subtitle translation"
+      },
+      "translation-business": {
+        "name": "Business Translation",
+        "description": "Business document translation"
+      },
+      "speech-product-launch": {
+        "name": "Product Launch Speech",
+        "description": "Product launch presentation"
+      },
+      "speech-annual-party": {
+        "name": "Annual Party Speech",
+        "description": "Annual meeting/summary speech"
+      },
+      "marketing-soft-article": {
+        "name": "Soft Article",
+        "description": "Marketing soft article"
+      },
+      "marketing-short-video": {
+        "name": "Short Video Script",
+        "description": "Short video content script"
+      },
+      "marketing-live-stream": {
+        "name": "Live Stream Script",
+        "description": "Live streaming sales script"
+      },
+      "marketing-promotion": {
+        "name": "Promotion Copy",
+        "description": "Promotional activity copy"
+      },
+      "marketing-brand-story": {
+        "name": "Brand Story",
+        "description": "Brand story writing"
+      },
+      "marketing-review-reply": {
+        "name": "Review Reply",
+        "description": "Customer review reply template"
+      },
+      "marketing-email": {
+        "name": "Email Marketing",
+        "description": "Marketing email template"
+      },
+      "gongwen-qingshi": {
+        "name": "Request for Instructions",
+        "description": "Request for instructions document"
+      },
+      "gongwen-pifu": {
+        "name": "Official Reply",
+        "description": "Official reply document"
+      },
+      "gongwen-han": {
+        "name": "Official Letter",
+        "description": "Official letter/correspondence"
+      },
+      "gongwen-jiyao": {
+        "name": "Meeting Minutes",
+        "description": "Official meeting minutes"
+      },
+      "gongwen-jianbao": {
+        "name": "Briefing",
+        "description": "Work briefing"
+      },
+      "academic-abstract": {
+        "name": "Abstract Writing",
+        "description": "Paper abstract writing"
+      },
+      "academic-introduction": {
+        "name": "Introduction Writing",
+        "description": "Paper introduction writing"
+      },
+      "academic-conclusion": {
+        "name": "Conclusion Writing",
+        "description": "Paper conclusion writing"
+      },
+      "academic-reference": {
+        "name": "Reference Format",
+        "description": "Reference citation standards"
+      },
+      "academic-email": {
+        "name": "Academic Email",
+        "description": "Academic email template"
+      },
+      "academic-cover-letter": {
+        "name": "Cover Letter",
+        "description": "Journal submission cover letter"
+      },
+      "tech-design-doc": {
+        "name": "Technical Design Doc",
+        "description": "Technical design document"
+      },
+      "tech-deployment": {
+        "name": "Deployment Guide",
+        "description": "Deployment guide"
+      },
+      "tech-changelog": {
+        "name": "Changelog",
+        "description": "CHANGELOG"
+      },
+      "tech-user-manual": {
+        "name": "User Manual",
+        "description": "User manual"
+      },
+      "tech-code-comment": {
+        "name": "Code Comment",
+        "description": "Code comment standards"
+      },
+      "tech-test-case": {
+        "name": "Test Case",
+        "description": "Test case document"
+      },
+      "life-finance": {
+        "name": "Finance Record",
+        "description": "Income and expense record template"
+      },
+      "life-time-log": {
+        "name": "Time Log",
+        "description": "Time tracking record"
+      },
+      "event-wedding": {
+        "name": "Wedding Planning",
+        "description": "Wedding planning proposal"
+      },
+      "event-birthday": {
+        "name": "Birthday Party",
+        "description": "Birthday party planning"
+      },
+      "event-online": {
+        "name": "Online Event",
+        "description": "Online event planning"
+      },
+      "travel-family": {
+        "name": "Family Travel Guide",
+        "description": "Family travel guide"
+      },
+      "travel-roadtrip": {
+        "name": "Road Trip Guide",
+        "description": "Road trip guide"
+      },
+      "essay-expository": {
+        "name": "Expository Essay",
+        "description": "Expository essay writing"
+      },
+      "essay-reading-response": {
+        "name": "Reading Response",
+        "description": "Reading response writing"
+      },
+      "essay-movie-response": {
+        "name": "Movie Review",
+        "description": "Movie review writing"
+      },
+      "essay-speech-draft": {
+        "name": "Speech Draft",
+        "description": "Speech draft writing"
+      },
+      "essay-investigation": {
+        "name": "Investigation Report",
+        "description": "Investigation report writing"
+      },
+      "essay-imagination": {
+        "name": "Imaginative Essay",
+        "description": "Imaginative essay writing"
+      },
+      "exam-grad-adjustment": {
+        "name": "Grad Exam Adjustment",
+        "description": "Adjustment application and communication"
+      },
+      "exam-grad-interview": {
+        "name": "Interview Q&A",
+        "description": "Common interview questions"
+      },
+      "exam-civil-short-answer": {
+        "name": "Essay Short Questions",
+        "description": "Summary and analysis questions"
+      },
+      "exam-civil-doc-writing": {
+        "name": "Document Writing",
+        "description": "Essay document writing"
+      },
+      "exam-civil-hot-topics": {
+        "name": "Interview Hot Topics",
+        "description": "Interview hot topic analysis"
+      },
+      "exam-civil-group-discussion": {
+        "name": "Group Discussion",
+        "description": "Leaderless group discussion"
+      },
+      "exam-civil-medical-check": {
+        "name": "Medical & Background Check",
+        "description": "Medical and background check preparation"
+      },
+      "exam-abroad-toefl-speaking": {
+        "name": "TOEFL Speaking",
+        "description": "TOEFL speaking template"
+      },
+      "exam-abroad-toefl-writing": {
+        "name": "TOEFL Writing",
+        "description": "TOEFL writing template"
+      },
+      "exam-abroad-ielts-reading": {
+        "name": "IELTS Reading",
+        "description": "IELTS reading skills"
+      },
+      "exam-abroad-gmat": {
+        "name": "GMAT Prep",
+        "description": "GMAT preparation plan"
+      },
+      "lit-ancient-poetry": {
+        "name": "Classical Poetry",
+        "description": "Classical poetry creation"
+      },
+      "lit-ci-poetry": {
+        "name": "Ci Poetry",
+        "description": "Ci poetry writing"
+      },
+      "lit-couplet": {
+        "name": "Couplet",
+        "description": "Couplet creation"
+      },
+      "lit-micro-fiction": {
+        "name": "Micro Fiction",
+        "description": "Micro fiction creation"
+      },
+      "humor-dad-jokes": {
+        "name": "Dad Jokes",
+        "description": "Dad jokes creation"
+      },
+      "humor-meme-text": {
+        "name": "Meme Text",
+        "description": "Meme caption text"
+      },
+      "career-plan": {
+        "name": "Career Plan",
+        "description": "Career development direction and goal planning"
+      },
+      "career-interview": {
+        "name": "Interview Q&A",
+        "description": "Common interview questions and answers"
+      },
+      "career-resume-optimize": {
+        "name": "Resume Optimization",
+        "description": "Resume diagnosis and optimization suggestions"
+      },
+      "career-salary-negotiate": {
+        "name": "Salary Negotiation",
+        "description": "Salary negotiation strategies and scripts"
+      },
+      "career-resignation": {
+        "name": "Resignation Communication",
+        "description": "Resignation application and handover communication"
+      },
+      "career-promotion": {
+        "name": "Promotion Application",
+        "description": "Promotion application and presentation"
+      },
+      "career-feedback": {
+        "name": "Performance Feedback",
+        "description": "Performance review and feedback"
+      },
+      "career-mentoring": {
+        "name": "Mentor Communication",
+        "description": "Communication with supervisor/mentor"
+      },
+      "career-network": {
+        "name": "Professional Networking",
+        "description": "Professional networking and business cards"
+      },
+      "career-worklife": {
+        "name": "Work-Life Balance",
+        "description": "Work-life balance advice"
+      },
+      "creative-script": {
+        "name": "Script Writing",
+        "description": "Short drama/microfilm script"
+      },
+      "creative-lyrics": {
+        "name": "Lyrics Writing",
+        "description": "Various style lyrics"
+      },
+      "creative-poetry": {
+        "name": "Poetry Writing",
+        "description": "Modern/classical poetry"
+      },
+      "creative-story": {
+        "name": "Story Writing",
+        "description": "Short story fiction"
+      },
+      "creative-slogan": {
+        "name": "Slogan",
+        "description": "Promotional slogan/tagline"
+      },
+      "creative-naming": {
+        "name": "Creative Naming",
+        "description": "Brand/product/character naming"
+      },
+      "creative-ad-idea": {
+        "name": "Ad Creative",
+        "description": "Advertising creative ideation"
+      },
+      "creative-plot": {
+        "name": "Plot Outline",
+        "description": "Film/novel plot outline"
+      },
+      "health-diet-plan": {
+        "name": "Diet Plan",
+        "description": "Healthy diet plan development"
+      },
+      "health-workout": {
+        "name": "Workout Plan",
+        "description": "Fitness exercise plan"
+      },
+      "health-mental": {
+        "name": "Mental Wellness",
+        "description": "Mental health advice"
+      },
+      "health-sleep": {
+        "name": "Sleep Improvement",
+        "description": "Sleep quality improvement plan"
+      },
+      "health-recipe": {
+        "name": "Healthy Recipe",
+        "description": "Nutritious recipe recommendation"
+      },
+      "health-habit": {
+        "name": "Health Habits",
+        "description": "Healthy habit building plan"
+      },
+      "health-check": {
+        "name": "Checkup Interpretation",
+        "description": "Medical checkup report interpretation"
+      },
+      "health-weight": {
+        "name": "Weight Management",
+        "description": "Weight loss/gain plan"
+      }
+    },
+    "categoryArticle": "Article",
+    "categoryCreative": "Creative Writing",
+    "categoryEmailDraft": "Email Draft",
+    "categoryGeneral": "General",
+    "categoryMeeting": "Meeting Notes",
+    "categoryReport": "Report",
+    "categoryTechnical": "Technical Docs"
+  },
+  "conversations": {
+    "title": "Conversation Manager",
+    "newConversation": "New Conversation",
+    "deleteConversation": "Delete Conversation",
+    "renameConversation": "Rename Conversation",
+    "search": "Search Conversations",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "lastWeek": "Last Week",
+    "lastMonth": "Last Month",
+    "older": "Older",
+    "noConversations": "No conversations",
+    "conversationCount": "{{count}} conversation(s)",
+    "confirmDelete": "Are you sure you want to delete this conversation?",
+    "deleted": "Conversation deleted",
+    "renamed": "Conversation renamed",
+    "messages": "messages",
+    "noDocumentSelected": "Please select a document first",
+    "pin": "Pin",
+    "unpin": "Unpin"
+  },
+  "shortcuts": {
+    "title": "Keyboard Shortcuts",
+    "reference": "Shortcuts Reference",
+    "description": "Keyboard shortcuts",
+    "search": "Global Search",
+    "save": "Save",
+    "saveAll": "Save All",
+    "newDocument": "New Document",
+    "newProject": "New Project",
+    "newFromTemplate": "New from Template",
+    "importFile": "Import File",
+    "closeDocument": "Close Document",
+    "toggleSidebar": "Toggle Sidebar",
+    "toggleChat": "Toggle AI Assistant",
+    "toggleLayout": "Toggle Layout",
+    "versionHistory": "Version History",
+    "export": "Export",
+    "settings": "Open Settings",
+    "pressKey": "Press",
+    "or": "or",
+    "catFile": "File",
+    "catEdit": "Edit",
+    "catView": "View",
+    "catTabs": "Tabs",
+    "undo": "Undo",
+    "redo": "Redo",
+    "cut": "Cut",
+    "copy": "Copy",
+    "paste": "Paste",
+    "selectAll": "Select All",
+    "find": "Find",
+    "nextTab": "Next Tab",
+    "prevTab": "Previous Tab",
+    "switchToTab": "Switch to Tab"
+  },
+  "tabs": {
+    "closeTab": "Close Tab",
+    "closeOtherTabs": "Close Other Tabs",
+    "closeAllTabs": "Close All Tabs",
+    "unsavedChanges": "Unsaved Changes",
+    "unsavedConfirm": "\"{{title}}\" has unsaved changes. Save before closing?",
+    "saveAndClose": "Save & Close",
+    "discardAndClose": "Discard",
+    "noOpenDocuments": "No open documents",
+    "selectDocumentHint": "Select a document from the file tree to start editing",
+    "closeRightTabs": "Close Tabs to the Right",
+    "copyDocTitle": "Copy Document Title",
+    "openDocInTree": "Click a document in the file tree to open",
+    "commonShortcuts": "{{mod}}+N New Document · {{mod}}+S Save · {{mod}}+F Find",
+    "versionHistory": "Version History",
+    "moreFeaturesComing": "More features coming soon..."
+  },
+  "projectPicker": {
+    "moveTitle": "Move Document to...",
+    "copyTitle": "Copy Document to...",
+    "noDocument": "Please open a document first",
+    "noProjects": "No other projects available. Create a new project first",
+    "moveDesc": "Move \"{{title}}\" to:",
+    "copyDesc": "Copy \"{{title}}\" to:",
+    "cancel": "Cancel",
+    "processing": "Processing...",
+    "move": "Move",
+    "copy": "Copy",
+    "moveSuccess": "Document \"{{docTitle}}\" has been moved to project \"{{projectName}}\"",
+    "moveSuccessTitle": "Move Successful",
+    "copySuccess": "Document \"{{docTitle}}\" has been copied to project \"{{projectName}}\"",
+    "copySuccessTitle": "Copy Successful",
+    "operationFailed": "Operation failed: {{error}}",
+    "errorTitle": "Error"
+  },
+  "findReplace": {
+    "find": "Find...",
+    "replaceWith": "Replace with...",
+    "noMatch": "No match",
+    "replace": "Replace",
+    "replaceAll": "Replace All",
+    "showReplace": "Show Replace",
+    "hideReplace": "Hide Replace"
+  },
+  "statusBar": {
+    "lines": "lines",
+    "words": "words",
+    "chars": "chars",
+    "selected": "selected",
+    "line": "Ln",
+    "col": "Col",
+    "markdown": "Markdown"
+  },
+  "ai": {
+    "stopGeneration": "Stop Generation",
+    "adopt": "Adopt",
+    "adoptToOriginal": "Adopt main content to source material",
+    "replaceContent": "Replace Source Material",
+    "appendContent": "Append to Source Material",
+    "testConnection": "Test Connection",
+    "testing": "Testing...",
+    "connectionSuccess": "Connection successful",
+    "connectionFailed": "Connection failed",
+    "systemPrompt": "System Prompt",
+    "systemPromptHint": "Custom AI system prompt. Leave empty if not needed.",
+    "configureApiKey": "Please configure API Key first"
+  },
+  "errors": {
+    "general": "An error occurred",
+    "network": "Network error, please check connection",
+    "fileNotFound": "File not found",
+    "saveFailed": "Save failed",
+    "loadFailed": "Load failed",
+    "deleteFailed": "Delete failed",
+    "restoreFailed": "Version restore failed",
+    "invalidInput": "Invalid input",
+    "unauthorized": "Unauthorized",
+    "quotaExceeded": "Quota exceeded",
+    "rateLimited": "Too many requests",
+    "aiError": "AI service error",
+    "unknown": "Unknown error"
+  },
+  "slides": {
+    "pptView": "PPT View",
+    "backToEditor": "Back to Editor",
+    "generatePpt": "Generate PPT",
+    "noSlides": "No Slides Yet",
+    "generateHint": "Click \"Generate PPT\" to let AI create slides from your document content",
+    "slideCount": "Slides",
+    "newSlide": "New Slide",
+    "addSlide": "Add Slide",
+    "deleteSlide": "Delete Slide",
+    "duplicate": "Duplicate",
+    "moveUp": "Move Up",
+    "moveDown": "Move Down",
+    "undo": "Undo",
+    "redo": "Redo",
+    "edit": "Edit",
+    "preview": "Preview",
+    "theme": "Theme",
+    "selectTheme": "Select Theme",
+    "editSlide": "Edit Slide",
+    "layout": "Layout",
+    "title": "Title",
+    "titlePlaceholder": "Slide title",
+    "subtitle": "Subtitle",
+    "subtitlePlaceholder": "Subtitle (optional)",
+    "contentBullets": "Content Bullets",
+    "addBulletPlaceholder": "Add bullet point...",
+    "speakerNotes": "Speaker Notes",
+    "notesPlaceholder": "Speaker notes (optional)",
+    "promptDialogTitle": "Generate PPT",
+    "promptDialogDesc": "Edit the prompt and click Generate. AI will create slides based on your prompt.",
+    "promptTemplate": "Prompt Templates",
+    "promptLabel": "PPT Prompt",
+    "promptPlaceholder": "Describe the PPT content you want to generate...",
+    "slideCountLabel": "Suggested Slides",
+    "slideCountHint": "slides (8-15 recommended)",
+    "startGenerate": "Generate",
+    "stopGenerate": "Stop",
+    "templateManage": "Manage Templates",
+    "templateManagerTitle": "PPT Prompt Template Manager",
+    "templateManagerDesc": "Manage built-in and custom PPT prompt templates. Built-in templates can be copied as custom templates for editing.",
+    "templateNew": "New Template",
+    "templateEdit": "Edit Template",
+    "templateAdd": "New Custom Template",
+    "templateCustom": "Custom Templates",
+    "templateBuiltin": "Built-in Templates",
+    "templateBuiltinBadge": "Built-in",
+    "templatePages": "slides",
+    "templateDeleteConfirm": "Confirm delete?",
+    "templateCopyEdit": "Copy as Custom Template",
+    "templateDelete": "Delete Template",
+    "templateName": "Template Name",
+    "templateTopic": "Default Topic",
+    "templateDesc": "Description",
+    "templateSlideCount": "Suggested Slides",
+    "templatePrompt": "Prompt Template Content (optional, auto-generated if empty)"
+  },
+  "update": {
+    "newVersionAvailable": "New version available",
+    "downloading": "Downloading update...",
+    "readyToRestart": "Update is ready",
+    "upToDate": "Already up to date",
+    "checkFailed": "Failed to check updates",
+    "downloadAndInstall": "Download and install",
+    "restartToApply": "Restart app to apply the update",
+    "restartNow": "Restart now",
+    "currentVersion": "Current version"
+  },
+  "coding": {
+    "loading": "Loading coding area...",
+    "loadingEditor": "Loading editor...",
+    "detecting": "Detecting...",
+    "pythonNotFound": "Python not found",
+    "run": "Run",
+    "running": "Running...",
+    "timedOut": "Timed out",
+    "exitCode": "Exit code",
+    "newScript": "New Script",
+    "openScript": "Open Script",
+    "save": "Save",
+    "saved": "Saved",
+    "closeTab": "Close Tab",
+    "addFavorite": "Add to Favorites",
+    "removeFavorite": "Remove from Favorites",
+    "favorites": "Favorite Scripts",
+    "output": "Output",
+    "clearOutput": "Clear",
+    "settings": "Settings",
+    "pythonPath": "Python Path",
+    "pythonPathPlaceholder": "Leave empty to auto-detect",
+    "timeout": "Timeout",
+    "timeoutUnit": "seconds",
+    "fontSize": "Font Size",
+    "passDocContent": "Pass Document Content",
+    "passDocContentDesc": "Pass current document content via environment variable",
+    "specifyOutput": "Specify Output Path",
+    "specifyOutputDesc": "Pass output file path via environment variable",
+    "outputPath": "Output File Path",
+    "selectOutputPath": "Browse",
+    "extraArgs": "Extra Arguments",
+    "extraArgsPlaceholder": "Extra arguments passed to the script",
+    "scriptsDir": "Scripts Directory",
+    "modified": "modified",
+    "line": "Ln",
+    "col": "Col",
+    "aiPlaceholder": "Describe what you need, AI will auto-generate, run, test and fix code...",
+    "aiAutoRun": "Auto Generate",
+    "aiCancel": "Stop",
+    "aiAssistant": "AI Coding Assistant",
+    "clearChat": "Clear",
+    "toggleAssistant": "AI Assistant",
+    "aiWelcome": "I'm your AI coding assistant\nDescribe your needs, or use the quick actions above",
+    "aiNotConfigured": "Please configure AI service in settings first",
+    "aiThinking": "Thinking...",
+    "aiInputPlaceholder": "Enter your question or request...",
+    "scriptManager": "Script Manager",
+    "refresh": "Refresh",
+    "close": "Close",
+    "noScripts": "No script files",
+    "deleteScript": "Delete Script",
+    "renameScript": "Rename",
+    "renamePrompt": "Enter new file name:",
+    "renamed": "Renamed",
+    "deleted": "Deleted",
+    "confirmDelete": "Are you sure you want to delete this script? This action cannot be undone.",
+    "confirmClose": "This file has unsaved changes. Close anyway?",
+    "copyOutput": "Copy Output",
+    "copy": "Copy",
+    "copied": "Copied",
+    "runCode": "Run Code",
+    "systemPrompt": "System Prompt",
+    "resetPrompt": "Reset to Default",
+    "promptReset": "System prompt reset to default",
+    "modeChat": "Chat",
+    "modeCode": "Code",
+    "modePlan": "Plan",
+    "modeChatDesc": "General Q&A and debugging",
+    "modeCodeDesc": "Generate runnable code directly",
+    "modePlanDesc": "Step-by-step planning for complex tasks",
+    "webSearch": "Web Search",
+    "webSearchUnsupported": "Current model does not support web search",
+    "thinking": "Deep Thinking",
+    "thinkingUnsupported": "Current model does not support deep thinking",
+    "approvePlan": "Approve plan & generate code",
+    "undo": "Undo",
+    "redo": "Redo",
+    "wordWrap": "Word Wrap",
+    "gotoLine": "Go to Line",
+    "go": "Go",
+    "keyboardShortcuts": "Keyboard Shortcuts",
+    "cmdPalette": "Command Palette",
+    "cmdPalettePlaceholder": "Type a command...",
+    "noResults": "No matching commands",
+    "searchReplace": "Search / Replace",
+    "selectNext": "Select Next Match",
+    "toggleComment": "Toggle Comment",
+    "indentDedent": "Indent / Dedent",
+    "runAndScroll": "Run & Scroll to Output",
+    "shortcutsEditor": "Editor",
+    "shortcutsRun": "Run",
+    "closeOtherTabs": "Close Others",
+    "closeTabsToRight": "Close to the Right",
+    "copyPath": "Copy Path",
+    "preview": "Preview",
+    "newFile": "New File",
+    "stop": "Stop",
+    "killed": "Killed",
+    "searchOutput": "Search Output",
+    "prevMatch": "Previous",
+    "nextMatch": "Next",
+    "envVars": "Environment Variables",
+    "addEnvVar": "Add",
+    "envKey": "Key",
+    "envValue": "Value",
+    "runHistory": "Run History",
+    "clearHistory": "Clear",
+    "applyCode": "Apply",
+    "applyAndRun": "Apply & Run",
+    "exportChat": "Export Chat",
+    "diffPreview": "Diff Preview",
+    "fileExplorer": "Files",
+    "newFolder": "New Folder",
+    "refreshTree": "Refresh",
+    "folderName": "Folder name",
+    "fileName": "File name",
+    "emptyDir": "Directory is empty",
+    "welcomeTitle": "Coding Workbench",
+    "welcomeSubtitle": "Create or open a file to start coding",
+    "recentFavorites": "Favorite Files",
+    "editorTheme": "Editor Theme",
+    "themeAuto": "Auto",
+    "themeLight": "Light",
+    "recentFiles": "Recent Files",
+    "globalSearch": "Search",
+    "searchPlaceholder": "Search file contents...",
+    "searchNoResults": "No results found",
+    "searchMatches": "matches",
+    "noHistory": "No run history"
+  }
+}

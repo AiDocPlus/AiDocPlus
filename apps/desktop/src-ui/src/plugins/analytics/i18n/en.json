@@ -1,0 +1,16 @@
+{
+  "title": "Document Analytics",
+  "description": "Statistics on word count, paragraphs, reading time, etc.",
+  "analyze": "Analyze",
+  "analyzing": "Analyzing...",
+  "reanalyze": "Reanalyze",
+  "wordCount": "Words",
+  "charCount": "Characters",
+  "paragraphCount": "Paragraphs",
+  "sentenceCount": "Sentences",
+  "readingTime": "Estimated Reading Time",
+  "minutes": "min",
+  "welcome": "Document Analytics",
+  "welcomeDesc": "Statistics on word count, paragraphs, reading time, and more.",
+  "noContent": "No document content"
+}

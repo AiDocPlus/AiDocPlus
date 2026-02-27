@@ -1,0 +1,19 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440002",
+  "name": "生成测试题",
+  "version": "1.0.0",
+  "description": "根据文档内容 AI 生成单选、多选、判断题",
+  "icon": "ClipboardList",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "content-generation",
+  "subCategory": "ai-text",
+  "category": "ai-text",
+  "tags": [
+    "quiz",
+    "测试",
+    "考试",
+    "题目"
+  ]
+}

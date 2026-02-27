@@ -1,0 +1,21 @@
+{
+  "id": "doc-research-report",
+  "name": "调研分析报告",
+  "description": "市场/用户/行业调研报告，含数据分析和结论建议",
+  "icon": "🔍",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "document-template",
+  "majorCategory": "report",
+  "subCategory": "general",
+  "tags": [],
+  "roles": [
+    "researcher",
+    "product-manager"
+  ],
+  "order": 2,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

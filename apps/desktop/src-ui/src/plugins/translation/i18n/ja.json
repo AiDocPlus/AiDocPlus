@@ -1,0 +1,18 @@
+{
+  "title": "ドキュメント翻訳",
+  "description": "AIがドキュメント内容を複数の言語に翻訳",
+  "generate": "翻訳",
+  "generating": "翻訳中...",
+  "regenerate": "再翻訳",
+  "copy": "コピー",
+  "copied": "コピー済み",
+  "copiedToClipboard": "クリップボードにコピーしました",
+  "emptyContent": "❌ ドキュメント内容が空のため、翻訳できません。",
+  "generateFailed": "❌ 翻訳に失敗しました：{{error}}",
+  "generateSuccess": "翻訳完了",
+  "promptPlaceholder": "翻訳要件を記述...",
+  "defaultPrompt": "ドキュメント内容を英語に翻訳",
+  "welcome": "ドキュメント翻訳",
+  "welcomeDesc": "AIがドキュメント内容をターゲット言語に翻訳します。複数言語に対応。",
+  "systemPrompt": "あなたはプロの翻訳アシスタントです。以下の内容をターゲット言語に翻訳し、元のフォーマットと意味を保持してください。"
+}

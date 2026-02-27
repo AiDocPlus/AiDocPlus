@@ -1,0 +1,19 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440008",
+  "name": "教案生成",
+  "version": "1.0.0",
+  "description": "AI 根据文档内容生成结构化教案",
+  "icon": "BookOpen",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "content-generation",
+  "subCategory": "ai-text",
+  "category": "ai-text",
+  "tags": [
+    "lesson",
+    "教案",
+    "教学",
+    "课程"
+  ]
+}

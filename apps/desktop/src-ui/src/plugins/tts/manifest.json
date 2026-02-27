@@ -1,0 +1,19 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440021",
+  "name": "文本转语音",
+  "version": "1.0.0",
+  "description": "使用浏览器内置语音合成将文档内容朗读出来",
+  "icon": "Volume2",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "functional",
+  "subCategory": "export",
+  "category": "export",
+  "tags": [
+    "tts",
+    "语音",
+    "朗读",
+    "播放"
+  ]
+}

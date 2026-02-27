@@ -1,0 +1,50 @@
+{
+  "id": "kimi",
+  "name": "Kimi / Moonshot 开放平台",
+  "description": "Kimi / Moonshot 开放平台 AI 服务",
+  "icon": "🌙",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "ai-provider",
+  "majorCategory": "china",
+  "subCategory": "general",
+  "tags": [
+    "Kimi / Moonshot 开放平台"
+  ],
+  "order": 10,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z",
+  "baseUrl": "https://api.moonshot.cn/v1",
+  "defaultModel": "kimi-k2.5",
+  "models": [
+    {
+      "id": "kimi-k2.5",
+      "name": "Kimi K2.5（旗舰多模态）"
+    },
+    {
+      "id": "kimi-k2",
+      "name": "Kimi K2"
+    },
+    {
+      "id": "kimi-latest",
+      "name": "Kimi Latest"
+    },
+    {
+      "id": "moonshot-v1-auto",
+      "name": "Moonshot v1 Auto"
+    },
+    {
+      "id": "moonshot-v1-128k",
+      "name": "Moonshot v1 128K"
+    }
+  ],
+  "authHeader": "bearer",
+  "capabilities": {
+    "webSearch": true,
+    "thinking": true,
+    "functionCalling": true,
+    "vision": true
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "title": "信息图海报",
+  "description": "AI 将文档内容转化为可视化信息图海报",
+  "generate": "AI 生成海报",
+  "generating": "生成中...",
+  "stopGenerate": "中断生成",
+  "promptPlaceholder": "描述海报设计需求...",
+  "welcomeDesc": "选择主题风格，AI 将文档内容转化为精美的可视化信息图海报",
+  "emptyContent": "文档内容为空，无法生成海报",
+  "generateFailed": "生成失败：{{error}}",
+  "generateSuccess": "海报生成完成",
+  "preview": "浏览器预览",
+  "exportHtml": "导出 HTML",
+  "themeModernBlue": "现代蓝",
+  "themeWarmOrange": "暖橙色",
+  "themeForestGreen": "森林绿",
+  "themeElegantPurple": "优雅紫",
+  "themeDarkMode": "暗色模式"
+}

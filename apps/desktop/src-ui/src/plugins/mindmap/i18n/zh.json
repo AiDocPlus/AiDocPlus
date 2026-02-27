@@ -1,0 +1,19 @@
+{
+  "title": "思维导图",
+  "description": "AI 分析文档结构，生成思维导图",
+  "generate": "生成导图",
+  "generating": "生成中...",
+  "regenerate": "重新生成",
+  "copy": "复制",
+  "copied": "已复制",
+  "copiedToClipboard": "已复制到剪贴板",
+  "export": "导出",
+  "emptyContent": "❌ 文档内容为空，无法生成思维导图。",
+  "generateFailed": "❌ 思维导图生成失败：{{error}}",
+  "generateSuccess": "思维导图已生成",
+  "promptPlaceholder": "描述你需要的思维导图...",
+  "defaultPrompt": "根据文档内容生成结构化思维导图",
+  "welcome": "思维导图",
+  "welcomeDesc": "AI 分析文档结构，自动生成 Markdown 格式的思维导图。",
+  "systemPrompt": "你是一个专业的文档分析助手，擅长将文档内容转化为结构化的思维导图。请使用 Markdown 缩进列表格式输出。"
+}

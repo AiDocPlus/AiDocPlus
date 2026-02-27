@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "1.0",
+  "resourceType": "document-template",
+  "defaultLocale": "zh",
+  "categories": [
+    {
+      "key": "report",
+      "name": "报告",
+      "icon": "📊",
+      "order": 0
+    },
+    {
+      "key": "article",
+      "name": "文章",
+      "icon": "📰",
+      "order": 1
+    },
+    {
+      "key": "email-draft",
+      "name": "邮件草稿",
+      "icon": "✉️",
+      "order": 2
+    },
+    {
+      "key": "meeting",
+      "name": "会议纪要",
+      "icon": "📋",
+      "order": 3
+    },
+    {
+      "key": "creative",
+      "name": "创意写作",
+      "icon": "✨",
+      "order": 4
+    },
+    {
+      "key": "technical",
+      "name": "技术文档",
+      "icon": "💻",
+      "order": 5
+    },
+    {
+      "key": "general",
+      "name": "通用",
+      "icon": "📄",
+      "order": 6
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "title": "ドキュメント要約",
+  "description": "AIがドキュメント内容を分析し、様々なスタイルの要約を生成します。\n一行要約、要点抽出、構造化アウトライン、学術要約に対応。",
+  "defaultPrompt": "以下のドキュメントの核心内容を一文で要約してください（50字以内）",
+  "styles": {
+    "oneline": "一行要約",
+    "keypoints": "要点抽出",
+    "outline": "アウトライン",
+    "abstract": "学術要約"
+  },
+  "promptPlaceholder": "必要な要約スタイルを記述...",
+  "generate": "要約を生成",
+  "aiGenerate": "AI 要約生成",
+  "generating": "生成中...",
+  "regenerate": "再生成",
+  "copy": "コピー",
+  "copied": "コピー済み",
+  "copiedToClipboard": "クリップボードにコピーしました",
+  "emptyContent": "❌ ドキュメント内容が空のため、要約を生成できません。",
+  "generateSuccess": "「{{style}}」要約を生成しました",
+  "generateFailed": "❌ 要約生成に失敗しました：{{error}}",
+  "selectStyleHint": "上のスタイルボタンをクリックして要約を生成",
+  "systemPrompt": "あなたはプロのドキュメント分析アシスタントです。ドキュメント内容の抽出と要約が得意です。結果を直接出力し、余分な説明や接頭辞を付けないでください。",
+  "promptBuilderTitle": "要約プロンプトを生成",
+  "promptBuilderDesc": "要約スタイルを選択してプロンプトを自動生成",
+  "styleLabel": "要約スタイル"
+}

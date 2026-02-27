@@ -1,0 +1,16 @@
+{
+  "title": "文档统计",
+  "description": "统计文档字数、段落、阅读时间等信息",
+  "analyze": "分析",
+  "analyzing": "分析中...",
+  "reanalyze": "重新分析",
+  "wordCount": "字数",
+  "charCount": "字符数",
+  "paragraphCount": "段落数",
+  "sentenceCount": "句子数",
+  "readingTime": "预计阅读时间",
+  "minutes": "分钟",
+  "welcome": "文档统计",
+  "welcomeDesc": "统计文档的字数、段落数、阅读时间等详细信息。",
+  "noContent": "暂无文档内容"
+}

@@ -1,0 +1,21 @@
+{
+  "id": "doc-wechat-article",
+  "name": "公众号文章",
+  "description": "微信公众号文章，注重可读性和传播性",
+  "icon": "📱",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "document-template",
+  "majorCategory": "article",
+  "subCategory": "general",
+  "tags": [],
+  "roles": [
+    "content-creator",
+    "marketing"
+  ],
+  "order": 2,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

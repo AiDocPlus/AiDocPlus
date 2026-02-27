@@ -1,0 +1,20 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440010",
+  "name": "邮件发送",
+  "version": "1.0.0",
+  "description": "AI 辅助撰写邮件正文，通过 SMTP 直接发送文档内容",
+  "icon": "Mail",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "functional",
+  "subCategory": "communication",
+  "category": "communication",
+  "tags": [
+    "email",
+    "邮件",
+    "发送",
+    "smtp",
+    "协作"
+  ]
+}

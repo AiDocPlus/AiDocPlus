@@ -1,0 +1,21 @@
+{
+  "id": "doc-requirements",
+  "name": "需求规格说明",
+  "description": "软件需求规格说明书，含功能需求、非功能需求和约束条件",
+  "icon": "📋",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "document-template",
+  "majorCategory": "technical",
+  "subCategory": "general",
+  "tags": [],
+  "roles": [
+    "product-manager",
+    "programmer"
+  ],
+  "order": 1,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

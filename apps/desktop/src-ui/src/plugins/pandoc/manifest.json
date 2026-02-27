@@ -1,0 +1,21 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440011",
+  "name": "Pandoc 导出",
+  "version": "1.0.0",
+  "description": "通过 Pandoc 将文档导出为 PDF、DOCX、EPUB、LaTeX 等高质量格式",
+  "icon": "FileOutput",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "functional",
+  "subCategory": "export",
+  "category": "export",
+  "tags": [
+    "pandoc",
+    "导出",
+    "pdf",
+    "docx",
+    "epub",
+    "latex"
+  ]
+}

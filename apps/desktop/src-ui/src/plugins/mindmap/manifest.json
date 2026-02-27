@@ -1,0 +1,19 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440004",
+  "name": "思维导图",
+  "version": "1.0.0",
+  "description": "AI 分析文档内容生成思维导图",
+  "icon": "Brain",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "content-generation",
+  "subCategory": "visualization",
+  "category": "visualization",
+  "tags": [
+    "mindmap",
+    "导图",
+    "结构",
+    "脑图"
+  ]
+}

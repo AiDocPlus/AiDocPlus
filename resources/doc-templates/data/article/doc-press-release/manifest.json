@@ -1,0 +1,21 @@
+{
+  "id": "doc-press-release",
+  "name": "新闻稿",
+  "description": "企业/活动新闻稿，规范的新闻写作格式",
+  "icon": "📰",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "document-template",
+  "majorCategory": "article",
+  "subCategory": "general",
+  "tags": [],
+  "roles": [
+    "marketing",
+    "content-creator"
+  ],
+  "order": 3,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

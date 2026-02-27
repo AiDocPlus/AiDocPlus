@@ -1,0 +1,20 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440031",
+  "name": "知识卡片",
+  "version": "1.0.0",
+  "description": "从文档提取关键知识点，生成问答式记忆卡片，支持翻转学习和 Anki 导出",
+  "icon": "Layers",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "content-generation",
+  "subCategory": "ai-text",
+  "category": "ai-text",
+  "tags": [
+    "flashcard",
+    "卡片",
+    "记忆",
+    "学习",
+    "Anki"
+  ]
+}

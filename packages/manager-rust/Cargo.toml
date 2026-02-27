@@ -1,0 +1,19 @@
+[package]
+name = "aidocplus-manager-rust"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4"] }
+zip = "0.6"
+dirs = "5"
+walkdir = "2"
+reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls-native-roots"], default-features = false }
+eventsource-client = "0.12"
+futures-util = "0.3"
+tokio = { version = "1", features = ["full"] }
+thiserror = "2"

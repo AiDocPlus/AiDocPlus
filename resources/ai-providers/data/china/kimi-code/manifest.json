@@ -1,0 +1,34 @@
+{
+  "id": "kimi-code",
+  "name": "Kimi Code（会员编程）",
+  "description": "Kimi Code（会员编程） AI 服务",
+  "icon": "💻",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "ai-provider",
+  "majorCategory": "china",
+  "subCategory": "general",
+  "tags": [
+    "Kimi Code（会员编程）"
+  ],
+  "order": 11,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z",
+  "baseUrl": "https://api.kimi.com/coding/v1",
+  "defaultModel": "kimi-for-coding",
+  "models": [
+    {
+      "id": "kimi-for-coding",
+      "name": "Kimi for Coding（默认）"
+    }
+  ],
+  "authHeader": "bearer",
+  "capabilities": {
+    "webSearch": true,
+    "thinking": true,
+    "functionCalling": true,
+    "vision": false
+  }
+}

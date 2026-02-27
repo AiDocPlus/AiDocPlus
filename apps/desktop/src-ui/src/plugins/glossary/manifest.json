@@ -1,0 +1,20 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440032",
+  "name": "术语表",
+  "version": "1.0.0",
+  "description": "AI 自动识别文档中的专业术语，生成带定义的术语表，支持编辑和导出",
+  "icon": "BookA",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "content-generation",
+  "subCategory": "data",
+  "category": "data",
+  "tags": [
+    "glossary",
+    "术语",
+    "词汇",
+    "定义",
+    "词典"
+  ]
+}

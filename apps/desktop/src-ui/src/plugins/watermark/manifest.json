@@ -1,0 +1,18 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440018",
+  "name": "文档水印",
+  "version": "1.0.0",
+  "description": "为文档添加文字或图片水印，支持自定义样式和导出",
+  "icon": "Droplets",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "functional",
+  "subCategory": "export",
+  "category": "export",
+  "tags": [
+    "watermark",
+    "水印",
+    "保护"
+  ]
+}

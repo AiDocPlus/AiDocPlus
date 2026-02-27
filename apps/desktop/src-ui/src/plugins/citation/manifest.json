@@ -1,0 +1,20 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440034",
+  "name": "引用管理",
+  "version": "1.0.0",
+  "description": "AI 识别文档中的引用和参考文献，支持格式转换、完整性检查和规范化输出",
+  "icon": "BookOpen",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "content-generation",
+  "subCategory": "data",
+  "category": "data",
+  "tags": [
+    "citation",
+    "引用",
+    "参考文献",
+    "文献",
+    "引文"
+  ]
+}

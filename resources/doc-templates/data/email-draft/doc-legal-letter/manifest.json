@@ -1,0 +1,20 @@
+{
+  "id": "doc-legal-letter",
+  "name": "法律函件",
+  "description": "正式法律函件，用于法律通知、律师函等场景",
+  "icon": "⚖️",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "document-template",
+  "majorCategory": "email-draft",
+  "subCategory": "general",
+  "tags": [],
+  "roles": [
+    "lawyer"
+  ],
+  "order": 1,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z"
+}

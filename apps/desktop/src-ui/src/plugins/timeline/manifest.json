@@ -1,0 +1,19 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440014",
+  "name": "版本时间线",
+  "version": "1.0.0",
+  "description": "可视化展示文档版本历史，支持版本预览和对比",
+  "icon": "Clock",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "functional",
+  "subCategory": "analysis",
+  "category": "analysis",
+  "tags": [
+    "timeline",
+    "版本",
+    "历史",
+    "时间线"
+  ]
+}

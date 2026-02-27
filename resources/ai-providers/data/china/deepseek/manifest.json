@@ -1,0 +1,38 @@
+{
+  "id": "deepseek",
+  "name": "DeepSeek",
+  "description": "DeepSeek AI 服务",
+  "icon": "🔍",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "ai-provider",
+  "majorCategory": "china",
+  "subCategory": "general",
+  "tags": [
+    "DeepSeek"
+  ],
+  "order": 4,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z",
+  "baseUrl": "https://api.deepseek.com",
+  "defaultModel": "deepseek-chat",
+  "models": [
+    {
+      "id": "deepseek-chat",
+      "name": "DeepSeek-V3.2"
+    },
+    {
+      "id": "deepseek-reasoner",
+      "name": "DeepSeek-R1（推理）"
+    }
+  ],
+  "authHeader": "bearer",
+  "capabilities": {
+    "webSearch": false,
+    "thinking": true,
+    "functionCalling": true,
+    "vision": false
+  }
+}

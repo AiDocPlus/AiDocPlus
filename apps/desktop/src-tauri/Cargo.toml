@@ -1,0 +1,57 @@
+[package]
+name = "aidocplus"
+version = "0.3.0"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+thiserror = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+dirs = "5"
+chrono = { version = "0.4", features = ["serde"] }
+reqwest = { version = "0.12", features = ["json", "stream", "multipart", "rustls-tls-native-roots"], default-features = false }
+eventsource-client = "0.12"
+futures-util = "0.3"
+regex = "1"
+zip = "0.6"
+tauri-plugin-window-state = "2.4.1"
+tauri-plugin-process = "2"
+comrak = "0.34"
+lettre = { version = "0.11", features = ["tokio1-rustls-tls", "smtp-transport", "builder"], default-features = false }
+docx-rs = "0.4"
+base64 = "0.22"
+quick-xml = "0.36"
+tts = "0.26"
+tauri-plugin-updater = "2"
+url = "2"
+aidocplus-manager-rust = { path = "../../../packages/manager-rust" }
+
+# 本地开发构建：快速编译，重在测试
+[profile.dev]
+incremental = true
+opt-level = 0
+
+# 本地开发时依赖库用 opt-level 1，避免运行太慢
+[profile.dev.package."*"]
+opt-level = 1
+
+# 发布构建：优化 + 多核并行编译
+[profile.release]
+incremental = false
+lto = "thin"
+opt-level = 2
+strip = true
+codegen-units = 8
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

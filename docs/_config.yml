@@ -1,0 +1,23 @@
+title: AiDocPlus
+description: AI 驱动的智能文档创作工具
+url: "https://AiDocPlus.com"
+baseurl: ""
+
+theme: jekyll-theme-cayman
+
+markdown: kramdown
+highlighter: rouge
+
+plugins:
+  - jekyll-seo-tag
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+
+exclude:
+  - screenshots/originals/
+  - node_modules/
+  - vendor/

@@ -1,0 +1,32 @@
+{
+  "id": "warm-red",
+  "name": "热情红",
+  "description": "PPT 主题: 热情红",
+  "icon": "🎨",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "document-template",
+  "subType": "ppt-theme",
+  "majorCategory": "ppt-theme",
+  "subCategory": "general",
+  "tags": [
+    "ppt",
+    "热情红"
+  ],
+  "order": 6,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z",
+  "colors": {
+    "primary": "#dc2626",
+    "secondary": "#f87171",
+    "background": "#fef2f2",
+    "text": "#450a0a",
+    "accent": "#fb923c"
+  },
+  "fonts": {
+    "title": "system-ui, \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+    "body": "system-ui, \"PingFang SC\", \"Microsoft YaHei\", sans-serif"
+  }
+}

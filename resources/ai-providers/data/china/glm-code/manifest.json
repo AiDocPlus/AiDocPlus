@@ -1,0 +1,46 @@
+{
+  "id": "glm-code",
+  "name": "智谱 AI (Coding Plan)",
+  "description": "智谱 AI (Coding Plan) AI 服务",
+  "icon": "💻",
+  "version": "1.0.0",
+  "author": "AiDocPlus",
+  "resourceType": "ai-provider",
+  "majorCategory": "china",
+  "subCategory": "general",
+  "tags": [
+    "智谱 AI (Coding Plan)"
+  ],
+  "order": 7,
+  "enabled": true,
+  "source": "builtin",
+  "createdAt": "2026-02-18T00:00:00Z",
+  "updatedAt": "2026-02-18T00:00:00Z",
+  "baseUrl": "https://open.bigmodel.cn/api/coding/paas/v4",
+  "defaultModel": "GLM-5",
+  "models": [
+    {
+      "id": "GLM-5",
+      "name": "GLM-5（旗舰）"
+    },
+    {
+      "id": "GLM-4.7",
+      "name": "GLM-4.7"
+    },
+    {
+      "id": "GLM-4.6",
+      "name": "GLM-4.6"
+    },
+    {
+      "id": "GLM-4.5-air",
+      "name": "GLM-4.5 Air"
+    }
+  ],
+  "authHeader": "bearer",
+  "capabilities": {
+    "webSearch": true,
+    "thinking": true,
+    "functionCalling": true,
+    "vision": false
+  }
+}
