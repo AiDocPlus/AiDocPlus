@@ -1,7 +1,18 @@
-use lettre::message::{header::ContentType, Mailbox, MultiPart, SinglePart};
+use lettre::message::header::ContentType;
+use lettre::message::{Attachment, Mailbox, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::transport::smtp::client::{Tls, TlsParameters};
 use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
+use serde::Deserialize;
+
+/// 附件信息
+#[derive(Debug, Deserialize)]
+#[allow(non_snake_case)]
+pub struct AttachmentInfo {
+    pub path: String,
+    pub filename: String,
+    pub mimeType: String,
+}
 
 /// 测试 SMTP 连接
 #[tauri::command]
@@ -16,14 +27,14 @@ pub async fn test_smtp_connection(
     let creds = Credentials::new(email.clone(), password);
 
     let transport = build_smtp_transport(&smtpHost, smtpPort, &encryption, creds)
-        .map_err(|e| format!("构建 SMTP 连接失败: {}", e))?;
+        .map_err(|e| format!("SMTP_BUILD_FAILED: {}", e))?;
 
     transport
         .test_connection()
         .await
-        .map_err(|e| format!("SMTP 连接测试失败: {}", e))?;
+        .map_err(|e| format!("SMTP_TEST_FAILED: {}", e))?;
 
-    Ok(format!("连接成功！SMTP 服务器 {}:{} 验证通过", smtpHost, smtpPort))
+    Ok(format!("SMTP_TEST_OK: {}:{}", smtpHost, smtpPort))
 }
 
 /// 发送邮件
@@ -43,20 +54,21 @@ pub async fn send_email(
     body: String,
     isHtml: bool,
     isRawHtml: Option<bool>,
+    attachments: Option<Vec<AttachmentInfo>>,
 ) -> Result<String, String> {
     if to.is_empty() {
-        return Err("收件人不能为空".to_string());
+        return Err("RECIPIENT_EMPTY".to_string());
     }
 
     // 构建发件人
     let from_mailbox: Mailbox = if let Some(ref name) = displayName {
         format!("{} <{}>", name, email)
             .parse()
-            .map_err(|e| format!("发件人地址格式错误: {}", e))?
+            .map_err(|e| format!("SENDER_FORMAT_ERROR: {}", e))?
     } else {
         email
             .parse()
-            .map_err(|e| format!("发件人地址格式错误: {}", e))?
+            .map_err(|e| format!("SENDER_FORMAT_ERROR: {}", e))?
     };
 
     let mut builder = Message::builder()
@@ -68,7 +80,7 @@ pub async fn send_email(
         let mailbox: Mailbox = addr
             .trim()
             .parse()
-            .map_err(|e| format!("收件人地址 '{}' 格式错误: {}", addr, e))?;
+            .map_err(|e| format!("RECIPIENT_FORMAT_ERROR: {} - {}", addr, e))?;
         builder = builder.to(mailbox);
     }
 
@@ -80,7 +92,7 @@ pub async fn send_email(
         }
         let mailbox: Mailbox = trimmed
             .parse()
-            .map_err(|e| format!("抄送地址 '{}' 格式错误: {}", addr, e))?;
+            .map_err(|e| format!("CC_FORMAT_ERROR: {} - {}", addr, e))?;
         builder = builder.cc(mailbox);
     }
 
@@ -92,69 +104,85 @@ pub async fn send_email(
         }
         let mailbox: Mailbox = trimmed
             .parse()
-            .map_err(|e| format!("密送地址 '{}' 格式错误: {}", addr, e))?;
+            .map_err(|e| format!("BCC_FORMAT_ERROR: {} - {}", addr, e))?;
         builder = builder.bcc(mailbox);
     }
 
     // 构建邮件正文
     let raw_html = isRawHtml.unwrap_or(false);
-    let message = if raw_html {
+    let content_part = if raw_html {
         // body 已经是完整 HTML（富文本编辑器输出），包装邮件模板后直接发送
         let html_body = wrap_html_email(&body);
         // 生成纯文本备用版本（简单去标签）
         let plain_text = strip_html_tags(&body);
-        builder
-            .multipart(
-                MultiPart::alternative()
-                    .singlepart(
-                        SinglePart::builder()
-                            .header(ContentType::TEXT_PLAIN)
-                            .body(plain_text),
-                    )
-                    .singlepart(
-                        SinglePart::builder()
-                            .header(ContentType::TEXT_HTML)
-                            .body(html_body),
-                    ),
+        MultiPart::alternative()
+            .singlepart(
+                SinglePart::builder()
+                    .header(ContentType::TEXT_PLAIN)
+                    .body(plain_text),
             )
-            .map_err(|e| format!("构建邮件失败: {}", e))?
+            .singlepart(
+                SinglePart::builder()
+                    .header(ContentType::TEXT_HTML)
+                    .body(html_body),
+            )
     } else if isHtml {
         // Markdown → HTML 转换
         let html_body = markdown_to_html(&body);
-        builder
-            .multipart(
-                MultiPart::alternative()
-                    .singlepart(
-                        SinglePart::builder()
-                            .header(ContentType::TEXT_PLAIN)
-                            .body(body.clone()),
-                    )
-                    .singlepart(
-                        SinglePart::builder()
-                            .header(ContentType::TEXT_HTML)
-                            .body(html_body),
-                    ),
+        MultiPart::alternative()
+            .singlepart(
+                SinglePart::builder()
+                    .header(ContentType::TEXT_PLAIN)
+                    .body(body.clone()),
             )
-            .map_err(|e| format!("构建邮件失败: {}", e))?
+            .singlepart(
+                SinglePart::builder()
+                    .header(ContentType::TEXT_HTML)
+                    .body(html_body),
+            )
     } else {
+        // 纯文本模式
+        MultiPart::alternative()
+            .singlepart(
+                SinglePart::builder()
+                    .header(ContentType::TEXT_PLAIN)
+                    .body(body.clone()),
+            )
+    };
+
+    // 构建附件
+    let attachment_list = attachments.unwrap_or_default();
+    let message = if attachment_list.is_empty() {
         builder
-            .body(body.clone())
-            .map_err(|e| format!("构建邮件失败: {}", e))?
+            .multipart(content_part)
+            .map_err(|e| format!("EMAIL_BUILD_FAILED: {}", e))?
+    } else {
+        let mut mixed = MultiPart::mixed().multipart(content_part);
+        for att in &attachment_list {
+            let file_content = std::fs::read(&att.path)
+                .map_err(|e| format!("ATTACHMENT_READ_FAILED: {} - {}", att.filename, e))?;
+            let ct: ContentType = att.mimeType.parse().unwrap_or(ContentType::TEXT_PLAIN);
+            let attachment_part = Attachment::new(att.filename.clone()).body(file_content, ct);
+            mixed = mixed.singlepart(attachment_part);
+        }
+        builder
+            .multipart(mixed)
+            .map_err(|e| format!("EMAIL_BUILD_FAILED: {}", e))?
     };
 
     // 发送
     let creds = Credentials::new(email.clone(), password);
     let transport = build_smtp_transport(&smtpHost, smtpPort, &encryption, creds)
-        .map_err(|e| format!("构建 SMTP 连接失败: {}", e))?;
+        .map_err(|e| format!("SMTP_BUILD_FAILED: {}", e))?;
 
     transport
         .send(message)
         .await
-        .map_err(|e| format!("发送邮件失败: {}", e))?;
+        .map_err(|e| format!("SEND_FAILED: {}", e))?;
 
     let recipients: Vec<&str> = to.iter().map(|s| s.as_str()).collect();
     Ok(format!(
-        "邮件已成功发送至 {}",
+        "SEND_OK: {}",
         recipients.join(", ")
     ))
 }
@@ -169,10 +197,10 @@ fn build_smtp_transport(
     match encryption {
         "tls" => {
             let tls_params = TlsParameters::new(host.to_string())
-                .map_err(|e| format!("TLS 参数错误: {}", e))?;
+                .map_err(|e| format!("TLS_PARAM_ERROR: {}", e))?;
             Ok(
                 AsyncSmtpTransport::<Tokio1Executor>::relay(host)
-                    .map_err(|e| format!("SMTP relay 错误: {}", e))?
+                    .map_err(|e| format!("SMTP_RELAY_ERROR: {}", e))?
                     .port(port)
                     .tls(Tls::Wrapper(tls_params))
                     .credentials(creds)
@@ -181,10 +209,10 @@ fn build_smtp_transport(
         }
         "starttls" => {
             let tls_params = TlsParameters::new(host.to_string())
-                .map_err(|e| format!("TLS 参数错误: {}", e))?;
+                .map_err(|e| format!("TLS_PARAM_ERROR: {}", e))?;
             Ok(
                 AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(host)
-                    .map_err(|e| format!("SMTP STARTTLS relay 错误: {}", e))?
+                    .map_err(|e| format!("SMTP_STARTTLS_RELAY_ERROR: {}", e))?
                     .port(port)
                     .tls(Tls::Required(tls_params))
                     .credentials(creds)
@@ -248,7 +276,7 @@ fn markdown_to_html(markdown: &str) -> String {
     options.extension.strikethrough = true;
     options.extension.tasklist = true;
     options.extension.autolink = true;
-    options.render.unsafe_ = true;
+    options.render.r#unsafe = true;
 
     let html_body = comrak_md2html(markdown, &options);
 

@@ -518,14 +518,26 @@ export interface EmailProviderPreset {
 }
 
 export const EMAIL_PROVIDER_PRESETS: EmailProviderPreset[] = [
-  { id: 'netease163', name: '网易 163',    smtpHost: 'smtp.163.com',      smtpPort: 465, encryption: 'tls' },
-  { id: 'netease126', name: '网易 126',    smtpHost: 'smtp.126.com',      smtpPort: 465, encryption: 'tls' },
-  { id: 'china139',   name: '移动 139',    smtpHost: 'smtp.139.com',      smtpPort: 465, encryption: 'tls' },
-  { id: 'qq',         name: 'QQ 邮箱',     smtpHost: 'smtp.qq.com',       smtpPort: 465, encryption: 'tls' },
-  { id: 'gmail',      name: 'Gmail',       smtpHost: 'smtp.gmail.com',    smtpPort: 465, encryption: 'tls' },
-  { id: 'outlook',    name: 'Outlook',     smtpHost: 'smtp.office365.com', smtpPort: 587, encryption: 'starttls' },
-  { id: 'aliyun',     name: '阿里云邮箱',  smtpHost: 'smtp.aliyun.com',   smtpPort: 465, encryption: 'tls' },
-  { id: 'custom',     name: '自定义',      smtpHost: '',                   smtpPort: 465, encryption: 'tls' },
+  { id: 'netease163',    name: '网易 163',      smtpHost: 'smtp.163.com',         smtpPort: 465, encryption: 'tls' },
+  { id: 'netease126',    name: '网易 126',      smtpHost: 'smtp.126.com',         smtpPort: 465, encryption: 'tls' },
+  { id: 'neteaseVip163', name: 'VIP 163',       smtpHost: 'smtp.vip.163.com',    smtpPort: 465, encryption: 'tls' },
+  { id: 'neteaseVip126', name: 'VIP 126',       smtpHost: 'smtp.vip.126.com',    smtpPort: 465, encryption: 'tls' },
+  { id: 'netease188',    name: '网易 188',      smtpHost: 'smtp.188.com',         smtpPort: 465, encryption: 'tls' },
+  { id: 'neteaseYeah',   name: 'Yeah.net',      smtpHost: 'smtp.yeah.net',        smtpPort: 465, encryption: 'tls' },
+  { id: 'china139',      name: '移动 139',      smtpHost: 'smtp.139.com',         smtpPort: 465, encryption: 'tls' },
+  { id: 'china189',      name: '电信 189',      smtpHost: 'smtp.189.cn',          smtpPort: 465, encryption: 'tls' },
+  { id: 'qq',            name: 'QQ 邮箱',       smtpHost: 'smtp.qq.com',          smtpPort: 465, encryption: 'tls' },
+  { id: 'foxmail',       name: 'Foxmail',        smtpHost: 'smtp.qq.com',          smtpPort: 465, encryption: 'tls' },
+  { id: 'gmail',         name: 'Gmail',          smtpHost: 'smtp.gmail.com',       smtpPort: 465, encryption: 'tls' },
+  { id: 'outlook',       name: 'Outlook',        smtpHost: 'smtp.office365.com',   smtpPort: 587, encryption: 'starttls' },
+  { id: 'yahoo',         name: 'Yahoo',          smtpHost: 'smtp.mail.yahoo.com',  smtpPort: 465, encryption: 'tls' },
+  { id: 'icloud',        name: 'iCloud',         smtpHost: 'smtp.mail.me.com',     smtpPort: 587, encryption: 'starttls' },
+  { id: 'aliyun',        name: '阿里云邮箱',    smtpHost: 'smtp.aliyun.com',      smtpPort: 465, encryption: 'tls' },
+  { id: 'sohu',          name: '搜狐邮箱',      smtpHost: 'smtp.sohu.com',        smtpPort: 465, encryption: 'tls' },
+  { id: 'sina',          name: '新浪邮箱',      smtpHost: 'smtp.sina.com',        smtpPort: 465, encryption: 'tls' },
+  { id: 'sinaVip',       name: '新浪 VIP',      smtpHost: 'smtp.vip.sina.com',   smtpPort: 465, encryption: 'tls' },
+  { id: 'tom',           name: 'Tom 邮箱',      smtpHost: 'smtp.tom.com',         smtpPort: 25,  encryption: 'none' },
+  { id: 'custom',        name: '自定义',        smtpHost: '',                      smtpPort: 465, encryption: 'tls' },
 ];
 
 export function getEmailPreset(presetId: string): EmailProviderPreset | undefined {

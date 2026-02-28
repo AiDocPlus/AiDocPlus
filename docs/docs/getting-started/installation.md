@@ -1,6 +1,7 @@
 ---
-layout: default
-title: 安装指南 - AiDocPlus
+title: 安装指南
+parent: 快速入门
+nav_order: 1
 ---
 
 # 安装指南

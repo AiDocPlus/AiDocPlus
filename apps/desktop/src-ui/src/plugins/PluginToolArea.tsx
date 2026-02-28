@@ -150,12 +150,14 @@ interface PluginToolAreaProps {
   rightSidebarOpen?: boolean;
   /** 过滤显示的插件大类，不传则显示全部 */
   filterCategory?: 'content-generation' | 'functional';
+  /** 活跃插件变化时通知上层（传递插件信息供 AI 助手面板使用） */
+  onActivePluginChange?: (plugin: import('./types').DocumentPlugin | null) => void;
 }
 
 /**
  * 插件工具区：顶部插件标签栏 + 当前插件面板 / 管理面板
  */
-export function PluginToolArea({ document, tabId, aiContent, isMaximized, onMaximizeToggle, onLeftSidebarToggle, onRightSidebarToggle, leftSidebarOpen, rightSidebarOpen, filterCategory }: PluginToolAreaProps) {
+export function PluginToolArea({ document, tabId, aiContent, isMaximized, onMaximizeToggle, onLeftSidebarToggle, onRightSidebarToggle, leftSidebarOpen, rightSidebarOpen, filterCategory, onActivePluginChange }: PluginToolAreaProps) {
   // 记住最大化前的侧边栏状态，以便恢复
   const sidebarStateBeforeMaximize = useRef<{ left: boolean; right: boolean } | null>(null);
   const { t } = useTranslation('plugin-framework');
@@ -228,6 +230,11 @@ export function PluginToolArea({ document, tabId, aiContent, isMaximized, onMaxi
   }, [tabId, setTabPanelState]);
 
   const activePlugin = docPlugins.find(p => p.id === activePluginId);
+
+  // 通知上层当前活跃插件变化
+  useEffect(() => {
+    onActivePluginChange?.(activePlugin || null);
+  }, [activePlugin, onActivePluginChange]);
 
   // AI 生成完成后，插件调用此回调触发磁盘保存
   const handleRequestSave = useCallback(async () => {

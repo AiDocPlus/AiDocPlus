@@ -1,6 +1,7 @@
 ---
-layout: default
-title: 导出功能 - AiDocPlus
+title: 导出功能
+parent: 功能指南
+nav_order: 7
 ---
 
 # 导出功能

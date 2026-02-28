@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
   "productName": "AiDocPlus",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "identifier": "com.aidocplus.app",
   "build": {
     "beforeDevCommand": "cd src-ui && pnpm dev",
@@ -52,6 +52,54 @@
       ],
       "windows": {
         "installMode": "passive"
+      }
+    },
+    "cli": {
+      "description": "AiDocPlus 命令行工具",
+      "args": [
+        {
+          "name": "version",
+          "short": "v",
+          "description": "显示版本号",
+          "takesValue": false
+        }
+      ],
+      "subcommands": {
+        "api": {
+          "description": "API 相关操作",
+          "subcommands": {
+            "status": {
+              "description": "查看 API Server 状态"
+            },
+            "schema": {
+              "description": "查看 API Schema"
+            },
+            "call": {
+              "description": "调用 API 方法",
+              "args": [
+                {
+                  "name": "method",
+                  "description": "API 方法名（如 document.list）",
+                  "index": 1,
+                  "required": true,
+                  "takesValue": true
+                },
+                {
+                  "name": "params",
+                  "short": "p",
+                  "description": "JSON 参数",
+                  "takesValue": true
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "deep-link": {
+      "mobile": [],
+      "desktop": {
+        "schemes": ["aidocplus"]
       }
     }
   }

@@ -220,7 +220,7 @@ fn parse_docx_xml(xml: &str) -> Result<String> {
             }
             Ok(Event::Text(ref e)) => {
                 if in_text {
-                    let text = e.unescape().unwrap_or_default().to_string();
+                    let text = String::from_utf8_lossy(e.as_ref()).to_string();
                     if in_table_cell {
                         current_cell.push_str(&text);
                     } else {

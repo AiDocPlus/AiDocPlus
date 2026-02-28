@@ -1,9 +1,13 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import type { EditorTab, Attachment } from '@aidocplus/shared-types';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import type { EditorTab, Attachment, Document } from '@aidocplus/shared-types';
 import { EditorPanel } from '../editor/EditorPanel';
 import { ChatPanel } from '../chat/ChatPanel';
 import { useAppStore } from '@/stores/useAppStore';
 import { ResizableHandle } from '../ui/resizable-handle';
+import type { DocumentPlugin } from '@/plugins/types';
+import { PluginAssistantPanel } from '@/plugins/_framework/PluginAssistantPanel';
+import { PluginHostContext, createPluginHostAPI } from '@/plugins/_framework/PluginHostAPI';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 
 
 interface EditorWorkspaceProps {
@@ -25,6 +29,16 @@ export function EditorWorkspace({ tab }: EditorWorkspaceProps) {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [composedContent, setComposedContent] = useState('');
   const [activeView, setActiveView] = useState<'editor' | 'plugins' | 'composer' | 'functional' | 'coding'>('editor');
+  const [activePlugin, setActivePlugin] = useState<DocumentPlugin | null>(null);
+
+  // 插件区活跃插件变化回调
+  const handleActivePluginChange = useCallback((plugin: DocumentPlugin | null) => {
+    setActivePlugin(plugin);
+  }, []);
+
+  // 插件助手面板是否显示
+  const isPluginView = activeView === 'plugins' || activeView === 'functional';
+  const showPluginAssistant = isPluginView && activePlugin != null;
 
   const tabLayoutMode = tab.panelState.layoutMode ?? 'vertical';
   const tabChatPanelWidth = tab.panelState.chatPanelWidth ?? 320;
@@ -145,6 +159,7 @@ export function EditorWorkspace({ tab }: EditorWorkspaceProps) {
           composedContent={composedContent}
           onComposedContentChange={setComposedContent}
           onActiveViewChange={setActiveView}
+          onActivePluginChange={handleActivePluginChange}
         />
       </div>
 
@@ -153,20 +168,98 @@ export function EditorWorkspace({ tab }: EditorWorkspaceProps) {
         <ResizableHandle direction="horizontal" onResize={handleChatResize} />
       )}
 
-      {/* 右侧聊天面板（编程区自带AI助手，不显示外部聊天面板） */}
+      {/* 右侧面板：插件区显示插件 AI 助手，其他显示 ChatPanel，编程区自带不显示 */}
       {tab.panelState.chatOpen && activeView !== 'coding' && (
         <div
-          className="border-l flex-shrink-0 overflow-hidden h-full flex flex-col"
+          className="flex-shrink-0 overflow-hidden h-full flex flex-col"
           style={{ width: tabChatPanelWidth }}
         >
-          <ChatPanel
-            key={`chat-${tab.id}-${activeView}`}
-            tabId={activeView === 'editor' ? tab.id : `${tab.id}::${activeView}`}
-            onClose={() => handlePanelToggle('chatOpen', false)}
-            simpleMode={activeView === 'plugins' || activeView === 'composer' || activeView === 'functional'}
-          />
+          {showPluginAssistant ? (
+            <PluginAssistantWrapper
+              key={`plugin-assistant-${activePlugin!.id}`}
+              plugin={activePlugin!}
+              document={documents.find(d => d.id === tab.documentId)!}
+              tabId={tab.id}
+              aiContent={aiContent}
+            />
+          ) : (
+            <ChatPanel
+              key={`chat-${tab.id}-${activeView}`}
+              tabId={activeView === 'editor' ? tab.id : `${tab.id}::${activeView}`}
+              onClose={() => handlePanelToggle('chatOpen', false)}
+              simpleMode={activeView === 'composer'}
+            />
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * 插件 AI 助手包装组件
+ * 为 PluginAssistantPanel 提供 PluginHostContext，使其能使用 usePluginHost()
+ */
+function PluginAssistantWrapper({
+  plugin,
+  document: doc,
+  tabId,
+  aiContent,
+}: {
+  plugin: DocumentPlugin;
+  document: Document;
+  tabId: string;
+  aiContent: string;
+}) {
+  // 使用 ref 持有最新值，避免 hostAPI 频繁重建导致 Context 消费者不必要重渲染
+  const docRef = useRef(doc);
+  const aiContentRef = useRef(aiContent);
+  useEffect(() => { docRef.current = doc; }, [doc]);
+  useEffect(() => { aiContentRef.current = aiContent; }, [aiContent]);
+
+  const hostAPI = useMemo(() => {
+    return createPluginHostAPI({
+      pluginId: plugin.id,
+      getDocument: () => docRef.current,
+      getAIContent: () => aiContentRef.current,
+      getComposedContent: () => docRef.current.composedContent || '',
+      showStatus: () => {},
+      getLocale: () => useSettingsStore.getState().ui?.language || 'zh',
+      getTheme: () => (useSettingsStore.getState().ui?.theme === 'dark' ? 'dark' : 'light'),
+      i18nNamespace: plugin.i18nNamespace,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plugin.id, plugin.i18nNamespace]);
+
+  // 插件提供了完全自定义的助手面板组件
+  if (plugin.AssistantPanelComponent) {
+    const CustomPanel = plugin.AssistantPanelComponent;
+    return (
+      <PluginHostContext.Provider value={hostAPI}>
+        <CustomPanel
+          pluginId={plugin.id}
+          document={doc}
+          pluginData={doc.pluginData?.[plugin.id] ?? null}
+          aiContent={aiContent}
+          tabId={tabId}
+        />
+      </PluginHostContext.Provider>
+    );
+  }
+
+  // 使用通用助手面板（配置式或默认）
+  return (
+    <PluginHostContext.Provider value={hostAPI}>
+      <PluginAssistantPanel
+        pluginId={plugin.id}
+        pluginName={plugin.name}
+        pluginDesc={plugin.description}
+        assistantConfig={plugin.assistantConfig}
+        document={doc}
+        pluginData={doc.pluginData?.[plugin.id] ?? null}
+        aiContent={aiContent}
+        tabId={tabId}
+      />
+    </PluginHostContext.Provider>
   );
 }

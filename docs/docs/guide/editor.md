@@ -1,6 +1,7 @@
 ---
-layout: default
-title: 生成区（编辑器） - AiDocPlus
+title: 生成区（编辑器）
+parent: 功能指南
+nav_order: 1
 ---
 
 # 生成区（编辑器）

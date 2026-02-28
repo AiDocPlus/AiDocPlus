@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { initApiBridge } from './api/ApiBridge'
 
 // 全局禁用拼写检查和自动纠正
 document.documentElement.setAttribute('spellcheck', 'false');
@@ -36,6 +37,9 @@ new MutationObserver((mutations) => {
     }
   }
 }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['contenteditable'] });
+
+// 初始化 API Bridge（监听后端 API Server 就绪事件）
+initApiBridge();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

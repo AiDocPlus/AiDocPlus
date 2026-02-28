@@ -1,6 +1,7 @@
 ---
-layout: default
-title: AI 对话与生成 - AiDocPlus
+title: AI 对话与生成
+parent: 功能指南
+nav_order: 2
 ---
 
 # AI 对话与生成

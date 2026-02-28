@@ -1,6 +1,7 @@
 ---
-layout: default
-title: 合并区 - AiDocPlus
+title: 合并区
+parent: 功能指南
+nav_order: 4
 ---
 
 # 合并区

@@ -2,12 +2,13 @@ import { useEffect, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MainLayout } from './components/layout/MainLayout';
 import { useAppStore } from './stores/useAppStore';
-import { useSettingsStore } from './stores/useSettingsStore';
+import { useSettingsStore, getAIInvokeParams } from './stores/useSettingsStore';
 import { useTemplatesStore } from './stores/useTemplatesStore';
 import { useWorkspaceAutosave } from './hooks/useWorkspaceAutosave';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { UpdateChecker } from './components/settings/UpdateChecker';
 import './i18n'; // Initialize i18n
+import { registerFrontendStateProvider } from './api/ApiBridge';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,6 +52,27 @@ function AppContent() {
         // Fallback to loading projects if restore fails
         await loadProjects();
       }
+
+      // 注册前端状态提供者，让 API Bridge 能查询 UI 状态
+      registerFrontendStateProvider({
+        getActiveDocument: () => {
+          const { currentDocument } = useAppStore.getState();
+          if (!currentDocument) return null;
+          return {
+            id: currentDocument.id,
+            title: currentDocument.title,
+            projectId: currentDocument.projectId || '',
+            content: currentDocument.content || '',
+          };
+        },
+        getActiveProjectId: () => {
+          const { currentProject } = useAppStore.getState();
+          return currentProject?.id ?? null;
+        },
+        getAiConfig: () => {
+          return getAIInvokeParams();
+        },
+      });
 
       setIsInitialized(true);
       setRestoring(false);

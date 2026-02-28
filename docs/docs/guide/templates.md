@@ -1,6 +1,7 @@
 ---
-layout: default
-title: 模板管理 - AiDocPlus
+title: 模板管理
+parent: 功能指南
+nav_order: 6
 ---
 
 # 模板管理

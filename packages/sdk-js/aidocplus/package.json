@@ -1,0 +1,8 @@
+{
+  "name": "aidocplus",
+  "version": "0.1.0",
+  "description": "AiDocPlus JavaScript SDK — 在脚本中调用 AiDocPlus 主程序功能",
+  "main": "index.js",
+  "keywords": ["aidocplus", "sdk", "api"],
+  "license": "MIT"
+}

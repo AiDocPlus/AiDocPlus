@@ -7,7 +7,7 @@ pub fn export_resources(resource_paths: &[String], output_path: &str) -> Result<
     let file =
         fs::File::create(output_path).map_err(|e| format!("创建 ZIP 文件失败: {}", e))?;
     let mut zip = zip::ZipWriter::new(file);
-    let options = zip::write::FileOptions::default()
+    let options = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated);
 
     for resource_path in resource_paths {
@@ -37,7 +37,7 @@ fn add_dir_to_zip(
     zip: &mut zip::ZipWriter<fs::File>,
     dir: &Path,
     prefix: &str,
-    options: zip::write::FileOptions,
+    options: zip::write::SimpleFileOptions,
 ) -> Result<(), String> {
     let entries = fs::read_dir(dir).map_err(|e| format!("读取目录失败: {}", e))?;
 

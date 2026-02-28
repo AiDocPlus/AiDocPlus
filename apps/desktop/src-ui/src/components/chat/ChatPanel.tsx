@@ -719,7 +719,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+    <div className="flex-1 flex flex-col overflow-hidden min-h-0 border-l">
       {/* Header with close button */}
       <div className="flex items-center justify-between px-4 py-2 border-b bg-background flex-shrink-0">
         <div className="flex items-center gap-2">

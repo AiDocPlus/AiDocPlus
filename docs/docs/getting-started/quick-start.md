@@ -1,6 +1,7 @@
 ---
-layout: default
-title: 快速开始 - AiDocPlus
+title: 快速开始
+parent: 快速入门
+nav_order: 2
 ---
 
 # 快速开始

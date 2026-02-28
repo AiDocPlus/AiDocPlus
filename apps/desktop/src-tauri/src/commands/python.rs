@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::io::Write;
 use std::process::Command;
 use std::time::{Duration, Instant};
 
@@ -388,6 +387,21 @@ pub fn run_python_script(
     }
     if let Some(ref out_path) = outputPath {
         cmd.env("AIDOCPLUS_OUTPUT_FILE", out_path);
+    }
+
+    // 注入 API Server 连接参数（供 aidocplus SDK 使用）
+    if let Some((port, token)) = crate::api_server::get_api_connection_info() {
+        cmd.env("AIDOCPLUS_API_PORT", port.to_string());
+        cmd.env("AIDOCPLUS_API_TOKEN", &token);
+        if let Some(sdk_path) = crate::api_server::get_python_sdk_path() {
+            let existing = std::env::var("PYTHONPATH").unwrap_or_default();
+            let new_path = if existing.is_empty() {
+                sdk_path
+            } else {
+                format!("{}:{}", sdk_path, existing)
+            };
+            cmd.env("PYTHONPATH", new_path);
+        }
     }
 
     // 设置工作目录

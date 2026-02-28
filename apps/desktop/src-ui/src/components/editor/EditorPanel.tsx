@@ -44,6 +44,7 @@ interface EditorPanelProps {
   composedContent: string;
   onComposedContentChange: (value: string) => void;
   onActiveViewChange?: (view: 'editor' | 'plugins' | 'composer' | 'functional' | 'coding') => void;
+  onActivePluginChange?: (plugin: import('@/plugins/types').DocumentPlugin | null) => void;
 }
 
 export function EditorPanel({
@@ -66,6 +67,7 @@ export function EditorPanel({
   composedContent,
   onComposedContentChange,
   onActiveViewChange,
+  onActivePluginChange,
 }: EditorPanelProps) {
   const { t } = useTranslation();
   const { documents, tabs, saveDocument, markTabAsDirty, markTabAsClean, createDocument, openTab, closeTab, closeAllTabs, aiStreamingTabId, sidebarOpen, setSidebarOpen } = useAppStore();
@@ -608,6 +610,7 @@ export function EditorPanel({
               if (!open && chatOpen) onChatToggle?.();
             }}
             filterCategory="content-generation"
+            onActivePluginChange={onActivePluginChange}
           />
         ) : activeView === 'functional' && document ? (
           /* 功能插件区域 */
@@ -625,6 +628,7 @@ export function EditorPanel({
               if (!open && chatOpen) onChatToggle?.();
             }}
             filterCategory="functional"
+            onActivePluginChange={onActivePluginChange}
           />
         ) : activeView === 'coding' ? (
           /* 编程区 */

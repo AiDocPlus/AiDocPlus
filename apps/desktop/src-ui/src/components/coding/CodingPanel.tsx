@@ -15,6 +15,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useCodingStore, nextTabId, detectLangFromExt } from '@/stores/useCodingStore';
 import type { CodingTab } from '@/stores/useCodingStore';
 import { CodingAssistantPanel } from './CodingAssistantPanel';
+import { getApiServerPort, isApiServerReady } from '@/api/ApiBridge';
+import { ResizableHandle } from '@/components/ui/resizable-handle';
 import { CodingFileTree } from './CodingFileTree';
 import { MarkdownPreview } from '@/components/editor/MarkdownPreview';
 import {
@@ -202,9 +204,6 @@ export function CodingPanel() {
   // ── AI 助手面板 ──
   const [assistantOpen, setAssistantOpen] = useState(settings.assistantOpen ?? true);
   const [assistantWidth, setAssistantWidth] = useState(settings.assistantWidth || 420);
-  const assistDragRef = useRef(false);
-  const assistDragStartXRef = useRef(0);
-  const assistDragStartWidthRef = useRef(0);
 
   // ── 文件树面板 ──
   const [fileTreeOpen, setFileTreeOpen] = useState(settings.fileTreeOpen ?? false);
@@ -250,6 +249,17 @@ export function CodingPanel() {
   const showStatus = useCallback((msg: string, isError = false) => {
     setStatusMsg(msg); setStatusIsError(isError);
     setTimeout(() => setStatusMsg(null), 4000);
+  }, []);
+
+  // ── API Server 状态 ──
+  const [apiReady, setApiReady] = useState(isApiServerReady());
+  const [apiPort, setApiPort] = useState(getApiServerPort());
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setApiReady(isApiServerReady());
+      setApiPort(getApiServerPort());
+    }, 3000);
+    return () => clearInterval(timer);
   }, []);
 
   // ── 初始化：从缓存或异步检测 Python / Node.js ──
@@ -719,24 +729,9 @@ export function CodingPanel() {
   }, [outputHeight]);
 
   // ── AI 助手面板水平拖拽 ──
-  const handleAssistDragStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    assistDragRef.current = true;
-    assistDragStartXRef.current = e.clientX;
-    assistDragStartWidthRef.current = assistantWidth;
-    const onMove = (ev: MouseEvent) => {
-      if (!assistDragRef.current) return;
-      const delta = assistDragStartXRef.current - ev.clientX;
-      setAssistantWidth(Math.max(240, Math.min(600, assistDragStartWidthRef.current + delta)));
-    };
-    const onUp = () => {
-      assistDragRef.current = false;
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  }, [assistantWidth]);
+  const handleAssistResize = useCallback((delta: number) => {
+    setAssistantWidth(prev => Math.max(240, Math.min(600, prev - delta)));
+  }, []);
 
   // ── 文件树面板水平拖拽 ──
   const handleFtDragStart = useCallback((e: React.MouseEvent) => {
@@ -1670,6 +1665,22 @@ export function CodingPanel() {
           : activeLang.toUpperCase()}</span>
         <span>·</span>
         <span>{fileName}{activeTab?.dirty ? ` (${t('coding.modified', { defaultValue: '已修改' })})` : ''}</span>
+        <span>·</span>
+        {apiReady ? (
+          <span className="flex items-center gap-1 text-green-600 dark:text-green-400" title={`API Server :${apiPort}\n\n${activeLang === 'python'
+            ? 'Python SDK:\nimport aidocplus\napi = aidocplus.connect()'
+            : (activeLang === 'javascript' || activeLang === 'typescript')
+              ? 'JavaScript SDK:\nconst aidocplus = require("aidocplus");\nconst api = aidocplus.connect();'
+              : 'Python: import aidocplus\nJS: const aidocplus = require("aidocplus")'}`}>
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500" />
+            API :{apiPort}
+          </span>
+        ) : (
+          <span className="flex items-center gap-1 opacity-50" title={t('coding.apiNotReady', { defaultValue: 'API Server 未就绪' })}>
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-gray-400" />
+            API
+          </span>
+        )}
         <div className="flex-1" />
         {statusMsg && (
           <span className={statusIsError ? 'text-destructive' : 'text-green-600 dark:text-green-400'}>{statusMsg}</span>
@@ -1681,11 +1692,7 @@ export function CodingPanel() {
       {/* ═══ 右侧：AI 编程助手 ═══ */}
       {assistantOpen && (
         <>
-          {/* 可拖拽分隔条（垂直） */}
-          <div
-            className="flex-shrink-0 w-1.5 bg-muted/40 hover:bg-primary/20 cursor-col-resize flex items-center justify-center border-x transition-colors"
-            onMouseDown={handleAssistDragStart}
-          />
+          <ResizableHandle direction="horizontal" onResize={handleAssistResize} />
           <div className="flex-shrink-0 overflow-hidden" style={{ width: assistantWidth }}>
             <CodingAssistantPanel
               currentCode={activeTab?.code || ''}

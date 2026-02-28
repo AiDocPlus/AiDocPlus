@@ -1,11 +1,12 @@
 ---
-layout: default
-title: 内容区与功能区 - AiDocPlus
+title: 插件系统
+parent: 功能指南
+nav_order: 3
 ---
 
-# 内容区与功能区
+# 插件系统
 
-AiDocPlus 内置 **28 个插件**，分为内容生成类（内容区）和功能类（功能区）。
+AiDocPlus 内置 **27 个插件**，分为内容生成类（内容区）和功能类（功能区）。
 
 ## 进入方式
 

@@ -146,7 +146,7 @@ fn process_node<'a>(node: &'a AstNode<'a>, docx: &mut Docx) {
             *docx = std::mem::take(docx).add_paragraph(para);
         }
         NodeValue::CodeBlock(cb) => {
-            let code_text = cb.literal.clone();
+            let code_text = cb.literal.to_string();
             for line in code_text.lines() {
                 let run = Run::new()
                     .add_text(line)
@@ -236,7 +236,7 @@ fn collect_inline_runs_recursive<'a>(
         match &child.data.borrow().value {
             NodeValue::Text(text) => {
                 let mut run = Run::new()
-                    .add_text(text)
+                    .add_text(text.as_ref())
                     .fonts(RunFonts::new().east_asia(styles::FONT_FANGSONG[0]).ascii(styles::FONT_WESTERN))
                     .size(styles::pt_to_half_point(styles::FONT_SIZE_BODY));
                 if bold { run = run.bold(); }
@@ -250,7 +250,7 @@ fn collect_inline_runs_recursive<'a>(
                 runs.push(Run::new().add_break(BreakType::TextWrapping));
             }
             NodeValue::Code(c) => {
-                let text = c.literal.clone();
+                let text = c.literal.to_string();
                 let run = Run::new()
                     .add_text(&text)
                     .fonts(RunFonts::new().ascii("Consolas").east_asia("Consolas").hi_ansi("Consolas"))

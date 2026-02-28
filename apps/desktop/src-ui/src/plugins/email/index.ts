@@ -4,6 +4,7 @@ import type { DocumentPlugin } from '../types';
 import { registerPluginI18n } from '../i18n-loader';
 import { registerPlugin } from '../pluginStore';
 const EmailPluginPanel = React.lazy(() => import('./EmailPluginPanel').then(m => ({ default: m.EmailPluginPanel })));
+const EmailAssistantPanel = React.lazy(() => import('./EmailAssistantPanel').then(m => ({ default: m.EmailAssistantPanel })));
 import manifest from './manifest.json';
 import zh from './i18n/zh.json';
 import en from './i18n/en.json';
@@ -21,6 +22,8 @@ export const emailPlugin: DocumentPlugin = {
   PanelComponent: EmailPluginPanel,
   // 功能执行类插件不在 document.pluginData 中存储数据
   hasData: () => false,
+  // 邮件专属 AI 助手面板（完全自定义）
+  AssistantPanelComponent: EmailAssistantPanel,
 };
 
 registerPlugin(emailPlugin);

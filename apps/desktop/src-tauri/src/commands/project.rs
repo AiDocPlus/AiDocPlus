@@ -154,7 +154,7 @@ pub fn export_project_zip(
     let output = Path::new(&outputPath);
     let file = fs::File::create(output).map_err(|e| format!("创建 ZIP 文件失败: {}", e))?;
     let mut zip_writer = zip::ZipWriter::new(file);
-    let options = zip::write::FileOptions::default()
+    let options = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated);
 
     // 写入项目元数据
@@ -195,7 +195,7 @@ pub fn export_project_zip(
             zip_writer: &mut zip::ZipWriter<fs::File>,
             dir: &Path,
             prefix: &str,
-            options: zip::write::FileOptions,
+            options: zip::write::SimpleFileOptions,
         ) -> std::result::Result<(), String> {
             let entries = fs::read_dir(dir).map_err(|e| e.to_string())?;
             for entry in entries {

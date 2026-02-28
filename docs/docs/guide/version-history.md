@@ -1,6 +1,7 @@
 ---
-layout: default
-title: 版本历史 - AiDocPlus
+title: 版本历史
+parent: 功能指南
+nav_order: 8
 ---
 
 # 版本历史

@@ -3,6 +3,30 @@
 > 基于对整个代码库的深入架构分析，按照高端商业软件标准，提出以下改进方向。
 > 每项改进标注了 **重要性**（⭐~⭐⭐⭐）、**可行性**（🔧容易 / 🔧🔧中等 / 🔧🔧🔧复杂）和 **优先级**（P0~P3）。
 
+### 最新状态（2026-02-27）
+
+**✅ Monorepo 合并已完成**：6 个独立仓库（AiDocPlus-Main、AiDocPlus-Plugins、AiDocPlus-AIProviders、AiDocPlus-DocTemplates、AiDocPlus-PromptTemplates、AiDocPlus-ResourceManager）已合并为单一 `AiDocPlus` monorepo。
+
+**当前项目规模**：
+- Rust 后端：8,895 行（23 个源文件）
+- TypeScript 前端：45,754 行（197 个源文件）
+- 内置插件：27 个（含 `_framework/` SDK）
+- AI 服务商：13 个
+- 提示词模板：1,481 个（53 个分类）
+- 文档模板：20 个（7 个分类）+ 8 个 PPT 主题
+- Zustand Store：6 个（useAppStore 1,782 行）
+
+**已完成的架构改进**：
+- ✅ 资源管理器合并到主程序（Tauri 多窗口）
+- ✅ 多仓库 → 单一 Monorepo（消除同步问题）
+- ✅ 插件 `_framework/` 统一为唯一一份
+- ✅ `build-resources.sh` 替代 `assemble.sh` + 各 `deploy.sh`
+- ✅ CI 简化（从 checkout 6 仓库 → 1 仓库）
+- ✅ Rust 编译优化（`codegen-units` 1→8）
+- ✅ SQLite 资源引擎移除（回归 JSON 文件模式）
+- ✅ 角色系统、项目模板功能完全移除
+- ✅ 插件框架字体跨平台 fallback（7 处）
+
 ---
 
 ## 一、编辑器核心功能（EditorPanel / MarkdownEditor）
@@ -115,6 +139,8 @@
 ---
 
 ## 三、插件系统（PluginHostAPI / loader / types）
+
+> **架构更新（2026-02-27）**：插件已从独立仓库（AiDocPlus-Plugins）合并到主仓库 `plugins/` 目录。`_framework/` 只有一份，消除了之前三份不同步的问题。当前共 27 个插件（含 `_framework/`）。
 
 ### 3.1 插件沙箱隔离
 
@@ -415,7 +441,7 @@
   - ✅ 个人、教育和非商业使用完全免费
   - ❌ 禁止用于竞争性商业产品（不能直接卖竞品或作为 SaaS 提供）
   - ⏰ 时间锁：3~4 年后自动转为 Apache 2.0（`Change Date: 2030-03-01`）
-- **资源仓库**（提示词模板、文档模板）保持 **MIT** 或 **CC BY 4.0** 以鼓励社区贡献
+- **资源数据**（`resources/` 目录中的提示词模板、文档模板）可考虑单独声明 **CC BY 4.0** 以鼓励社区贡献
 - ⭐⭐⭐ | 🔧 | **P0**
 
 ### 11.2 商业化收费模式：Freemium + 开放核心
@@ -423,7 +449,7 @@
 | 层级 | 定价 | 内容 |
 |------|------|------|
 | **社区版**（免费） | ¥0 | 本地 AI 写作全功能（用户自带 API Key）、基础插件（~10 个）、3 个项目 / 每项目 50 文档、单设备 |
-| **专业版** | ¥99~199/年 | 无限项目和文档、全部 28+ 插件、多设备同步、高级导出模板、RAG 知识库、优先邮件支持 |
+| **专业版** | ¥99~199/年 | 无限项目和文档、全部 27 个插件、多设备同步、高级导出模板、RAG 知识库、优先邮件支持 |
 | **企业版** | 按需 | 私有化部署、SSO/LDAP、批量授权、定制开发、专属技术支持 |
 
 #### 授权验证技术方案
@@ -661,9 +687,9 @@
 #### 构建与发布
 
 - **`tauri.conf.json`** bundle targets: `["dmg", "nsis"]`（仅双平台）
-- **`build.yml`**：GitHub Actions 双平台矩阵，`tauri-apps/tauri-action` 自动构建+发布
+- **`build.yml`**：GitHub Actions 构建 Windows x64，`tauri-apps/tauri-action` 自动构建+发布（Monorepo 后仅需 checkout 一个仓库）
 - **`scripts/windows/`**：Parallels VM 本地 ARM64 构建的完整 PowerShell 脚本
-- **`scripts/assemble.sh`**：bash 总装脚本，macOS/Linux 可用
+- **`scripts/build-resources.sh`**：资源构建脚本（替代原 assemble.sh + 各 deploy.sh）
 - **CLAUDE.md**：已有完整的代码跨平台规范和脚本兼容规范
 
 ### 16.3 短期目标：完善桌面三平台（P1）
@@ -695,7 +721,7 @@
 
 4. **测试 Linux TTS**：`tts` crate v0.26 支持 speech-dispatcher，但中文语音质量可能差异大，需标注为"实验性"
 
-5. **资源管理器**：`deploy.sh` 需增加 Linux 二进制文件的处理逻辑
+5. **资源管理器**：已合并到主程序，Linux 构建时自动包含
 
 - **开发成本**：约 3~5 天
 - **预期用户**：开发者、教育机构（Linux 桌面用户）
@@ -807,7 +833,7 @@
 | # | 问题 | 严重度 | 当前状态 |
 |---|------|--------|---------|
 | 1 | `tauri.conf.json` bundle targets 缺少 `deb`/`appimage` | 中 | 仅 `["dmg", "nsis"]` |
-| 2 | CI 无 Linux 构建矩阵 | 中 | `build.yml` 仅 macOS + Windows |
+| 2 | CI 无 Linux / macOS 构建矩阵 | 中 | `build.yml` 仅 Windows x64 |
 | 3 | 无 macOS Intel 构建 | 中 | 仅 `aarch64-apple-darwin` |
 | 4 | 无代码签名（macOS `signingIdentity: "-"`） | 高 | 安装时会触发 Gatekeeper 警告 |
 | 5 | Windows 无代码签名 | 高 | SmartScreen 警告，用户可能放弃安装 |
@@ -915,10 +941,11 @@
 
 ### A. 当前架构优势
 1. **Tauri 2 + React + Rust** 技术栈选型优秀，兼顾性能与开发效率。
-2. **外部化资源体系**（多仓库 + 总装脚本）便于团队协作和独立发版。
-3. **插件系统设计成熟**：两角色原则、自注册机制、Host API 隔离。
+2. **Monorepo 统一架构**：源码、插件、资源数据在同一仓库，`build-resources.sh` 一键构建，消除多仓库同步问题。
+3. **插件系统设计成熟**：27 个内置插件，两角色原则、自注册机制、Host API 隔离、统一 `_framework/`。
 4. **安全意识良好**：ZIP 炸弹防护、ReDoS 防护、命令白名单。
 5. **工作区持久化**完整：标签页状态、面板布局、侧边栏宽度等均可恢复。
+6. **资源管理器已合并到主程序**：Tauri 多窗口机制，无需独立构建和部署。
 
 ### B. 当前架构风险
 1. **单一大 Store**（`useAppStore` ~1800 行）：状态耦合度高，所有写操作都可能触发全局重渲染。
@@ -931,7 +958,8 @@
 
 ---
 
-*文档生成日期：基于对 AiDocPlus-Main 代码库的深入分析*
-*分析范围：前端（src-ui）、后端（src-tauri）、共享类型、插件框架、资源管理器*
+*文档生成日期：基于对 AiDocPlus 代码库的深入分析*
+*分析范围：前端（src-ui）、后端（src-tauri）、共享类型、插件框架、资源管理器、资源数据*
 *§11~§15 战略讨论补充日期：2026-02-27*
 *§16 跨平台战略补充日期：2026-02-27*
+*Monorepo 合并 + 状态更新日期：2026-02-27*

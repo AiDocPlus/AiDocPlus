@@ -1907,5 +1907,30 @@
     "searchNoResults": "No results found",
     "searchMatches": "matches",
     "noHistory": "No run history"
+  },
+  "pluginAssistant": {
+    "title": "{{name}} AI",
+    "switchService": "Switch AI Service",
+    "selectService": "Select AI Service",
+    "globalDefault": "Global Default",
+    "systemPrompt": "System Prompt",
+    "promptBtn": "Prompt",
+    "resetDefault": "Reset",
+    "clear": "Clear",
+    "exportChat": "Export Chat",
+    "copy": "Copy",
+    "copied": "Copied",
+    "generating": "Generating...",
+    "thinking": "Thinking...",
+    "interrupted": "_(Interrupted)_",
+    "emptyTitle": "{{name}} AI Assistant",
+    "emptyHint": "Describe your needs or use the quick actions above",
+    "noAiService": "Please configure AI service in Settings first",
+    "inputPlaceholder": "Type your question or request...",
+    "webSearch": "Web Search",
+    "webSearchUnavailable": "Current model does not support web search",
+    "deepThink": "Deep Think",
+    "deepThinkUnavailable": "Current model does not support deep thinking",
+    "copyMsg": "Copy"
   }
 }

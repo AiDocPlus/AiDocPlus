@@ -1,0 +1,18 @@
+{
+  "name": "@aidocplus/mcp-server",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "AiDocPlus MCP Server — 让 AI 助手（Claude Desktop 等）直接操作 AiDocPlus",
+  "main": "index.js",
+  "bin": {
+    "aidocplus-mcp": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "keywords": ["aidocplus", "mcp", "model-context-protocol"],
+  "license": "MIT"
+}

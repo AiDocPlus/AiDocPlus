@@ -37,6 +37,73 @@ export interface PluginPanelProps {
 }
 
 // ============================================================
+// AI 助手面板类型
+// ============================================================
+
+/** 插件 AI 助手面板的 Props（自定义面板组件接收） */
+export interface PluginAssistantPanelProps {
+  /** 插件 ID */
+  pluginId: string;
+  /** 当前文档 */
+  document: Document;
+  /** 该插件在文档中的数据 */
+  pluginData: unknown;
+  /** AI 正文内容 */
+  aiContent: string;
+  /** 当前标签页 ID */
+  tabId: string;
+}
+
+/** 插件快捷操作 */
+export interface PluginQuickAction {
+  /** 操作 ID */
+  id: string;
+  /** lucide 图标名（如 'Wand2', 'FileText'） */
+  icon: string;
+  /** 按钮文字 */
+  label: string;
+  /** 构建提示词（ctx 包含文档和插件上下文） */
+  buildPrompt: (ctx: { document: Document; pluginData: unknown; aiContent: string }) => string;
+}
+
+/** 插件 AI 助手配置（使用默认面板但定制行为） */
+export interface PluginAssistantConfig {
+  /** 默认系统提示词 */
+  defaultSystemPrompt: string;
+  /** 快捷操作按钮 */
+  quickActions?: PluginQuickAction[];
+  /** 构建上下文（追加到系统提示词末尾） */
+  buildContext?: (doc: Document, pluginData: unknown, aiContent: string) => string;
+}
+
+/** 生成默认助手配置的辅助函数 */
+export function createDefaultAssistantConfig(
+  pluginName: string,
+  pluginDesc: string,
+): PluginAssistantConfig {
+  return {
+    defaultSystemPrompt: `你是「${pluginName}」的 AI 助手。${pluginDesc}\n\n请根据用户的需求，提供与「${pluginName}」功能相关的帮助和建议。回复使用中文。`,
+    quickActions: [
+      {
+        id: 'help',
+        icon: 'HelpCircle',
+        label: '使用帮助',
+        buildPrompt: () => `请介绍「${pluginName}」的主要功能和使用方法。`,
+      },
+      {
+        id: 'optimize',
+        icon: 'Sparkles',
+        label: '优化建议',
+        buildPrompt: ({ aiContent }) => {
+          const content = aiContent ? `\n\n当前正文内容（截取前2000字）：\n${aiContent.slice(0, 2000)}` : '';
+          return `请针对当前文档内容，给出与「${pluginName}」功能相关的优化建议。${content}`;
+        },
+      },
+    ],
+  };
+}
+
+// ============================================================
 // 插件接口
 // ============================================================
 
@@ -73,6 +140,11 @@ export interface DocumentPlugin {
   onDeactivate?: () => void;
   onDocumentChange?: () => void;
   onDestroy?: () => void;
+
+  /** 完全自定义的 AI 助手面板组件（最高优先级） */
+  AssistantPanelComponent?: React.ComponentType<PluginAssistantPanelProps>;
+  /** AI 助手配置（使用默认面板但定制行为，次优先级） */
+  assistantConfig?: PluginAssistantConfig;
 }
 
 /**

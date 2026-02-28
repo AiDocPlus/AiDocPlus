@@ -1,6 +1,8 @@
 ---
-layout: default
-title: 配置智谱 AI - AiDocPlus
+title: 配置 AI 服务
+parent: 快速入门
+nav_order: 3
+permalink: /docs/getting-started/ai-service
 ---
 
 # 配置智谱 AI API Key

@@ -8,7 +8,7 @@ pub fn export_to_html(markdown: &str, title: &str) -> Result<String, String> {
     options.extension.strikethrough = true;
     options.extension.tasklist = true;
     options.extension.autolink = true;
-    options.render.unsafe_ = true;
+    options.render.r#unsafe = true;
 
     let html_body = markdown_to_html(markdown, &options);
     let css = styles::get_html_css();

@@ -8,6 +8,7 @@ import { usePluginStorageStore } from '@/stores/usePluginStorageStore';
 import { getFragmentsGroupedByPlugin } from '../fragments';
 import { parseThinkTags } from '@/utils/thinkTagParser';
 import i18next from 'i18next';
+import { getApiServerPort, isApiServerReady } from '@/api/ApiBridge';
 
 // ============================================================
 // SDK 版本号
@@ -29,6 +30,7 @@ const ALLOWED_PLUGIN_COMMANDS = new Set([
   'write_binary_file',      // 写入二进制文件
   'read_file_base64',       // 读取文件为 base64（附件处理）
   'read_text_file',         // 读取文本文件（CSV 导入等）
+  'get_file_metadata',      // 获取文件元数据（大小等）
   'get_temp_dir',           // 获取临时目录
   'open_file_with_app',     // 用系统应用打开文件（预览）
 
@@ -66,6 +68,10 @@ const ALLOWED_PLUGIN_COMMANDS = new Set([
   'tts_kokoro_synthesize',      // 合成文本为 PCM
   'tts_kokoro_export_wav',      // 导出 WAV 文件
   'tts_kokoro_list_voices',     // Kokoro 语音列表
+
+  // 插件存储（与 API Gateway plugin 命名空间对齐）
+  'load_plugin_storage',        // 加载插件存储 JSON
+  'save_plugin_storage',        // 保存插件存储 JSON
 ]);
 
 /**
@@ -100,7 +106,7 @@ export interface ContentAPI {
 /** AI 服务 API */
 export interface AIAPI {
   /** 单次 AI 对话（非流式），自动过滤 <think> 标签 */
-  chat(messages: Array<{ role: string; content: string }>, options?: { maxTokens?: number }): Promise<string>;
+  chat(messages: Array<{ role: string; content: string }>, options?: { maxTokens?: number; serviceId?: string }): Promise<string>;
   /**
    * 流式 AI 对话，自动过滤 <think> 标签
    * @param messages 消息列表
@@ -111,7 +117,7 @@ export interface AIAPI {
   chatStream(
     messages: Array<{ role: string; content: string }>,
     onChunk: (text: string) => void,
-    options?: { maxTokens?: number; signal?: AbortSignal }
+    options?: { maxTokens?: number; signal?: AbortSignal; serviceId?: string }
   ): Promise<string>;
   /** AI 服务是否可用 */
   isAvailable(): boolean;
@@ -155,6 +161,8 @@ export interface UIAPI {
   showSaveDialog(opts: { defaultName: string; extensions: string[] }): Promise<string | null>;
   /** 打开文件选择对话框 */
   showOpenDialog(opts: { filters: Array<{ name: string; extensions: string[] }> }): Promise<string | null>;
+  /** 打开多文件选择对话框 */
+  showOpenDialogMultiple(opts: { filters: Array<{ name: string; extensions: string[] }> }): Promise<string[]>;
   /** 获取当前语言 */
   getLocale(): string;
   /** 获取当前主题 */
@@ -238,6 +246,12 @@ export interface PlatformAPI {
    * @param params 插值参数
    */
   t(key: string, params?: Record<string, string | number>): string;
+  /**
+   * 获取 API Server 连接信息
+   * 插件如需启动外部脚本进程并让其通过 SDK 回调主程序，可用此方法获取连接参数
+   * @returns { port, ready } 或 null（Server 未启动时）
+   */
+  getApiServerInfo(): { port: number; ready: boolean } | null;
 }
 
 /** 主程序向插件提供的完整 API */
@@ -397,7 +411,7 @@ export function createPluginHostAPI(opts: CreatePluginHostAPIOptions): PluginHos
 
   const ai: AIAPI = {
     chat: async (messages, options) => {
-      const aiParams = getAIInvokeParamsForService(opts.getDocument().aiServiceId);
+      const aiParams = getAIInvokeParamsForService(options?.serviceId || opts.getDocument().aiServiceId);
       // 通知宿主：开始新的 AI 调用，清空思考内容
       lastThinking = '';
       opts.onThinkingUpdate?.('');
@@ -417,7 +431,7 @@ export function createPluginHostAPI(opts: CreatePluginHostAPIOptions): PluginHos
       return parsed.content;
     },
     chatStream: async (messages, onChunk, options) => {
-      const aiParams = getAIInvokeParamsForService(opts.getDocument().aiServiceId);
+      const aiParams = getAIInvokeParamsForService(options?.serviceId || opts.getDocument().aiServiceId);
       const requestId = `plugin_${pluginId}_${Date.now()}`;
 
       // 通知宿主：开始新的 AI 调用，清空思考内容
@@ -551,6 +565,15 @@ export function createPluginHostAPI(opts: CreatePluginHostAPIOptions): PluginHos
       if (!result || typeof result !== 'string') return null;
       return result;
     },
+    showOpenDialogMultiple: async (dialogOpts) => {
+      const result = await open({
+        multiple: true,
+        filters: dialogOpts.filters,
+      });
+      if (!result) return [];
+      if (typeof result === 'string') return [result];
+      return result as string[];
+    },
     getLocale: opts.getLocale,
     getTheme: opts.getTheme,
   };
@@ -592,6 +615,12 @@ export function createPluginHostAPI(opts: CreatePluginHostAPIOptions): PluginHos
         result = String(i18next.t(key, params as Record<string, string>));
       }
       return result;
+    },
+    getApiServerInfo: () => {
+      const port = getApiServerPort();
+      const ready = isApiServerReady();
+      if (!ready || port === null) return null;
+      return { port, ready };
     },
   };
 

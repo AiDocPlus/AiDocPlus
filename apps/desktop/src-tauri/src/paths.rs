@@ -59,6 +59,7 @@ fn find_dev_bundled_resources() -> Option<PathBuf> {
 }
 
 /// 获取 bundled-resources 根目录
+#[allow(dead_code)]
 pub fn bundled_resources_dir() -> Option<PathBuf> {
     BUNDLED_RESOURCES_DIR.get().cloned()
 }

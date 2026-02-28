@@ -48,6 +48,8 @@ AiDocPlus/
 │       │   │   ├── commands/ # IPC 命令处理（ai.rs, document.rs, export.rs, import.rs, workspace.rs, template.rs, resource.rs）
 │       │   │   ├── main.rs  # 入口文件
 │       │   │   ├── ai.rs    # AI HTTP 请求和流式处理
+│       │   │   ├── api_gateway.rs # 开放 API 网关（JSON-RPC 路由 + 权限）
+│       │   │   ├── api_server.rs  # HTTP API Server（axum，Token 认证）
 │       │   │   ├── document.rs # 文档数据模型
 │       │   │   ├── template.rs # 文档模板管理（用户模板 + 内置模板加载）
 │       │   │   ├── native_export/ # 原生导出模块
@@ -72,7 +74,7 @@ AiDocPlus/
 │           │   │   ├── settings/  # 设置面板
 │           │   │   ├── templates/ # 提示词模板
 │           │   │   └── ui/        # 基础 UI 组件
-│           │   ├── plugins/    # 插件系统（SDK + 框架 + 21 个内置插件）
+│           │   ├── plugins/    # 插件系统（SDK + 框架 + 27 个插件）
 │           │   │   ├── _framework/    # 插件框架 SDK（PluginHostAPI, 布局组件, UI 原语, i18n）
 │           │   │   ├── types.ts       # 插件接口定义（DocumentPlugin, PluginPanelProps）
 │           │   │   ├── constants.ts   # 默认启用插件列表 + 分类定义
@@ -98,6 +100,9 @@ AiDocPlus/
 │   │           ├── ai-providers.generated.ts
 │   │           ├── ppt-themes.generated.ts
 │   │           └── doc-template-categories.generated.ts
+│   ├── mcp-server/          # MCP Server（Model Context Protocol，23 个工具）
+│   ├── sdk-python/          # Python SDK（自动代理，pip install 即用）
+│   ├── sdk-js/              # JavaScript SDK（自动代理，require 即用）
 │   ├── manager-rust/        # 资源管理器 Rust crate（35+ Tauri commands）
 │   ├── manager-shared/      # 资源管理器共享 TypeScript 类型
 │   ├── manager-ui/          # 资源管理器共享 React 组件库（ManagerApp 等）
@@ -117,11 +122,13 @@ AiDocPlus/
 - **多格式导出**：Markdown、HTML、DOCX、TXT（原生导出 + Pandoc）
 - **工作区状态保存和恢复**：标签页、面板布局、项目状态持久化
 - **附件系统**：支持添加参考文件，AI 生成时自动读取附件内容
-- **插件系统**：21 个内置插件，自注册 + 自动发现 + manifest 驱动
+- **插件系统**：27 个插件，自注册 + 自动发现 + manifest 驱动
 - **资源数据**：提示词模板、AI 提供商、文档模板等资源数据在 `resources/` 目录，通过 `build-resources.sh` 生成 TypeScript 文件和 bundled-resources
 - **文档标签与收藏**：文档可添加自定义标签，支持收藏（星标），文件树按标签筛选/按收藏筛选，编辑器工具栏内联标签编辑器（TagEditor）
 - **编程区**：独立的多语言代码编辑与执行环境（Python/JavaScript/TypeScript/HTML 等），集成文件树、AI 助手、自动化运行、pip 包管理
 - **功能区**：功能类插件工作区（格式转换、OCR、代码工具等），独立于内容生成类插件
+- **开放 API**：HTTP API Server + JSON-RPC 网关（11 个命名空间 30+ 操作），MCP Server（23 个工具），Python / JS SDK
+- **脚本自动化**：编程区运行脚本时自动注入 API 连接参数，零配置调用 AiDocPlus 全部功能
 
 ### 运行命令
 
@@ -167,7 +174,7 @@ pnpm clean      # 清理构建缓存
 
 | 资源目录 | 说明 | 数量 |
 |------|------|----------|
-| `resources/prompt-templates/` | 提示词模板（JSON 文件模式） | 982 个模板（46 分类） |
+| `resources/prompt-templates/` | 提示词模板（JSON 文件模式） | 1481 个模板（53 分类） |
 | `resources/ai-providers/` | AI 服务提供商配置 | 13 个提供商 |
 | `resources/doc-templates/` | PPT 主题 + 文档模板分类 | 8 主题 + 8 分类 |
 
@@ -194,7 +201,7 @@ AiDocPlus-PromptTemplates/
 ├── data/                    # 每个分类一个 JSON 文件
 │   ├── academic.json        # {key, name, icon, order, templates: [{id, name, description, content, variables, order}]}
 │   ├── business.json
-│   └── ...                  # 共 46 个分类 JSON 文件（982 个模板）
+│   └── ...                  # 共 53 个分类 JSON 文件（1481 个模板）
 ├── scripts/
 │   ├── build.py             # 读取 data/*.json 生成 dist/*.generated.ts
 │   └── deploy.sh            # 复制 JSON 到 bundled-resources + generated TS 到 shared-types
@@ -368,19 +375,19 @@ AiDocPlus-Main/
 
 ### 插件体系操作规范（强制）
 
-> **⚠️ 最高优先级规则：所有 21 个插件都是外部插件，代码存放在独立项目 [AiDocPlus-Plugins](https://github.com/AiDocPlus/AiDocPlus-Plugins)（本地路径 `/Users/jdh/Code/AiDocPlus-Plugins`）。**
+> **⚠️ 最高优先级规则：所有 27 个插件的代码直接存放在 Monorepo 的 `apps/desktop/src-ui/src/plugins/` 目录下。**
 >
-> **当用户要求创建、修改、调试任何具体插件时，必须在 AiDocPlus-Plugins 项目中操作，绝不在主程序的 `src/plugins/` 目录下直接修改插件代码。** 主程序 `src/plugins/` 下的插件目录会被 `deploy.sh` 部署覆盖，任何直接修改都会丢失。
+> **插件在仓库中直接开发和修改。** `_framework/` 为插件 SDK 框架，其余每个子目录为一个独立插件。
 
 #### 操作位置判断（强制）
 
 | 用户需求 | 操作位置 | 说明 |
 |----------|----------|------|
-| 创建新插件 | `AiDocPlus-Plugins/plugins/{name}/` | 在插件项目中创建 |
-| 修改某个插件功能/UI/bug | `AiDocPlus-Plugins/plugins/{name}/` | 在插件项目中修改 |
-| 修改插件 SDK/框架 | 主程序 `src/plugins/_framework/` | 主程序构建者角色 |
-| 修改插件加载/注册机制 | 主程序 `src/plugins/loader.ts` 等 | 主程序构建者角色 |
-| 修改 PluginHostAPI | 主程序 `src/plugins/_framework/PluginHostAPI.ts` | 主程序构建者角色 |
+| 创建新插件 | `src/plugins/{name}/` | 在 Monorepo 中直接创建 |
+| 修改某个插件功能/UI/bug | `src/plugins/{name}/` | 在 Monorepo 中直接修改 |
+| 修改插件 SDK/框架 | `src/plugins/_framework/` | 主程序构建者角色 |
+| 修改插件加载/注册机制 | `src/plugins/loader.ts` 等 | 主程序构建者角色 |
+| 修改 PluginHostAPI | `src/plugins/_framework/PluginHostAPI.ts` | 主程序构建者角色 |
 
 #### 双角色原则（强制）
 
@@ -391,18 +398,17 @@ AiDocPlus-Main/
 
 **绝不混淆这两种角色。**
 
-#### 主程序 `src/plugins/` 目录说明
+#### `src/plugins/` 目录说明
 
-主程序 `src/plugins/` 只保留以下 SDK/框架文件（受 Git 版本控制）：
+`src/plugins/` 包含：
 - `_framework/` — 插件框架 SDK
 - `types.ts`、`pluginStore.ts`、`i18n-loader.ts`、`constants.ts`、`loader.ts`、`registry.ts`、`fragments.ts`
 - `PluginToolArea.tsx`、`PluginManagerPanel.tsx`、`PluginMenu.tsx`
-
-所有 `plugins/*/` 插件目录被 `.gitignore` 忽略，由 `AiDocPlus-Plugins` 项目的 `deploy.sh` 部署而来。
+- `{name}/` — 各插件目录，全部在 Monorepo 中管理
 
 ### 插件架构（v3 — 全外部插件体系）
 
-应用采用**全外部插件架构**，不存在任何内部/内置插件。所有 21 个插件都是独立的外部插件，通过自注册 + 自动发现机制加载。插件分为「内容生成类」和「功能执行类」两大类，通过三层解耦设计实现松耦合。
+应用采用**插件架构**，所有 27 个插件通过自注册 + 自动发现机制加载。插件分为「内容生成类」和「功能执行类」两大类，通过三层解耦设计实现松耦合。
 
 #### 核心机制
 
@@ -650,7 +656,7 @@ interface DocumentPlugin {
 
 每个插件自带翻译文件（`{plugin}/i18n/{zh,en}.json`），通过 `registerPluginI18n` 注册到 i18next 命名空间（如 `plugin-summary`）。框架层翻译在 `plugins/_framework/i18n/` 中，命名空间为 `plugin-framework`。
 
-#### 当前插件（21 个，全部为外部插件）
+#### 当前插件（27 个）
 
 **内容生成类**（使用 `PluginPanelLayout`）：
 - **摘要插件**（`plugins/summary/`）：AI 多风格文档摘要 — **新内容生成类插件首选参考**
@@ -685,12 +691,12 @@ interface DocumentPlugin {
 
 | 文件 | 作用 |
 |------|------|
-| `/Users/jdh/Code/AiDocPlus-Main/apps/desktop/src-ui/src/components/coding/CodingPanel.tsx` | 主面板（~1900 行）：工具栏、标签栏（DnD 拖拽排序）、CodeMirror 编辑器、输出区、设置面板、命令面板、面包屑导航、运行历史 |
-| `/Users/jdh/Code/AiDocPlus-Main/apps/desktop/src-ui/src/components/coding/CodingFileTree.tsx` | 文件树侧边栏（~416 行）：递归树形展示、收藏标记、文件大小显示、右键菜单（新建/重命名/删除/收藏）、全局内容搜索、3 秒轮询刷新 |
-| `/Users/jdh/Code/AiDocPlus-Main/apps/desktop/src-ui/src/components/coding/CodingAssistantPanel.tsx` | AI 助手面板（~635 行）：快捷操作（修正/解释/优化/安装依赖/生成文档/测试）、上下文感知对话、代码块应用、Diff 预览、系统提示词编辑 |
-| `/Users/jdh/Code/AiDocPlus-Main/apps/desktop/src-ui/src/components/coding/codingAI.ts` | AI 自动化引擎（~549 行）：自动运行循环（生成→运行→检测→pip install→AI 修正→重试）、流式对话、代码块提取、LCS Diff |
-| `/Users/jdh/Code/AiDocPlus-Main/apps/desktop/src-ui/src/stores/useCodingStore.ts` | 状态管理（~448 行）：标签页、收藏、设置、运行历史、最近文件，Zustand 手动持久化（debounce 500ms → Rust `save_coding_state`） |
-| `/Users/jdh/Code/AiDocPlus-Main/apps/desktop/src-tauri/src/commands/coding.rs` | Rust 后端（~428 行）：文件 CRUD、递归文件树、全局搜索、外部文件读取、pip 包管理、状态持久化 |
+| `apps/desktop/src-ui/src/components/coding/CodingPanel.tsx` | 主面板（~1900 行）：工具栏、标签栏（DnD 拖拽排序）、CodeMirror 编辑器、输出区、设置面板、命令面板、面包屑导航、运行历史 |
+| `apps/desktop/src-ui/src/components/coding/CodingFileTree.tsx` | 文件树侧边栏（~416 行）：递归树形展示、收藏标记、文件大小显示、右键菜单（新建/重命名/删除/收藏）、全局内容搜索、3 秒轮询刷新 |
+| `apps/desktop/src-ui/src/components/coding/CodingAssistantPanel.tsx` | AI 助手面板（~635 行）：快捷操作（修正/解释/优化/安装依赖/生成文档/测试）、上下文感知对话、代码块应用、Diff 预览、系统提示词编辑 |
+| `apps/desktop/src-ui/src/components/coding/codingAI.ts` | AI 自动化引擎（~549 行）：自动运行循环（生成→运行→检测→pip install→AI 修正→重试）、流式对话、代码块提取、LCS Diff |
+| `apps/desktop/src-ui/src/stores/useCodingStore.ts` | 状态管理（~448 行）：标签页、收藏、设置、运行历史、最近文件，Zustand 手动持久化（debounce 500ms → Rust `save_coding_state`） |
+| `apps/desktop/src-tauri/src/commands/coding.rs` | Rust 后端（~428 行）：文件 CRUD、递归文件树、全局搜索、外部文件读取、pip 包管理、状态持久化 |
 
 #### UI 布局
 
@@ -845,6 +851,88 @@ interface DocumentPlugin {
 - **版本历史包含 pluginData 和 enabledPlugins**，创建和恢复版本时完整保存/还原插件数据
 - 生成完成后，`PluginPanelLayout` 自动收起提示词区域
 - **后端 `save_document` Option 字段保护规则**：`attachments`、`pluginData`、`enabledPlugins` 等 `Option` 类型字段必须用 `if let Some` 保护，禁止无条件直接赋值（`document.field = value`），否则前端传 `undefined`（Rust 侧 `None`）时会清空磁盘上已有的数据
+
+### 开放 API 与脚本自动化
+
+程序启动时在 `127.0.0.1` 上开启 HTTP API Server（随机可用端口），连接信息写入 `~/.aidocplus/api.json`，退出时自动清理。
+
+#### 架构
+
+```
+外部调用方                        AiDocPlus 主程序
+─────────                        ─────────────
+Python SDK ─┐                   ┌─ api_server.rs（axum HTTP Server）
+JS SDK     ─┤── HTTP POST ─────→│  Token 认证（Bearer）
+MCP Server ─┤  /api/v1/call     │  ↓
+curl / 脚本 ─┘                   └─ api_gateway.rs（JSON-RPC 路由）
+                                      ↓ dispatch
+                                   11 个命名空间 30+ 操作
+                                      ↓ 部分通过事件桥接前端
+                                   Tauri emit/listen
+```
+
+#### HTTP 端点
+
+| 端点 | 方法 | 认证 | 说明 |
+|------|------|------|------|
+| `/api/v1/status` | GET | 无 | 运行状态 |
+| `/api/v1/schema` | GET | 无 | API 自描述（所有命名空间和操作） |
+| `/api/v1/call` | POST | Bearer Token | JSON-RPC 统一入口 |
+
+#### API 命名空间（`api_gateway.rs`）
+
+| 命名空间 | 操作 | 说明 |
+|----------|------|------|
+| `app` | `status`, `getActiveDocument`, `getSelectedText`, `getActiveProjectId` | 程序状态 |
+| `document` | `list`, `get`, `create`, `save` | 文档 CRUD |
+| `project` | `list` | 项目列表 |
+| `search` | `documents` | 文档搜索 |
+| `ai` | `chat`, `generate` | AI 对话/生成（支持 `system_prompt`、`temperature`、`max_tokens`） |
+| `export` | `markdown`, `html`, `docx`, `pdf`, `txt` | 多格式导出 |
+| `template` | `list`, `getContent` | 提示词模板 |
+| `plugin` | `list`, `storage.get`, `storage.set` | 插件管理 |
+| `file` | `read`, `write`, `metadata` | 文件操作（限 `~/AiDocPlus/` 下） |
+| `script` | `listFiles` | 脚本列表 |
+| `tts` | `speak`, `stop`, `listVoices` | 语音朗读（占位） |
+| `email` | `send`, `testConnection` | 邮件（占位） |
+
+#### 连接信息（`~/.aidocplus/api.json`）
+
+```json
+{
+  "port": 12345,
+  "token": "64位hex",
+  "pid": 1234,
+  "version": "0.3.0"
+}
+```
+
+权限：Unix 下 `0600`，仅当前用户可读。
+
+#### SDK
+
+- **Python SDK**（`packages/sdk-python/`）：`Proxy.__getattr__` 自动代理，`api.document.list(projectId="xxx")` 即可调用
+- **JS SDK**（`packages/sdk-js/`）：同样的 Proxy 自动代理机制
+- 连接参数优先级：函数参数 > 环境变量（`AIDOCPLUS_API_PORT` / `AIDOCPLUS_API_TOKEN`）> `~/.aidocplus/api.json`
+
+#### MCP Server（`packages/mcp-server/`）
+
+Model Context Protocol Server，23 个工具，供 Claude Desktop / Cursor 等 AI 工具直接调用 AiDocPlus。工具名统一使用 `aidocplus_` 前缀。
+
+#### 编程区自动化
+
+脚本运行器（`commands/script_runner.rs`）自动注入环境变量：
+- `AIDOCPLUS_API_PORT` / `AIDOCPLUS_API_TOKEN` — API 连接参数
+- `PYTHONPATH` — 追加 Python SDK 路径，使 `import aidocplus` 可用
+- `NODE_PATH` — 追加 JS SDK 路径，使 `require('aidocplus')` 可用
+
+编程区中的 Python/Node.js 脚本无需任何配置即可调用 AiDocPlus 全部 API。
+
+#### 安全机制
+
+- **Token 认证**：所有 `/api/v1/call` 请求需要 Bearer Token
+- **路径安全**：`file.read/write/metadata` 和 `export.*` 操作通过 `canonicalize` + 前缀验证，限制在 `~/AiDocPlus/` 下
+- **调用者级别**：`CallerLevel::Script`（编程区脚本）/ `CallerLevel::External`（外部 SDK/MCP）
 
 ## Known Issues & Solutions
 

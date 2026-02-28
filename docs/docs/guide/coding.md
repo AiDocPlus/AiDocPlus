@@ -1,6 +1,7 @@
 ---
-layout: default
-title: 编程区 - AiDocPlus
+title: 编程区
+parent: 功能指南
+nav_order: 5
 ---
 
 # 编程区

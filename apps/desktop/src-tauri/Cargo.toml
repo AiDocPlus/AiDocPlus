@@ -1,6 +1,6 @@
 [package]
 name = "aidocplus"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 
 [build-dependencies]
@@ -16,23 +16,29 @@ serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 thiserror = "2"
 uuid = { version = "1", features = ["v4", "serde"] }
-dirs = "5"
+dirs = "6"
 chrono = { version = "0.4", features = ["serde"] }
-reqwest = { version = "0.12", features = ["json", "stream", "multipart", "rustls-tls-native-roots"], default-features = false }
-eventsource-client = "0.12"
+reqwest = { version = "0.13", features = ["json", "stream", "multipart"] }
+eventsource-client = "0.17"
 futures-util = "0.3"
 regex = "1"
-zip = "0.6"
+zip = "8.1"
 tauri-plugin-window-state = "2.4.1"
 tauri-plugin-process = "2"
-comrak = "0.34"
+comrak = "0.50"
 lettre = { version = "0.11", features = ["tokio1-rustls-tls", "smtp-transport", "builder"], default-features = false }
 docx-rs = "0.4"
 base64 = "0.22"
-quick-xml = "0.36"
+quick-xml = "0.39"
 tts = "0.26"
 tauri-plugin-updater = "2"
 url = "2"
+axum = { version = "0.7", features = ["json"] }
+tower-http = { version = "0.5", features = ["cors"] }
+rand = "0.8"
+tauri-plugin-cli = "2"
+tauri-plugin-deep-link = "2"
+async-stream = "0.3"
 aidocplus-manager-rust = { path = "../../../packages/manager-rust" }
 
 # 本地开发构建：快速编译，重在测试

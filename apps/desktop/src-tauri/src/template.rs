@@ -63,6 +63,7 @@ fn default_template_type() -> String {
 // ═══════════════════════════════════════════════════════════════
 
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 struct CategoryJsonFile {
     key: String,
     name: String,
@@ -75,6 +76,7 @@ struct CategoryJsonFile {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 struct BuiltinJsonTemplate {
     id: String,
     #[serde(default)]

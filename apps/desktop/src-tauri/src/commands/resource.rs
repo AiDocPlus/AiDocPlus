@@ -1,4 +1,5 @@
 #[tauri::command]
+#[allow(non_snake_case)]
 pub fn open_resource_manager(
     app_handle: tauri::AppHandle,
     managerName: String,

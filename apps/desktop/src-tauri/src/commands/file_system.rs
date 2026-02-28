@@ -199,3 +199,18 @@ pub fn create_directory(path: String) -> Result<()> {
 
     Ok(fs::create_dir_all(path).map_err(|e| e.to_string())?)
 }
+
+/// 获取文件元数据（大小等），供插件查询附件大小
+#[tauri::command]
+pub fn get_file_metadata(path: String) -> Result<serde_json::Value> {
+    let file_path = Path::new(&path);
+    if !file_path.exists() {
+        return Err(format!("File not found: {}", path));
+    }
+    let metadata = fs::metadata(file_path).map_err(|e| format!("Failed to read metadata: {}", e))?;
+    Ok(serde_json::json!({
+        "size": metadata.len(),
+        "isFile": metadata.is_file(),
+        "isDir": metadata.is_dir(),
+    }))
+}

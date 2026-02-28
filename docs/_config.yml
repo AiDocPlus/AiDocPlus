@@ -3,21 +3,36 @@ description: AI 驱动的智能文档创作工具
 url: "https://AiDocPlus.com"
 baseurl: ""
 
-theme: jekyll-theme-cayman
+remote_theme: just-the-docs/just-the-docs@v0.10.0
 
 markdown: kramdown
 highlighter: rouge
 
 plugins:
   - jekyll-seo-tag
+  - jekyll-remote-theme
 
-defaults:
-  - scope:
-      path: ""
-    values:
-      layout: default
+color_scheme: light
+
+search_enabled: true
+search:
+  heading_level: 3
+
+nav_external_links:
+  - title: GitHub
+    url: https://github.com/AiDocPlus/AiDocPlus
+
+aux_links:
+  "GitHub":
+    - "https://github.com/AiDocPlus/AiDocPlus"
+
+footer_content: "Copyright &copy; 2024-2026 AiDocPlus. MIT License."
+
+back_to_top: true
+back_to_top_text: "回到顶部"
 
 exclude:
   - screenshots/originals/
   - node_modules/
   - vendor/
+  - getting-started/

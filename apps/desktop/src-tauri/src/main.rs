@@ -2,6 +2,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod ai;
+mod api_gateway;
+mod api_server;
 mod commands;
 mod config;
 mod document;
@@ -39,7 +41,8 @@ use commands::{
 use commands::tts::TtsState;
 use commands::script_runner::RunningScriptState;
 use aidocplus_manager_rust::commands::DataDirState;
-use tauri::{Manager, Emitter};
+use tauri::{Manager, Emitter, Listener};
+use tauri_plugin_cli::CliExt;
 use tauri::menu::{
     MenuBuilder, SubmenuBuilder, MenuItem,
 };
@@ -51,6 +54,8 @@ fn main() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_cli::init())
+        .plugin(tauri_plugin_deep_link::init())
         .setup(|app| {
             // Initialize app state
             app.manage(config::AppState::new());
@@ -194,6 +199,59 @@ fn main() {
                 }
             });
 
+            // ── CLI 参数处理 ──
+            if let Ok(matches) = app.cli().matches() {
+                // --version / -v
+                if matches.args.get("version").and_then(|v| v.value.as_bool()).unwrap_or(false) {
+                    println!("AiDocPlus v{}", env!("CARGO_PKG_VERSION"));
+                }
+                // 子命令 api
+                if let Some(ref sub_cmd) = matches.subcommand {
+                    if sub_cmd.name == "api" {
+                        if let Some(ref api_sub) = sub_cmd.matches.subcommand {
+                            if api_sub.name == "status" {
+                                println!("[CLI] api status — 请求将在 API Server 启动后处理");
+                            } else if api_sub.name == "schema" {
+                                println!("[CLI] api schema — 请求将在 API Server 启动后处理");
+                            } else if api_sub.name == "call" {
+                                if let Some(method_val) = api_sub.matches.args.get("method") {
+                                    if let Some(method) = method_val.value.as_str() {
+                                        let params = api_sub.matches.args.get("params")
+                                            .and_then(|v| v.value.as_str())
+                                            .unwrap_or("{}");
+                                        println!("[CLI] api call {} -p {}", method, params);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Deep Link URL Scheme 监听 ──
+            let dl_handle = app.handle().clone();
+            app.listen("deep-link://new-url", move |event: tauri::Event| {
+                let payload = event.payload();
+                println!("[AiDocPlus] 收到 deep-link URL: {}", payload);
+                let _ = dl_handle.emit("deep-link:open", payload);
+            });
+
+            // 启动 API HTTP Server（后台 task）
+            let app_handle = app.handle().clone();
+            let api_handle = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                match api_server::start_api_server(api_handle).await {
+                    Ok((port, _token)) => {
+                        println!("[AiDocPlus] API Server 已启动，端口: {}", port);
+                        // 通知前端 API Server 已就绪
+                        let _ = app_handle.emit("api-server:ready", serde_json::json!({ "port": port }));
+                    }
+                    Err(e) => {
+                        eprintln!("[AiDocPlus] API Server 启动失败: {}", e);
+                    }
+                }
+            });
+
             #[cfg(debug_assertions)]
             {
                 let window = app.get_webview_window("main").unwrap();
@@ -211,6 +269,7 @@ fn main() {
             write_file,
             delete_file,
             create_directory,
+            get_file_metadata,
 
             // Project commands
             create_project,
@@ -406,10 +465,14 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+
+    // 程序退出时清理 api.json
+    api_server::cleanup_api_json();
 }
 
 // ── 资源管理器多窗口支持 ──
 
+#[allow(dead_code)]
 pub struct ManagerWindowState(std::sync::Mutex<Option<String>>);
 
 #[tauri::command]

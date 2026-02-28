@@ -78,6 +78,32 @@ pub async fn run_script_stream(
         }
     }
 
+    // 注入 API Server 连接参数（供 aidocplus SDK 使用）
+    if let Some((port, token)) = crate::api_server::get_api_connection_info() {
+        cmd.env("AIDOCPLUS_API_PORT", port.to_string());
+        cmd.env("AIDOCPLUS_API_TOKEN", &token);
+        // 注入 SDK 路径到 PYTHONPATH，使 import aidocplus 可用
+        if let Some(sdk_path) = crate::api_server::get_python_sdk_path() {
+            let existing = std::env::var("PYTHONPATH").unwrap_or_default();
+            let new_path = if existing.is_empty() {
+                sdk_path
+            } else {
+                format!("{}:{}", sdk_path, existing)
+            };
+            cmd.env("PYTHONPATH", new_path);
+        }
+        // 注入 SDK 路径到 NODE_PATH，使 require('aidocplus') 可用
+        if let Some(sdk_path) = crate::api_server::get_js_sdk_path() {
+            let existing = std::env::var("NODE_PATH").unwrap_or_default();
+            let new_path = if existing.is_empty() {
+                sdk_path
+            } else {
+                format!("{}:{}", sdk_path, existing)
+            };
+            cmd.env("NODE_PATH", new_path);
+        }
+    }
+
     // Set working directory
     if let Some(ref dir) = cwd {
         cmd.current_dir(dir);
