@@ -60,7 +60,14 @@ pub fn open_resource_manager(
     let url = if cfg!(debug_assertions) {
         WebviewUrl::External(url_str.parse().map_err(|e| format!("URL 解析失败: {}", e))?)
     } else {
-        WebviewUrl::App(url_str.into())
+        // WebviewUrl::App(PathBuf) 不支持 query string（Windows 上 ? 是非法路径字符）
+        // 改用 CustomProtocol 构造完整 URL
+        let full_url = if cfg!(target_os = "windows") {
+            format!("https://tauri.localhost/{}", url_str)
+        } else {
+            format!("tauri://localhost/{}", url_str)
+        };
+        WebviewUrl::CustomProtocol(full_url.parse().map_err(|e| format!("URL 解析失败: {}", e))?)
     };
 
     WebviewWindowBuilder::new(&app_handle, window_label, url)
