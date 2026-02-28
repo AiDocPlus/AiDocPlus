@@ -93,15 +93,16 @@ jobs:
         with:
           projectPath: ./apps/desktop
           tagName: ${{ steps.version.outputs.tag }}
-          releaseName: 'AiDocPlus __VERSION__'
+          releaseName: 'AiDocPlus ${{ steps.version.outputs.tag }}'
           releaseBody: |
-            ## AiDocPlus __VERSION__
+            ## AiDocPlus ${{ steps.version.outputs.tag }}
 
             ### 下载
             - **Windows (x64)**: .exe 安装程序（NSIS）
+            - **macOS (Apple Silicon)**: .dmg 安装包
 
             ### 更新说明
             请查看 CHANGELOG.md 获取详细更新内容。
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: --target x86_64-pc-windows-msvc
