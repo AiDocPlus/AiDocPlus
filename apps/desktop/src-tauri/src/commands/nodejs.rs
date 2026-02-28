@@ -2,6 +2,16 @@ use serde::{Deserialize, Serialize};
 use std::process::Command;
 use std::time::{Duration, Instant};
 
+/// 在 Windows 上隐藏子进程控制台窗口
+#[cfg(target_os = "windows")]
+fn hide_console_window(cmd: &mut Command) {
+    use std::os::windows::process::CommandExt;
+    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+}
+
+#[cfg(not(target_os = "windows"))]
+fn hide_console_window(_cmd: &mut Command) {}
+
 /// Node.js 检测结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeCheckResult {
@@ -28,9 +38,10 @@ pub struct NodeRunResult {
 pub fn find_node(custom_path: Option<&str>) -> Option<String> {
     if let Some(path) = custom_path {
         if !path.is_empty() {
-            if Command::new(path)
-                .arg("--version")
-                .output()
+            let mut cmd = Command::new(path);
+            cmd.arg("--version");
+            hide_console_window(&mut cmd);
+            if cmd.output()
                 .map(|o| o.status.success())
                 .unwrap_or(false)
             {
@@ -41,9 +52,10 @@ pub fn find_node(custom_path: Option<&str>) -> Option<String> {
     // 候选命令名
     let candidates = vec!["node"];
     for candidate in candidates {
-        if Command::new(candidate)
-            .arg("--version")
-            .output()
+        let mut cmd = Command::new(candidate);
+        cmd.arg("--version");
+        hide_console_window(&mut cmd);
+        if cmd.output()
             .map(|o| o.status.success())
             .unwrap_or(false)
         {
@@ -57,9 +69,10 @@ pub fn find_node(custom_path: Option<&str>) -> Option<String> {
 fn get_node_path(node: &str) -> Option<String> {
     #[cfg(target_os = "windows")]
     {
-        Command::new("where")
-            .arg(node)
-            .output()
+        let mut cmd = Command::new("where");
+        cmd.arg(node);
+        hide_console_window(&mut cmd);
+        cmd.output()
             .ok()
             .and_then(|o| {
                 if o.status.success() {
@@ -97,7 +110,10 @@ fn check_nodejs_sync(custom_path: Option<String>) -> NodeCheckResult {
     let node = find_node(custom_path.as_deref());
     match node {
         Some(n) => {
-            match Command::new(&n).arg("--version").output() {
+            let mut cmd = Command::new(&n);
+            cmd.arg("--version");
+            hide_console_window(&mut cmd);
+            match cmd.output() {
                 Ok(output) => {
                     let version_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
                     let version = version_str.strip_prefix('v').unwrap_or(&version_str).to_string();
@@ -166,6 +182,7 @@ pub fn run_node_script(
 
     let mut cmd = Command::new(&node);
     cmd.arg(&script);
+    hide_console_window(&mut cmd);
 
     // 注入 API Server 连接参数（供 SDK 使用）
     if let Some((port, token)) = crate::api_server::get_api_connection_info() {

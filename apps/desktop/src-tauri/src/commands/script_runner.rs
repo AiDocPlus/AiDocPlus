@@ -120,6 +120,13 @@ pub async fn run_script_stream(
     cmd.stdout(std::process::Stdio::piped());
     cmd.stderr(std::process::Stdio::piped());
 
+    // 在 Windows 上隐藏子进程控制台窗口
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+
     // Spawn
     let mut child = cmd
         .spawn()

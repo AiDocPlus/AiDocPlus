@@ -2,6 +2,16 @@ use serde::{Deserialize, Serialize};
 use std::process::Command;
 use std::time::{Duration, Instant};
 
+/// 在 Windows 上隐藏子进程控制台窗口
+#[cfg(target_os = "windows")]
+fn hide_console_window(cmd: &mut Command) {
+    use std::os::windows::process::CommandExt;
+    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+}
+
+#[cfg(not(target_os = "windows"))]
+fn hide_console_window(_cmd: &mut Command) {}
+
 /// Python 检测结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PythonCheckResult {
@@ -41,9 +51,10 @@ pub fn find_python(custom_path: Option<&str>) -> Option<String> {
     if let Some(path) = custom_path {
         if !path.is_empty() {
             // 验证自定义路径是否可用
-            if Command::new(path)
-                .arg("--version")
-                .output()
+            let mut cmd = Command::new(path);
+            cmd.arg("--version");
+            hide_console_window(&mut cmd);
+            if cmd.output()
                 .map(|o| o.status.success())
                 .unwrap_or(false)
             {
@@ -52,9 +63,10 @@ pub fn find_python(custom_path: Option<&str>) -> Option<String> {
         }
     }
     for candidate in python_candidates() {
-        if Command::new(candidate)
-            .arg("--version")
-            .output()
+        let mut cmd = Command::new(candidate);
+        cmd.arg("--version");
+        hide_console_window(&mut cmd);
+        if cmd.output()
             .map(|o| o.status.success())
             .unwrap_or(false)
         {
@@ -69,7 +81,10 @@ fn check_python_sync(custom_path: Option<String>) -> PythonCheckResult {
     let python = find_python(custom_path.as_deref());
     match python {
         Some(py) => {
-            match Command::new(&py).arg("--version").output() {
+            let mut cmd = Command::new(&py);
+            cmd.arg("--version");
+            hide_console_window(&mut cmd);
+            match cmd.output() {
                 Ok(output) => {
                     let version_str = String::from_utf8_lossy(&output.stdout).to_string();
                     let version = version_str
@@ -125,9 +140,10 @@ pub async fn check_python(
 fn get_python_path(python: &str) -> Option<String> {
     #[cfg(target_os = "windows")]
     {
-        Command::new("where")
-            .arg(python)
-            .output()
+        let mut cmd = Command::new("where");
+        cmd.arg(python);
+        hide_console_window(&mut cmd);
+        cmd.output()
             .ok()
             .and_then(|o| {
                 if o.status.success() {
@@ -297,10 +313,10 @@ pub async fn discover_pythons() -> Vec<PythonInterpreter> {
 
 /// 探测单个 Python 路径，返回其信息
 fn probe_python(cmd: &str) -> Option<PythonInterpreter> {
-    let output = Command::new(cmd)
-        .arg("--version")
-        .output()
-        .ok()?;
+    let mut proc = Command::new(cmd);
+    proc.arg("--version");
+    hide_console_window(&mut proc);
+    let output = proc.output().ok()?;
     if !output.status.success() { return None; }
     let version_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
     let version = version_str.strip_prefix("Python ").unwrap_or(&version_str).to_string();
@@ -373,6 +389,7 @@ pub fn run_python_script(
     // 构建命令
     let mut cmd = Command::new(&python);
     cmd.arg(&script_file);
+    hide_console_window(&mut cmd);
 
     // 添加额外参数
     if let Some(ref extra_args) = args {
