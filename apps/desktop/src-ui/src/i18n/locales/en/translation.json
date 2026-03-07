@@ -1767,6 +1767,7 @@
     "templatePrompt": "Prompt Template Content (optional, auto-generated if empty)"
   },
   "update": {
+    "checking": "Checking for updates...",
     "newVersionAvailable": "New version available",
     "downloading": "Downloading update...",
     "readyToRestart": "Update is ready",

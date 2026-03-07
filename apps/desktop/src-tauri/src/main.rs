@@ -180,6 +180,8 @@ fn main() {
                 .item(&MenuItem::with_id(handle, "help_docs", "使用文档", true, None::<&str>)?)
                 .item(&MenuItem::with_id(handle, "help_feedback", "反馈与建议", true, None::<&str>)?)
                 .separator()
+                .item(&MenuItem::with_id(handle, "check_update", "检查更新...", true, None::<&str>)?)
+                .separator()
                 .item(&MenuItem::with_id(handle, "about", "关于 AiDocPlus", true, None::<&str>)?)
                 .build()?;
 

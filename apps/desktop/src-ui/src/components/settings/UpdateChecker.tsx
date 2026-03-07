@@ -22,6 +22,7 @@ export function UpdateChecker() {
     try {
       setStatus('checking');
       setErrorMsg('');
+      if (!silent) setShowBanner(true);
       const update: Update | null = await check();
       if (update) {
         setNewVersion(update.version);
@@ -96,6 +97,15 @@ export function UpdateChecker() {
     return () => clearTimeout(timer);
   }, [checkForUpdate]);
 
+  // 监听菜单"检查更新"事件
+  useEffect(() => {
+    const handleMenuCheckUpdate = () => {
+      checkForUpdate(false);
+    };
+    window.addEventListener('menu-check-update', handleMenuCheckUpdate);
+    return () => window.removeEventListener('menu-check-update', handleMenuCheckUpdate);
+  }, [checkForUpdate]);
+
   if (!showBanner) return null;
 
   return (
@@ -103,12 +113,14 @@ export function UpdateChecker() {
       <div className="bg-card border border-border rounded-lg shadow-lg p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
+            {status === 'checking' && <RefreshCw className="w-5 h-5 text-primary shrink-0 animate-spin" />}
             {status === 'available' && <Download className="w-5 h-5 text-primary shrink-0" />}
             {status === 'downloading' && <RefreshCw className="w-5 h-5 text-primary shrink-0 animate-spin" />}
             {status === 'ready' && <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />}
             {status === 'up-to-date' && <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />}
             {status === 'error' && <AlertCircle className="w-5 h-5 text-destructive shrink-0" />}
             <span className="text-sm font-medium">
+              {status === 'checking' && t('update.checking', { defaultValue: '正在检查更新...' })}
               {status === 'available' && t('update.newVersionAvailable', { defaultValue: '发现新版本' })}
               {status === 'downloading' && t('update.downloading', { defaultValue: '正在下载更新...' })}
               {status === 'ready' && t('update.readyToRestart', { defaultValue: '更新已就绪' })}

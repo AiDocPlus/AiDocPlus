@@ -153,6 +153,9 @@ export function useMenuEvents(onSettingsOpen: () => void) {
         case 'help_feedback':
           invoke('open_file_with_app', { path: 'https://github.com/AiDocPlus/AiDocPlus/issues', appName: null }).catch(() => {});
           break;
+        case 'check_update':
+          window.dispatchEvent(new CustomEvent('menu-check-update'));
+          break;
         case 'about':
           window.dispatchEvent(new CustomEvent('menu-about'));
           break;
