@@ -88,7 +88,7 @@ export function UpdateChecker() {
     if (checkedRef.current) return;
     checkedRef.current = true;
 
-    getVersion().then(setCurrentVersion).catch(() => setCurrentVersion('0.3.0'));
+    getVersion().then(setCurrentVersion).catch(() => setCurrentVersion('未知'));
 
     const timer = setTimeout(() => {
       checkForUpdate(true);
