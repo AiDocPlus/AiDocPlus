@@ -767,12 +767,26 @@ async fn handle_ai(action: &str, params: &Value, app_handle: &AppHandle) -> Hand
                 _ => "gpt-4.1",
             };
 
+            // 根据 provider 使用推荐的默认 temperature
+            let default_temp = match provider {
+                "glm" | "glm-code" => 1.0,
+                "minimax" | "minimax-code" => 1.0,
+                _ => 0.7,
+            };
             let temperature = params.get("temperature")
                 .and_then(|v| v.as_f64())
-                .unwrap_or(0.7);
+                .unwrap_or(default_temp);
+            // 根据 provider 使用推荐的默认 max_tokens
+            let default_max_tokens: u64 = match provider {
+                "glm" | "glm-code" => 8192,
+                "minimax" | "minimax-code" => 8192,
+                "anthropic" => 8192,
+                _ => 4096,
+            };
             let max_tokens_val = params.get("max_tokens")
                 .or_else(|| params.get("maxTokens"))
-                .and_then(|v| v.as_u64());
+                .and_then(|v| v.as_u64())
+                .or(Some(default_max_tokens));
 
             let the_model = model.unwrap_or(default_model);
             let client = reqwest::Client::new();
@@ -853,9 +867,7 @@ async fn handle_ai(action: &str, params: &Value, app_handle: &AppHandle) -> Hand
                     "temperature": temperature,
                     "stream": false
                 });
-                if let Some(mt) = max_tokens_val {
-                    body["max_tokens"] = json!(mt);
-                }
+                body["max_tokens"] = json!(max_tokens_val.unwrap_or(default_max_tokens));
 
                 let resp = client.post(&url)
                     .header("Content-Type", "application/json")

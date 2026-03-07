@@ -100,7 +100,7 @@ interface AppState {
   clearAiMessages: (tabId: string) => void;
   setAiStreaming: (streaming: boolean, tabId?: string) => void;
   stopAiStreaming: () => void;
-  sendChatMessage: (tabId: string, content: string, enableWebSearch?: boolean, contextInfo?: { mode: ChatContextMode; content: string }, enableTools?: boolean) => Promise<string>;
+  sendChatMessage: (tabId: string, content: string, enableWebSearch?: boolean, contextInfo?: { mode: ChatContextMode; content: string }, enableTools?: boolean, options?: { enableThinking?: boolean; planMode?: boolean }) => Promise<string>;
   generateContent: (authorNotes: string, currentContent: string) => Promise<string>;
   generateContentStream: (authorNotes: string, currentContent: string, onChunk: (chunk: string) => void, conversationHistory?: AIMessage[], enableWebSearch?: boolean) => Promise<string>;
 
@@ -729,7 +729,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ isAiStreaming: false, aiStreamingTabId: null });
   },
   // AI Actions（流式聊天，支持停止）
-  sendChatMessage: async (tabId, content, enableWebSearch, contextInfo, enableTools) => {
+  sendChatMessage: async (tabId, content, enableWebSearch, contextInfo, enableTools, options) => {
     // 获取当前标签页的流状态
     const currentStreamState = get().streamStateByTab[tabId] || {
       unlistenFn: null,
@@ -793,7 +793,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       const messages: { role: string; content: string }[] = [];
       const userSystemPrompt = aiSettings.systemPrompt?.trim() || '';
       const mdPrompt = aiSettings.markdownMode ? getMarkdownModePrompt() : '';
-      const combinedSystemPrompt = [userSystemPrompt, mdPrompt].filter(Boolean).join('\n\n');
+      const planPrompt = options?.planMode ? '\n\n【计划模式】\n- 将任务分解为清晰的编号步骤（1. 2. 3. ...）\n- 每步说明目标和预期结果\n- 给出整体思路和建议\n- 不要直接给最终内容，先给出规划' : '';
+      const combinedSystemPrompt = [userSystemPrompt, mdPrompt, planPrompt].filter(Boolean).join('\n\n');
       if (combinedSystemPrompt) {
         messages.push({ role: 'system', content: combinedSystemPrompt });
       }
@@ -857,7 +858,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         messages,
         ...aiParams,
         enableWebSearch: enableWebSearch || undefined,
-        enableThinking: aiSettings.enableThinking || undefined,
+        enableThinking: (options?.enableThinking ?? aiSettings.enableThinking) || undefined,
         enableTools: enableTools || undefined,
         requestId
       });

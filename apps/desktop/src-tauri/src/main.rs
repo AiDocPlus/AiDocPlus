@@ -4,6 +4,7 @@
 mod ai;
 mod api_gateway;
 mod api_server;
+mod cli;
 mod commands;
 mod config;
 mod document;
@@ -42,12 +43,14 @@ use commands::tts::TtsState;
 use commands::script_runner::RunningScriptState;
 use aidocplus_manager_rust::commands::DataDirState;
 use tauri::{Manager, Emitter, Listener};
-use tauri_plugin_cli::CliExt;
 use tauri::menu::{
     MenuBuilder, SubmenuBuilder, MenuItem,
 };
 
 fn main() {
+    // CLI 命令在 Tauri 启动前处理，处理完直接退出不启动 GUI
+    cli::try_handle_cli();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
@@ -199,35 +202,6 @@ fn main() {
                 }
             });
 
-            // ── CLI 参数处理 ──
-            if let Ok(matches) = app.cli().matches() {
-                // --version / -v
-                if matches.args.get("version").and_then(|v| v.value.as_bool()).unwrap_or(false) {
-                    println!("AiDocPlus v{}", env!("CARGO_PKG_VERSION"));
-                }
-                // 子命令 api
-                if let Some(ref sub_cmd) = matches.subcommand {
-                    if sub_cmd.name == "api" {
-                        if let Some(ref api_sub) = sub_cmd.matches.subcommand {
-                            if api_sub.name == "status" {
-                                println!("[CLI] api status — 请求将在 API Server 启动后处理");
-                            } else if api_sub.name == "schema" {
-                                println!("[CLI] api schema — 请求将在 API Server 启动后处理");
-                            } else if api_sub.name == "call" {
-                                if let Some(method_val) = api_sub.matches.args.get("method") {
-                                    if let Some(method) = method_val.value.as_str() {
-                                        let params = api_sub.matches.args.get("params")
-                                            .and_then(|v| v.value.as_str())
-                                            .unwrap_or("{}");
-                                        println!("[CLI] api call {} -p {}", method, params);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
             // ── Deep Link URL Scheme 监听 ──
             let dl_handle = app.handle().clone();
             app.listen("deep-link://new-url", move |event: tauri::Event| {
@@ -362,6 +336,8 @@ fn main() {
             // Email commands
             test_smtp_connection,
             send_email,
+            store_email_credential,
+            delete_email_credential,
 
             // Pandoc commands
             check_pandoc,

@@ -37,6 +37,8 @@ const ALLOWED_PLUGIN_COMMANDS = new Set([
   // 邮件功能
   'test_smtp_connection',   // 测试 SMTP 连接
   'send_email',             // 发送邮件
+  'store_email_credential', // 存储邮箱密码到系统密钥链
+  'delete_email_credential', // 从系统密钥链删除邮箱密码
 
   // Pandoc 导出功能
   'check_pandoc',           // 检测 Pandoc 是否安装及版本
@@ -117,7 +119,7 @@ export interface AIAPI {
   chatStream(
     messages: Array<{ role: string; content: string }>,
     onChunk: (text: string) => void,
-    options?: { maxTokens?: number; signal?: AbortSignal; serviceId?: string }
+    options?: { maxTokens?: number; signal?: AbortSignal; serviceId?: string; enableWebSearch?: boolean; enableThinking?: boolean }
   ): Promise<string>;
   /** AI 服务是否可用 */
   isAvailable(): boolean;
@@ -488,6 +490,8 @@ export function createPluginHostAPI(opts: CreatePluginHostAPIOptions): PluginHos
           messages,
           ...aiParams,
           maxTokens: options?.maxTokens ?? 4096,
+          enableWebSearch: options?.enableWebSearch || undefined,
+          enableThinking: options?.enableThinking || undefined,
           requestId,
         });
 

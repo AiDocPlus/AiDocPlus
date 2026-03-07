@@ -1,0 +1,17 @@
+/* FortuneSheet 自定义样式覆盖 */
+
+/* 工具栏：允许自动换行，显示所有按钮 */
+.fortune-toolbar {
+  white-space: normal !important;
+  flex-wrap: wrap !important;
+  gap: 2px 0;
+}
+
+/* 默认字体：宋体（UI 元素、公式栏、工具栏等） */
+.fortune-container,
+.fortune-sheet-overlay,
+.fortune-toolbar,
+.fortune-fx-input,
+.fortune-sheettab-container {
+  font-family: "SimSun", "宋体", "Songti SC", serif !important;
+}

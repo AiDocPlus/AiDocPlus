@@ -1,29 +1,18 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import type { PluginPanelProps } from '../types';
-import { Button } from '../_framework/ui';
+import {
+  Button,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from '../_framework/ui';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { usePluginHost } from '../_framework/PluginHostAPI';
 import {
-  Plus, Download, Upload, Table2,
-  Rows3, Columns3, ChevronDown, ChevronUp,
-  ArrowUpDown, ArrowUp, ArrowDown, Copy, Trash2, X,
-  ArrowUpToLine, ArrowDownToLine, ArrowLeftToLine, ArrowRightToLine,
-  Calculator,
+  Upload, Copy, Sparkles, Loader2,
+  Columns3, Check, PanelTop, FileDown, Settings2,
 } from 'lucide-react';
+import type { Sheet } from '@fortune-sheet/core';
 import {
   type TableSheet,
-  type FormulaType,
-  createEmptySheet,
-  addRow,
-  insertRow,
-  removeRow,
-  addColumn,
-  insertColumn,
-  removeColumn,
-  updateCell,
-  sortByColumn,
-  calcColumnStats,
-  buildFormulaRow,
-  evaluateCellFormula,
   sheetsToMarkdown,
   exportSheetsToXlsx,
   exportSheetsToCsv,
@@ -34,22 +23,29 @@ import {
 } from './tableUtils';
 import { setFileSaveAPI } from './tableUtils';
 import { truncateContent } from '../_framework/pluginUtils';
-import { PluginPanelLayout } from '../_framework/PluginPanelLayout';
-import { PluginPromptBuilderDialog } from '../_framework/PluginPromptBuilderDialog';
-
-/** 插件数据结构（多表格） */
-interface TablePluginData {
-  sheets?: TableSheet[];
-  lastPrompt?: string;
-}
-
-type SortState = { col: number; dir: 'asc' | 'desc' } | null;
+import { FortuneSheetWrapper } from './FortuneSheetWrapper';
+import type { FortuneSheetRef, SelectionInfo } from './FortuneSheetWrapper';
+import { loadFortuneData, packFortuneData, tableSheetsToFortune, fortuneToTableSheets } from './tableDataBridge';
+import { useTableActionBridge } from './tableActionBridge';
+import { autoFitColumns } from './tableAutoFit';
 
 const DEFAULT_PROMPT = '根据本文档的正文内容，提取其中的数据和表格，汇总生成多个表格。';
 
+/** 选区统计数据 */
+interface SelectionStats {
+  count: number;
+  numericCount: number;
+  sum: number;
+  avg: number;
+}
+
 /**
- * 表格编辑器插件面板
- * 支持多表格：AI 生成 / 手动创建 / 导入，多 Sheet 导出
+ * 表格插件面板（FortuneSheet 版）
+ *
+ * 一打开即展示 Excel 级电子表格界面，不再使用 PluginPanelLayout 的欢迎页模式。
+ * 顶部：AI 工具栏 + 编辑工具栏 + 导入导出
+ * 中部：FortuneSheet（占满剩余空间，支持拖拽导入）
+ * 底部：智能状态栏（Sheet 信息 + 选区统计 + 保存状态）
  */
 export function TablePluginPanel({ document, content, pluginData, onPluginDataChange, onRequestSave }: PluginPanelProps) {
   const host = usePluginHost();
@@ -62,81 +58,185 @@ export function TablePluginPanel({ document, content, pluginData, onPluginDataCh
       writeFile: (path, data) => host.platform.invoke('write_binary_file', { path, data }),
     });
   }, [host]);
-  const raw = (pluginData as TablePluginData) || {};
 
-  // 兼容旧数据格式（单表格 → 多表格）
-  const initSheets = (): TableSheet[] => {
-    if (raw.sheets && raw.sheets.length > 0) return raw.sheets;
-    // 兼容旧格式
-    const old = pluginData as { tableData?: unknown[][]; headers?: string[]; hasHeader?: boolean } | null;
-    if (old?.tableData && Array.isArray(old.tableData) && old.tableData.length > 0) {
-      return [{ name: '表格1', headers: old.headers || [], data: old.tableData as TableSheet['data'] }];
-    }
-    return [];
-  };
-
-  const [sheets, setSheets] = useState<TableSheet[]>(initSheets);
-  const [activeIdx, setActiveIdx] = useState(0);
-  const [editingCell, setEditingCell] = useState<{ row: number; col: number } | null>(null);
+  // ── 状态 ──
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [statusIsError, setStatusIsError] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [prompt, setPrompt] = useState(raw.lastPrompt || DEFAULT_PROMPT);
-  const [builderOpen, setBuilderOpen] = useState(false);
-  const [selectedRow, setSelectedRow] = useState<number | null>(null);
-  const [selectedCol, setSelectedCol] = useState<number | null>(null);
-  const [sortState, setSortState] = useState<SortState>(null);
-  const [renamingSheet, setRenamingSheet] = useState<number | null>(null);
-  const [formulaOpen, setFormulaOpen] = useState(false);
+  const [aiPopoverOpen, setAiPopoverOpen] = useState(false);
+  const [prompt, setPrompt] = useState(DEFAULT_PROMPT);
+  const [frozen, setFrozen] = useState(false);
+  const [saveState, setSaveState] = useState<'saved' | 'unsaved' | 'idle'>('idle');
+  const [draggingOver, setDraggingOver] = useState(false);
+  const [selectionStats, setSelectionStats] = useState<SelectionStats | null>(null);
+  const [sheetInfo, setSheetInfo] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const FORMULA_GROUPS: { label: string; items: FormulaType[] }[] = [
-    { label: t('formulaGroupBasic'), items: ['SUM', 'AVG', 'MAX', 'MIN', 'COUNT'] },
-    { label: t('formulaGroupAdvanced'), items: ['MEDIAN', 'VAR', 'STDEV', 'DISTINCT'] },
-  ];
-  // ALL_FORMULAS 用于未来扩展
-
-  const persist = useCallback((newSheets: TableSheet[]) => {
-    setSheets(newSheets);
-    onPluginDataChange({ sheets: newSheets, lastPrompt: prompt });
-  }, [prompt, onPluginDataChange]);
-
-  const handlePromptChange = useCallback((val: string) => {
-    setPrompt(val);
-    onPluginDataChange({ sheets, lastPrompt: val });
-    host.docData!.markDirty();
-  }, [sheets, onPluginDataChange, host]);
-
-  const updateCurrentSheet = useCallback((updater: (s: TableSheet) => TableSheet) => {
-    const newSheets = sheets.map((s, i) => i === activeIdx ? updater(s) : s);
-    persist(newSheets);
-    host.docData!.markDirty();
-  }, [sheets, activeIdx, persist, host]);
-
+  const sheetRef = useRef<FortuneSheetRef>(null);
   const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dragCounterRef = useRef(0);
 
-  const showStatus = (msg: string, isError = false, persistent = false) => {
+  // ── 加载 FortuneSheet 初始数据 ──
+  const initialData = useMemo(() => loadFortuneData(pluginData), []);
+
+  const showStatus = useCallback((msg: string, isError = false, persistent = false) => {
     if (statusTimerRef.current) { clearTimeout(statusTimerRef.current); statusTimerRef.current = null; }
     setStatusMsg(msg);
     setStatusIsError(isError);
     if (!persistent) {
       statusTimerRef.current = setTimeout(() => { setStatusMsg(null); statusTimerRef.current = null; }, 4000);
     }
-  };
+  }, []);
 
   const docTitle = document.title?.replace(/[/\\:*?"<>|]/g, '_') || '表格';
-  const sheet = sheets[activeIdx] || null;
 
-  // ── AI 生成多表格 ──
-  const handleGenerate = async () => {
+  // ── 数据变更持久化 + 防抖磁盘保存 ──
+  const diskSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleDataChange = useCallback((sheets: Sheet[]) => {
+    const packed = packFortuneData(sheets);
+    onPluginDataChange(packed);
+    host.docData!.markDirty();
+
+    // 立即显示未保存状态
+    setSaveState('unsaved');
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    if (diskSaveTimerRef.current) clearTimeout(diskSaveTimerRef.current);
+
+    // 3 秒无新编辑后触发磁盘保存
+    diskSaveTimerRef.current = setTimeout(() => {
+      onRequestSave?.();
+      setSaveState('saved');
+      saveTimerRef.current = setTimeout(() => setSaveState('idle'), 2000);
+    }, 3000);
+  }, [onPluginDataChange, host, onRequestSave]);
+
+  // ── 获取当前 TableSheet[] 用于导出 ──
+  const getCurrentTableSheets = useCallback((): TableSheet[] => {
+    const inst = sheetRef.current;
+    if (!inst) return [];
+    const fortuneSheets = inst.getAllSheets();
+    return fortuneToTableSheets(fortuneSheets);
+  }, []);
+
+  // ── AI 动作桥接 ──
+  useTableActionBridge({ sheetRef, onDataChange: handleDataChange, showStatus });
+
+  // ── 选区变化 → 状态栏统计 ──
+  const handleSelectionChange = useCallback((info: SelectionInfo) => {
+    const inst = sheetRef.current;
+    if (!inst) return;
+
+    try {
+      const sel = info.selection;
+      if (!sel || !Array.isArray(sel.row) || !Array.isArray(sel.column)) {
+        setSelectionStats(null);
+        return;
+      }
+
+      const [r0, r1] = sel.row;
+      const [c0, c1] = sel.column;
+      const rowCount = r1 - r0 + 1;
+      const colCount = c1 - c0 + 1;
+
+      // 单个单元格不显示统计
+      if (rowCount <= 1 && colCount <= 1) {
+        setSelectionStats(null);
+        return;
+      }
+
+      let count = 0;
+      let numericCount = 0;
+      let sum = 0;
+
+      for (let r = r0; r <= r1; r++) {
+        for (let c = c0; c <= c1; c++) {
+          count++;
+          const val = inst.getCellValue(r, c);
+          if (val !== null && val !== undefined && val !== '') {
+            const num = typeof val === 'number' ? val : Number(val);
+            if (!isNaN(num)) {
+              numericCount++;
+              sum += num;
+            }
+          }
+        }
+      }
+
+      setSelectionStats({
+        count,
+        numericCount,
+        sum,
+        avg: numericCount > 0 ? sum / numericCount : 0,
+      });
+    } catch {
+      setSelectionStats(null);
+    }
+  }, []);
+
+  // ── 更新 Sheet 信息 ──
+  const updateSheetInfo = useCallback(() => {
+    try {
+      const inst = sheetRef.current;
+      if (!inst) return;
+      const sheets = inst.getAllSheets();
+      if (!sheets.length) return;
+      const current = inst.getSheet();
+      if (!current) return;
+      const name = current.name || '';
+      const celldata = current.celldata || [];
+      let maxR = 0, maxC = 0;
+      for (const cell of celldata) {
+        if (cell.r > maxR) maxR = cell.r;
+        if (cell.c > maxC) maxC = cell.c;
+      }
+      const rows = celldata.length > 0 ? maxR + 1 : 0;
+      const cols = celldata.length > 0 ? maxC + 1 : 0;
+      setSheetInfo(`${name} · ${sheets.length} ${t('sheet', { defaultValue: '表' })} · ${rows}${t('rows', { defaultValue: '行' })} × ${cols}${t('cols', { defaultValue: '列' })}`);
+    } catch {
+      // FortuneSheet 尚未初始化完成，静默忽略
+    }
+  }, [t]);
+
+  // 定期更新 Sheet 信息
+  useEffect(() => {
+    updateSheetInfo();
+    const timer = setInterval(updateSheetInfo, 2000);
+    return () => clearInterval(timer);
+  }, [updateSheetInfo]);
+
+  // ── 冻结首行 ──
+  const handleFreezeToggle = useCallback(() => {
+    const inst = sheetRef.current;
+    if (!inst) return;
+    if (frozen) {
+      inst.freeze('row', { row: 0, column: 0 });
+      setFrozen(false);
+      showStatus(t('unfreezeHeader', { defaultValue: '已取消冻结首行' }));
+    } else {
+      inst.freeze('row', { row: 1, column: 0 });
+      setFrozen(true);
+      showStatus(t('freezeHeader', { defaultValue: '已冻结首行' }));
+    }
+  }, [frozen, showStatus, t]);
+
+  // ── 自适应列宽 ──
+  const handleAutoFit = useCallback(() => {
+    const inst = sheetRef.current;
+    if (!inst) return;
+    autoFitColumns(inst);
+    showStatus(t('autoFitDone', { defaultValue: '列宽已自适应' }));
+  }, [showStatus, t]);
+
+  // ── AI 生成表格 ──
+  const handleGenerate = useCallback(async () => {
     const sourceContent = content || document.aiGeneratedContent || document.content || '';
     if (!sourceContent.trim()) {
-      showStatus(t('emptyContent'), true);
+      showStatus(t('emptyContent', { defaultValue: '文档内容为空，无法生成表格' }), true);
       return;
     }
 
     setGenerating(true);
-    showStatus('正在生成表格，请稍候...', false, true);
+    showStatus(t('generatingMsg', { defaultValue: '正在根据文档内容生成表格...' }), false, true);
     const userPrompt = prompt.trim() || DEFAULT_PROMPT;
 
     try {
@@ -167,13 +267,12 @@ export function TablePluginPanel({ document, content, pluginData, onPluginDataCh
 
       let newSheets: TableSheet[];
       if (parsed.tables && Array.isArray(parsed.tables) && parsed.tables.length > 0) {
-        newSheets = parsed.tables.map(t => ({
-          name: t.name || '表格',
-          headers: t.headers || [],
-          data: t.rows || [],
+        newSheets = parsed.tables.map(tbl => ({
+          name: tbl.name || '表格',
+          headers: tbl.headers || [],
+          data: tbl.rows || [],
         }));
       } else {
-        // 兼容旧的单表格格式
         const single = parsed as unknown as { headers?: string[]; rows?: string[][] };
         if (single.headers && single.rows) {
           newSheets = [{ name: '表格1', headers: single.headers, data: single.rows }];
@@ -182,570 +281,262 @@ export function TablePluginPanel({ document, content, pluginData, onPluginDataCh
         }
       }
 
-      persist(newSheets);
-      setActiveIdx(0);
-      setSortState(null);
-      setSelectedRow(null);
-      setSelectedCol(null);
+      // 转换为 FortuneSheet 格式并写入
+      const fortuneData = tableSheetsToFortune(newSheets);
+      sheetRef.current?.updateSheets(fortuneData);
+
+      // 自动调整列宽
+      setTimeout(() => { if (sheetRef.current) autoFitColumns(sheetRef.current); }, 100);
+
+      // 持久化
+      const packed = packFortuneData(fortuneData);
+      onPluginDataChange(packed);
       host.docData!.markDirty();
-      showStatus(t('generateSuccess'));
+      showStatus(t('generateSuccess', { defaultValue: '表格生成完成' }));
       onRequestSave?.();
+      setAiPopoverOpen(false);
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
-      showStatus(t('generateFailed', { error: errMsg }), true);
+      showStatus(t('generateFailed', { error: errMsg, defaultValue: '表格生成失败：{{error}}' }), true);
     } finally {
       setGenerating(false);
     }
-  };
+  }, [content, document, prompt, host, t, onPluginDataChange, onRequestSave, showStatus]);
 
-  // ── 导入 ──
-  const handleImportFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // ── 导入文件（通用，供按钮和拖拽使用） ──
+  const importFile = useCallback((file: File) => {
     const ext = file.name.split('.').pop()?.toLowerCase();
 
     const onParsed = (imported: TableSheet[]) => {
-      persist(imported);
-      setActiveIdx(0);
-      setSortState(null);
+      const fortuneData = tableSheetsToFortune(imported);
+      sheetRef.current?.updateSheets(fortuneData);
+      setTimeout(() => { if (sheetRef.current) autoFitColumns(sheetRef.current); }, 100);
+      const packed = packFortuneData(fortuneData);
+      onPluginDataChange(packed);
       host.docData!.markDirty();
-      const totalRows = imported.reduce((s, t) => s + t.data.length, 0);
-      showStatus(`已导入 ${imported.length} 个表格，共 ${totalRows} 行`);
+      const totalRows = imported.reduce((s, tbl) => s + tbl.data.length, 0);
+      showStatus(t('importSuccess', { defaultValue: '导入成功' }) + ` — ${imported.length} ${t('sheet', { defaultValue: '表' })}, ${totalRows} ${t('rows', { defaultValue: '行' })}`);
     };
 
     if (ext === 'csv') {
       file.text().then(text => onParsed(parseCsvText(text)))
-        .catch(err => showStatus(`导入失败: ${err instanceof Error ? err.message : String(err)}`, true));
+        .catch(err => showStatus(t('importFailed', { defaultValue: '导入失败' }) + `: ${err instanceof Error ? err.message : String(err)}`, true));
     } else {
       file.arrayBuffer().then(buffer => onParsed(parseXlsxFile(buffer)))
-        .catch(err => showStatus(`导入失败: ${err instanceof Error ? err.message : String(err)}`, true));
+        .catch(err => showStatus(t('importFailed', { defaultValue: '导入失败' }) + `: ${err instanceof Error ? err.message : String(err)}`, true));
     }
+  }, [onPluginDataChange, host, t, showStatus]);
+
+  const handleImportFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) importFile(file);
     e.target.value = '';
-  }, [persist, host]);
+  }, [importFile]);
 
-  // ── 表格管理 ──
-  const handleAddSheet = () => {
-    const newSheets = [...sheets, createEmptySheet(`表格${sheets.length + 1}`)];
-    persist(newSheets);
-    setActiveIdx(newSheets.length - 1);
-    host.docData!.markDirty();
-  };
+  // ── 拖拽导入 ──
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounterRef.current++;
+    setDraggingOver(true);
+  }, []);
 
-  const handleDeleteSheet = (idx: number) => {
-    if (sheets.length <= 1) return;
-    const newSheets = sheets.filter((_, i) => i !== idx);
-    persist(newSheets);
-    if (activeIdx >= newSheets.length) setActiveIdx(newSheets.length - 1);
-    else if (activeIdx === idx) setActiveIdx(Math.max(0, idx - 1));
-    host.docData!.markDirty();
-  };
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounterRef.current--;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setDraggingOver(false);
+    }
+  }, []);
 
-  const handleRenameSheet = (idx: number, name: string) => {
-    const newSheets = sheets.map((s, i) => i === idx ? { ...s, name } : s);
-    persist(newSheets);
-    setRenamingSheet(null);
-    host.docData!.markDirty();
-  };
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }, []);
 
-  // ── 单元格编辑 ──
-  const handleCellChange = useCallback((row: number, col: number, value: string) => {
-    updateCurrentSheet(s => ({ ...s, data: updateCell(s.data, row, col, value) }));
-  }, [updateCurrentSheet]);
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounterRef.current = 0;
+    setDraggingOver(false);
 
-  const handleHeaderChange = useCallback((col: number, value: string) => {
-    updateCurrentSheet(s => {
-      const newHeaders = [...s.headers];
-      newHeaders[col] = value;
-      return { ...s, headers: newHeaders };
-    });
-  }, [updateCurrentSheet]);
-
-  // ── 行操作 ──
-  const handleAddRow = useCallback(() => updateCurrentSheet(s => ({ ...s, data: addRow(s.data) })), [updateCurrentSheet]);
-  const handleInsertRowAbove = useCallback(() => {
-    if (selectedRow === null) return;
-    updateCurrentSheet(s => ({ ...s, data: insertRow(s.data, selectedRow) }));
-    setSelectedRow(selectedRow + 1);
-  }, [selectedRow, updateCurrentSheet]);
-  const handleInsertRowBelow = useCallback(() => {
-    if (selectedRow === null) return;
-    updateCurrentSheet(s => ({ ...s, data: insertRow(s.data, selectedRow + 1) }));
-  }, [selectedRow, updateCurrentSheet]);
-  const handleDeleteRow = useCallback(() => {
-    if (selectedRow === null || !sheet || sheet.data.length <= 1) return;
-    updateCurrentSheet(s => ({ ...s, data: removeRow(s.data, selectedRow) }));
-    setSelectedRow(null);
-  }, [selectedRow, sheet, updateCurrentSheet]);
-
-  // ── 列操作 ──
-  const handleAddCol = useCallback(() => {
-    updateCurrentSheet(s => ({ ...s, data: addColumn(s.data), headers: [...s.headers, `列${s.headers.length + 1}`] }));
-  }, [updateCurrentSheet]);
-  const handleInsertColLeft = useCallback(() => {
-    if (selectedCol === null) return;
-    updateCurrentSheet(s => {
-      const h = [...s.headers]; h.splice(selectedCol, 0, `列${s.headers.length + 1}`);
-      return { ...s, data: insertColumn(s.data, selectedCol), headers: h };
-    });
-    setSelectedCol(selectedCol + 1);
-  }, [selectedCol, updateCurrentSheet]);
-  const handleInsertColRight = useCallback(() => {
-    if (selectedCol === null) return;
-    updateCurrentSheet(s => {
-      const h = [...s.headers]; h.splice(selectedCol + 1, 0, `列${s.headers.length + 1}`);
-      return { ...s, data: insertColumn(s.data, selectedCol + 1), headers: h };
-    });
-  }, [selectedCol, updateCurrentSheet]);
-  const handleDeleteCol = useCallback(() => {
-    if (selectedCol === null || !sheet || (sheet.data.length > 0 && sheet.data[0].length <= 1)) return;
-    updateCurrentSheet(s => ({
-      ...s, data: removeColumn(s.data, selectedCol), headers: s.headers.filter((_, i) => i !== selectedCol),
-    }));
-    setSelectedCol(null);
-  }, [selectedCol, sheet, updateCurrentSheet]);
-
-  // ── 公式：插入汇总行 ──
-  const handleInsertFormulaRow = useCallback((formula: FormulaType) => {
-    if (!sheet) return;
-    const row = buildFormulaRow(sheet.data, sheet.headers, formula);
-    updateCurrentSheet(s => ({ ...s, data: [...s.data, row] }));
-    showStatus(t('formulaInserted', { formula }));
-  }, [sheet, updateCurrentSheet, t]);
-
-  // ── 当前选中列的统计信息 ──
-  const colStats = (selectedCol !== null && sheet) ? calcColumnStats(sheet.data, selectedCol) : null;
-
-  // ── 排序 ──
-  const handleSort = useCallback((colIndex: number) => {
-    let newDir: 'asc' | 'desc' = 'asc';
-    if (sortState && sortState.col === colIndex) newDir = sortState.dir === 'asc' ? 'desc' : 'asc';
-    updateCurrentSheet(s => ({ ...s, data: sortByColumn(s.data, colIndex, newDir) }));
-    setSortState({ col: colIndex, dir: newDir });
-  }, [sortState, updateCurrentSheet]);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (!['xlsx', 'xls', 'csv'].includes(ext || '')) {
+      showStatus(t('unsupportedFormat', { defaultValue: '不支持的文件格式，请拖入 .xlsx 或 .csv 文件' }), true);
+      return;
+    }
+    importFile(file);
+  }, [importFile, showStatus, t]);
 
   // ── 复制 Markdown ──
   const handleCopyMarkdown = useCallback(async () => {
+    const sheets = getCurrentTableSheets();
     const md = sheetsToMarkdown(sheets);
     await navigator.clipboard.writeText(md);
-    showStatus(t('copiedToClipboard'));
-  }, [sheets]);
-
-  // ── 清空所有 ──
-  const handleReset = useCallback(() => {
-    persist([]);
-    setPrompt(DEFAULT_PROMPT);
-    setActiveIdx(0);
-    setSelectedRow(null);
-    setSelectedCol(null);
-    setSortState(null);
-    showStatus('已清空全部内容');
-  }, [persist]);
+    showStatus(t('copiedToClipboard', { defaultValue: '已复制到剪贴板' }));
+  }, [getCurrentTableSheets, t, showStatus]);
 
   // ── 导出 ──
-  const handleExportXlsx = async () => {
+  const handleExport = useCallback(async (format: 'xlsx' | 'csv' | 'json' | 'md') => {
+    const sheets = getCurrentTableSheets();
+    if (sheets.length === 0) { showStatus(t('noData', { defaultValue: '无数据可导出' }), true); return; }
     try {
-      const path = await exportSheetsToXlsx(sheets, `${docTitle}.xlsx`);
-      if (path) showStatus(`已导出: ${path}`);
-    } catch (e) { showStatus(`导出失败: ${e instanceof Error ? e.message : String(e)}`, true); }
-  };
-  const handleExportCsv = async () => {
-    try {
-      const path = await exportSheetsToCsv(sheets, `${docTitle}.csv`);
-      if (path) showStatus(`已导出: ${path}`);
-    } catch (e) { showStatus(`导出失败: ${e instanceof Error ? e.message : String(e)}`, true); }
-  };
-  const handleExportJson = async () => {
-    try {
-      const path = await exportSheetsToJson(sheets, `${docTitle}.json`);
-      if (path) showStatus(`已导出: ${path}`);
-    } catch (e) { showStatus(`导出失败: ${e instanceof Error ? e.message : String(e)}`, true); }
-  };
-  const handleExportMd = async () => {
-    try {
-      const path = await exportSheetsToMarkdown(sheets, `${docTitle}.md`);
-      if (path) showStatus(`已导出: ${path}`);
-    } catch (e) { showStatus(`导出失败: ${e instanceof Error ? e.message : String(e)}`, true); }
-  };
-
-  const hasData = sheets.length > 0 && sheets.some(s => s.data.length > 0);
-  const rows = sheet?.data.length ?? 0;
-  const cols = sheet ? (sheet.data.length > 0 ? sheet.data[0].length : sheet.headers.length) : 0;
-
-  // ── 排序图标 ──
-  const SortIcon = ({ ci }: { ci: number }) => {
-    if (sortState?.col === ci) {
-      return sortState.dir === 'asc'
-        ? <ArrowUp className="h-3 w-3 inline ml-1 text-primary" />
-        : <ArrowDown className="h-3 w-3 inline ml-1 text-primary" />;
+      let path: string | null = null;
+      switch (format) {
+        case 'xlsx': path = await exportSheetsToXlsx(sheets, `${docTitle}.xlsx`); break;
+        case 'csv': path = await exportSheetsToCsv(sheets, `${docTitle}.csv`); break;
+        case 'json': path = await exportSheetsToJson(sheets, `${docTitle}.json`); break;
+        case 'md': path = await exportSheetsToMarkdown(sheets, `${docTitle}.md`); break;
+      }
+      if (path) showStatus(t('exportSuccess', { defaultValue: '导出成功' }) + `: ${path}`);
+    } catch (e) {
+      showStatus(t('exportFailed', { defaultValue: '导出失败' }) + `: ${e instanceof Error ? e.message : String(e)}`, true);
     }
-    return <ArrowUpDown className="h-3 w-3 inline ml-1 text-muted-foreground/40" />;
-  };
+  }, [getCurrentTableSheets, docTitle, t, showStatus]);
 
-  // ── 工具栏 ──
-  const toolbarContent = (
-    <>
-      <Button variant="outline" size="sm" onClick={handleAddRow} className="gap-1 h-7 text-xs" title="添加行">
-        <Rows3 className="h-3 w-3" /><Plus className="h-2.5 w-2.5" />
-      </Button>
-      {selectedRow !== null && (
-        <>
-          <Button variant="outline" size="sm" onClick={handleInsertRowAbove} className="gap-1 h-7 text-xs" title="上方插入行">
-            <ArrowUpToLine className="h-3 w-3" />
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleInsertRowBelow} className="gap-1 h-7 text-xs" title="下方插入行">
-            <ArrowDownToLine className="h-3 w-3" />
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleDeleteRow} className="gap-1 h-7 text-xs text-destructive" title="删除选中行" disabled={rows <= 1}>
-            <Trash2 className="h-3 w-3" />
-          </Button>
-        </>
-      )}
-      <div className="w-px h-4 bg-border mx-0.5" />
-      <Button variant="outline" size="sm" onClick={handleAddCol} className="gap-1 h-7 text-xs" title="添加列">
-        <Columns3 className="h-3 w-3" /><Plus className="h-2.5 w-2.5" />
-      </Button>
-      {selectedCol !== null && (
-        <>
-          <Button variant="outline" size="sm" onClick={handleInsertColLeft} className="gap-1 h-7 text-xs" title="左侧插入列">
-            <ArrowLeftToLine className="h-3 w-3" />
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleInsertColRight} className="gap-1 h-7 text-xs" title="右侧插入列">
-            <ArrowRightToLine className="h-3 w-3" />
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleDeleteCol} className="gap-1 h-7 text-xs text-destructive" title="删除选中列" disabled={cols <= 1}>
-            <Trash2 className="h-3 w-3" />
-          </Button>
-        </>
-      )}
-      <div className="w-px h-4 bg-border mx-0.5" />
-      {/* 公式按钮 */}
-      <div className="relative">
-        <Button variant="outline" size="sm" onClick={() => setFormulaOpen(!formulaOpen)} className="gap-1 h-7 text-xs" title={t('formula')}>
-          <Calculator className="h-3 w-3" />{t('formula')}
-          {formulaOpen ? <ChevronUp className="h-2.5 w-2.5" /> : <ChevronDown className="h-2.5 w-2.5" />}
-        </Button>
-        {formulaOpen && (
-          <div className="absolute top-full left-0 mt-1 z-50 bg-popover border rounded-md shadow-lg p-1.5 min-w-[180px]">
-            {FORMULA_GROUPS.map((group, gi) => (
-              <div key={gi}>
-                {gi > 0 && <div className="h-px bg-border my-1" />}
-                <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{group.label}</div>
-                {group.items.map(f => (
-                  <button
-                    key={f}
-                    className="w-full text-left px-3 py-1.5 text-xs rounded hover:bg-accent transition-colors flex items-center gap-2"
-                    onClick={() => { handleInsertFormulaRow(f); setFormulaOpen(false); }}
-                  >
-                    <span className="font-mono font-semibold w-16 text-primary">{f}</span>
-                    <span className="text-muted-foreground">{t(`formula_${f}`)}</span>
-                  </button>
-                ))}
-              </div>
-            ))}
-            <div className="h-px bg-border my-1" />
-            <div className="px-2 py-1 text-[10px] text-muted-foreground">
-              {t('formulaCellHint')}
+  return (
+    <div
+      className="flex flex-col h-full w-full overflow-hidden"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {/* ── 顶部工具栏 ── */}
+      <div className="flex items-center gap-1.5 px-2 py-1.5 border-b bg-muted/30 flex-shrink-0" style={{ fontFamily: 'SimSun, "宋体", "Songti SC", serif', fontSize: '16px' }}>
+        {/* AI 生成（Popover 内嵌 prompt） */}
+        <Popover open={aiPopoverOpen} onOpenChange={setAiPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant={aiPopoverOpen ? 'default' : 'outline'} size="sm" className="gap-1.5 h-8 text-sm"
+              title={t('generate', { defaultValue: 'AI 生成表格' })}>
+              <Sparkles className="h-4 w-4" />
+              {t('generate', { defaultValue: 'AI 生成' })}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80 p-3" align="start">
+            <p className="text-sm font-medium mb-2">{t('aiGenerateTitle', { defaultValue: 'AI 生成表格' })}</p>
+            <input type="text"
+              className="w-full text-sm border rounded px-2 py-1.5 bg-transparent outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground"
+              placeholder={t('promptPlaceholder', { defaultValue: '描述你需要的表格...' })}
+              title={t('promptPlaceholder', { defaultValue: '描述你需要的表格...' })}
+              value={prompt} onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !generating) handleGenerate(); }}
+            />
+            <div className="flex justify-end mt-2">
+              <Button size="sm" className="h-8 text-sm gap-1" onClick={handleGenerate} disabled={generating}
+                title={generating ? t('generating', { defaultValue: '生成中...' }) : t('generate', { defaultValue: '生成' })}>
+                {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                {generating ? t('generating', { defaultValue: '生成中...' }) : t('generate', { defaultValue: '生成' })}
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        {/* 📁 文件 下拉菜单（合并导入+导出+复制） */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="gap-1.5 h-8 text-sm"
+              title={t('fileMenu', { defaultValue: '文件' })}>
+              <FileDown className="h-4 w-4" />
+              {t('fileMenu', { defaultValue: '文件' })}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem className="text-sm" onClick={() => fileInputRef.current?.click()}>
+              <Upload className="h-4 w-4 mr-2" />{t('importFile', { defaultValue: '导入 Excel / CSV' })}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-sm" onClick={() => handleExport('xlsx')}>Excel (.xlsx)</DropdownMenuItem>
+            <DropdownMenuItem className="text-sm" onClick={() => handleExport('csv')}>CSV</DropdownMenuItem>
+            <DropdownMenuItem className="text-sm" onClick={() => handleExport('json')}>JSON</DropdownMenuItem>
+            <DropdownMenuItem className="text-sm" onClick={() => handleExport('md')}>Markdown</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-sm" onClick={handleCopyMarkdown}>
+              <Copy className="h-4 w-4 mr-2" />{t('copyMarkdown', { defaultValue: '复制为 Markdown' })}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* ⚙ 视图 下拉菜单（合并冻结+列宽） */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="gap-1.5 h-8 text-sm"
+              title={t('viewMenu', { defaultValue: '视图' })}>
+              <Settings2 className="h-4 w-4" />
+              {t('viewMenu', { defaultValue: '视图' })}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem className="text-sm" onClick={handleFreezeToggle}>
+              <PanelTop className="h-4 w-4 mr-2" />
+              {frozen ? t('unfreezeHeader', { defaultValue: '取消冻结首行' }) : t('freezeHeader', { defaultValue: '冻结首行' })}
+              {frozen && <Check className="h-3.5 w-3.5 ml-auto" />}
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-sm" onClick={handleAutoFit}>
+              <Columns3 className="h-4 w-4 mr-2" />{t('autoFitColumns', { defaultValue: '自适应列宽' })}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <div className="flex-1" />
+
+        {/* 保存状态指示器 */}
+        {saveState === 'unsaved' && <span className="text-xs text-yellow-500">{t('unsaved', { defaultValue: '未保存' })}</span>}
+        {saveState === 'saved' && <span className="text-xs text-green-500 flex items-center gap-0.5"><Check className="h-3 w-3" />{t('saved', { defaultValue: '已保存' })}</span>}
+      </div>
+
+      {/* ── FortuneSheet 主体区域 ── */}
+      <div className="flex-1 min-h-0 relative">
+        <FortuneSheetWrapper
+          ref={sheetRef}
+          initialData={initialData}
+          onDataChange={handleDataChange}
+          onSelectionChange={handleSelectionChange}
+        />
+
+        {/* 拖拽导入覆盖层 */}
+        {draggingOver && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-primary/10 border-2 border-dashed border-primary rounded pointer-events-none">
+            <div className="bg-background/90 rounded-lg px-6 py-4 shadow-lg text-center">
+              <Upload className="h-8 w-8 mx-auto mb-2 text-primary" />
+              <p className="text-sm font-medium">{t('dropFileHere', { defaultValue: '松开以导入 Excel / CSV 文件' })}</p>
             </div>
           </div>
         )}
       </div>
-      <div className="w-px h-4 bg-border mx-0.5" />
-      <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="gap-1 h-7 text-xs" title={t('importFile')}>
-        <Upload className="h-3 w-3" />
-      </Button>
-      <Button variant="outline" size="sm" onClick={handleCopyMarkdown} className="gap-1 h-7 text-xs" title={t('copiedToClipboard')}>
-        <Copy className="h-3 w-3" />MD
-      </Button>
-      <div className="flex-1" />
-      <span className="text-xs text-muted-foreground">{sheets.length} 表 · {rows} 行 × {cols} 列</span>
-      <div className="w-px h-4 bg-border mx-0.5" />
-      <Button variant="outline" size="sm" onClick={handleExportXlsx} className="gap-1 h-7 text-xs">
-        <Download className="h-3 w-3" />Excel
-      </Button>
-      <Button variant="outline" size="sm" onClick={handleExportCsv} className="gap-1 h-7 text-xs">
-        <Download className="h-3 w-3" />CSV
-      </Button>
-      <Button variant="outline" size="sm" onClick={handleExportJson} className="gap-1 h-7 text-xs">
-        <Download className="h-3 w-3" />JSON
-      </Button>
-      <Button variant="outline" size="sm" onClick={handleExportMd} className="gap-1 h-7 text-xs">
-        <Download className="h-3 w-3" />MD
-      </Button>
-    </>
-  );
 
-  // ── 状态栏额外内容（选中行/列信息 + 列统计） ──
-  const statusExtraContent = (selectedRow !== null || selectedCol !== null) ? (
-    <span className="flex items-center gap-2 flex-wrap">
-      <span className="text-blue-600 dark:text-blue-400">
-        {selectedRow !== null && t('selectedRow', { num: selectedRow + 1 })}
-        {selectedCol !== null && t('selectedCol', { num: selectedCol + 1 })}
-        {selectedCol !== null && sheet?.headers[selectedCol] && ` (${sheet.headers[selectedCol]})`}
-      </span>
-      <button className="underline text-blue-600 dark:text-blue-400" onClick={() => { setSelectedRow(null); setSelectedCol(null); }}>{t('cancelSelect')}</button>
-      {colStats && (
-        <>
-          <span className="mx-1 text-border">|</span>
-          <span className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
-            <Calculator className="h-3 w-3 inline flex-shrink-0" />
-            <span className="text-green-600 dark:text-green-400"><b>Σ</b> {Number.isInteger(colStats.sum) ? colStats.sum : colStats.sum.toFixed(2)}</span>
-            <span><b>AVG</b> {colStats.avg.toFixed(2)}</span>
-            <span><b>MED</b> {Number.isInteger(colStats.median) ? colStats.median : colStats.median.toFixed(2)}</span>
-            <span><b>MAX</b> {Number.isInteger(colStats.max) ? colStats.max : colStats.max.toFixed(2)}</span>
-            <span><b>MIN</b> {Number.isInteger(colStats.min) ? colStats.min : colStats.min.toFixed(2)}</span>
-            <span><b>σ</b> {colStats.stdev.toFixed(2)}</span>
-            <span><b>N</b> {colStats.count}/{colStats.totalCount}</span>
-            <span><b>D</b> {colStats.distinct}</span>
+      {/* ── 智能状态栏 ── */}
+      <div className="flex-shrink-0 flex items-center gap-3 px-3 py-1.5 text-sm border-t bg-muted/20 text-muted-foreground min-h-[28px]" style={{ fontFamily: 'SimSun, "宋体", "Songti SC", serif' }}>
+        {/* 状态消息（优先显示） */}
+        {statusMsg ? (
+          <span className={statusIsError ? 'text-destructive' : ''}>{statusMsg}</span>
+        ) : (
+          <>
+            {/* Sheet 信息 */}
+            {sheetInfo && <span>{sheetInfo}</span>}
+          </>
+        )}
+
+        <div className="flex-1" />
+
+        {/* 选区统计 */}
+        {selectionStats && selectionStats.count > 1 && (
+          <span className="tabular-nums">
+            {t('count', { defaultValue: '计数' })}: {selectionStats.count}
+            {selectionStats.numericCount > 0 && (
+              <>
+                {' · '}{t('formula_SUM', { defaultValue: '求和' })}: {selectionStats.sum.toLocaleString()}
+                {' · '}{t('formula_AVG', { defaultValue: '均值' })}: {selectionStats.avg.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              </>
+            )}
           </span>
-        </>
-      )}
-    </span>
-  ) : null;
-
-  // ── 提示词构造器弹窗 ──
-  const promptBuilderDialog = (
-    <PluginPromptBuilderDialog
-      open={builderOpen}
-      onOpenChange={setBuilderOpen}
-      description={t('promptBuilderDesc', { defaultValue: '设置表格生成需求，自动组装提示词' })}
-      onConfirm={(builtPrompt) => handlePromptChange(builtPrompt)}
-      previewPrompt={prompt}
-    >
-      <div className="space-y-3">
-        <p className="text-sm text-muted-foreground">
-          {t('promptBuilderHint', { defaultValue: '您可以直接在提示词框中编辑，或使用下方快捷选项：' })}
-        </p>
-        <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={() => handlePromptChange('根据本文档的正文内容，提取其中的数据和表格，汇总生成多个表格。')}>
-            {t('promptPresetExtract', { defaultValue: '提取数据表格' })}
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => handlePromptChange('根据本文档的正文内容，生成对比分析表格。')}>
-            {t('promptPresetCompare', { defaultValue: '对比分析' })}
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => handlePromptChange('根据本文档的正文内容，生成统计汇总表格。')}>
-            {t('promptPresetSummary', { defaultValue: '统计汇总' })}
-          </Button>
-        </div>
-      </div>
-    </PluginPromptBuilderDialog>
-  );
-
-  return (
-    <PluginPanelLayout
-      pluginIcon={<Table2 className="h-12 w-12 text-muted-foreground/50" />}
-      pluginTitle={t('title')}
-      pluginDesc={t('welcomeDesc')}
-      prompt={prompt}
-      onPromptChange={handlePromptChange}
-      promptPlaceholder={t('promptPlaceholder')}
-      generating={generating}
-      onGenerate={handleGenerate}
-      generateLabel={t('generate', { defaultValue: 'AI 生成表格' })}
-      generatingLabel={t('generating')}
-      onPromptBuilderOpen={() => setBuilderOpen(true)}
-      promptBuilderDialog={promptBuilderDialog}
-      toolbar={toolbarContent}
-      hasContent={hasData}
-      statusMsg={statusMsg}
-      statusIsError={statusIsError}
-      statusExtra={statusExtraContent}
-      onClearAll={handleReset}
-      sourceCode={hasData ? JSON.stringify(sheets, null, 2) : undefined}
-      onSourceCodeSave={(code) => {
-        try {
-          const parsed = JSON.parse(code);
-          if (Array.isArray(parsed)) {
-            persist(parsed);
-            setActiveIdx(0);
-            host.docData!.markDirty();
-          }
-        } catch { /* ignore invalid JSON */ }
-      }}
-    >
-      <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImportFile} />
-
-      {/* ③ 内容区（标签栏 + 表格） */}
-      <div className="flex-1 min-h-0 flex flex-col">
-        {/* 标签栏 */}
-        {sheets.length > 0 && (
-          <div className="flex items-center gap-0.5 px-2 py-1 border-b bg-muted/30 flex-shrink-0 overflow-x-auto">
-            {sheets.map((s, idx) => (
-              <div
-                key={idx}
-                className={`group flex items-center gap-1 px-2.5 py-1 rounded-t-md text-xs cursor-pointer border border-b-0 transition-colors
-                  ${idx === activeIdx
-                    ? 'bg-background text-foreground font-medium border-border'
-                    : 'bg-muted/50 text-muted-foreground hover:bg-muted border-transparent'
-                  }`}
-                onClick={() => { setActiveIdx(idx); setSelectedRow(null); setSelectedCol(null); setSortState(null); setEditingCell(null); }}
-                onDoubleClick={() => setRenamingSheet(idx)}
-              >
-                {renamingSheet === idx ? (
-                  <input
-                    type="text"
-                    className="w-20 bg-transparent outline-none text-xs"
-                    defaultValue={s.name}
-                    autoFocus
-                    onBlur={(e) => handleRenameSheet(idx, e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleRenameSheet(idx, (e.target as HTMLInputElement).value);
-                      if (e.key === 'Escape') setRenamingSheet(null);
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                ) : (
-                  <span className="truncate max-w-[100px]">{s.name || `表格${idx + 1}`}</span>
-                )}
-                {sheets.length > 1 && (
-                  <button
-                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-destructive/20 transition-opacity"
-                    onClick={(e) => { e.stopPropagation(); handleDeleteSheet(idx); }}
-                    title="删除此表格"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                )}
-              </div>
-            ))}
-            <button
-              className="flex items-center px-2 py-1 text-xs text-muted-foreground hover:text-foreground rounded"
-              onClick={handleAddSheet}
-              title="新增表格"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </button>
-          </div>
         )}
 
-        {/* 表格区域 */}
-        {sheet && (
-          <div className="flex-1 min-h-0 overflow-auto p-3">
-            <table className="w-full border-collapse text-sm">
-              {sheet.headers.length > 0 && (
-                <thead>
-                  <tr>
-                    <th className="w-8 text-center text-xs text-muted-foreground bg-muted/50 border border-border px-1 py-1">#</th>
-                    {sheet.headers.map((h, ci) => {
-                      const isSelected = selectedCol === ci;
-                      return (
-                        <th
-                          key={ci}
-                          className={`border border-border px-2 py-1.5 min-w-[80px] max-w-[300px] font-semibold cursor-pointer select-none ${isSelected ? 'bg-blue-100 dark:bg-blue-900/30 ring-2 ring-blue-400 ring-inset' : 'bg-muted/50'}`}
-                          onClick={(e) => {
-                            if (e.detail === 2) {
-                              setEditingCell({ row: -1, col: ci });
-                              setSelectedCol(null);
-                            } else {
-                              setSelectedCol(isSelected ? null : ci);
-                              setSelectedRow(null);
-                            }
-                          }}
-                        >
-                          {editingCell?.row === -1 && editingCell?.col === ci ? (
-                            <input
-                              type="text"
-                              className="w-full bg-transparent outline-none text-sm font-semibold"
-                              style={{ fontFamily: '宋体', fontSize: '16px' }}
-                              defaultValue={h}
-                              autoFocus
-                              onBlur={(e) => { handleHeaderChange(ci, e.target.value); setEditingCell(null); }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === 'Tab') {
-                                  e.preventDefault();
-                                  handleHeaderChange(ci, (e.target as HTMLInputElement).value);
-                                  setEditingCell(e.key === 'Tab' && ci < cols - 1 ? { row: -1, col: ci + 1 } : null);
-                                } else if (e.key === 'Escape') { setEditingCell(null); }
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          ) : (
-                            <span className="flex items-center justify-between gap-1">
-                              <span className="truncate" style={{ fontFamily: '宋体', fontSize: '16px' }}>{h || '\u00A0'}</span>
-                              <button
-                                className="flex-shrink-0 p-0.5 rounded hover:bg-accent/50"
-                                onClick={(e) => { e.stopPropagation(); handleSort(ci); }}
-                                title="排序"
-                              >
-                                <SortIcon ci={ci} />
-                              </button>
-                            </span>
-                          )}
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-              )}
-              <tbody>
-                {sheet.data.map((row, ri) => {
-                  const isRowSelected = selectedRow === ri;
-                  const isEvenRow = ri % 2 === 0;
-                  return (
-                    <tr key={ri} className={isRowSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''}>
-                      <td
-                        className={`w-8 text-center text-xs select-none px-1 py-1 border border-border cursor-pointer ${isRowSelected ? 'bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200 font-bold' : 'text-muted-foreground bg-muted/30'}`}
-                        onClick={() => { setSelectedRow(isRowSelected ? null : ri); setSelectedCol(null); }}
-                        title={`点击选中第 ${ri + 1} 行`}
-                      >
-                        {ri + 1}
-                      </td>
-                      {row.map((cell, ci) => {
-                        const isEditing = editingCell?.row === ri && editingCell?.col === ci;
-                        const isColSelected = selectedCol === ci;
-                        const formulaResult = evaluateCellFormula(cell, sheet.data);
-                        const isFormula = formulaResult !== null;
-                        const displayValue = isFormula ? formulaResult : (cell !== '' ? String(cell) : '\u00A0');
-                        return (
-                          <td
-                            key={ci}
-                            className={`border border-border px-2 py-1 min-w-[80px] max-w-[300px] cursor-text
-                              ${isEditing ? 'ring-2 ring-primary ring-inset' : 'hover:bg-accent/30'}
-                              ${isRowSelected ? 'bg-blue-50 dark:bg-blue-900/20' : isColSelected ? 'bg-blue-50/50 dark:bg-blue-900/10' : isEvenRow ? 'bg-background' : 'bg-muted/10'}
-                            `}
-                            onClick={() => { setEditingCell({ row: ri, col: ci }); setSelectedRow(null); setSelectedCol(null); }}
-                            title={isFormula ? String(cell) : undefined}
-                          >
-                            {isEditing ? (
-                              <input
-                                type="text"
-                                className="w-full bg-transparent outline-none text-sm"
-                                style={{ fontFamily: '宋体', fontSize: '16px' }}
-                                defaultValue={String(cell)}
-                                autoFocus
-                                onBlur={(e) => { handleCellChange(ri, ci, e.target.value); setEditingCell(null); }}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleCellChange(ri, ci, (e.target as HTMLInputElement).value);
-                                    setEditingCell(ri < rows - 1 ? { row: ri + 1, col: ci } : null);
-                                  } else if (e.key === 'Tab') {
-                                    e.preventDefault();
-                                    handleCellChange(ri, ci, (e.target as HTMLInputElement).value);
-                                    if (ci < cols - 1) setEditingCell({ row: ri, col: ci + 1 });
-                                    else if (ri < rows - 1) setEditingCell({ row: ri + 1, col: 0 });
-                                    else setEditingCell(null);
-                                  } else if (e.key === 'Escape') { setEditingCell(null); }
-                                }}
-                              />
-                            ) : (
-                              <span
-                                className={`block truncate ${isFormula ? 'text-purple-600 dark:text-purple-400 italic' : ''} ${displayValue === '#ERR' ? 'text-destructive font-bold' : ''}`}
-                                style={{ fontFamily: '宋体', fontSize: '16px' }}
-                              >
-                                {displayValue}
-                              </span>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
-    </PluginPanelLayout>
+
+      {/* 隐藏的文件输入 */}
+      <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImportFile} title={t('importFile', { defaultValue: '导入文件' })} />
+    </div>
   );
 }

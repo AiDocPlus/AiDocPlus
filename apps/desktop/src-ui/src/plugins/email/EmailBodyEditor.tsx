@@ -1,7 +1,6 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import { StarterKit } from '@tiptap/starter-kit';
-import { Extension } from '@tiptap/core';
 import { Image } from '@tiptap/extension-image';
 import { Link } from '@tiptap/extension-link';
 import { Underline } from '@tiptap/extension-underline';
@@ -17,6 +16,7 @@ import { Placeholder } from '@tiptap/extensions';
 import { usePluginHost } from '../_framework/PluginHostAPI';
 import {
   Button, Separator,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger,
   DropdownMenuTrigger, DropdownMenuSeparator,
@@ -27,12 +27,12 @@ import {
   List, ListOrdered, Quote, Code, Minus,
   AlignLeft, AlignCenter, AlignRight,
   Link as LinkIcon, ImagePlus, Table as TableIcon,
-  Undo2, Redo2, Palette, RemoveFormatting,
+  Undo2, Redo2, RemoveFormatting,
   Trash2, ArrowDown, ArrowRight,
   PenLine, Code2, Eye,
   FileText, ChevronDown, IndentIncrease,
   Superscript as SuperscriptIcon, Subscript as SubscriptIcon,
-  Type, ArrowUpDown, Wand2, FileType,
+  FileType,
   Save,
   Scissors, Copy, ClipboardPaste, ClipboardCheck, MousePointerClick,
   Search, Replace, X as XIcon,
@@ -40,6 +40,10 @@ import {
   WrapText,
 } from 'lucide-react';
 import { looksLikeMarkdown, convertMarkdownToHtml } from './markdownToHtml';
+import {
+  DEFAULT_FONT_SIZE, TextIndent, LineHeight, formatHtml,
+} from './editorConstants';
+import { ToolBtn, ColorPicker, FontSizePicker, FontFamilyPicker, LineHeightPicker } from './EditorToolbarWidgets';
 
 export interface EmailBodyEditorProps {
   value: string;
@@ -61,166 +65,12 @@ export interface EmailBodyEditorProps {
  */
 type EditorMode = 'edit' | 'source' | 'preview';
 
-const DEFAULT_FONT_SIZE = '18px';
-const FONT_SIZES = ['12px', '14px', '16px', '18px', '20px', '24px', '28px', '32px'];
-const LINE_HEIGHTS = ['1.0', '1.2', '1.5', '1.75', '2.0', '2.5', '3.0'];
-const FONT_FAMILIES = [
-  { label: '宋体', value: '宋体, SimSun, serif' },
-  { label: '黑体', value: '黑体, SimHei, sans-serif' },
-  { label: '楷体', value: '楷体, KaiTi, serif' },
-  { label: '仿宋', value: '仿宋, FangSong, serif' },
-  { label: '微软雅黑', value: '微软雅黑, "Microsoft YaHei", sans-serif' },
-  { label: 'Arial', value: 'Arial, Helvetica, sans-serif' },
-  { label: 'Times New Roman', value: '"Times New Roman", Times, serif' },
-  { label: 'Georgia', value: 'Georgia, serif' },
-];
-
-/** 一键排版预设 */
-interface TypographyPreset {
-  name: string;
-  fontFamily: string;
-  fontSize: string;
-  lineHeight: string;
-  textIndent: string | null;
-  textAlign: string;
-}
-function getTypographyPresets(t: (key: string) => string): TypographyPreset[] {
-  return [
-    { name: t('typographyOfficial'), fontFamily: '仿宋, FangSong, serif', fontSize: '16px', lineHeight: '2.0', textIndent: '2em', textAlign: 'left' },
-    { name: t('typographyThesis'), fontFamily: '宋体, SimSun, serif', fontSize: '14px', lineHeight: '1.5', textIndent: '2em', textAlign: 'left' },
-    { name: t('typographyBusiness'), fontFamily: '微软雅黑, "Microsoft YaHei", sans-serif', fontSize: '14px', lineHeight: '1.6', textIndent: null, textAlign: 'left' },
-    { name: t('typographyBrief'), fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '14px', lineHeight: '1.5', textIndent: null, textAlign: 'left' },
-  ];
-}
-
-/** 自定义首行缩进扩展：为段落/标题添加 text-indent 样式属性，支持 Tab 快捷键 */
-const TextIndent = Extension.create({
-  name: 'textIndent',
-  addGlobalAttributes() {
-    return [{
-      types: ['paragraph', 'heading'],
-      attributes: {
-        textIndent: {
-          default: null,
-          parseHTML: (el: HTMLElement) => el.style?.textIndent || null,
-          renderHTML: (attrs: Record<string, string | null>) => {
-            if (!attrs.textIndent) return {};
-            return { style: `text-indent: ${attrs.textIndent}` };
-          },
-        },
-      },
-    }];
-  },
-  addCommands() {
-    return {
-      setTextIndent: (indent: string) => ({ commands }: { commands: any }) => {
-        return commands.updateAttributes('paragraph', { textIndent: indent })
-          || commands.updateAttributes('heading', { textIndent: indent });
-      },
-      unsetTextIndent: () => ({ commands }: { commands: any }) => {
-        return commands.updateAttributes('paragraph', { textIndent: null })
-          || commands.updateAttributes('heading', { textIndent: null });
-      },
-      toggleTextIndent: (indent: string) => ({ editor: ed, commands }: { editor: any; commands: any }) => {
-        const current = ed.getAttributes('paragraph').textIndent || ed.getAttributes('heading').textIndent;
-        if (current) {
-          return commands.updateAttributes('paragraph', { textIndent: null })
-            || commands.updateAttributes('heading', { textIndent: null });
-        }
-        return commands.updateAttributes('paragraph', { textIndent: indent })
-          || commands.updateAttributes('heading', { textIndent: indent });
-      },
-    } as any;
-  },
-  addKeyboardShortcuts() {
-    return {
-      Tab: () => {
-        const ed = this.editor;
-        if (ed.isActive('bulletList') || ed.isActive('orderedList')) return false;
-        return (ed as any).commands.setTextIndent('2em');
-      },
-      'Shift-Tab': () => {
-        const ed = this.editor;
-        if (ed.isActive('bulletList') || ed.isActive('orderedList')) return false;
-        return (ed as any).commands.unsetTextIndent();
-      },
-    };
-  },
-});
-
-/** 自定义行间距扩展：为段落/标题添加 line-height 样式属性 */
-const LineHeight = Extension.create({
-  name: 'lineHeight',
-  addGlobalAttributes() {
-    return [{
-      types: ['paragraph', 'heading'],
-      attributes: {
-        lineHeight: {
-          default: null,
-          parseHTML: (el: HTMLElement) => el.style?.lineHeight || null,
-          renderHTML: (attrs: Record<string, string | null>) => {
-            if (!attrs.lineHeight) return {};
-            return { style: `line-height: ${attrs.lineHeight}` };
-          },
-        },
-      },
-    }];
-  },
-  addCommands() {
-    return {
-      setLineHeight: (height: string) => ({ commands }: { commands: any }) => {
-        return commands.updateAttributes('paragraph', { lineHeight: height })
-          || commands.updateAttributes('heading', { lineHeight: height });
-      },
-      unsetLineHeight: () => ({ commands }: { commands: any }) => {
-        return commands.updateAttributes('paragraph', { lineHeight: null })
-          || commands.updateAttributes('heading', { lineHeight: null });
-      },
-    } as any;
-  },
-});
-
-/** 简易 HTML 格式化：将压缩的 HTML 转为带缩进的可读格式 */
-function formatHtml(html: string): string {
-  if (!html.trim()) return '';
-  let result = '';
-  let indent = 0;
-  const tab = '  ';
-  // 按标签拆分，保留标签
-  const tokens = html.replace(/>(\s*)</g, '>\n<').split('\n');
-  for (const raw of tokens) {
-    const token = raw.trim();
-    if (!token) continue;
-    // 闭合标签：先减缩进再输出
-    if (/^<\//.test(token)) {
-      indent = Math.max(0, indent - 1);
-      result += tab.repeat(indent) + token + '\n';
-    }
-    // 自闭合标签或非容器标签
-    else if (/\/>$/.test(token) || /^<(img|br|hr|input|meta|link)\b/i.test(token)) {
-      result += tab.repeat(indent) + token + '\n';
-    }
-    // 同一行包含开标签和闭标签（如 <p>text</p>）
-    else if (/^<[^/][^>]*>.*<\/[^>]+>$/.test(token)) {
-      result += tab.repeat(indent) + token + '\n';
-    }
-    // 开标签：输出后增缩进
-    else if (/^<[^/]/.test(token)) {
-      result += tab.repeat(indent) + token + '\n';
-      indent++;
-    }
-    // 纯文本
-    else {
-      result += tab.repeat(indent) + token + '\n';
-    }
-  }
-  return result.trimEnd();
-}
-
 // HTML → 纯文本，保留段落和换行结构
 export function htmlToPlainText(html: string): string {
   if (!html) return '';
   let text = html;
+  // 空段落整体替换为单个换行（避免 br 和 /p 各产生一个换行）
+  text = text.replace(/<p>\s*<br\s*\/?>\s*<\/p>/gi, '\n');
   // 块级元素前添加换行
   text = text.replace(/<\/(p|div|h[1-6]|li|tr|blockquote|pre)>/gi, '\n');
   text = text.replace(/<br\s*\/?>/gi, '\n');
@@ -249,6 +99,7 @@ export function EmailBodyEditor({ value, onChange, placeholder, t, format = 'htm
   const [sourceCode, setSourceCode] = useState('');
   const [plainText, setPlainText] = useState('');
   const savedHtmlRef = useRef<string>('');
+  const [confirmSwitchOpen, setConfirmSwitchOpen] = useState(false);
   const [saved, setSaved] = useState(true);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showFindReplace, setShowFindReplace] = useState(false);
@@ -259,23 +110,29 @@ export function EmailBodyEditor({ value, onChange, placeholder, t, format = 'htm
   const plainTextRef = useRef<HTMLTextAreaElement>(null);
 
   // 防抖自动保存
+  const pendingHtmlRef = useRef<string | null>(null);
   const debouncedOnChange = useCallback((html: string) => {
     setSaved(false);
     onSaveStatus?.(false);
+    pendingHtmlRef.current = html;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
       onChange(html);
+      pendingHtmlRef.current = null;
       setSaved(true);
       onSaveStatus?.(true);
-    }, 1000);
+    }, 500);
   }, [onChange, onSaveStatus]);
 
-  // 组件卸载时立即保存
+  // 组件卸载时 flush 未保存内容
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      if (pendingHtmlRef.current !== null) {
+        onChange(pendingHtmlRef.current);
+      }
     };
-  }, []);
+  }, [onChange]);
 
   const editor = useEditor({
     extensions: [
@@ -372,13 +229,6 @@ export function EmailBodyEditor({ value, onChange, placeholder, t, format = 'htm
     }
   }, [value, editor]);
 
-  // 纯文本模式同步
-  useEffect(() => {
-    if (format === 'plaintext' && value) {
-      setPlainText(htmlToPlainText(value));
-    }
-  }, [format]);
-
   // ── 导入内容（统一 MD→HTML 转换） ──
   const importContent = useCallback((text: string) => {
     const html = looksLikeMarkdown(text) ? convertMarkdownToHtml(text) : text;
@@ -451,26 +301,6 @@ export function EmailBodyEditor({ value, onChange, placeholder, t, format = 'htm
   const handleClearFormatting = useCallback(() => {
     if (!editor) return;
     editor.chain().focus().clearNodes().unsetAllMarks().run();
-  }, [editor]);
-
-  // ── 一键排版 ──
-  const applyTypography = useCallback((preset: TypographyPreset) => {
-    if (!editor) return;
-    editor.chain().focus().selectAll().run();
-    editor.chain().focus().setFontFamily(preset.fontFamily).run();
-    editor.chain().focus().setFontSize(preset.fontSize).run();
-    (editor as any).commands.setLineHeight(preset.lineHeight);
-    if (preset.textIndent) {
-      (editor as any).commands.setTextIndent(preset.textIndent);
-    } else {
-      (editor as any).commands.unsetTextIndent();
-    }
-    editor.chain().focus().setTextAlign(preset.textAlign).run();
-  }, [editor]);
-
-  const resetTypography = useCallback(() => {
-    if (!editor) return;
-    editor.chain().focus().selectAll().clearNodes().unsetAllMarks().run();
   }, [editor]);
 
   // ── 查找替换 ──
@@ -548,21 +378,32 @@ export function EmailBodyEditor({ value, onChange, placeholder, t, format = 'htm
   const handleSelectAll = useCallback(() => { if (editor) editor.commands.selectAll(); }, [editor]);
 
   // ── 纯文本/富文本切换 ──
+  const doSwitchToPlaintext = useCallback(() => {
+    if (!editor) return;
+    const currentHtml = editor.getHTML();
+    savedHtmlRef.current = currentHtml;
+    const text = htmlToPlainText(currentHtml);
+    setPlainText(text);
+    onFormatChange?.('plaintext');
+  }, [editor, onFormatChange]);
+
   const handleFormatToggle = useCallback(() => {
     if (!editor) return;
     if (format === 'html') {
-      // 保存当前 HTML 以便切回时恢复
-      savedHtmlRef.current = editor.getHTML();
-      const text = htmlToPlainText(savedHtmlRef.current);
-      setPlainText(text);
-      onFormatChange?.('plaintext');
+      // G4: 切换前检查是否有 HTML 格式内容，先确认再执行转换
+      const currentHtml = editor.getHTML();
+      if (/<[a-z][\s\S]*>/i.test(currentHtml) && currentHtml !== '<p></p>') {
+        setConfirmSwitchOpen(true);
+        return;
+      }
+      doSwitchToPlaintext();
     } else {
       // 切回富文本：如果纯文本未修改则恢复原始 HTML，否则从纯文本重建
       const originalPlain = htmlToPlainText(savedHtmlRef.current);
       if (plainText === originalPlain && savedHtmlRef.current) {
         onChange(savedHtmlRef.current);
       } else {
-        const html = plainText.split('\n').map(line => {
+        const html = plainText.trimEnd().split('\n').map(line => {
           if (line.trim() === '') return '<p><br></p>';
           if (line.trim() === '---') return '<hr>';
           if (line.trim().startsWith('• ')) return `<li>${line.trim().substring(2)}</li>`;
@@ -573,7 +414,7 @@ export function EmailBodyEditor({ value, onChange, placeholder, t, format = 'htm
       savedHtmlRef.current = '';
       onFormatChange?.('html');
     }
-  }, [editor, format, plainText, onChange, onFormatChange]);
+  }, [editor, format, plainText, onChange, onFormatChange, t]);
 
   // ── 模式切换逻辑 ──
   const switchToMode = useCallback((newMode: EditorMode) => {
@@ -607,6 +448,7 @@ export function EmailBodyEditor({ value, onChange, placeholder, t, format = 'htm
   const isPlaintext = format === 'plaintext';
 
   return (
+    <>
     <div className={`overflow-hidden bg-background flex flex-col h-full ${isDark ? 'dark' : ''}`}>
 
       {/* ── 纯文本模式 ── */}
@@ -925,28 +767,6 @@ export function EmailBodyEditor({ value, onChange, placeholder, t, format = 'htm
               </>
             )}
 
-            <Separator orientation="vertical" className="h-5 mx-0.5" />
-            {/* 一键排版下拉 */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-7 px-1.5 gap-0.5 text-xs">
-                  <Wand2 className="h-3.5 w-3.5" />
-                  <ChevronDown className="h-3 w-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-40">
-                {getTypographyPresets(t).map((preset: TypographyPreset) => (
-                  <DropdownMenuItem key={preset.name} onClick={() => applyTypography(preset)}>
-                    {preset.name}
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={resetTypography} className="text-destructive">
-                  {t('editorResetTypography')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
             {/* 右侧：格式切换 + 模式切换 */}
             <div className="flex-1" />
             <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1" onClick={handleFormatToggle}>
@@ -1091,156 +911,25 @@ export function EmailBodyEditor({ value, onChange, placeholder, t, format = 'htm
       `}</style>
 
     </div>
-  );
-}
 
-// ── 工具栏按钮子组件 ──
-
-function ToolBtn({ icon: Icon, title, onClick, active, disabled, className }: {
-  icon: React.ElementType;
-  title: string;
-  onClick: () => void;
-  active?: boolean;
-  disabled?: boolean;
-  className?: string;
-}) {
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className={`h-7 w-7 p-0 ${active && !className ? 'bg-accent text-accent-foreground' : ''} ${className || ''}`}
-      title={title}
-      onClick={onClick}
-      disabled={disabled}
-    >
-      <Icon className="h-3.5 w-3.5" />
-    </Button>
-  );
-}
-
-// ── 颜色选择器子组件 ──
-
-const TEXT_COLORS = [
-  '#000000', '#434343', '#666666', '#999999',
-  '#dc2626', '#ea580c', '#ca8a04', '#16a34a',
-  '#2563eb', '#7c3aed', '#db2777', '#0d9488',
-];
-
-function ColorPicker({ editor, t }: { editor: ReturnType<typeof useEditor>; t: (key: string) => string }) {
-  if (!editor) return null;
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title={t('editorColor')}>
-          <Palette className="h-3.5 w-3.5" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="p-2 min-w-[120px]">
-        <div className="grid grid-cols-4 gap-1">
-          {TEXT_COLORS.map(color => (
-            <button
-              key={color}
-              className="w-6 h-6 rounded border border-border hover:scale-110 transition-transform"
-              style={{ backgroundColor: color }}
-              title={color}
-              onClick={() => editor.chain().focus().setColor(color).run()}
-            />
-          ))}
+    {/* 格式切换确认对话框 */}
+    <Dialog open={confirmSwitchOpen} onOpenChange={setConfirmSwitchOpen}>
+      <DialogContent className="sm:max-w-[400px]" style={{ fontFamily: '宋体', fontSize: '16px' }}>
+        <DialogHeader>
+          <DialogTitle>{t('formatSwitchTitle', { defaultValue: '切换到纯文本' })}</DialogTitle>
+          <DialogDescription>{t('formatSwitchWarning')}</DialogDescription>
+        </DialogHeader>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setConfirmSwitchOpen(false)}>
+            {t('cancel')}
+          </Button>
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setConfirmSwitchOpen(false); doSwitchToPlaintext(); }}>
+            {t('formatSwitchConfirm', { defaultValue: '确认切换' })}
+          </Button>
         </div>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-xs text-muted-foreground justify-center"
-          onClick={() => editor.chain().focus().unsetColor().run()}>
-          {t('editorColorReset')}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 
-// ── 字号选择器子组件 ──
-
-function FontSizePicker({ editor, t }: { editor: ReturnType<typeof useEditor>; t: (key: string) => string }) {
-  if (!editor) return null;
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 px-1 text-[11px] min-w-[32px]" title={t('editorFontSize')}>
-          <span className="font-mono">A</span>
-          <ChevronDown className="h-2.5 w-2.5 ml-0.5" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-[80px]">
-        {FONT_SIZES.map(size => (
-          <DropdownMenuItem key={size}
-            className={`text-xs ${size === DEFAULT_FONT_SIZE ? 'font-bold' : ''}`}
-            onClick={() => editor.chain().focus().setFontSize(size).run()}>
-            {size}{size === DEFAULT_FONT_SIZE ? ' ✓' : ''}
-          </DropdownMenuItem>
-        ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-xs text-muted-foreground"
-          onClick={() => editor.chain().focus().unsetFontSize().run()}>
-          {t('editorFontSizeReset')}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-// ── 字体选择器子组件 ──
-
-function FontFamilyPicker({ editor, t }: { editor: ReturnType<typeof useEditor>; t: (key: string) => string }) {
-  if (!editor) return null;
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 px-1.5 text-[11px] min-w-[40px] gap-0.5" title={t('editorFontFamily')}>
-          <Type className="h-3.5 w-3.5" />
-          <ChevronDown className="h-2.5 w-2.5" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-[140px]">
-        {FONT_FAMILIES.map(ff => (
-          <DropdownMenuItem key={ff.label} className="text-xs"
-            style={{ fontFamily: ff.value }}
-            onClick={() => editor.chain().focus().setFontFamily(ff.value).run()}>
-            {ff.label}
-          </DropdownMenuItem>
-        ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-xs text-muted-foreground"
-          onClick={() => editor.chain().focus().unsetFontFamily().run()}>
-          {t('editorFontFamilyReset')}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-// ── 行间距选择器子组件 ──
-
-function LineHeightPicker({ editor, t }: { editor: ReturnType<typeof useEditor>; t: (key: string) => string }) {
-  if (!editor) return null;
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title={t('editorLineHeight')}>
-          <ArrowUpDown className="h-3.5 w-3.5" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-[80px]">
-        {LINE_HEIGHTS.map(lh => (
-          <DropdownMenuItem key={lh} className="text-xs"
-            onClick={() => (editor as any).commands.setLineHeight(lh)}>
-            {lh}
-          </DropdownMenuItem>
-        ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-xs text-muted-foreground"
-          onClick={() => (editor as any).commands.unsetLineHeight()}>
-          {t('editorLineHeightReset')}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}

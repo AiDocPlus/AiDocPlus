@@ -15,7 +15,7 @@ export const compliancePlugin: DocumentPlugin = {
   name: '合规检查',
   icon: ShieldCheck,
   description: 'AI 检查文档是否符合特定写作规范，输出结构化检查报告',
-  majorCategory: 'content-generation',
+  majorCategory: 'functional',
   subCategory: 'analysis',
   i18nNamespace: 'plugin-compliance',
   PanelComponent: CompliancePluginPanel,

@@ -5,10 +5,12 @@ import { useSettingsStore, type CategoryItem } from '@/stores/useSettingsStore';
  * UUID 直接内联，不再依赖集中式常量
  */
 export const DEFAULT_DOC_PLUGINS = [
-  '550e8400-e29b-41d4-a716-446655440003', // 文档摘要
-  '550e8400-e29b-41d4-a716-446655440007', // 文档统计
-  '550e8400-e29b-41d4-a716-446655440001', // 生成 PPT
-  '550e8400-e29b-41d4-a716-446655440010', // 邮件发送（功能区默认插件）
+  '550e8400-e29b-41d4-a716-446655440037', // 图片编辑
+  '550e8400-e29b-41d4-a716-446655440009', // 表格编辑器
+  '550e8400-e29b-41d4-a716-446655440006', // Mermaid 图表
+  '550e8400-e29b-41d4-a716-446655440004', // 思维导图
+  '550e8400-e29b-41d4-a716-446655440010', // 邮件发送
+  '550e8400-e29b-41d4-a716-446655440017', // Office 文档预览
 ];
 
 /**
@@ -32,6 +34,8 @@ export const PLUGIN_SUB_CATEGORIES: Record<string, Array<{ key: string; label: s
     { key: 'analysis',      label: '分析统计' },
   ],
   'functional': [
+    { key: 'ai-text',       label: 'AI 文本' },
+    { key: 'analysis',      label: '分析统计' },
     { key: 'communication', label: '通信协作' },
     { key: 'export',        label: '导出发布' },
     { key: 'visualization', label: '可视化预览' },

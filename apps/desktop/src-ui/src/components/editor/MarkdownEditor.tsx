@@ -81,6 +81,7 @@ interface MarkdownEditorProps {
   editorId?: string;
   importSources?: ImportSources;
   exportCallbacks?: import('./EditorToolbar').ExportCallbacks;
+  initialViewMode?: 'edit' | 'preview' | 'split';
 }
 
 // 创建一组 Compartment 实例（每个编辑器实例独立）
@@ -118,6 +119,7 @@ export function MarkdownEditor({
   editorId: _editorId,
   importSources,
   exportCallbacks,
+  initialViewMode,
 }: MarkdownEditorProps) {
   const editorDivRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -134,7 +136,7 @@ export function MarkdownEditor({
   const editorSettings = useEditorSettings();
   const [localFontSize, setLocalFontSize] = useState(editorSettings.fontSize);
   const [cursorInfo, setCursorInfo] = useState({ line: 1, col: 1, selChars: 0 });
-  const [viewMode, setViewMode] = useState<ViewMode>(editorSettings.defaultViewMode || 'edit');
+  const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode || editorSettings.defaultViewMode || 'edit');
   const [docContent, setDocContent] = useState(value);
   const [outlineOpen, setOutlineOpen] = useState(false);
 

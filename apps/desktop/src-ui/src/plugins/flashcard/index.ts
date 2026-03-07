@@ -15,7 +15,7 @@ export const flashcardPlugin: DocumentPlugin = {
   name: '知识卡片',
   icon: Layers,
   description: '从文档提取关键知识点，生成问答式记忆卡片，支持翻转学习和 Anki 导出',
-  majorCategory: 'content-generation',
+  majorCategory: 'functional',
   subCategory: 'ai-text',
   i18nNamespace: 'plugin-flashcard',
   PanelComponent: FlashcardPluginPanel,

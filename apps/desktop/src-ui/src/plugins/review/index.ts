@@ -15,7 +15,7 @@ export const reviewPlugin: DocumentPlugin = {
   name: '文档评审',
   icon: ClipboardCheck,
   description: 'AI 对文档进行多维度评审，给出修改建议和评分',
-  majorCategory: 'content-generation',
+  majorCategory: 'functional',
   subCategory: 'ai-text',
   i18nNamespace: 'plugin-review',
   PanelComponent: ReviewPluginPanel,

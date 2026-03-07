@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, memo } from 'react';
-import { Send, Sparkles, X, ChevronDown, ChevronUp, FileText, BookOpen, Square, Eraser, Trash2, Copy, Check, ArrowUpToLine, MessageSquareText, PenLine, Wand2 } from 'lucide-react';
+import { Send, Sparkles, X, ChevronDown, ChevronUp, FileText, BookOpen, Square, Eraser, Trash2, Copy, Check, ArrowUpToLine, MessageSquareText, PenLine, Wand2, Brain, ListChecks } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useAppStore } from '@/stores/useAppStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
@@ -170,7 +170,9 @@ const ChatMessage = memo(function ChatMessage({
             <div className="text-xs font-medium opacity-70 mb-1">{t('chat.ai', { defaultValue: 'AI' })}</div>
             <div className="text-sm [&_.markdown-preview]:p-0 [&_.markdown-preview]:text-inherit">
               <MarkdownPreview
-                content={`<details>\n<summary>${t('chat.thinkingCollapsed', { defaultValue: '\ud83d\udcad \u67e5\u770b AI \u601d\u8003\u8fc7\u7a0b' })}</summary>\n\n${parsed.thinking}\n\n</details>`}
+                content={enableThinking
+                  ? `> 💭 **思考过程：**\n>\n> ${parsed.thinking.replace(/\n/g, '\n> ')}`
+                  : `<details>\n<summary>${t('chat.thinkingCollapsed', { defaultValue: '💭 查看 AI 思考过程' })}</summary>\n\n${parsed.thinking}\n\n</details>`}
                 theme={resolveTheme()}
                 className="!p-0"
                 fontSize={13}
@@ -212,8 +214,10 @@ const ChatMessage = memo(function ChatMessage({
             <div className="text-sm [&_.markdown-preview]:p-0 [&_.markdown-preview]:text-inherit">
               <MarkdownPreview content={(() => {
                 const parsed = parseThinkTags(message.content);
-                if (!parsed.thinking) return message.content;
-                if (enableThinking) return message.content;
+                if (!parsed.thinking) return parsed.content;
+                if (enableThinking) {
+                  return `> 💭 **思考过程：**\n>\n> ${parsed.thinking.replace(/\n/g, '\n> ')}\n\n${parsed.content}`;
+                }
                 return `<details>\n<summary>${t('chat.thinkingCollapsed', { defaultValue: '💭 查看 AI 思考过程' })}</summary>\n\n${parsed.thinking}\n\n</details>\n\n${parsed.content}`;
               })()} theme={resolveTheme()} className="!p-0" fontSize={13} />
             </div>
@@ -274,6 +278,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
   const providerConfig = effectiveService ? getProviderConfig(effectiveService.provider) : undefined;
   const supportsWebSearch = providerConfig?.capabilities?.webSearch ?? false;
   const supportsFunctionCalling = providerConfig?.capabilities?.functionCalling ?? false;
+  const supportsThinking = providerConfig?.capabilities?.thinking ?? false;
 
   const [input, setInput] = useState('');
   const [showAuthorNotes, setShowAuthorNotes] = useState(true);
@@ -281,6 +286,8 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
   const [useStreaming, setUseStreaming] = useState(true);
   const [webSearch, setWebSearch] = useState(true);
   const [useTools, setUseTools] = useState(false);
+  const [enableThinking, setEnableThinking] = useState(false);
+  const [planMode, setPlanMode] = useState(false);
   const [authorNotesInput, setAuthorNotesInput] = useState('');
   const [contextMode, _setContextMode] = useState<ChatContextMode>('none');
   // simpleMode 时强制为 none
@@ -400,7 +407,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
       const ctxInfo = effectiveContextMode !== 'none'
         ? { mode: effectiveContextMode, content: getContextContent() }
         : undefined;
-      await sendChatMessage(effectiveTabId, messageContent, webSearch && supportsWebSearch, ctxInfo, useTools && supportsFunctionCalling);
+      await sendChatMessage(effectiveTabId, messageContent, webSearch && supportsWebSearch, ctxInfo, useTools && supportsFunctionCalling, { enableThinking: enableThinking && supportsThinking, planMode });
     } catch (error) {
       console.error('Failed to send message:', error);
       const errMsg = typeof error === 'string' ? error : (error instanceof Error ? error.message : JSON.stringify(error));
@@ -1072,8 +1079,8 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
             spellCheck={false}
             autoCorrect="off"
             autoCapitalize="off"
-            rows={simpleMode ? 3 : 1}
-            className={`flex-1 px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 text-sm resize-none ${simpleMode ? 'min-h-[72px]' : 'min-h-0'}`}
+            rows={3}
+            className="flex-1 px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 text-sm resize-none min-h-[60px]"
           />
           {isCurrentTabStreaming ? (
             <Button
@@ -1097,6 +1104,26 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
             </Button>
           )}
         </div>
+        {/* AI 模式切换按钮 */}
+        {!simpleMode && (
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm"
+            className={`h-7 px-2 text-xs gap-1 ${enableThinking && supportsThinking ? 'text-purple-600 dark:text-purple-400' : 'text-muted-foreground'}`}
+            disabled={!supportsThinking}
+            onClick={() => setEnableThinking(v => !v)}
+            title={supportsThinking ? (enableThinking ? t('chat.thinkingOn', { defaultValue: '深度思考：已开启' }) : t('chat.thinkingOff', { defaultValue: '深度思考：已关闭' })) : t('chat.thinkingUnsupported', { defaultValue: '当前模型不支持深度思考' })}>
+            <Brain className="h-3.5 w-3.5" />
+            {t('chat.thinking', { defaultValue: '深度思考' })}
+          </Button>
+          <Button variant="ghost" size="sm"
+            className={`h-7 px-2 text-xs gap-1 ${planMode ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground'}`}
+            onClick={() => setPlanMode(v => !v)}
+            title={planMode ? t('chat.planModeOn', { defaultValue: '计划模式：已开启（AI 将先给出规划而非直接生成内容）' }) : t('chat.planModeOff', { defaultValue: '计划模式：已关闭' })}>
+            <ListChecks className="h-3.5 w-3.5" />
+            {t('chat.planMode', { defaultValue: '计划模式' })}
+          </Button>
+        </div>
+        )}
       </div>
 
       {/* Prompt Templates Panel（simpleMode 时隐藏） */}

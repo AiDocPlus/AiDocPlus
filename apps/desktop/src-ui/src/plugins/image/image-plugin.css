@@ -1,0 +1,15 @@
+/* 图片插件公共样式 */
+
+.image-plugin-font {
+  font-family: SimSun, "宋体", "Songti SC", serif;
+  font-size: 16px;
+}
+
+.image-canvas-container {
+  min-height: 200px;
+}
+
+.image-context-menu {
+  font-family: SimSun, "宋体", "Songti SC", serif;
+  font-size: 14px;
+}

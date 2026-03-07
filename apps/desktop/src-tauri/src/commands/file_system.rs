@@ -178,7 +178,7 @@ pub fn read_file_base64(path: String) -> Result<String> {
     Ok(format!("data:{};base64,{}", mime, b64))
 }
 
-/// 读取文本文件内容
+/// 读取文本文件内容（自动检测编码，支持 UTF-8/GBK/GB2312 等）
 #[tauri::command]
 pub fn read_text_file(path: String) -> Result<String> {
     let file_path = Path::new(&path);
@@ -186,7 +186,25 @@ pub fn read_text_file(path: String) -> Result<String> {
         return Err(format!("文件不存在: {}", path));
     }
 
-    fs::read_to_string(file_path).map_err(|e| format!("读取文件失败: {}", e))
+    let bytes = fs::read(file_path).map_err(|e| format!("读取文件失败: {}", e))?;
+
+    // 先尝试 UTF-8
+    if let Ok(s) = std::str::from_utf8(&bytes) {
+        return Ok(s.to_string());
+    }
+
+    // UTF-8 失败，使用 chardetng 检测编码
+    let mut detector = chardetng::EncodingDetector::new();
+    detector.feed(&bytes, true);
+    let encoding = detector.guess(None, true);
+    let (decoded, _, had_errors) = encoding.decode(&bytes);
+    if had_errors {
+        // 回退：强制用 GBK 解码
+        let (decoded_gbk, _, _) = encoding_rs::GBK.decode(&bytes);
+        Ok(decoded_gbk.into_owned())
+    } else {
+        Ok(decoded.into_owned())
+    }
 }
 
 #[tauri::command]

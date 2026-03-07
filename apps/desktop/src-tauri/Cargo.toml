@@ -1,6 +1,6 @@
 [package]
 name = "aidocplus"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2021"
 
 [build-dependencies]
@@ -39,6 +39,10 @@ rand = "0.8"
 tauri-plugin-cli = "2"
 tauri-plugin-deep-link = "2"
 async-stream = "0.3"
+ureq = { version = "3", features = ["json"] }
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+encoding_rs = "0.8"
+chardetng = "0.1"
 aidocplus-manager-rust = { path = "../../../packages/manager-rust" }
 
 # 本地开发构建：快速编译，重在测试

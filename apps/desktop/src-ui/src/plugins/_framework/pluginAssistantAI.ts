@@ -16,6 +16,7 @@ export interface AssistantMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: number;
+  isError?: boolean;
 }
 
 let _nextMsgId = 1;

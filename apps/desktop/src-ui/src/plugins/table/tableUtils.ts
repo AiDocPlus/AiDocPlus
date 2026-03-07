@@ -348,6 +348,8 @@ function sheetToMarkdown(sheet: TableSheet): string {
     lines.push('| ' + sheet.headers.map(() => '---').join(' | ') + ' |');
   }
   for (const row of sheet.data) {
+    // 跳过全空行，避免插入文档时产生无意义的空 Markdown 表格行
+    if (row.every(c => c === '' || c === null || c === undefined)) continue;
     lines.push('| ' + row.map(c => String(c).replace(/\|/g, '\\|')).join(' | ') + ' |');
   }
   return lines.join('\n');

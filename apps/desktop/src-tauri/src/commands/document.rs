@@ -363,10 +363,22 @@ pub fn write_binary_file(path: String, data: Vec<u8>) -> Result<()> {
     // 获取允许的目录列表
     let mut allowed_dirs: Vec<std::path::PathBuf> = Vec::new();
 
-    // 应用项目目录
     if let Some(home) = dirs::home_dir() {
+        // 应用项目目录
         allowed_dirs.push(home.join("AiDocPlus"));
+        // 常用用户目录（桌面、下载、文档）
+        allowed_dirs.push(home.join("Desktop"));
+        allowed_dirs.push(home.join("Downloads"));
+        allowed_dirs.push(home.join("Documents"));
+        // 用户主目录（兜底）
+        allowed_dirs.push(home.clone());
     }
+
+    // 系统标准目录
+    if let Some(d) = dirs::desktop_dir() { allowed_dirs.push(d); }
+    if let Some(d) = dirs::download_dir() { allowed_dirs.push(d); }
+    if let Some(d) = dirs::document_dir() { allowed_dirs.push(d); }
+    if let Some(d) = dirs::picture_dir() { allowed_dirs.push(d); }
 
     // 临时目录
     allowed_dirs.push(std::env::temp_dir());

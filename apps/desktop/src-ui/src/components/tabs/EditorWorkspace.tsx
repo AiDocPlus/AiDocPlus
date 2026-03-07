@@ -6,7 +6,7 @@ import { useAppStore } from '@/stores/useAppStore';
 import { ResizableHandle } from '../ui/resizable-handle';
 import type { DocumentPlugin } from '@/plugins/types';
 import { PluginAssistantPanel } from '@/plugins/_framework/PluginAssistantPanel';
-import { PluginHostContext, createPluginHostAPI } from '@/plugins/_framework/PluginHostAPI';
+import { PluginHostContext, ThinkingContext, createPluginHostAPI, type CreatePluginHostAPIOptions } from '@/plugins/_framework/PluginHostAPI';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 
 
@@ -217,8 +217,16 @@ function PluginAssistantWrapper({
   useEffect(() => { docRef.current = doc; }, [doc]);
   useEffect(() => { aiContentRef.current = aiContent; }, [aiContent]);
 
+  // 思考内容状态（供 ThinkingContext 传递给子组件）
+  const [thinkingContent, setThinkingContent] = useState('');
+  const thinkingUpdateRef = useRef(setThinkingContent);
+  thinkingUpdateRef.current = setThinkingContent;
+
+  const { updatePluginData, markTabAsDirty, saveDocument } = useAppStore();
+
   const hostAPI = useMemo(() => {
-    return createPluginHostAPI({
+    const isFunctional = plugin.majorCategory === 'functional';
+    const opts: CreatePluginHostAPIOptions = {
       pluginId: plugin.id,
       getDocument: () => docRef.current,
       getAIContent: () => aiContentRef.current,
@@ -227,22 +235,49 @@ function PluginAssistantWrapper({
       getLocale: () => useSettingsStore.getState().ui?.language || 'zh',
       getTheme: () => (useSettingsStore.getState().ui?.theme === 'dark' ? 'dark' : 'light'),
       i18nNamespace: plugin.i18nNamespace,
-    });
+      onThinkingUpdate: (thinking: string) => thinkingUpdateRef.current(thinking),
+    };
+    // 内容生成类插件提供 docData 回调，使 host.docData 可用
+    if (!isFunctional) {
+      opts.docDataCallbacks = {
+        getPluginData: () => docRef.current.pluginData?.[plugin.id] ?? null,
+        setPluginData: (data: unknown) => {
+          const versioned = (data != null && typeof data === 'object' && !Array.isArray(data))
+            ? { _version: 1, ...(data as Record<string, unknown>) }
+            : data;
+          updatePluginData(docRef.current.id, plugin.id, versioned);
+          markTabAsDirty(tabId);
+        },
+        markDirty: () => markTabAsDirty(tabId),
+        requestSave: async () => {
+          const latestDoc = useAppStore.getState().documents.find(d => d.id === docRef.current.id);
+          if (latestDoc) {
+            await saveDocument(latestDoc);
+            const { markTabAsClean, tabs } = useAppStore.getState();
+            const t = tabs.find(x => x.documentId === docRef.current.id);
+            if (t) markTabAsClean(t.id);
+          }
+        },
+      };
+    }
+    return createPluginHostAPI(opts);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plugin.id, plugin.i18nNamespace]);
+  }, [plugin.id, plugin.i18nNamespace, plugin.majorCategory, tabId, updatePluginData, markTabAsDirty, saveDocument]);
 
   // 插件提供了完全自定义的助手面板组件
   if (plugin.AssistantPanelComponent) {
     const CustomPanel = plugin.AssistantPanelComponent;
     return (
       <PluginHostContext.Provider value={hostAPI}>
-        <CustomPanel
-          pluginId={plugin.id}
-          document={doc}
-          pluginData={doc.pluginData?.[plugin.id] ?? null}
-          aiContent={aiContent}
-          tabId={tabId}
-        />
+        <ThinkingContext.Provider value={thinkingContent}>
+          <CustomPanel
+            pluginId={plugin.id}
+            document={doc}
+            pluginData={doc.pluginData?.[plugin.id] ?? null}
+            aiContent={aiContent}
+            tabId={tabId}
+          />
+        </ThinkingContext.Provider>
       </PluginHostContext.Provider>
     );
   }
@@ -250,16 +285,18 @@ function PluginAssistantWrapper({
   // 使用通用助手面板（配置式或默认）
   return (
     <PluginHostContext.Provider value={hostAPI}>
-      <PluginAssistantPanel
-        pluginId={plugin.id}
-        pluginName={plugin.name}
-        pluginDesc={plugin.description}
-        assistantConfig={plugin.assistantConfig}
-        document={doc}
-        pluginData={doc.pluginData?.[plugin.id] ?? null}
-        aiContent={aiContent}
-        tabId={tabId}
-      />
+      <ThinkingContext.Provider value={thinkingContent}>
+        <PluginAssistantPanel
+          pluginId={plugin.id}
+          pluginName={plugin.name}
+          pluginDesc={plugin.description}
+          assistantConfig={plugin.assistantConfig}
+          document={doc}
+          pluginData={doc.pluginData?.[plugin.id] ?? null}
+          aiContent={aiContent}
+          tabId={tabId}
+        />
+      </ThinkingContext.Provider>
     </PluginHostContext.Provider>
   );
 }

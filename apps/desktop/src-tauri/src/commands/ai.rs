@@ -85,16 +85,18 @@ pub async fn chat(
         return call_anthropic_with_search(&config, &client, &messages, max_tokens).await;
     }
 
+    // 合并多个 system 消息为一个（部分 provider 如 MiniMax 不支持多 system 消息）
+    let merged_messages = merge_system_messages(&messages);
+
     let mut request_body = json!({
-        "messages": messages,
+        "messages": merged_messages,
         "model": config.get_default_model(),
-        "temperature": temperature.unwrap_or(0.7),
+        "temperature": temperature.unwrap_or_else(|| get_default_temperature(&config)),
         "stream": false
     });
 
-    if let Some(mt) = max_tokens {
-        request_body["max_tokens"] = json!(mt);
-    }
+    // 注入 max_tokens：优先使用传入值，否则使用 provider 推荐的默认值
+    request_body["max_tokens"] = json!(max_tokens.unwrap_or_else(|| get_default_max_tokens(&config)));
 
     // 联网搜索：根据 provider 注入正确的参数格式
     if web_search {
@@ -209,8 +211,11 @@ pub async fn chat_stream(
     let url = format!("{}/chat/completions", config.get_base_url());
     let docs = project_documents.unwrap_or_default();
 
+    // 合并多个 system 消息为一个（部分 provider 如 MiniMax 不支持多 system 消息）
+    let merged_messages = merge_system_messages(&messages);
+
     // Function Calling 循环：先用非流式检测 tool_calls，执行工具后再次调用
-    let mut current_messages: Vec<serde_json::Value> = messages.iter().map(|m| {
+    let mut current_messages: Vec<serde_json::Value> = merged_messages.iter().map(|m| {
         json!({ "role": m.role, "content": m.content })
     }).collect();
 
@@ -224,7 +229,7 @@ pub async fn chat_stream(
             let mut tool_request = json!({
                 "messages": current_messages,
                 "model": config.get_default_model(),
-                "temperature": 0.7,
+                "temperature": get_default_temperature(&config),
                 "stream": false,
                 "tools": tool_defs
             });
@@ -316,7 +321,8 @@ pub async fn chat_stream(
     let mut request_body = json!({
         "messages": current_messages,
         "model": config.get_default_model(),
-        "temperature": 0.7,
+        "temperature": get_default_temperature(&config),
+        "max_tokens": get_default_max_tokens(&config),
         "stream": true
     });
 
@@ -1069,9 +1075,8 @@ fn inject_thinking_params(request_body: &mut serde_json::Value, config: &AIConfi
         "glm" | "glm-code" => {
             if enabled {
                 request_body["thinking"] = json!({ "type": "enabled" });
-            } else {
-                request_body["thinking"] = json!({ "type": "disabled" });
             }
+            // 不再主动 disabled，让 GLM-5 保持默认行为（enabled/强制思考）
         }
         // DeepSeek: deepseek-reasoner 自动启用思考，无额外参数
         // 由用户在设置中选择 reasoner 模型
@@ -1088,6 +1093,59 @@ fn inject_thinking_params(request_body: &mut serde_json::Value, config: &AIConfi
         "anthropic" => {}
         _ => {}
     }
+}
+
+/// 根据 provider 返回推荐的默认 temperature
+fn get_default_temperature(config: &AIConfig) -> f64 {
+    match config.provider.as_str() {
+        "glm" | "glm-code" => 1.0,              // GLM-5 官方默认 1.0
+        "minimax" | "minimax-code" => 1.0,       // MiniMax 官方推荐 1.0
+        _ => 0.7,
+    }
+}
+
+/// 根据 provider 返回推荐的默认 max_tokens
+fn get_default_max_tokens(config: &AIConfig) -> u32 {
+    match config.provider.as_str() {
+        "glm" | "glm-code" => 8192,             // GLM-5 默认仅 1024，太低
+        "minimax" | "minimax-code" => 8192,      // MiniMax 需要合理默认值
+        "anthropic" => 8192,
+        _ => 4096,
+    }
+}
+
+/// 合并多个 system 消息为一个（部分 provider 如 MiniMax 不支持多 system 消息）
+/// 将所有 system 消息内容合并到第一条 system 消息中，移除后续的 system 消息
+fn merge_system_messages(messages: &[ChatMessage]) -> Vec<ChatMessage> {
+    let system_parts: Vec<&str> = messages.iter()
+        .filter(|m| m.role == "system")
+        .map(|m| m.content.as_str())
+        .collect();
+
+    if system_parts.len() <= 1 {
+        return messages.to_vec();
+    }
+
+    let merged_system = system_parts.join("\n\n");
+    let mut result: Vec<ChatMessage> = Vec::new();
+    let mut system_emitted = false;
+
+    for m in messages {
+        if m.role == "system" {
+            if !system_emitted {
+                result.push(ChatMessage {
+                    role: "system".to_string(),
+                    content: merged_system.clone(),
+                });
+                system_emitted = true;
+            }
+            // 跳过后续的 system 消息
+        } else {
+            result.push(m.clone());
+        }
+    }
+
+    result
 }
 
 fn get_ai_config(

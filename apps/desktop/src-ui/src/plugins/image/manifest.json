@@ -1,0 +1,20 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440037",
+  "name": "图片编辑",
+  "version": "1.0.0",
+  "description": "AI 图片生成、编辑与管理",
+  "icon": "Image",
+  "author": "AiDocPlus",
+  "type": "external",
+  "enabled": true,
+  "majorCategory": "content-generation",
+  "subCategory": "visualization",
+  "category": "visualization",
+  "tags": [
+    "image",
+    "图片",
+    "矢量",
+    "SVG",
+    "GIF"
+  ]
+}

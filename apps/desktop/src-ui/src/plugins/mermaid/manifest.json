@@ -1,7 +1,7 @@
 {
   "id": "550e8400-e29b-41d4-a716-446655440006",
   "name": "Mermaid 图表",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "AI 生成流程图、时序图、类图等 Mermaid 图表",
   "icon": "GitBranch",
   "author": "AiDocPlus",
