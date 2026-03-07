@@ -46,7 +46,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEU5NjNCQjAwNjEzNkE5ODEKUldTQnFUWmhBTHRqNllsSmw4L3lnZExDTXpiWG5nTkRJa2hHM2dEcFdobytkaU45VGJicEVhY3MK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDBGOTFBQzk5ODI0MzE0M0EKUldRNkZFT0NtYXlSRDhmR080NU5DTVlzTlVOLy9hTUY1d0cxYXdqRVdDYXcweEljdDcyVEUya28K",
       "endpoints": [
         "https://github.com/AiDocPlus/AiDocPlus/releases/latest/download/latest.json"
       ],
