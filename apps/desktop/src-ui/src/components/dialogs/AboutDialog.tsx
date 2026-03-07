@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { getVersion } from '@tauri-apps/api/app';
 import { useTranslation } from '@/i18n';
 import { Globe, Github, FileText, ExternalLink } from 'lucide-react';
+import pkgJson from '../../../../package.json';
 
 interface AboutDialogProps {
   open: boolean;
@@ -16,7 +17,7 @@ export function AboutDialog({ open, onClose }: AboutDialogProps) {
 
   useEffect(() => {
     if (open) {
-      getVersion().then(setVersion).catch(() => setVersion('0.3.0'));
+      getVersion().then(v => setVersion(v || pkgJson.version)).catch(() => setVersion(pkgJson.version));
     }
   }, [open]);
 
