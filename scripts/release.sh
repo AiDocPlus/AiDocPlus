@@ -30,6 +30,7 @@ fail()  { echo -e "${RED}[错误]${NC} $1"; exit 1; }
 # ── 0. 前置检查 ──
 info "检查环境..."
 [ -z "$TAURI_SIGNING_PRIVATE_KEY" ] && fail "TAURI_SIGNING_PRIVATE_KEY 未设置"
+[ -z "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" ] && warn "TAURI_SIGNING_PRIVATE_KEY_PASSWORD 未设置，如果密钥有密码将会失败"
 [ -z "$APPLE_ID" ] && fail "APPLE_ID 未设置"
 [ -z "$APPLE_PASSWORD" ] && fail "APPLE_PASSWORD 未设置"
 [ -z "$APPLE_TEAM_ID" ] && fail "APPLE_TEAM_ID 未设置"
@@ -43,76 +44,60 @@ TAG="v${VERSION}"
 info "版本: ${VERSION} (tag: ${TAG})"
 
 # ── 1. 本地构建 macOS ──
-info "开始构建 macOS..."
+info "开始构建 macOS（含签名+公证+updater artifacts）..."
 cd "$DESKTOP_DIR"
-pnpm tauri build --bundles dmg 2>&1 | tail -20 || true
+pnpm tauri build --bundles app,dmg 2>&1 | tail -20
+BUILD_EXIT=$?
 
 # 检查构建产物
 APP_PATH="${BUNDLE_DIR}/macos/AiDocPlus.app"
-[ -d "$APP_PATH" ] || fail "AiDocPlus.app 未生成"
-
-# 检查 updater artifacts
 UPDATER_TAR="${BUNDLE_DIR}/macos/AiDocPlus.app.tar.gz"
 UPDATER_SIG="${BUNDLE_DIR}/macos/AiDocPlus.app.tar.gz.sig"
+DMG_PATH="${BUNDLE_DIR}/dmg/AiDocPlus_${VERSION}_aarch64.dmg"
+
+[ -d "$APP_PATH" ] || fail "AiDocPlus.app 未生成"
 
 if [ ! -f "$UPDATER_TAR" ] || [ ! -f "$UPDATER_SIG" ]; then
-    warn "Tauri 未生成 updater artifacts，可能构建失败或公证超时"
-    warn "检查 TAURI_SIGNING_PRIVATE_KEY 是否正确设置"
+    warn "构建未能自动生成 updater artifacts（可能公证超时），尝试手动完成..."
     
-    # 如果 .app 存在但 updater artifacts 不存在，可能是公证超时导致构建中断
-    # 尝试手动生成
-    if [ -d "$APP_PATH" ]; then
-        info "手动生成 updater artifacts..."
-        cd "${BUNDLE_DIR}/macos"
-        tar -czf AiDocPlus.app.tar.gz AiDocPlus.app
-        # 使用 tauri signer 签名
-        cd "$DESKTOP_DIR"
-        pnpm tauri signer sign "${UPDATER_TAR}" 2>/dev/null || {
-            warn "tauri signer 签名失败，尝试直接使用私钥..."
-            # Tauri v2 使用 minisign 格式
-            fail "无法生成签名文件，请确保 TAURI_SIGNING_PRIVATE_KEY 正确"
-        }
-    fi
+    # 手动公证（通过代理）
+    info "手动公证（通过代理）..."
+    NOTARIZE_ZIP="/tmp/AiDocPlus_notarize.zip"
+    ditto -c -k --keepParent "$APP_PATH" "$NOTARIZE_ZIP"
+    https_proxy=http://127.0.0.1:7890 http_proxy=http://127.0.0.1:7890 \
+        xcrun notarytool submit "$NOTARIZE_ZIP" \
+        --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_PASSWORD" \
+        --wait || fail "公证失败"
+    xcrun stapler staple "$APP_PATH" || fail "Staple 失败"
+    rm -f "$NOTARIZE_ZIP"
+    
+    # 手动生成 updater artifacts
+    info "手动生成 updater artifacts..."
+    tar -czf "$UPDATER_TAR" -C "${BUNDLE_DIR}/macos" AiDocPlus.app
+    pnpm tauri signer sign "$UPDATER_TAR" || fail "签名失败"
 fi
 
 [ -f "$UPDATER_TAR" ] || fail "AiDocPlus.app.tar.gz 未生成"
 [ -f "$UPDATER_SIG" ] || fail "AiDocPlus.app.tar.gz.sig 未生成"
 ok "构建完成，updater artifacts 已生成"
 
-# ── 2. Apple 公证（通过代理）──
-info "开始 Apple 公证（通过代理）..."
+# ── 2. 生成 DMG（如果 Tauri 未自动生成）──
+if [ ! -f "$DMG_PATH" ]; then
+    info "生成 DMG..."
+    mkdir -p "${BUNDLE_DIR}/dmg"
+    hdiutil create -volname "AiDocPlus" -srcfolder "$APP_PATH" -ov -format UDZO "$DMG_PATH"
+    ok "DMG 已生成: $(basename "$DMG_PATH")"
+else
+    ok "DMG 已存在: $(basename "$DMG_PATH")"
+fi
 
-# 打包用于公证的 zip
-NOTARIZE_ZIP="/tmp/AiDocPlus_notarize.zip"
-ditto -c -k --keepParent "$APP_PATH" "$NOTARIZE_ZIP"
-
-# 通过代理提交公证
-https_proxy=http://127.0.0.1:7890 http_proxy=http://127.0.0.1:7890 \
-    xcrun notarytool submit "$NOTARIZE_ZIP" \
-    --apple-id "$APPLE_ID" \
-    --team-id "$APPLE_TEAM_ID" \
-    --password "$APPLE_PASSWORD" \
-    --wait || fail "公证失败"
-
-# Staple
-xcrun stapler staple "$APP_PATH" || fail "Staple 失败"
-ok "公证完成"
-rm -f "$NOTARIZE_ZIP"
-
-# ── 3. 生成 DMG ──
-info "生成 DMG..."
-DMG_PATH="${BUNDLE_DIR}/dmg/AiDocPlus_${VERSION}_aarch64.dmg"
-mkdir -p "${BUNDLE_DIR}/dmg"
-hdiutil create -volname "AiDocPlus" -srcfolder "$APP_PATH" -ov -format UDZO "$DMG_PATH"
-ok "DMG 已生成: $(basename "$DMG_PATH")"
-
-# ── 4. 复制到 Applications ──
+# ── 3. 复制到 Applications ──
 info "复制到 /Applications..."
 rm -rf /Applications/AiDocPlus.app
 cp -R "$APP_PATH" /Applications/
 ok "已复制到 /Applications"
 
-# ── 5. 上传 macOS 产物到 GitHub Release ──
+# ── 4. 上传 macOS 产物到 GitHub Release ──
 info "上传 macOS 产物到 GitHub Release..."
 
 # 确保 Release 存在（CI 的 tauri-action 可能已创建）
@@ -130,7 +115,7 @@ gh release upload "$TAG" "$UPDATER_TAR" --repo "$REPO" --clobber
 gh release upload "$TAG" "$UPDATER_SIG" --repo "$REPO" --clobber
 ok "macOS 产物上传完成"
 
-# ── 6. 等待 CI Windows 构建完成 ──
+# ── 5. 等待 CI Windows 构建完成 ──
 info "等待 CI Windows 构建完成..."
 MAX_WAIT=1800  # 最多等 30 分钟
 WAITED=0
@@ -154,7 +139,7 @@ if [ $WAITED -ge $MAX_WAIT ]; then
     warn "等待超时，CI 可能仍在运行。可稍后手动运行: bash scripts/merge-latest-json.sh ${TAG}"
 fi
 
-# ── 7. 合并 latest.json ──
+# ── 6. 合并 latest.json ──
 info "合并 latest.json..."
 
 # 下载 CI 生成的 latest.json
