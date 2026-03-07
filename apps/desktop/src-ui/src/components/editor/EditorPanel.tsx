@@ -6,7 +6,8 @@ import { PluginToolArea } from '@/plugins/PluginToolArea';
 import { MarkdownEditor } from './MarkdownEditor';
 import { ComposerPanel } from './ComposerPanel';
 import { VersionHistoryPanel } from '../version/VersionHistoryPanel';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { invoke } from '@tauri-apps/api/core';
 import { message, save } from '@tauri-apps/plugin-dialog';
 import { useSettingsStore } from '@/stores/useSettingsStore';
@@ -22,6 +23,7 @@ import { AttachmentPanel } from './AttachmentPanel';
 import { TagEditor } from './TagEditor';
 import { CodingPanel } from '../coding/CodingPanel';
 import type { Attachment } from '@aidocplus/shared-types';
+import { logRender } from '@/lib/perfLog';
 
 
 interface EditorPanelProps {
@@ -47,7 +49,7 @@ interface EditorPanelProps {
   onActivePluginChange?: (plugin: import('@/plugins/types').DocumentPlugin | null) => void;
 }
 
-export function EditorPanel({
+export const EditorPanel = memo(function EditorPanel({
   tabId,
   documentId,
   authorNotes,
@@ -69,8 +71,25 @@ export function EditorPanel({
   onActiveViewChange,
   onActivePluginChange,
 }: EditorPanelProps) {
+  logRender('EditorPanel');
   const { t } = useTranslation();
-  const { documents, tabs, saveDocument, markTabAsDirty, markTabAsClean, createDocument, openTab, closeTab, closeAllTabs, aiStreamingTabId, sidebarOpen, setSidebarOpen } = useAppStore();
+  const {
+    document, saveDocument, markTabAsDirty, markTabAsClean,
+    createDocument, openTab, closeTab, closeAllTabs,
+    aiStreamingTabId, sidebarOpen, setSidebarOpen,
+  } = useAppStore(useShallow(s => ({
+    document: s.documents.find(d => d.id === documentId),
+    saveDocument: s.saveDocument,
+    markTabAsDirty: s.markTabAsDirty,
+    markTabAsClean: s.markTabAsClean,
+    createDocument: s.createDocument,
+    openTab: s.openTab,
+    closeTab: s.closeTab,
+    closeAllTabs: s.closeAllTabs,
+    aiStreamingTabId: s.aiStreamingTabId,
+    sidebarOpen: s.sidebarOpen,
+    setSidebarOpen: s.setSidebarOpen,
+  })));
   const isAiStreaming = aiStreamingTabId === tabId;
   type ActiveView = 'editor' | 'plugins' | 'composer' | 'functional' | 'coding';
   const [activeView, _setActiveView] = useState<ActiveView>('editor');
@@ -102,16 +121,13 @@ export function EditorPanel({
     return () => window.removeEventListener('menu-view-switch', handler);
   }, [tabId]);
 
-  const { ui } = useSettingsStore();
+  const uiTheme = useSettingsStore(s => s.ui.theme);
   const mod = navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘' : 'Ctrl+';
 
-  // 查找文档
-  const document = documents.find(d => d.id === documentId);
-
   // Determine effective theme (handles 'auto' mode)
-  const effectiveTheme = ui.theme === 'auto'
+  const effectiveTheme = uiTheme === 'auto'
     ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-    : ui.theme;
+    : uiTheme;
 
   const [isSaving, setIsSaving] = useState(false);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
@@ -181,10 +197,11 @@ export function EditorPanel({
         baselineRef.current = { authorNotes: document.authorNotes || '', content, aiContent, composedContent };
         if (tabId) markTabAsClean(tabId);
       }
-      // 保存其他 dirty 标签的文档
-      for (const tab of tabs) {
+      // 保存其他 dirty 标签的文档（实时获取，避免响应式订阅）
+      const { tabs: allTabs, documents: allDocs } = useAppStore.getState();
+      for (const tab of allTabs) {
         if (tab.id === tabId || !tab.isDirty) continue;
-        const doc = documents.find(d => d.id === tab.documentId);
+        const doc = allDocs.find(d => d.id === tab.documentId);
         if (doc) {
           await saveDocument(doc);
           markTabAsClean(tab.id);
@@ -284,13 +301,15 @@ export function EditorPanel({
   };
 
   // 自动保存（用 ref 存储频繁变化的值，避免每次按键都重建 interval）
-  const { editor: editorSettings } = useSettingsStore();
+  const editorSettings = useSettingsStore(s => s.editor);
   const contentRef = useRef(content);
   contentRef.current = content;
   const aiContentRef = useRef(aiContent);
   aiContentRef.current = aiContent;
   const authorNotesRef = useRef(authorNotes);
   authorNotesRef.current = authorNotes;
+  const composedContentRef = useRef(composedContent);
+  composedContentRef.current = composedContent;
   const isSavingRef = useRef(isSaving);
   isSavingRef.current = isSaving;
   const layoutModeRef = useRef(layoutMode);
@@ -368,8 +387,13 @@ export function EditorPanel({
       };
       baselineReadyRef.current = false;
       const timer = setTimeout(() => {
-        // 用编辑器规范化后的实际 props 值更新 baseline
-        baselineRef.current = { authorNotes, content, aiContent, composedContent };
+        // 用编辑器规范化后的实际值更新 baseline（从 refs 读取最新值，避免闭包过期）
+        baselineRef.current = {
+          authorNotes: authorNotesRef.current,
+          content: contentRef.current,
+          aiContent: aiContentRef.current,
+          composedContent: composedContentRef.current,
+        };
         baselineReadyRef.current = true;
       }, 500);
       return () => clearTimeout(timer);
@@ -802,4 +826,4 @@ export function EditorPanel({
 
     </div>
   );
-}
+});

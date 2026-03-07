@@ -1,5 +1,6 @@
 import { useAppStore } from '@/stores/useAppStore';
-import { File, Folder, FolderOpen, Plus, Trash2, X, Check, Edit2, Download, FilePlus, Copy, ArrowUpDown, ArrowUp, ArrowDown, GripVertical, ChevronsDownUp, ChevronsUpDown, LayoutTemplate, Star, Tag, Filter } from 'lucide-react';
+import { logRender } from '@/lib/perfLog';
+import { File, Folder, FolderOpen, Plus, X, Check, Download, ArrowUpDown, ArrowUp, ArrowDown, GripVertical, ChevronsDownUp, ChevronsUpDown, Star, Tag, Filter } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -24,11 +25,13 @@ import {
 } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { cn } from '@/lib/utils';
 import { confirm } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import { loadUIPreferences, saveProjectOrder, saveDocOrders } from '@/lib/uiPreferences';
 import { useTranslation } from '@/i18n';
+import { FileTreeContextMenu, type FileTreeContextMenuProps } from './FileTreeContextMenu';
 
 interface FileTreeProps {
   sidebarOpen?: boolean;
@@ -38,12 +41,40 @@ type SortField = 'custom' | 'name' | 'createdAt' | 'updatedAt';
 type SortDirection = 'asc' | 'desc';
 
 export function FileTree({ sidebarOpen }: FileTreeProps) {
+  logRender('FileTree');
   const { t } = useTranslation();
-  const { projects, currentProject, documents, currentDocument, openProject, createProject, deleteProject, renameProject, openTab, renameDocument, deleteDocument, createDocument, loadDocuments, error, isLoading, allTags, loadAllTags, documentFilterTag, setDocumentFilterTag, toggleDocumentStarred } = useAppStore();
+  // 数据（合并为单个 shallow selector，减少多次 store 变化时的重复渲染）
+  const {
+    projects, currentProject, documents, currentDocumentId,
+    error, isLoading, allTags, documentFilterTag,
+    openProject, createProject, deleteProject, renameProject,
+    openTab, renameDocument, deleteDocument, createDocument,
+    loadDocuments, loadAllTags, setDocumentFilterTag, toggleDocumentStarred,
+  } = useAppStore(useShallow(s => ({
+    projects: s.projects,
+    currentProject: s.currentProject,
+    documents: s.documents,
+    currentDocumentId: s.currentDocument?.id ?? null,
+    error: s.error,
+    isLoading: s.isLoading,
+    allTags: s.allTags,
+    documentFilterTag: s.documentFilterTag,
+    openProject: s.openProject,
+    createProject: s.createProject,
+    deleteProject: s.deleteProject,
+    renameProject: s.renameProject,
+    openTab: s.openTab,
+    renameDocument: s.renameDocument,
+    deleteDocument: s.deleteDocument,
+    createDocument: s.createDocument,
+    loadDocuments: s.loadDocuments,
+    loadAllTags: s.loadAllTags,
+    setDocumentFilterTag: s.setDocumentFilterTag,
+    toggleDocumentStarred: s.toggleDocumentStarred,
+  })));
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [isCreating, setIsCreating] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
-  const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
   const [newProjectNameEdit, setNewProjectNameEdit] = useState('');
   const [renamingDocId, setRenamingDocId] = useState<string | null>(null);
@@ -55,12 +86,18 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [projectOrder, setProjectOrder] = useState<string[]>([]);
   const [docOrders, setDocOrders] = useState<Record<string, string[]>>({});
+  const [contextMenu, setContextMenu] = useState<FileTreeContextMenuProps | null>(null);
+  const [focusedDocId, setFocusedDocId] = useState<string | null>(null);
 
   // 从 Tauri 后端加载自定义排序（自动从 localStorage 迁移）
   useEffect(() => {
     loadUIPreferences().then(prefs => {
-      if (prefs.projectOrder) setProjectOrder(prefs.projectOrder);
-      if (prefs.docOrders) setDocOrders(prefs.docOrders);
+      // 批量更新，避免两次 setState 导致两轮渲染
+      if (prefs.projectOrder || prefs.docOrders) {
+        // React 18 自动批处理：同一微任务中的多次 setState 只触发一次渲染
+        if (prefs.projectOrder) setProjectOrder(prefs.projectOrder);
+        if (prefs.docOrders) setDocOrders(prefs.docOrders);
+      }
     }).catch(() => {});
   }, []);
 
@@ -197,7 +234,6 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
   };
 
   const handleDeleteProject = async (projectId: string, projectName: string) => {
-    setIsDeleting(projectId);
     try {
       const confirmed = await confirm(
         t('fileTree.confirmDeleteProject', { name: projectName }),
@@ -208,12 +244,11 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
       }
     } catch (err) {
       console.error('Failed to delete project:', err);
-    } finally {
-      setIsDeleting(null);
     }
   };
 
   const handleSelectDocument = async (_projectId: string, documentId: string) => {
+    setFocusedDocId(null);
     const doc = documents.find(d => d.id === documentId);
     if (doc) {
       await openTab(documentId);
@@ -356,19 +391,22 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
 
   // Auto-expand project and highlight current document
   useEffect(() => {
-    if (sidebarOpen && currentDocument) {
-      if (currentDocument.projectId && !expandedProjects.has(currentDocument.projectId)) {
-        setExpandedProjects(prev => new Set([...prev, currentDocument.projectId]));
+    if (sidebarOpen && currentDocumentId) {
+      const doc = documents.find(d => d.id === currentDocumentId);
+      if (doc?.projectId && !expandedProjects.has(doc.projectId)) {
+        setExpandedProjects(prev => new Set([...prev, doc.projectId]));
       }
     }
-  }, [sidebarOpen, currentDocument?.id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sidebarOpen, currentDocumentId]);
 
-  // 当前项目变化时加载标签
+  // 当前项目变化或文档增删时加载标签
   useEffect(() => {
     if (currentProject) {
       loadAllTags(currentProject.id);
     }
-  }, [currentProject?.id, documents]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentProject?.id, documents.length]);
 
   // Drag and drop handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -445,6 +483,68 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
       setIsImporting(false);
     }
   }, [currentProject, documents, createDocument, loadDocuments, t]);
+
+  // ── 右键菜单回调 ──
+  const handleProjectContextMenu = useCallback((e: React.MouseEvent, projectId: string, projectName: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({
+      type: 'project',
+      projectId,
+      projectName,
+      position: { x: e.clientX, y: e.clientY },
+      onClose: () => { setContextMenu(null); setFocusedDocId(null); },
+      onNewDocument: (pid) => {
+        const isExp = expandedProjects.has(pid);
+        if (!isExp) {
+          setExpandedProjects(prev => new Set([...prev, pid]));
+          openProject(pid);
+        }
+        setIsCreatingDoc(pid);
+      },
+      onNewFromTemplate: (pid) => {
+        const isExp = expandedProjects.has(pid);
+        if (!isExp) {
+          setExpandedProjects(prev => new Set([...prev, pid]));
+          openProject(pid);
+        }
+        window.dispatchEvent(new CustomEvent('menu-new-from-template'));
+      },
+      onRenameProject: handleStartRenameProject,
+      onDeleteProject: handleDeleteProject,
+    });
+  }, [expandedProjects, openProject, handleStartRenameProject, handleDeleteProject]);
+
+  const handleDocContextMenu = useCallback((e: React.MouseEvent, projectId: string, doc: typeof documents[0]) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setFocusedDocId(doc.id);
+    const isStarred = (doc.metadata?.tags || []).includes('_starred');
+    setContextMenu({
+      type: 'document',
+      projectId,
+      documentId: doc.id,
+      documentTitle: doc.title,
+      isStarred,
+      position: { x: e.clientX, y: e.clientY },
+      onClose: () => { setContextMenu(null); setFocusedDocId(null); },
+      onRename: handleStartRename,
+      onDuplicate: handleDuplicateDocument,
+      onToggleStar: toggleDocumentStarred,
+      onDelete: handleDeleteDocument,
+      onMoveTo: () => {
+        window.dispatchEvent(new CustomEvent('menu-doc-move-to'));
+      },
+      onRevealInFinder: async (pid, docId) => {
+        try {
+          const docPath = await invoke<string>('get_document_file_path', { projectId: pid, documentId: docId });
+          await invoke('show_in_folder', { path: docPath });
+        } catch (err) {
+          console.error('Failed to reveal in Finder:', err);
+        }
+      },
+    });
+  }, [handleStartRename, handleDuplicateDocument, toggleDocumentStarred, handleDeleteDocument]);
 
   return (
     <div
@@ -622,7 +722,7 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
               {/* Project Node */}
               <div
                 className={cn(
-                  "flex items-center gap-1 px-1 py-1.5 rounded-md cursor-pointer group hover:bg-accent",
+                  "flex items-center gap-1 px-1 py-1.5 rounded-md cursor-pointer hover:bg-accent",
                   isActive && "bg-primary/10 border-l-2 border-primary"
                 )}
                 onClick={() => {
@@ -636,6 +736,7 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
                     }
                   }
                 }}
+                onContextMenu={(e) => handleProjectContextMenu(e, project.id, project.name)}
               >
                 <div className="h-5 w-5 flex items-center justify-center">
                   {isExpanded ? (
@@ -678,70 +779,6 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
                     </span>
                   </>
                 )}
-
-                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleStartRenameProject(project.id, project.name);
-                    }}
-                    className="h-6 w-6 p-0"
-                    title={t('fileTree.renameProject', { defaultValue: '重命名项目' })}
-                  >
-                    <Edit2 className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!isExpanded) {
-                        toggleProject(project.id);
-                        openProject(project.id);
-                      }
-                      setIsCreatingDoc(project.id);
-                    }}
-                    className="h-6 w-6 p-0"
-                    title={t('fileTree.newDocument')}
-                  >
-                    <FilePlus className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!isExpanded) {
-                        toggleProject(project.id);
-                        openProject(project.id);
-                      }
-                      window.dispatchEvent(new CustomEvent('menu-new-from-template'));
-                    }}
-                    className="h-6 w-6 p-0"
-                    title={t('fileTree.newFromTemplate', { defaultValue: '从模板新建' })}
-                  >
-                    <LayoutTemplate className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteProject(project.id, project.name);
-                    }}
-                    className="h-6 w-6 p-0 hover:bg-destructive/10"
-                    disabled={isDeleting === project.id}
-                    title={t('fileTree.deleteProject')}
-                  >
-                    {isDeleting === project.id ? (
-                      <div className="h-3 w-3 animate-spin rounded-full border-2 border-destructive border-t-transparent" />
-                    ) : (
-                      <Trash2 className="h-3 w-3 text-destructive" />
-                    )}
-                  </Button>
-                </div>
               </div>
 
               {/* Documents */}
@@ -753,7 +790,7 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
                     <div className="space-y-0.5">
                       {projectDocuments.map(doc => {
                         const isRenaming = renamingDocId === doc.id;
-                        const isCurrent = currentDocument?.id === doc.id;
+                        const isCurrent = currentDocumentId === doc.id;
                         const isStarred = (doc.metadata?.tags || []).includes('_starred');
                         const visibleTags = (doc.metadata?.tags || []).filter((t: string) => !t.startsWith('_'));
                         return (
@@ -761,11 +798,13 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
                           <div
                             id={isCurrent ? `current-doc-${doc.id}` : undefined}
                             className={cn(
-                              "flex items-center gap-1 px-1 py-1 rounded-md group hover:bg-accent cursor-pointer",
+                              "flex items-center gap-1 px-1 py-1 rounded-md hover:bg-accent cursor-pointer",
                               isCurrent && "bg-accent font-medium",
-                              isCurrent && "bg-red-500/10 text-red-600 dark:text-red-400"
+                              isCurrent && "bg-red-500/10 text-red-600 dark:text-red-400",
+                              focusedDocId === doc.id && !isCurrent && "bg-blue-500/10"
                             )}
                             onClick={() => handleSelectDocument(project.id, doc.id)}
+                            onContextMenu={(e) => handleDocContextMenu(e, project.id, doc)}
                             title={doc.title + (visibleTags.length > 0 ? ` [${visibleTags.join(', ')}]` : '')}
                           >
                             {isStarred ? (
@@ -791,67 +830,15 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
                                 />
                               </div>
                             ) : (
-                              <>
-                                <span
-                                  onDoubleClick={(e) => {
-                                    e.stopPropagation();
-                                    handleStartRename(doc.id, doc.title);
-                                  }}
-                                  className="flex-1 text-sm truncate"
-                                >
-                                  {doc.title}
-                                </span>
-                                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      toggleDocumentStarred(project.id, doc.id);
-                                    }}
-                                    className="h-6 w-6 p-0"
-                                    title={t('fileTree.toggleStar', { defaultValue: '收藏/取消收藏' })}
-                                  >
-                                    <Star className={cn("h-3 w-3", isStarred ? "text-yellow-500 fill-yellow-500" : "")} />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleStartRename(doc.id, doc.title);
-                                    }}
-                                    className="h-6 w-6 p-0"
-                                    title={t('fileTree.renameDocument')}
-                                  >
-                                    <Edit2 className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDuplicateDocument(project.id, doc.id);
-                                    }}
-                                    className="h-6 w-6 p-0"
-                                    title={t('fileTree.duplicateDocument', { defaultValue: '复制文档' })}
-                                  >
-                                    <Copy className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteDocument(project.id, doc.id, doc.title);
-                                    }}
-                                    className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                    title={t('fileTree.deleteDocument')}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              </>
+                              <span
+                                onDoubleClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStartRename(doc.id, doc.title);
+                                }}
+                                className="flex-1 text-sm truncate"
+                              >
+                                {doc.title}
+                              </span>
                             )}
                           </div>
                           </SortableItem>
@@ -965,6 +952,9 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
           </div>
         </div>
       )}
+
+      {/* 右键菜单 */}
+      {contextMenu && <FileTreeContextMenu {...contextMenu} />}
     </div>
   );
 }

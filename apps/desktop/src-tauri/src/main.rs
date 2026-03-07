@@ -244,6 +244,9 @@ fn main() {
             delete_file,
             create_directory,
             get_file_metadata,
+            get_home_dir,
+            get_document_file_path,
+            show_in_folder,
 
             // Project commands
             create_project,

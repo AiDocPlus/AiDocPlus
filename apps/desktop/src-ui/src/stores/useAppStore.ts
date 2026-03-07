@@ -260,19 +260,25 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     try {
       set({ isLoading: true, error: null });
+      const t0 = performance.now();
       const projects = await invoke<Project[]>('list_projects');
+      console.log(`[Perf] list_projects (${projects.length}个): ${(performance.now() - t0).toFixed(0)}ms`);
       set({ projects });
 
-      // 加载所有项目的文档，以便文件树正确显示文档数
-      const allDocs: Document[] = [];
-      for (const p of projects) {
-        try {
-          const docs = await invoke<Document[]>('list_documents', { projectId: p.id });
-          allDocs.push(...docs);
-        } catch (e) {
-          console.error('[loadProjects] Failed to load documents for project:', p.id, e);
-        }
-      }
+      // 加载所有项目的文档（并行），以便文件树正确显示文档数
+      const t1 = performance.now();
+      const results = await Promise.all(
+        projects.map(async (p) => {
+          try {
+            return await invoke<Document[]>('list_documents', { projectId: p.id });
+          } catch (e) {
+            console.error('[loadProjects] Failed to load documents for project:', p.id, e);
+            return [];
+          }
+        })
+      );
+      const allDocs = results.flat();
+      console.log(`[Perf] list_documents 并行 (${projects.length}个项目, ${allDocs.length}篇文档): ${(performance.now() - t1).toFixed(0)}ms`);
       set({ documents: allDocs });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to load projects' });
@@ -644,7 +650,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       const tags = await invoke<string[]>('list_all_tags', { projectId: projectId ?? null });
       // 过滤掉内部标签（以 _ 开头）
       const visibleTags = tags.filter(t => !t.startsWith('_'));
-      set({ allTags: visibleTags });
+      // 比较内容，避免相同标签列表创建新引用触发不必要的渲染
+      const prev = get().allTags;
+      if (prev.length !== visibleTags.length || prev.some((t, i) => t !== visibleTags[i])) {
+        set({ allTags: visibleTags });
+      }
       return visibleTags;
     } catch (error) {
       console.error('Failed to load all tags:', error);
@@ -1038,6 +1048,17 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // Update document fields in memory only (no disk write), so ChatPanel can read latest content
   updateDocumentInMemory: (documentId, fields) => {
+    // 提前检查：如果所有字段值与当前值相同，跳过 set() 避免不必要的重渲染
+    // 将 null/undefined/'' 视为等价（文本字段的"无内容"语义相同）
+    const normalize = (v: unknown) => (v === null || v === undefined || v === '' ? '' : v);
+    const currentDoc = get().documents.find(d => d.id === documentId);
+    if (currentDoc) {
+      const hasChange = Object.entries(fields).some(
+        ([key, value]) => normalize((currentDoc as unknown as Record<string, unknown>)[key]) !== normalize(value)
+      );
+      if (!hasChange) return;
+    }
+
     set((state) => {
       // 原子更新 documents 和 currentDocument
       const updatedDocuments = state.documents.map(d =>
@@ -1690,7 +1711,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   switchTab: (tabId) => {
-    const { tabs, documents } = get();
+    const { tabs, documents, activeTabId } = get();
+
+    // 已经是活动标签则不操作
+    if (activeTabId === tabId) return;
+
     const tab = tabs.find(t => t.id === tabId);
 
     if (!tab) {

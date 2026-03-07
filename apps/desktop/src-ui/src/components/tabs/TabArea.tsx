@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { TabBar } from './TabBar';
 import { EditorWorkspace } from './EditorWorkspace';
 import { useAppStore } from '@/stores/useAppStore';
-import { cn } from '@/lib/utils';
+import { logRender } from '@/lib/perfLog';
 import { FileText, FolderOpen, Keyboard } from 'lucide-react';
 import { useTranslation } from '@/i18n';
 
@@ -10,9 +11,30 @@ interface TabAreaProps {
   onSettingsOpen: () => void;
 }
 
+// 最多同时保留几个标签页的 EditorWorkspace 实例（活动 + 缓存）
+const MAX_MOUNTED = 3;
+
 export function TabArea({ onSettingsOpen }: TabAreaProps) {
+  logRender('TabArea');
   const { t } = useTranslation();
-  const { tabs, activeTabId, currentProject, createDocument, openTab } = useAppStore();
+  const { tabs, activeTabId, currentProject, createDocument, openTab } = useAppStore(useShallow(s => ({
+    tabs: s.tabs,
+    activeTabId: s.activeTabId,
+    currentProject: s.currentProject,
+    createDocument: s.createDocument,
+    openTab: s.openTab,
+  })));
+
+  // 维护最近访问的标签ID队列（LRU），用于决定哪些标签页保持挂载
+  const mountedIdsRef = useRef<string[]>([]);
+  if (activeTabId) {
+    const ids = mountedIdsRef.current.filter(id => id !== activeTabId);
+    ids.unshift(activeTabId);
+    mountedIdsRef.current = ids.slice(0, MAX_MOUNTED);
+  }
+  // 清理已关闭的标签
+  const tabIds = new Set(tabs.map(t => t.id));
+  mountedIdsRef.current = mountedIdsRef.current.filter(id => tabIds.has(id));
 
   // 没有打开文档时，监听 Cmd+N 新建文档事件
   useEffect(() => {
@@ -60,16 +82,16 @@ export function TabArea({ onSettingsOpen }: TabAreaProps) {
     );
   }
 
+  // 只挂载 LRU 缓存中的标签页，非活动标签隐藏
+  const mountedTabs = tabs.filter(tab => mountedIdsRef.current.includes(tab.id));
+
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
       <TabBar onSettingsOpen={onSettingsOpen} />
-      {tabs.map((tab) => (
+      {mountedTabs.map(tab => (
         <div
           key={tab.id}
-          className={cn(
-            'flex-1 min-h-0',
-            tab.id === activeTabId ? '' : 'hidden'
-          )}
+          className={`flex-1 min-h-0 ${tab.id === activeTabId ? '' : 'hidden'}`}
         >
           <EditorWorkspace tab={tab} />
         </div>

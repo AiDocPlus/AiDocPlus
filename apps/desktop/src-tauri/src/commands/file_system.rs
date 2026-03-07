@@ -232,3 +232,75 @@ pub fn get_file_metadata(path: String) -> Result<serde_json::Value> {
         "isDir": metadata.is_dir(),
     }))
 }
+
+/// 获取用户主目录路径
+#[tauri::command]
+pub fn get_home_dir() -> Result<String> {
+    dirs::home_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .ok_or_else(|| "无法获取用户主目录".to_string())
+}
+
+/// 获取文档在磁盘上的文件路径（跨平台安全拼接）
+#[tauri::command]
+pub fn get_document_file_path(project_id: String, document_id: String) -> Result<String> {
+    let home = dirs::home_dir()
+        .ok_or_else(|| "无法获取用户主目录".to_string())?;
+    let doc_path = home
+        .join("AiDocPlus")
+        .join("Projects")
+        .join(&project_id)
+        .join("documents")
+        .join(format!("{}.json", document_id));
+    Ok(doc_path.to_string_lossy().to_string())
+}
+
+/// 在操作系统文件管理器中显示文件（macOS Finder / Windows Explorer）
+#[tauri::command]
+pub fn show_in_folder(path: String) -> Result<()> {
+    let path_obj = Path::new(&path);
+
+    // 如果文件存在，打开其所在目录并选中文件
+    // 如果不存在，尝试打开其父目录
+    let target = if path_obj.exists() {
+        path_obj.to_path_buf()
+    } else if let Some(parent) = path_obj.parent() {
+        if parent.exists() {
+            parent.to_path_buf()
+        } else {
+            return Err(format!("路径不存在: {}", path));
+        }
+    } else {
+        return Err(format!("路径不存在: {}", path));
+    };
+
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .args(["-R", &target.to_string_lossy()])
+            .spawn()
+            .map_err(|e| format!("打开 Finder 失败: {}", e))?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // Windows explorer 要求 /select, 后紧跟路径（合并为一个参数），路径使用反斜杠
+        let win_path = target.to_string_lossy().replace('/', "\\");
+        std::process::Command::new("explorer")
+            .arg(format!("/select,{}", win_path))
+            .spawn()
+            .map_err(|e| format!("打开资源管理器失败: {}", e))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        if let Some(parent) = target.parent() {
+            std::process::Command::new("xdg-open")
+                .arg(parent)
+                .spawn()
+                .map_err(|e| format!("打开文件管理器失败: {}", e))?;
+        }
+    }
+
+    Ok(())
+}

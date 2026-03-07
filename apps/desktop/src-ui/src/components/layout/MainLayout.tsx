@@ -15,13 +15,19 @@ import { FirstRunGuideDialog } from '../dialogs/FirstRunGuideDialog';
 import { TemplatePickerDialog } from '../templates/TemplatePickerDialog';
 import { SaveAsTemplateDialog } from '../templates/SaveAsTemplateDialog';
 import { cn } from '@/lib/utils';
+import { logRender } from '@/lib/perfLog';
 import { Menu, X } from 'lucide-react';
 import { Button } from '../ui/button';
 import { ResizableHandle } from '../ui/resizable-handle';
 
 export function MainLayout() {
+  logRender('MainLayout');
   const { t } = useTranslation();
-  const { sidebarOpen, toggleSidebar, theme, sidebarWidth, setSidebarWidth } = useAppStore();
+  const sidebarOpen = useAppStore(s => s.sidebarOpen);
+  const toggleSidebar = useAppStore(s => s.toggleSidebar);
+  const theme = useAppStore(s => s.theme);
+  const sidebarWidth = useAppStore(s => s.sidebarWidth);
+  const setSidebarWidth = useAppStore(s => s.setSidebarWidth);
   const { ai } = useSettingsStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsDefaultTab, setSettingsDefaultTab] = useState<string | undefined>(undefined);

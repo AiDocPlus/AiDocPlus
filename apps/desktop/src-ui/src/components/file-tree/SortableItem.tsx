@@ -29,11 +29,11 @@ export function SortableItem({ id, disabled, showHandle, children }: SortableIte
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} className={cn(isDragging && 'z-10')}>
-      <div className="flex items-center">
+      <div className="flex items-start">
         {showHandle && (
           <div
             {...listeners}
-            className="cursor-grab active:cursor-grabbing px-0.5 flex-shrink-0"
+            className="cursor-grab active:cursor-grabbing px-0.5 flex-shrink-0 mt-2.5"
             onClick={e => e.stopPropagation()}
           >
             <GripVertical className="h-3 w-3 text-muted-foreground" />

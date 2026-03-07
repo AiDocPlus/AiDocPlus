@@ -21,8 +21,7 @@ const queryClient = new QueryClient({
 
 function AppContent() {
   const { t } = useTranslation();
-  const { loadProjects, restoreWorkspace } = useAppStore();
-  const { ui } = useSettingsStore();
+  const uiTheme = useSettingsStore(s => s.ui.theme);
   const { setRestoring } = useWorkspaceAutosave();
   const [isInitialized, setIsInitialized] = useState(false);
   const initializingRef = useRef(false);
@@ -34,24 +33,31 @@ function AppContent() {
 
     const initializeApp = async () => {
       setRestoring(true);
+      const t0 = performance.now();
 
       try {
-        // 第一批：互不依赖的操作并行执行
-        await Promise.all([
-          useAppStore.getState().loadPlugins(),
-          useAppStore.getState().loadDocTemplates(),
-          useAppStore.getState().loadDocTemplateCategories(),
-          useTemplatesStore.getState().loadBuiltInTemplates(),
-          useTemplatesStore.getState().loadBuiltInCategories(),
+        // 第一批：互不依赖的操作并行执行（分别计时）
+        const batch1Start = performance.now();
+        const [, , , ,] = await Promise.all([
+          (async () => { const s = performance.now(); await useAppStore.getState().loadPlugins(); console.log(`[Perf] loadPlugins: ${(performance.now() - s).toFixed(0)}ms`); })(),
+          (async () => { const s = performance.now(); await useAppStore.getState().loadDocTemplates(); console.log(`[Perf] loadDocTemplates: ${(performance.now() - s).toFixed(0)}ms`); })(),
+          (async () => { const s = performance.now(); await useAppStore.getState().loadDocTemplateCategories(); console.log(`[Perf] loadDocTemplateCategories: ${(performance.now() - s).toFixed(0)}ms`); })(),
+          (async () => { const s = performance.now(); await useTemplatesStore.getState().loadBuiltInTemplates(); console.log(`[Perf] loadBuiltInTemplates: ${(performance.now() - s).toFixed(0)}ms`); })(),
+          (async () => { const s = performance.now(); await useTemplatesStore.getState().loadBuiltInCategories(); console.log(`[Perf] loadBuiltInCategories: ${(performance.now() - s).toFixed(0)}ms`); })(),
         ]);
+        console.log(`[Perf] 第一批并行总耗时: ${(performance.now() - batch1Start).toFixed(0)}ms`);
 
         // 第二批：依赖第一批完成
-        await restoreWorkspace();
+        const batch2Start = performance.now();
+        await useAppStore.getState().restoreWorkspace();
+        console.log(`[Perf] restoreWorkspace: ${(performance.now() - batch2Start).toFixed(0)}ms`);
       } catch (error) {
         console.error('[App] Failed to restore workspace, loading projects:', error);
         // Fallback to loading projects if restore fails
-        await loadProjects();
+        await useAppStore.getState().loadProjects();
       }
+
+      console.log(`[Perf] 启动总耗时: ${(performance.now() - t0).toFixed(0)}ms`);
 
       // 注册前端状态提供者，让 API Bridge 能查询 UI 状态
       registerFrontendStateProvider({
@@ -83,16 +89,16 @@ function AppContent() {
 
   useEffect(() => {
     // Apply theme from settings
-    const effectiveTheme = ui.theme === 'auto'
+    const effectiveTheme = uiTheme === 'auto'
       ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-      : ui.theme;
+      : uiTheme;
 
     if (effectiveTheme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
-  }, [ui.theme]);
+  }, [uiTheme]);
 
   if (!isInitialized) {
     return (

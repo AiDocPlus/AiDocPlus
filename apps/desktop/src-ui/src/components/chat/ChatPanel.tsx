@@ -294,18 +294,14 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
   const effectiveContextMode = simpleMode ? 'none' : contextMode;
   const setContextMode = (m: ChatContextMode) => { if (!simpleMode) _setContextMode(m); };
   const { getBuiltInTemplates } = useTemplatesStore();
-  const authorNotesInitRef = useRef(false);
+  // 标记是否已完成初始化赋值（来自 currentDocument 的 authorNotes）
+  const authorNotesReadyRef = useRef(false);
 
   // 提示词变化时同步到 store，使 EditorPanel 保存时能获取最新值
-  // 跳过初始渲染，避免用空字符串覆盖 store 中的真实值
+  // 只在用户真正编辑后才同步，避免初始化赋值覆盖 store 中的真实值
   useEffect(() => {
-    if (!authorNotesInitRef.current) {
-      authorNotesInitRef.current = true;
-      return;
-    }
-    if (currentTab?.documentId) {
-      updateDocumentInMemory(currentTab.documentId, { authorNotes: authorNotesInput });
-    }
+    if (!currentTab?.documentId || !authorNotesReadyRef.current) return;
+    updateDocumentInMemory(currentTab.documentId, { authorNotes: authorNotesInput });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authorNotesInput]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -367,9 +363,13 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
 
   // Initialize author notes input from current document (only on document switch)
   useEffect(() => {
+    authorNotesReadyRef.current = false;
     if (currentDocument) {
       setAuthorNotesInput(currentDocument.authorNotes || '');
     }
+    // 延迟启用同步，确保初始化赋值的 effect 链完成后再允许写回 store
+    const timer = setTimeout(() => { authorNotesReadyRef.current = true; }, 100);
+    return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTab?.documentId]);
 

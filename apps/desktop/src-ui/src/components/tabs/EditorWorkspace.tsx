@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import type { EditorTab, Attachment, Document } from '@aidocplus/shared-types';
 import { EditorPanel } from '../editor/EditorPanel';
 import { ChatPanel } from '../chat/ChatPanel';
@@ -8,17 +8,19 @@ import type { DocumentPlugin } from '@/plugins/types';
 import { PluginAssistantPanel } from '@/plugins/_framework/PluginAssistantPanel';
 import { PluginHostContext, ThinkingContext, createPluginHostAPI, type CreatePluginHostAPIOptions } from '@/plugins/_framework/PluginHostAPI';
 import { useSettingsStore } from '@/stores/useSettingsStore';
+import { logRender } from '@/lib/perfLog';
 
 
 interface EditorWorkspaceProps {
   tab: EditorTab;
 }
 
-export function EditorWorkspace({ tab }: EditorWorkspaceProps) {
-  const documents = useAppStore(s => s.documents);
+export const EditorWorkspace = memo(function EditorWorkspace({ tab }: EditorWorkspaceProps) {
+  logRender(`EditorWorkspace[${tab.id.slice(-6)}]`);
+  const currentDoc = useAppStore(s => s.documents.find(d => d.id === tab.documentId));
   const setTabPanelState = useAppStore(s => s.setTabPanelState);
   const updateDocumentInMemory = useAppStore(s => s.updateDocumentInMemory);
-  // 精确订阅当前文档的 aiGeneratedContent，避免其他文档变化触发重渲染
+  // 精确订阅当前文档的 aiGeneratedContent
   const storeAiContent = useAppStore(s => {
     const doc = s.documents.find(d => d.id === tab.documentId);
     return doc?.aiGeneratedContent || '';
@@ -50,13 +52,13 @@ export function EditorWorkspace({ tab }: EditorWorkspaceProps) {
 
   // 获取文档内容（仅在文档ID变化时加载）
   useEffect(() => {
-    const document = documents.find(d => d.id === tab.documentId);
-    if (document) {
-      setAuthorNotes(document.authorNotes || '');
-      setContent(document.content || '');
-      setAiContent(document.aiGeneratedContent || '');
-      setAttachments(document.attachments || []);
-      setComposedContent(document.composedContent || '');
+    const doc = useAppStore.getState().documents.find(d => d.id === tab.documentId);
+    if (doc) {
+      setAuthorNotes(doc.authorNotes || '');
+      setContent(doc.content || '');
+      setAiContent(doc.aiGeneratedContent || '');
+      setAttachments(doc.attachments || []);
+      setComposedContent(doc.composedContent || '');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab.documentId]);
@@ -130,9 +132,27 @@ export function EditorWorkspace({ tab }: EditorWorkspaceProps) {
   }, [tab.documentId, updateDocumentInMemory]);
 
   // 处理面板状态变化
-  const handlePanelToggle = (panel: 'versionHistoryOpen' | 'chatOpen' | 'rightSidebarOpen', open: boolean) => {
+  const handlePanelToggle = useCallback((panel: 'versionHistoryOpen' | 'chatOpen' | 'rightSidebarOpen', open: boolean) => {
     setTabPanelState(tab.id, panel, open);
-  };
+  }, [tab.id, setTabPanelState]);
+
+  // 稳定化传给 EditorPanel 的回调引用（配合 React.memo 减少子组件渲染）
+  const handleSplitRatioChange = useCallback((ratio: number) => {
+    setTabPanelState(tab.id, 'splitRatio', ratio);
+  }, [tab.id, setTabPanelState]);
+
+  const handleLayoutModeChange = useCallback((mode: 'vertical' | 'horizontal') => {
+    setTabPanelState(tab.id, 'layoutMode', mode);
+  }, [tab.id, setTabPanelState]);
+
+  const handleVersionHistoryToggle = useCallback((open: boolean) => {
+    setTabPanelState(tab.id, 'versionHistoryOpen', open);
+  }, [tab.id, setTabPanelState]);
+
+  const handleChatToggle = useCallback(() => {
+    const chatOpen = useAppStore.getState().tabs.find(t => t.id === tab.id)?.panelState.chatOpen;
+    setTabPanelState(tab.id, 'chatOpen', !chatOpen);
+  }, [tab.id, setTabPanelState]);
 
   return (
     <div className="h-full flex overflow-hidden">
@@ -147,12 +167,12 @@ export function EditorWorkspace({ tab }: EditorWorkspaceProps) {
           aiContent={aiContent}
           layoutMode={tabLayoutMode}
           splitRatio={tab.panelState.splitRatio ?? (aiContent.trim() ? 60 : 40)}
-          onSplitRatioChange={(ratio) => setTabPanelState(tab.id, 'splitRatio', ratio)}
+          onSplitRatioChange={handleSplitRatioChange}
           onContentChange={setContent}
           onAiContentChange={setAiContent}
-          onLayoutModeChange={(mode) => setTabPanelState(tab.id, 'layoutMode', mode)}
-          onVersionHistoryToggle={(open) => handlePanelToggle('versionHistoryOpen', open)}
-          onChatToggle={() => handlePanelToggle('chatOpen', !tab.panelState.chatOpen)}
+          onLayoutModeChange={handleLayoutModeChange}
+          onVersionHistoryToggle={handleVersionHistoryToggle}
+          onChatToggle={handleChatToggle}
           chatOpen={tab.panelState.chatOpen}
           attachments={attachments}
           onAttachmentsChange={handleAttachmentsChange}
@@ -178,7 +198,7 @@ export function EditorWorkspace({ tab }: EditorWorkspaceProps) {
             <PluginAssistantWrapper
               key={`plugin-assistant-${activePlugin!.id}`}
               plugin={activePlugin!}
-              document={documents.find(d => d.id === tab.documentId)!}
+              document={currentDoc!}
               tabId={tab.id}
               aiContent={aiContent}
             />
@@ -194,7 +214,14 @@ export function EditorWorkspace({ tab }: EditorWorkspaceProps) {
       )}
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // 只比较 EditorWorkspace 实际使用的 tab 字段，忽略 isActive/isDirty/title/order 变化
+  const prev = prevProps.tab;
+  const next = nextProps.tab;
+  return prev.id === next.id
+    && prev.documentId === next.documentId
+    && prev.panelState === next.panelState;
+});
 
 /**
  * 插件 AI 助手包装组件
