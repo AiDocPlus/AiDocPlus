@@ -52,7 +52,7 @@ const TAG_STYLES: Record<string, string> = {
 export function inlineEmailStyles(
   html: string,
   baseFontFamily = '宋体, SimSun, serif',
-  baseFontSize = '16px',
+  baseFontSize = '20px',
 ): string {
   if (!html || !html.trim()) return html;
 

@@ -278,6 +278,8 @@ fn main() {
             list_versions,
             get_version,
             restore_version,
+            delete_version,
+            delete_all_versions,
 
             // Export commands
             export_document,

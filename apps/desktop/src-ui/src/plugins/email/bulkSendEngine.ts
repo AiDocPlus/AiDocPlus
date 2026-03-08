@@ -220,7 +220,7 @@ export function expandBulkJob(
   if (job.signatureId) {
     const sig = ctx.signatures.find(s => s.id === job.signatureId);
     if (sig?.content) {
-      signatureHtml = '<br/><br/><div style="border-top:1px solid #ccc;padding-top:8px;margin-top:12px;color:#666;">' + sig.content + '</div>';
+      signatureHtml = '<br/><br/><div style="border-top:1px solid #ccc;padding-top:8px;margin-top:12px;color:#666;font-size:20px;">' + sig.content + '</div>';
     }
   }
 

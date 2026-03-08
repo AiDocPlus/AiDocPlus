@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/i18n';
-import type { EditorView } from '@codemirror/view';
+import { EditorView } from '@codemirror/view';
 
 interface HeadingItem {
   level: number;
@@ -57,7 +57,7 @@ export function DocumentOutline({ cmViewRef, content, className }: DocumentOutli
       const pos = Math.min(heading.from, view.state.doc.length);
       view.dispatch({
         selection: { anchor: pos },
-        scrollIntoView: true,
+        effects: EditorView.scrollIntoView(pos, { y: 'start' }),
       });
       view.focus();
     } catch { /* view may be destroyed */ }

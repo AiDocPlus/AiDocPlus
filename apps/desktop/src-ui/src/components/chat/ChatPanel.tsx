@@ -251,6 +251,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
   const generateContentStream = useAppStore(s => s.generateContentStream);
   const stopAiStreaming = useAppStore(s => s.stopAiStreaming);
   const setAiStreaming = useAppStore(s => s.setAiStreaming);
+  const setGeneratingContent = useAppStore(s => s.setGeneratingContent);
   const saveDocument = useAppStore(s => s.saveDocument);
   const clearAiMessages = useAppStore(s => s.clearAiMessages);
   const createVersion = useAppStore(s => s.createVersion);
@@ -526,6 +527,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
 
       // 设置当前标签页为流式生成状态（标签页隔离）
       setAiStreaming(true, effectiveTabId);
+      setGeneratingContent(true);
 
       if (useStreaming) {
         // Streaming mode
@@ -671,7 +673,9 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
           }
         }
       }
+      setGeneratingContent(false);
     } catch (error) {
+      setGeneratingContent(false);
       // Enhanced error logging
       console.error('Failed to generate content. Full error:', error);
       console.error('Error type:', typeof error);

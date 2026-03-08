@@ -76,7 +76,8 @@ export const EditorPanel = memo(function EditorPanel({
   const {
     document, saveDocument, markTabAsDirty, markTabAsClean,
     createDocument, openTab, closeTab, closeAllTabs,
-    aiStreamingTabId, sidebarOpen, setSidebarOpen,
+    aiStreamingTabId, isGeneratingContent, sidebarOpen, setSidebarOpen,
+    createVersion,
   } = useAppStore(useShallow(s => ({
     document: s.documents.find(d => d.id === documentId),
     saveDocument: s.saveDocument,
@@ -87,8 +88,10 @@ export const EditorPanel = memo(function EditorPanel({
     closeTab: s.closeTab,
     closeAllTabs: s.closeAllTabs,
     aiStreamingTabId: s.aiStreamingTabId,
+    isGeneratingContent: s.isGeneratingContent,
     sidebarOpen: s.sidebarOpen,
     setSidebarOpen: s.setSidebarOpen,
+    createVersion: s.createVersion,
   })));
   const isAiStreaming = aiStreamingTabId === tabId;
   type ActiveView = 'editor' | 'plugins' | 'composer' | 'functional' | 'coding';
@@ -158,6 +161,26 @@ export const EditorPanel = memo(function EditorPanel({
   const handleVersionHistoryToggle = (open: boolean) => {
     setVersionHistoryOpen(open);
     onVersionHistoryToggle?.(open);
+  };
+
+  const handleCreateVersionQuick = async () => {
+    if (!document) return;
+    try {
+      await createVersion(
+        document.projectId,
+        document.id,
+        document.content,
+        document.authorNotes,
+        document.aiGeneratedContent,
+        'user',
+        t('version.manualCheckpoint', { defaultValue: '手动创建版本' }),
+        document.pluginData as Record<string, unknown> | undefined,
+        document.enabledPlugins,
+        document.composedContent,
+      );
+    } catch (err) {
+      console.error('Failed to create version:', err);
+    }
   };
 
   const handleSave = async () => {
@@ -578,15 +601,28 @@ export const EditorPanel = memo(function EditorPanel({
             <Rows className="h-3.5 w-3.5" />
           )}
         </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-7 w-7"
-          onClick={() => handleVersionHistoryToggle(true)}
-          title={`${t('editor.versionHistory', { defaultValue: '版本历史' })} (${mod}H)`}
-        >
-          <History className="h-3.5 w-3.5" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-7 w-7"
+              title={t('editor.versionHistory', { defaultValue: '版本历史' })}
+            >
+              <History className="h-3.5 w-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem onClick={handleCreateVersionQuick}>
+              <FilePlus className="h-4 w-4 mr-2" />
+              {t('version.createVersion', { defaultValue: '创建历史版本' })}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleVersionHistoryToggle(true)}>
+              <History className="h-4 w-4 mr-2" />
+              {t('version.manageVersions', { defaultValue: '历史版本管理' })}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <div className="w-px h-4 bg-border mx-0.5" />
         <TagEditor projectId={document.projectId} documentId={document.id} className="max-w-[300px] overflow-x-auto" />
 
@@ -733,7 +769,7 @@ export const EditorPanel = memo(function EditorPanel({
                     onChange={onAiContentChange}
                     placeholder={t('editor.aiContentPlaceholder', { defaultValue: '正文内容将出现在这里...' })}
                     theme={effectiveTheme}
-                    editable={!isAiStreaming}
+                    editable={!isGeneratingContent}
                     editorId={`ai-content-${document.id}`}
                     importSources={{ document }}
                     exportCallbacks={{

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Clock, Eye, RotateCcw, GitBranch, X, GitCompare } from 'lucide-react';
+import { Clock, Eye, RotateCcw, GitBranch, X, GitCompare, Trash2 } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
 import { useTranslation } from '@/i18n';
 import i18n from '@/i18n';
@@ -22,7 +22,7 @@ interface VersionHistoryPanelProps {
 
 export function VersionHistoryPanel({ open, onClose, projectId, documentId }: VersionHistoryPanelProps) {
   const { t } = useTranslation();
-  const { currentDocument, documents, loadVersions, createVersion, restoreVersion } = useAppStore();
+  const { currentDocument, documents, loadVersions, createVersion, restoreVersion, deleteVersion, deleteAllVersions } = useAppStore();
 
   // 如果传入了 projectId 和 documentId，使用它们；否则从 currentDocument 获取
   const effectiveDocumentId = documentId || currentDocument?.id;
@@ -138,6 +138,43 @@ export function VersionHistoryPanel({ open, onClose, projectId, documentId }: Ve
     }
   };
 
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+
+  const handleDeleteVersion = async (version: DocumentVersion) => {
+    if (!effectiveProjectId || !effectiveDocumentId) return;
+    try {
+      await deleteVersion(effectiveProjectId, effectiveDocumentId, version.id);
+      if (previewVersion?.id === version.id) {
+        setPreviewVersion(null);
+        setSelectedVersionId(null);
+      }
+      await loadVersionsData();
+      setRestoreMessage({ ok: true, msg: t('version.deleteSuccess', { defaultValue: '版本已删除' }) });
+      setTimeout(() => setRestoreMessage(null), 3000);
+    } catch (error) {
+      console.error('Failed to delete version:', error);
+      setRestoreMessage({ ok: false, msg: t('version.deleteFailed', { defaultValue: '删除版本失败' }) });
+      setTimeout(() => setRestoreMessage(null), 5000);
+    }
+  };
+
+  const handleDeleteAllVersions = async () => {
+    if (!effectiveProjectId || !effectiveDocumentId) return;
+    try {
+      await deleteAllVersions(effectiveProjectId, effectiveDocumentId);
+      setPreviewVersion(null);
+      setSelectedVersionId(null);
+      setShowDeleteAllConfirm(false);
+      await loadVersionsData();
+      setRestoreMessage({ ok: true, msg: t('version.deleteAllSuccess', { defaultValue: '已清除全部历史版本' }) });
+      setTimeout(() => setRestoreMessage(null), 3000);
+    } catch (error) {
+      console.error('Failed to delete all versions:', error);
+      setRestoreMessage({ ok: false, msg: t('version.deleteAllFailed', { defaultValue: '清除全部版本失败' }) });
+      setTimeout(() => setRestoreMessage(null), 5000);
+    }
+  };
+
   const getLocale = () => {
     const language = i18n.language || 'zh';
     switch (language) {
@@ -158,7 +195,7 @@ export function VersionHistoryPanel({ open, onClose, projectId, documentId }: Ve
   return (
     <>
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col bg-card">
+        <DialogContent className="max-w-3xl h-[76vh] top-[12vh] translate-y-0 overflow-hidden flex flex-col bg-card">
           <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-4 bg-card shrink-0">
             <DialogTitle className="text-xl flex items-center gap-2">
               <GitBranch className="w-5 h-5" />
@@ -182,7 +219,17 @@ export function VersionHistoryPanel({ open, onClose, projectId, documentId }: Ve
                 disabled={!currentDocument || loading}
               >
                 <Clock className="w-4 h-4 mr-2" />
-                {t('version.create', { defaultValue: 'Create Version' })}
+                {t('version.create', { defaultValue: '创建版本' })}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDeleteAllConfirm(true)}
+                disabled={versions.length <= 1 || loading}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                {t('version.deleteAll', { defaultValue: '清除全部' })}
               </Button>
               <Button
                 variant="ghost"
@@ -287,6 +334,20 @@ export function VersionHistoryPanel({ open, onClose, projectId, documentId }: Ve
                               >
                                 <RotateCcw className="w-3 h-3" />
                               </Button>
+                              {!isCurrent && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteVersion(version);
+                                  }}
+                                  title={t('version.deleteThis', { defaultValue: '删除此版本' })}
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </button>
@@ -385,6 +446,26 @@ export function VersionHistoryPanel({ open, onClose, projectId, documentId }: Ve
           {restoreMessage && (
             <div className={`border-t px-4 py-2 text-sm shrink-0 ${restoreMessage.ok ? 'bg-green-500/10 text-green-600 dark:text-green-400' : 'bg-red-500/10 text-red-600 dark:text-red-400'}`}>
               {restoreMessage.msg}
+            </div>
+          )}
+
+          {/* Delete All Confirmation */}
+          {showDeleteAllConfirm && (
+            <div className="border-t p-4 bg-background shrink-0">
+              <div className="space-y-3">
+                <h4 className="font-medium text-destructive">{t('version.deleteAllConfirm', { defaultValue: '确认清除全部历史版本？' })}</h4>
+                <p className="text-sm text-muted-foreground">
+                  {t('version.deleteAllWarning', { defaultValue: '此操作不可撤销，将删除除当前版本外的所有历史版本。' })}
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setShowDeleteAllConfirm(false)}>
+                    {t('common.cancel')}
+                  </Button>
+                  <Button variant="destructive" size="sm" onClick={handleDeleteAllVersions}>
+                    {t('version.confirmDeleteAll', { defaultValue: '确认清除' })}
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
 

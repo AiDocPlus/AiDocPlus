@@ -36,10 +36,15 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = React.memo(({
 
   // 初始化 Mermaid
   useEffect(() => {
+    // 清理 mermaid 之前渲染失败时残留在 body 中的临时 DOM
+    // mermaid 会在 body 下创建 div#d{id} > svg#{id}，失败时不清理导致残留
+    // 注意：只按 ID 精确匹配，不能用 querySelector 深度搜索，否则可能误删 #root
+    document.querySelectorAll('body > div[id^="dmermaid-"], body > div[id^="dmsg-mermaid-"]').forEach(el => el.remove());
     mermaid.initialize({
       startOnLoad: false,
       theme: theme === 'dark' ? 'dark' : 'default',
       securityLevel: 'loose',
+      suppressErrorRendering: true,
     });
   }, [theme]);
 
@@ -52,8 +57,8 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = React.memo(({
       const pre = block.parentElement;
       if (!pre || pre.getAttribute('data-mermaid-rendered') === 'true') continue;
       const code = block.textContent || '';
+      const id = `mermaid-${Math.random().toString(36).slice(2, 9)}`;
       try {
-        const id = `mermaid-${Math.random().toString(36).slice(2, 9)}`;
         const { svg } = await mermaid.render(id, code);
         const wrapper = document.createElement('div');
         wrapper.className = 'mermaid-diagram';
@@ -61,6 +66,10 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = React.memo(({
         pre.replaceWith(wrapper);
       } catch (e) {
         console.warn('[MarkdownPreview] Mermaid render failed:', e);
+        // 兜底清理 mermaid 可能残留在 body 中的临时渲染元素
+        document.getElementById(id)?.remove();
+        document.getElementById(`d${id}`)?.remove();
+        pre.setAttribute('data-mermaid-rendered', 'true');
       }
     }
   }, []);

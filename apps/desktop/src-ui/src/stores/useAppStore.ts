@@ -74,6 +74,7 @@ interface AppState {
   aiMessagesByTab: Record<string, AIMessage[]>;
   isAiStreaming: boolean;
   aiStreamingTabId: string | null;
+  isGeneratingContent: boolean;
 
   // 流式状态（按标签页隔离，替代模块级变量）
   streamStateByTab: Record<string, StreamState>;
@@ -98,6 +99,7 @@ interface AppState {
   addAiMessage: (tabId: string, message: AIMessage) => void;
   updateLastAiMessage: (tabId: string, fields: Partial<AIMessage>) => void;
   clearAiMessages: (tabId: string) => void;
+  setGeneratingContent: (generating: boolean) => void;
   setAiStreaming: (streaming: boolean, tabId?: string) => void;
   stopAiStreaming: () => void;
   sendChatMessage: (tabId: string, content: string, enableWebSearch?: boolean, contextInfo?: { mode: ChatContextMode; content: string }, enableTools?: boolean, options?: { enableThinking?: boolean; planMode?: boolean }) => Promise<string>;
@@ -150,6 +152,8 @@ interface AppState {
   loadVersions: (projectId: string, documentId: string) => Promise<DocumentVersion[]>;
   createVersion: (projectId: string, documentId: string, content: string, authorNotes: string, aiGeneratedContent: string, createdBy: string, changeDescription?: string, pluginData?: Record<string, unknown>, enabledPlugins?: string[], composedContent?: string) => Promise<string>;
   restoreVersion: (projectId: string, documentId: string, versionId: string, createBackup: boolean) => Promise<Document>;
+  deleteVersion: (projectId: string, documentId: string, versionId: string) => Promise<void>;
+  deleteAllVersions: (projectId: string, documentId: string) => Promise<void>;
 
   // 文档标签管理
   updateDocumentTags: (projectId: string, documentId: string, tags: string[]) => Promise<Document>;
@@ -206,6 +210,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   aiMessagesByTab: {},
   isAiStreaming: false,
   aiStreamingTabId: null,
+  isGeneratingContent: false,
   streamStateByTab: {},
   pluginManifests: [],
   docTemplates: [],
@@ -630,6 +635,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  deleteVersion: async (projectId, documentId, versionId) => {
+    try {
+      await invoke('delete_version', { projectId, documentId, versionId });
+    } catch (error) {
+      console.error('Failed to delete version:', error);
+      throw error;
+    }
+  },
+
+  deleteAllVersions: async (projectId, documentId) => {
+    try {
+      await invoke('delete_all_versions', { projectId, documentId });
+    } catch (error) {
+      console.error('Failed to delete all versions:', error);
+      throw error;
+    }
+  },
+
   // 文档标签管理
   updateDocumentTags: async (projectId, documentId, tags) => {
     try {
@@ -704,6 +727,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   clearAiMessages: (tabId) => set((state) => ({
     aiMessagesByTab: { ...state.aiMessagesByTab, [tabId]: [] }
   })),
+  setGeneratingContent: (generating) => set({ isGeneratingContent: generating }),
   setAiStreaming: (isAiStreaming, tabId) => set({ isAiStreaming, aiStreamingTabId: isAiStreaming ? (tabId ?? null) : null }),
   stopAiStreaming: () => {
     const { aiStreamingTabId, streamStateByTab } = get();

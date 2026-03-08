@@ -95,6 +95,7 @@ export function EmailBodyEditor({ value, onChange, placeholder, t, format = 'htm
   const host = usePluginHost();
   const isDark = host.ui.getTheme() === 'dark';
   const skipNextUpdate = useRef(false);
+  const isInternalChange = useRef(false);
   const [mode, setMode] = useState<EditorMode>('edit');
   const [sourceCode, setSourceCode] = useState('');
   const [plainText, setPlainText] = useState('');
@@ -117,6 +118,7 @@ export function EmailBodyEditor({ value, onChange, placeholder, t, format = 'htm
     pendingHtmlRef.current = html;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
+      isInternalChange.current = true;
       onChange(html);
       pendingHtmlRef.current = null;
       setSaved(true);
@@ -222,6 +224,11 @@ export function EmailBodyEditor({ value, onChange, placeholder, t, format = 'htm
   // 外部 value 变化时同步（如 AI 生成内容注入）
   useEffect(() => {
     if (!editor) return;
+    // 编辑器自身触发的 onChange 回流，跳过 setContent 避免光标跳转
+    if (isInternalChange.current) {
+      isInternalChange.current = false;
+      return;
+    }
     const currentHtml = editor.getHTML();
     if (value !== currentHtml && value !== undefined) {
       skipNextUpdate.current = true;
@@ -599,37 +606,13 @@ export function EmailBodyEditor({ value, onChange, placeholder, t, format = 'htm
             <ToolBtn icon={Redo2} title={t('editorRedo')} onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} />
             <Separator orientation="vertical" className="h-5 mx-0.5" />
 
-            {/* ── 编辑菜单 ── */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-7 px-1.5 text-[11px] gap-0.5">
-                  <Scissors className="h-3.5 w-3.5" />
-                  <ChevronDown className="h-2.5 w-2.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="min-w-[160px]">
-                <DropdownMenuItem onClick={handleCut}>
-                  <Scissors className="h-4 w-4 mr-2" />{t('editorCut')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleCopy}>
-                  <Copy className="h-4 w-4 mr-2" />{t('editorCopy')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handlePaste}>
-                  <ClipboardPaste className="h-4 w-4 mr-2" />{t('editorPaste')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handlePastePlain}>
-                  <ClipboardCheck className="h-4 w-4 mr-2" />{t('editorPastePlain')}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSelectAll}>
-                  <MousePointerClick className="h-4 w-4 mr-2" />{t('editorSelectAll')}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={toggleFindReplace}>
-                  <Search className="h-4 w-4 mr-2" />{t('editorFindReplace')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* ── 编辑操作 ── */}
+            <ToolBtn icon={Scissors} title={t('editorCut')} onClick={handleCut} />
+            <ToolBtn icon={Copy} title={t('editorCopy')} onClick={handleCopy} />
+            <ToolBtn icon={ClipboardPaste} title={t('editorPaste')} onClick={handlePaste} />
+            <ToolBtn icon={ClipboardCheck} title={t('editorPastePlain')} onClick={handlePastePlain} />
+            <ToolBtn icon={MousePointerClick} title={t('editorSelectAll')} onClick={handleSelectAll} />
+            <ToolBtn icon={Search} title={t('editorFindReplace')} onClick={toggleFindReplace} active={showFindReplace} />
             <Separator orientation="vertical" className="h-5 mx-0.5" />
 
             <FontFamilyPicker editor={editor} t={t} />
@@ -689,72 +672,34 @@ export function EmailBodyEditor({ value, onChange, placeholder, t, format = 'htm
             <ToolBtn icon={Quote} title={t('editorQuote')} onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} />
             <ToolBtn icon={Code} title={t('editorCodeBlock')} onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')} />
             <Separator orientation="vertical" className="h-5 mx-0.5" />
-            {/* 对齐方式下拉菜单 */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-7 px-1.5 text-[11px] gap-0.5">
-                  <AlignLeft className="h-3.5 w-3.5" />
-                  <ChevronDown className="h-2.5 w-2.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="min-w-[120px]">
-                <DropdownMenuItem onClick={() => editor.chain().focus().setTextAlign('left').run()} className={editor.isActive({ textAlign: 'left' }) ? 'font-bold' : ''}>
-                  <AlignLeft className="h-4 w-4 mr-2" />{t('editorAlignLeft')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => editor.chain().focus().setTextAlign('center').run()} className={editor.isActive({ textAlign: 'center' }) ? 'font-bold' : ''}>
-                  <AlignCenter className="h-4 w-4 mr-2" />{t('editorAlignCenter')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => editor.chain().focus().setTextAlign('right').run()} className={editor.isActive({ textAlign: 'right' }) ? 'font-bold' : ''}>
-                  <AlignRight className="h-4 w-4 mr-2" />{t('editorAlignRight')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* 对齐方式 */}
+            <ToolBtn icon={AlignLeft} title={t('editorAlignLeft')} onClick={() => editor.chain().focus().setTextAlign('left').run()} active={editor.isActive({ textAlign: 'left' })} />
+            <ToolBtn icon={AlignCenter} title={t('editorAlignCenter')} onClick={() => editor.chain().focus().setTextAlign('center').run()} active={editor.isActive({ textAlign: 'center' })} />
+            <ToolBtn icon={AlignRight} title={t('editorAlignRight')} onClick={() => editor.chain().focus().setTextAlign('right').run()} active={editor.isActive({ textAlign: 'right' })} />
             <Separator orientation="vertical" className="h-5 mx-0.5" />
             <ToolBtn icon={IndentIncrease} title={t('editorIndent')} onClick={() => (editor as any).commands.toggleTextIndent('2em')}
               active={!!(editor.getAttributes('paragraph').textIndent || editor.getAttributes('heading').textIndent)} />
             <LineHeightPicker editor={editor} t={t} />
             <Separator orientation="vertical" className="h-5 mx-0.5" />
-            {/* 插入菜单下拉 */}
+            {/* 插入操作 */}
+            <ToolBtn icon={LinkIcon} title={t('editorLink')} onClick={handleInsertLink} />
+            <ToolBtn icon={ImagePlus} title={t('editorImage')} onClick={handleInsertImage} />
+            <ToolBtn icon={TableIcon} title={t('editorTable')} onClick={handleInsertTable} />
+            <ToolBtn icon={Minus} title={t('editorHr')} onClick={() => editor.chain().focus().setHorizontalRule().run()} />
+            <ToolBtn icon={Calendar} title={t('editorInsertDate')} onClick={() => editor.chain().focus().insertContent(new Date().toLocaleDateString()).run()} />
+            {/* 特殊字符下拉 */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-7 px-1.5 text-[11px] gap-0.5">
-                  <Hash className="h-3.5 w-3.5" />
-                  <ChevronDown className="h-2.5 w-2.5" />
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title={t('editorSpecialChars')}>
+                  <WrapText className="h-3.5 w-3.5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="min-w-[160px]">
-                <DropdownMenuItem onClick={handleInsertLink}>
-                  <LinkIcon className="h-4 w-4 mr-2" />{t('editorLink')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleInsertImage}>
-                  <ImagePlus className="h-4 w-4 mr-2" />{t('editorImage')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleInsertTable}>
-                  <TableIcon className="h-4 w-4 mr-2" />{t('editorTable')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => editor.chain().focus().setHorizontalRule().run()}>
-                  <Minus className="h-4 w-4 mr-2" />{t('editorHr')}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => editor.chain().focus().insertContent(new Date().toLocaleDateString()).run()}>
-                  <Calendar className="h-4 w-4 mr-2" />{t('editorInsertDate')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => editor.chain().focus().insertContent(new Date().toLocaleTimeString()).run()}>
-                  <Calendar className="h-4 w-4 mr-2" />{t('editorInsertTime')}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>
-                    <WrapText className="h-4 w-4 mr-2" />{t('editorSpecialChars')}
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent className="min-w-[180px]">
-                    {['©', '®', '™', '→', '←', '↑', '↓', '★', '☆', '♠', '♥', '♦', '♣', '—', '…', '·', '§', '¶', '†', '‡'].map(ch => (
-                      <DropdownMenuItem key={ch} className="text-sm font-mono" onClick={() => editor.chain().focus().insertContent(ch).run()}>
-                        {ch}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
+              <DropdownMenuContent align="start" className="min-w-[180px]">
+                {['©', '®', '™', '→', '←', '↑', '↓', '★', '☆', '♠', '♥', '♦', '♣', '—', '…', '·', '§', '¶', '†', '‡'].map(ch => (
+                  <DropdownMenuItem key={ch} className="text-sm font-mono" onClick={() => editor.chain().focus().insertContent(ch).run()}>
+                    {ch}
+                  </DropdownMenuItem>
+                ))}
               </DropdownMenuContent>
             </DropdownMenu>
 

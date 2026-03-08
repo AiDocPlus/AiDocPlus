@@ -1,6 +1,6 @@
 import { Extension } from '@tiptap/core';
 
-export const DEFAULT_FONT_SIZE = '18px';
+export const DEFAULT_FONT_SIZE = '20px';
 export const FONT_SIZES = ['12px', '14px', '16px', '18px', '20px', '24px', '28px', '32px'];
 export const LINE_HEIGHTS = ['1.0', '1.2', '1.5', '1.75', '2.0', '2.5', '3.0'];
 export const FONT_FAMILIES = [

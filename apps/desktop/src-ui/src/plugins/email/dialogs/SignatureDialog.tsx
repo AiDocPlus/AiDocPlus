@@ -7,7 +7,7 @@ import { Plus, Trash2, Bold, Italic, Underline, Link, Type } from 'lucide-react'
 import { useEmailContext } from '../EmailContext';
 import type { EmailSignature } from '../types';
 
-const DIALOG_STYLE = { fontFamily: '宋体', fontSize: '16px' };
+const DIALOG_STYLE = { fontFamily: '宋体', fontSize: '20px' };
 
 interface SignatureDialogProps {
   open: boolean;

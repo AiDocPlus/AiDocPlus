@@ -355,6 +355,59 @@ pub fn restore_version(
 }
 
 #[tauri::command]
+pub fn delete_version(
+    state: State<'_, AppState>,
+    projectId: String,
+    documentId: String,
+    versionId: String,
+) -> Result<()> {
+    let doc_path = state.get_document_path(&projectId, &documentId);
+
+    if !doc_path.exists() {
+        return Err(format!("Document not found: {}", documentId));
+    }
+
+    let mut document = Document::load(&doc_path).map_err(|e| e.to_string())?;
+
+    // 不允许删除当前版本
+    if document.current_version_id == versionId {
+        return Err("Cannot delete the current active version".to_string());
+    }
+
+    let before_len = document.versions.len();
+    document.versions.retain(|v| v.id != versionId);
+
+    if document.versions.len() == before_len {
+        return Err(format!("Version not found: {}", versionId));
+    }
+
+    document.save(&doc_path).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_all_versions(
+    state: State<'_, AppState>,
+    projectId: String,
+    documentId: String,
+) -> Result<()> {
+    let doc_path = state.get_document_path(&projectId, &documentId);
+
+    if !doc_path.exists() {
+        return Err(format!("Document not found: {}", documentId));
+    }
+
+    let mut document = Document::load(&doc_path).map_err(|e| e.to_string())?;
+
+    // 只保留当前版本
+    let current_id = document.current_version_id.clone();
+    document.versions.retain(|v| v.id == current_id);
+
+    document.save(&doc_path).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 pub fn write_binary_file(path: String, data: Vec<u8>) -> Result<()> {
     use std::path::Path;
 

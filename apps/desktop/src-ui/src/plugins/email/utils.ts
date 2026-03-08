@@ -249,7 +249,7 @@ export function prepareSendPayload(input: SendPayloadInput, opts?: { skipEmptyCh
     if (isPlain) {
       bodyToSend = input.emailBody + '\n\n-- \n' + htmlToPlainText(activeSig.content);
     } else {
-      bodyToSend = input.emailBody + '<br/><br/><div style="border-top:1px solid #ccc;padding-top:8px;margin-top:12px;color:#666;">' + activeSig.content + '</div>';
+      bodyToSend = input.emailBody + '<br/><br/><div style="border-top:1px solid #ccc;padding-top:8px;margin-top:12px;color:#666;font-size:20px;">' + activeSig.content + '</div>';
     }
   }
 

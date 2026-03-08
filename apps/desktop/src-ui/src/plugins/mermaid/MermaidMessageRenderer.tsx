@@ -42,6 +42,7 @@ export function MermaidCodeBlock({ code, index, onApply, onFixError, t }: Mermai
           startOnLoad: false,
           theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default',
           securityLevel: 'loose',
+          suppressErrorRendering: true,
         });
         const id = `msg-mermaid-${index}-${Date.now()}`;
         const { svg } = await mermaid.render(id, code);
@@ -50,6 +51,8 @@ export function MermaidCodeBlock({ code, index, onApply, onFixError, t }: Mermai
           setRenderError('');
         }
       } catch (err) {
+        // 兜底清理 mermaid 可能残留在 body 中的临时渲染元素
+        document.querySelectorAll('body > [id^="dmsg-mermaid-"]').forEach(el => el.remove());
         if (!cancelled) {
           const msg = err instanceof Error ? err.message : String(err);
           setRenderError(msg);
