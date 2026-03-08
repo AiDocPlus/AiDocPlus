@@ -29,7 +29,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["dmg", "nsis"],
+    "targets": ["app", "dmg", "nsis"],
     "createUpdaterArtifacts": true,
     "resources": ["bundled-resources/"],
     "icon": [
