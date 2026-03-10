@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAppStore } from '@/stores/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from '@/i18n';
 import {
   DndContext,
@@ -132,7 +133,13 @@ export function CategoryManagerDialog({ open, onOpenChange }: CategoryManagerDia
     updateDocTemplateCategory,
     deleteDocTemplateCategory,
     reorderDocTemplateCategories,
-  } = useAppStore();
+  } = useAppStore(useShallow(s => ({
+    docTemplateCategories: s.docTemplateCategories,
+    createDocTemplateCategory: s.createDocTemplateCategory,
+    updateDocTemplateCategory: s.updateDocTemplateCategory,
+    deleteDocTemplateCategory: s.deleteDocTemplateCategory,
+    reorderDocTemplateCategories: s.reorderDocTemplateCategories,
+  })));
 
   const [isAdding, setIsAdding] = useState(false);
   const [newKey, setNewKey] = useState('');

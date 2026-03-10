@@ -131,12 +131,17 @@ impl Document {
         }
     }
 
+    /// 返回前端时剥离 versions 数据（惰性加载优化）
+    /// 前端通过 list_versions 命令按需获取版本
+    pub fn without_versions(mut self) -> Self {
+        self.versions = Vec::new();
+        self
+    }
+
     pub fn save(&self, path: &PathBuf) -> std::result::Result<(), AppError> {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
         let json = serde_json::to_string_pretty(self)?;
-        fs::write(path, json)?;
+        crate::config::atomic_write(path, &json)
+            .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
         Ok(())
     }
 

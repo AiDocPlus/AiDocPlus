@@ -27,7 +27,11 @@ pub async fn wechat_http_request(
     file_name: Option<String>,
     extra_form: Option<HashMap<String, String>>,
 ) -> Result<serde_json::Value, String> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(15))
+        .timeout(std::time::Duration::from_secs(60))
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new());
 
     let is_multipart = file_field.is_some() && file_path.is_some();
 

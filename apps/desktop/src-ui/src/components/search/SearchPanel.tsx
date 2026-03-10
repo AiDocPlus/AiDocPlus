@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { Search, X, FileText, Clock, Trash2 } from 'lucide-react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useAppStore } from '@/stores/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from '@/i18n';
 import type { SearchResult, SearchHistoryEntry, SearchOptions } from '@aidocplus/shared-types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
@@ -15,7 +16,10 @@ import { Separator } from '../ui/separator';
 
 export function SearchPanel() {
   const { t } = useTranslation();
-  const { currentProject, openTab } = useAppStore();
+  const { currentProject, openTab } = useAppStore(useShallow(s => ({
+    currentProject: s.currentProject,
+    openTab: s.openTab,
+  })));
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);

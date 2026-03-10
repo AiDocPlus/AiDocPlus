@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 import { useAppStore } from '@/stores/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/i18n';
 import { confirm } from '@tauri-apps/plugin-dialog';
@@ -31,7 +32,13 @@ const TAB_COLORS = [
 
 export function TabBar({ onSettingsOpen }: TabBarProps) {
   const { t } = useTranslation();
-  const { tabs, switchTab, closeTab, closeOtherTabs, closeAllTabs } = useAppStore();
+  const { tabs, switchTab, closeTab, closeOtherTabs, closeAllTabs } = useAppStore(useShallow(s => ({
+    tabs: s.tabs,
+    switchTab: s.switchTab,
+    closeTab: s.closeTab,
+    closeOtherTabs: s.closeOtherTabs,
+    closeAllTabs: s.closeAllTabs,
+  })));
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftScroll, setShowLeftScroll] = useState(false);
   const [showRightScroll, setShowRightScroll] = useState(false);
@@ -326,7 +333,12 @@ export function TabBar({ onSettingsOpen }: TabBarProps) {
 
 // 快捷键处理组件
 function TabShortcuts() {
-  const { tabs, activeTabId, closeTab, switchTab } = useAppStore();
+  const { tabs, activeTabId, closeTab, switchTab } = useAppStore(useShallow(s => ({
+    tabs: s.tabs,
+    activeTabId: s.activeTabId,
+    closeTab: s.closeTab,
+    switchTab: s.switchTab,
+  })));
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;

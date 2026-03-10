@@ -17,7 +17,7 @@ interface PluginMenuProps {
  */
 export function PluginMenu({ pluginAreaOpen, onToggle, document }: PluginMenuProps) {
   const { t } = useTranslation('plugin-framework');
-  const { pluginManifests } = useAppStore();
+  const pluginManifests = useAppStore(s => s.pluginManifests);
   const allPlugins = getPlugins();
   const contentPlugins = useMemo(() => {
     return allPlugins.filter(p => {
@@ -69,7 +69,7 @@ interface FunctionalPluginMenuProps {
  */
 export function FunctionalPluginMenu({ functionalAreaOpen, onToggle, document }: FunctionalPluginMenuProps) {
   const { t } = useTranslation('plugin-framework');
-  const { pluginManifests } = useAppStore();
+  const pluginManifests = useAppStore(s => s.pluginManifests);
   const allPlugins = getPlugins();
   const functionalPlugins = useMemo(() => {
     return allPlugins.filter(p => {

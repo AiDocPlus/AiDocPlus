@@ -4,9 +4,12 @@ import { Button } from '../ui/button';
 import { PluginMenu, FunctionalPluginMenu } from '@/plugins/PluginMenu';
 import { PluginToolArea } from '@/plugins/PluginToolArea';
 import { MarkdownEditor } from './MarkdownEditor';
-import { ComposerPanel } from './ComposerPanel';
-import { VersionHistoryPanel } from '../version/VersionHistoryPanel';
-import { useState, useEffect, useRef, useCallback, memo } from 'react';
+import { useState, useEffect, useRef, useCallback, memo, lazy, Suspense } from 'react';
+
+// 延迟加载非默认可见的重型面板，减少首屏 JS 包大小
+const ComposerPanel = lazy(() => import('./ComposerPanel').then(m => ({ default: m.ComposerPanel })));
+const VersionHistoryPanel = lazy(() => import('../version/VersionHistoryPanel').then(m => ({ default: m.VersionHistoryPanel })));
+const CodingPanel = lazy(() => import('../coding/CodingPanel').then(m => ({ default: m.CodingPanel })));
 import { useShallow } from 'zustand/react/shallow';
 import { invoke } from '@tauri-apps/api/core';
 import { message, save } from '@tauri-apps/plugin-dialog';
@@ -21,7 +24,6 @@ import {
 import { ResizableHandle } from '../ui/resizable-handle';
 import { AttachmentPanel } from './AttachmentPanel';
 import { TagEditor } from './TagEditor';
-import { CodingPanel } from '../coding/CodingPanel';
 import type { Attachment } from '@aidocplus/shared-types';
 import { logRender } from '@/lib/perfLog';
 
@@ -654,6 +656,7 @@ export const EditorPanel = memo(function EditorPanel({
 
       {/* Editor Content / Plugin Area / Composer / Functional（四态互斥显示） */}
       <div className="flex-1 min-h-0 overflow-hidden">
+        <Suspense fallback={<div className="flex items-center justify-center h-full text-muted-foreground text-sm">{t('common.loading', { defaultValue: '加载中...' })}</div>}>
         {activeView === 'plugins' && document ? (
           /* 内容插件区域 */
           <PluginToolArea
@@ -850,15 +853,18 @@ export const EditorPanel = memo(function EditorPanel({
           />
           </div>
         )}
+        </Suspense>
       </div>
 
       {/* Version History Panel */}
+      <Suspense fallback={null}>
       <VersionHistoryPanel
         open={versionHistoryOpen}
         onClose={() => handleVersionHistoryToggle(false)}
         projectId={document.projectId}
         documentId={document.id}
       />
+      </Suspense>
 
     </div>
   );

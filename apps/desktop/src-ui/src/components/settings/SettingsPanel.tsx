@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Monitor, Type, Globe, Zap, Download, Upload, RotateCcw, Loader2, Puzzle, Plus, Pencil, Trash2, Check, Power, Mail, Search, ChevronDown, ChevronRight, LayoutTemplate, Gift, ExternalLink } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { invoke } from '@tauri-apps/api/core';
 import { getVersion } from '@tauri-apps/api/app';
 import { useTranslation } from '../../i18n';
@@ -1580,7 +1581,10 @@ export function SettingsPanel({ open, onClose, defaultTab }: SettingsPanelProps)
  */
 function PluginSettingsList() {
   const { t } = useTranslation();
-  const { pluginManifests, loadPlugins } = useAppStore();
+  const { pluginManifests, loadPlugins } = useAppStore(useShallow(s => ({
+    pluginManifests: s.pluginManifests,
+    loadPlugins: s.loadPlugins,
+  })));
   const { plugins: pluginsSettings } = useSettingsStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());

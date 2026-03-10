@@ -3,6 +3,7 @@ import type { EditorTab, Attachment, Document } from '@aidocplus/shared-types';
 import { EditorPanel } from '../editor/EditorPanel';
 import { ChatPanel } from '../chat/ChatPanel';
 import { useAppStore } from '@/stores/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { ResizableHandle } from '../ui/resizable-handle';
 import type { DocumentPlugin } from '@/plugins/types';
 import { PluginAssistantPanel } from '@/plugins/_framework/PluginAssistantPanel';
@@ -249,7 +250,11 @@ function PluginAssistantWrapper({
   const thinkingUpdateRef = useRef(setThinkingContent);
   thinkingUpdateRef.current = setThinkingContent;
 
-  const { updatePluginData, markTabAsDirty, saveDocument } = useAppStore();
+  const { updatePluginData, markTabAsDirty, saveDocument } = useAppStore(useShallow(s => ({
+    updatePluginData: s.updatePluginData,
+    markTabAsDirty: s.markTabAsDirty,
+    saveDocument: s.saveDocument,
+  })));
 
   const hostAPI = useMemo(() => {
     const isFunctional = plugin.majorCategory === 'functional';

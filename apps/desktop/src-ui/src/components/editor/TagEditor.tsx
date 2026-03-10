@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { X, Plus, Tag } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from '@/i18n';
 import { cn } from '@/lib/utils';
 
@@ -12,7 +13,11 @@ interface TagEditorProps {
 
 export function TagEditor({ projectId, documentId, className }: TagEditorProps) {
   const { t } = useTranslation();
-  const { documents, allTags, updateDocumentTags } = useAppStore();
+  const { documents, allTags, updateDocumentTags } = useAppStore(useShallow(s => ({
+    documents: s.documents,
+    allTags: s.allTags,
+    updateDocumentTags: s.updateDocumentTags,
+  })));
   const [isAdding, setIsAdding] = useState(false);
   const [newTag, setNewTag] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);

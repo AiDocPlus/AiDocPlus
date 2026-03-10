@@ -18,6 +18,48 @@ fn get_stream_states() -> &'static Mutex<HashMap<String, AtomicBool>> {
 /// 流处理 Buffer 最大限制（10MB），防止恶意服务器发送无限数据
 const MAX_BUFFER_SIZE: usize = 10 * 1024 * 1024;
 
+/// AI 请求连接超时（15 秒）
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
+/// AI 非流式请求总超时（5 分钟，长文本生成可能耗时较久）
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(300);
+/// AI 流式请求总超时（10 分钟，流式传输持续时间更长）
+const STREAM_TIMEOUT: Duration = Duration::from_secs(600);
+
+/// 将 reqwest 错误转换为用户友好的提示信息
+fn friendly_reqwest_error(e: &reqwest::Error) -> String {
+    if e.is_timeout() {
+        return "AI 服务请求超时，请检查网络连接或稍后重试".to_string();
+    }
+    if e.is_connect() {
+        return "无法连接到 AI 服务，请检查网络连接和代理设置".to_string();
+    }
+    if e.is_request() {
+        return format!("请求 AI 服务失败: {}", e);
+    }
+    if e.is_decode() {
+        return "AI 服务返回数据格式异常".to_string();
+    }
+    format!("AI 服务通信错误: {}", e)
+}
+
+/// 创建带超时配置的 HTTP 客户端（非流式）
+fn ai_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .connect_timeout(CONNECT_TIMEOUT)
+        .timeout(REQUEST_TIMEOUT)
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new())
+}
+
+/// 创建带超时配置的 HTTP 客户端（流式，超时更长）
+fn ai_stream_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .connect_timeout(CONNECT_TIMEOUT)
+        .timeout(STREAM_TIMEOUT)
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new())
+}
+
 #[tauri::command]
 pub fn stop_ai_stream(request_id: Option<String>) {
     let states = get_stream_states();
@@ -73,7 +115,7 @@ pub async fn chat(
 ) -> Result<String> {
     let config = get_ai_config(&app, provider, api_key, model, base_url);
     let web_search = enable_web_search.unwrap_or(false);
-    let client = reqwest::Client::new();
+    let client = ai_client();
 
     // OpenAI + 联网搜索 → Responses API（非流式）
     if config.provider == "openai" && web_search {
@@ -124,7 +166,7 @@ pub async fn chat(
         .timeout(Duration::from_secs(120))
         .send()
         .await
-        .map_err(|e| AppError::AIError(format!("Failed to connect to AI service: {}", e)))?;
+        .map_err(|e| AppError::AIError(friendly_reqwest_error(&e)))?;
 
     if !response.status().is_success() {
         let status = response.status();
@@ -207,7 +249,7 @@ pub async fn chat_stream(
         return stream_anthropic_with_search(&config, &messages, &req_id, &window).await;
     }
 
-    let client = reqwest::Client::new();
+    let client = ai_stream_client();
     let url = format!("{}/chat/completions", config.get_base_url());
     let docs = project_documents.unwrap_or_default();
 
@@ -254,7 +296,7 @@ pub async fn chat_stream(
                 .timeout(Duration::from_secs(120))
                 .send()
                 .await
-                .map_err(|e| AppError::AIError(format!("Tool call failed: {}", e)))?;
+                .map_err(|e| AppError::AIError(friendly_reqwest_error(&e)))?;
 
             if !resp.status().is_success() {
                 let status = resp.status();
@@ -354,7 +396,7 @@ pub async fn chat_stream(
     let response = req_builder
         .send()
         .await
-        .map_err(|e| AppError::AIError(format!("Stream connection failed: {}", e)))?;
+        .map_err(|e| AppError::AIError(friendly_reqwest_error(&e)))?;
 
     if !response.status().is_success() {
         let status = response.status();
@@ -457,7 +499,7 @@ pub async fn test_api_connection(
     base_url: Option<String>,
 ) -> Result<String> {
     let config = get_ai_config(&app, provider, api_key, model, base_url);
-    let client = reqwest::Client::new();
+    let client = ai_client();
     let url = format!("{}/chat/completions", config.get_base_url());
 
     let request_body = json!({
@@ -487,7 +529,7 @@ pub async fn test_api_connection(
         .timeout(Duration::from_secs(15))
         .send()
         .await
-        .map_err(|e| AppError::AIError(format!("连接失败: {}", e)))?;
+        .map_err(|e| AppError::AIError(friendly_reqwest_error(&e)))?;
 
     if response.status().is_success() {
         Ok(format!("连接成功！模型: {}", config.get_default_model()))
@@ -534,7 +576,7 @@ async fn call_openai_responses(
         .timeout(Duration::from_secs(120))
         .send()
         .await
-        .map_err(|e| AppError::AIError(format!("OpenAI Responses API failed: {}", e)))?;
+        .map_err(|e| AppError::AIError(friendly_reqwest_error(&e)))?;
 
     if !response.status().is_success() {
         let status = response.status();
@@ -603,7 +645,7 @@ async fn call_anthropic_with_search(
         .timeout(Duration::from_secs(120))
         .send()
         .await
-        .map_err(|e| AppError::AIError(format!("Anthropic API failed: {}", e)))?;
+        .map_err(|e| AppError::AIError(friendly_reqwest_error(&e)))?;
 
     if !response.status().is_success() {
         let status = response.status();
@@ -631,19 +673,25 @@ async fn call_anthropic_with_search(
     Ok(result)
 }
 
-/// 通用 SSE 流式解析（OpenAI Chat Completions 格式）
-/// 解析 choices[0].delta.content 和 choices[0].delta.reasoning_content
-async fn stream_sse_chat_completions(
+/// SSE 事件类型
+enum SseEvent<'a> {
+    Done,
+    Data(&'a serde_json::Value),
+}
+
+/// 通用 SSE 流事件处理器：封装 buffer 管理、流取消检查、大小限制、行拆分、JSON 解析
+/// 单一回调处理所有事件，避免多闭包借用冲突
+async fn for_each_sse_event<F>(
     response: reqwest::Response,
     req_id: &str,
-    window: &tauri::Window,
-) -> Result<String> {
-    let mut stream = response.bytes_stream();
+    mut on_event: F,
+) -> Result<()>
+where
+    F: FnMut(SseEvent<'_>),
+{
     use futures_util::StreamExt;
-
-    let mut full_content = String::new();
+    let mut stream = response.bytes_stream();
     let mut buffer = Vec::new();
-    let mut in_reasoning = false;
 
     while let Some(chunk_result) = stream.next().await {
         if is_stream_cancelled(req_id) {
@@ -651,7 +699,7 @@ async fn stream_sse_chat_completions(
         }
 
         let chunk = chunk_result
-            .map_err(|e| AppError::AIError(format!("Stream error: {}", e)))?;
+            .map_err(|e| AppError::AIError(friendly_reqwest_error(&e)))?;
 
         if buffer.len() + chunk.len() > MAX_BUFFER_SIZE {
             return Err(AppError::AIError("Response too large, exceeded buffer limit".to_string()));
@@ -670,80 +718,82 @@ async fn stream_sse_chat_completions(
 
             if let Some(data) = line_str.strip_prefix("data: ") {
                 if data == "[DONE]" {
-                    // 如果还在 reasoning 状态，关闭 think 标签
-                    if in_reasoning {
-                        let _ = window.emit("ai:stream:chunk", json!({
-                            "request_id": req_id,
-                            "content": "</think>"
-                        }));
-                        full_content.push_str("</think>");
-                        in_reasoning = false;
-                    }
+                    on_event(SseEvent::Done);
                     continue;
                 }
 
                 if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(data) {
-                    let delta = json_val
-                        .get("choices")
-                        .and_then(|c| c.get(0))
-                        .and_then(|c| c.get("delta"));
-
-                    if let Some(delta) = delta {
-                        if is_stream_cancelled(req_id) {
-                            break;
-                        }
-
-                        // 处理 reasoning_content（Qwen/DeepSeek/xAI 思考内容）
-                        if let Some(reasoning) = delta.get("reasoning_content").and_then(|r| r.as_str()) {
-                            if !reasoning.is_empty() {
-                                if !in_reasoning {
-                                    // 开始思考：发送 <think> 开标签
-                                    let _ = window.emit("ai:stream:chunk", json!({
-                                        "request_id": req_id,
-                                        "content": "<think>"
-                                    }));
-                                    full_content.push_str("<think>");
-                                    in_reasoning = true;
-                                }
-                                full_content.push_str(reasoning);
-                                let _ = window.emit("ai:stream:chunk", json!({
-                                    "request_id": req_id,
-                                    "content": reasoning
-                                }));
-                            }
-                        }
-
-                        // 处理 content（正文内容）
-                        if let Some(content) = delta.get("content").and_then(|c| c.as_str()) {
-                            if !content.is_empty() {
-                                // 如果从 reasoning 切换到 content，关闭 think 标签
-                                if in_reasoning {
-                                    let _ = window.emit("ai:stream:chunk", json!({
-                                        "request_id": req_id,
-                                        "content": "</think>"
-                                    }));
-                                    full_content.push_str("</think>");
-                                    in_reasoning = false;
-                                }
-                                full_content.push_str(content);
-                                let _ = window.emit("ai:stream:chunk", json!({
-                                    "request_id": req_id,
-                                    "content": content
-                                }));
-                            }
-                        }
+                    if is_stream_cancelled(req_id) {
+                        break;
                     }
+                    on_event(SseEvent::Data(&json_val));
                 }
             }
         }
     }
 
+    Ok(())
+}
+
+/// 通用 SSE 流式解析（OpenAI Chat Completions 格式）
+/// 解析 choices[0].delta.content 和 choices[0].delta.reasoning_content
+async fn stream_sse_chat_completions(
+    response: reqwest::Response,
+    req_id: &str,
+    window: &tauri::Window,
+) -> Result<String> {
+    let mut full_content = String::new();
+    let mut in_reasoning = false;
+
+    for_each_sse_event(response, req_id, |event| {
+        match event {
+            SseEvent::Done => {
+                if in_reasoning {
+                    let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": "</think>" }));
+                    full_content.push_str("</think>");
+                    in_reasoning = false;
+                }
+            }
+            SseEvent::Data(json_val) => {
+                let delta = json_val
+                    .get("choices")
+                    .and_then(|c| c.get(0))
+                    .and_then(|c| c.get("delta"));
+
+                if let Some(delta) = delta {
+                    // 处理 reasoning_content（Qwen/DeepSeek/xAI 思考内容）
+                    if let Some(reasoning) = delta.get("reasoning_content").and_then(|r| r.as_str()) {
+                        if !reasoning.is_empty() {
+                            if !in_reasoning {
+                                let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": "<think>" }));
+                                full_content.push_str("<think>");
+                                in_reasoning = true;
+                            }
+                            full_content.push_str(reasoning);
+                            let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": reasoning }));
+                        }
+                    }
+
+                    // 处理 content（正文内容）
+                    if let Some(content) = delta.get("content").and_then(|c| c.as_str()) {
+                        if !content.is_empty() {
+                            if in_reasoning {
+                                let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": "</think>" }));
+                                full_content.push_str("</think>");
+                                in_reasoning = false;
+                            }
+                            full_content.push_str(content);
+                            let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": content }));
+                        }
+                    }
+                }
+            }
+        }
+    }).await?;
+
     // 安全关闭：如果流结束时仍在 reasoning 状态
     if in_reasoning {
-        let _ = window.emit("ai:stream:chunk", json!({
-            "request_id": req_id,
-            "content": "</think>"
-        }));
+        let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": "</think>" }));
         full_content.push_str("</think>");
     }
 
@@ -757,7 +807,7 @@ async fn stream_openai_responses(
     req_id: &str,
     window: &tauri::Window,
 ) -> Result<String> {
-    let client = reqwest::Client::new();
+    let client = ai_stream_client();
     let base_url = config.get_base_url();
     let url = format!("{}/responses", base_url);
 
@@ -788,7 +838,7 @@ async fn stream_openai_responses(
     let response = req_builder
         .send()
         .await
-        .map_err(|e| AppError::AIError(format!("OpenAI Responses API connection failed: {}", e)))?;
+        .map_err(|e| AppError::AIError(friendly_reqwest_error(&e)))?;
 
     if !response.status().is_success() {
         let status = response.status();
@@ -799,77 +849,36 @@ async fn stream_openai_responses(
     }
 
     // Responses API SSE 事件格式与 Chat Completions 不同
-    let mut stream = response.bytes_stream();
-    use futures_util::StreamExt;
-
     let mut full_content = String::new();
-    let mut buffer = Vec::new();
 
-    while let Some(chunk_result) = stream.next().await {
-        if is_stream_cancelled(req_id) {
-            break;
-        }
+    for_each_sse_event(response, req_id, |event| {
+        if let SseEvent::Data(json_val) = event {
+            let event_type = json_val.get("type").and_then(|t| t.as_str()).unwrap_or("");
 
-        let chunk = chunk_result
-            .map_err(|e| AppError::AIError(format!("Stream error: {}", e)))?;
-
-        if buffer.len() + chunk.len() > MAX_BUFFER_SIZE {
-            return Err(AppError::AIError("Response too large".to_string()));
-        }
-
-        buffer.extend_from_slice(&chunk);
-
-        while let Some(pos) = buffer.iter().position(|&b| b == b'\n') {
-            let line_bytes: Vec<u8> = buffer.drain(..=pos).collect();
-            let line_str = String::from_utf8_lossy(&line_bytes);
-            let line_str = line_str.trim_end_matches('\n').trim_end_matches('\r');
-
-            if line_str.is_empty() {
-                continue;
-            }
-
-            // Responses API 使用 "event: xxx" + "data: {}" 格式
-            if let Some(data) = line_str.strip_prefix("data: ") {
-                if data == "[DONE]" {
-                    continue;
-                }
-
-                if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(data) {
-                    let event_type = json_val.get("type").and_then(|t| t.as_str()).unwrap_or("");
-
-                    match event_type {
-                        // 文本增量输出
-                        "response.output_text.delta" => {
-                            if let Some(delta) = json_val.get("delta").and_then(|d| d.as_str()) {
-                                if !delta.is_empty() && !is_stream_cancelled(req_id) {
-                                    full_content.push_str(delta);
-                                    let _ = window.emit("ai:stream:chunk", json!({
-                                        "request_id": req_id,
-                                        "content": delta
-                                    }));
-                                }
-                            }
+            match event_type {
+                // 文本增量输出
+                "response.output_text.delta" => {
+                    if let Some(delta) = json_val.get("delta").and_then(|d| d.as_str()) {
+                        if !delta.is_empty() {
+                            full_content.push_str(delta);
+                            let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": delta }));
                         }
-                        // 推理内容增量（reasoning 模型）
-                        "response.reasoning_summary_text.delta" => {
-                            if let Some(delta) = json_val.get("delta").and_then(|d| d.as_str()) {
-                                if !delta.is_empty() && !is_stream_cancelled(req_id) {
-                                    // 包裹为 <think> 标签
-                                    let think_content = format!("<think>{}</think>", delta);
-                                    full_content.push_str(&think_content);
-                                    let _ = window.emit("ai:stream:chunk", json!({
-                                        "request_id": req_id,
-                                        "content": think_content
-                                    }));
-                                }
-                            }
-                        }
-                        _ => {}
                     }
                 }
+                // 推理内容增量（reasoning 模型）
+                "response.reasoning_summary_text.delta" => {
+                    if let Some(delta) = json_val.get("delta").and_then(|d| d.as_str()) {
+                        if !delta.is_empty() {
+                            let think_content = format!("<think>{}</think>", delta);
+                            full_content.push_str(&think_content);
+                            let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": think_content }));
+                        }
+                    }
+                }
+                _ => {}
             }
         }
-    }
+    }).await?;
 
     Ok(full_content)
 }
@@ -881,7 +890,7 @@ async fn stream_anthropic_with_search(
     req_id: &str,
     window: &tauri::Window,
 ) -> Result<String> {
-    let client = reqwest::Client::new();
+    let client = ai_stream_client();
     let base_url = config.get_base_url();
     let url = format!("{}/messages", base_url);
 
@@ -930,7 +939,7 @@ async fn stream_anthropic_with_search(
     let response = req_builder
         .send()
         .await
-        .map_err(|e| AppError::AIError(format!("Anthropic API connection failed: {}", e)))?;
+        .map_err(|e| AppError::AIError(friendly_reqwest_error(&e)))?;
 
     if !response.status().is_success() {
         let status = response.status();
@@ -941,69 +950,30 @@ async fn stream_anthropic_with_search(
     }
 
     // Anthropic SSE 格式：event: xxx \n data: {} \n\n
-    let mut stream = response.bytes_stream();
-    use futures_util::StreamExt;
-
     let mut full_content = String::new();
-    let mut buffer = Vec::new();
 
-    while let Some(chunk_result) = stream.next().await {
-        if is_stream_cancelled(req_id) {
-            break;
-        }
+    for_each_sse_event(response, req_id, |event| {
+        if let SseEvent::Data(json_val) = event {
+            let event_type = json_val.get("type").and_then(|t| t.as_str()).unwrap_or("");
 
-        let chunk = chunk_result
-            .map_err(|e| AppError::AIError(format!("Stream error: {}", e)))?;
-
-        if buffer.len() + chunk.len() > MAX_BUFFER_SIZE {
-            return Err(AppError::AIError("Response too large".to_string()));
-        }
-
-        buffer.extend_from_slice(&chunk);
-
-        while let Some(pos) = buffer.iter().position(|&b| b == b'\n') {
-            let line_bytes: Vec<u8> = buffer.drain(..=pos).collect();
-            let line_str = String::from_utf8_lossy(&line_bytes);
-            let line_str = line_str.trim_end_matches('\n').trim_end_matches('\r');
-
-            if line_str.is_empty() {
-                continue;
-            }
-
-            if let Some(data) = line_str.strip_prefix("data: ") {
-                if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(data) {
-                    let event_type = json_val.get("type").and_then(|t| t.as_str()).unwrap_or("");
-
-                    match event_type {
-                        // 文本增量
-                        "content_block_delta" => {
-                            if let Some(delta) = json_val.get("delta") {
-                                let delta_type = delta.get("type").and_then(|t| t.as_str()).unwrap_or("");
-                                match delta_type {
-                                    "text_delta" => {
-                                        if let Some(text) = delta.get("text").and_then(|t| t.as_str()) {
-                                            if !text.is_empty() && !is_stream_cancelled(req_id) {
-                                                full_content.push_str(text);
-                                                let _ = window.emit("ai:stream:chunk", json!({
-                                                    "request_id": req_id,
-                                                    "content": text
-                                                }));
-                                            }
-                                        }
-                                    }
-                                    "thinking_delta" => {
-                                        if let Some(thinking) = delta.get("thinking").and_then(|t| t.as_str()) {
-                                            if !thinking.is_empty() && !is_stream_cancelled(req_id) {
-                                                let think_text = format!("<think>{}</think>", thinking);
-                                                full_content.push_str(&think_text);
-                                                let _ = window.emit("ai:stream:chunk", json!({
-                                                    "request_id": req_id,
-                                                    "content": think_text
-                                                }));
-                                            }
-                                        }
-                                    }
-                                    _ => {}
+            if event_type == "content_block_delta" {
+                if let Some(delta) = json_val.get("delta") {
+                    let delta_type = delta.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                    match delta_type {
+                        "text_delta" => {
+                            if let Some(text) = delta.get("text").and_then(|t| t.as_str()) {
+                                if !text.is_empty() {
+                                    full_content.push_str(text);
+                                    let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": text }));
+                                }
+                            }
+                        }
+                        "thinking_delta" => {
+                            if let Some(thinking) = delta.get("thinking").and_then(|t| t.as_str()) {
+                                if !thinking.is_empty() {
+                                    let think_text = format!("<think>{}</think>", thinking);
+                                    full_content.push_str(&think_text);
+                                    let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": think_text }));
                                 }
                             }
                         }
@@ -1012,7 +982,7 @@ async fn stream_anthropic_with_search(
                 }
             }
         }
-    }
+    }).await?;
 
     Ok(full_content)
 }
@@ -1183,7 +1153,6 @@ pub fn export_ai_services(json: String) -> std::result::Result<(), String> {
     let config_dir = home.join(".aidocplus");
     std::fs::create_dir_all(&config_dir)
         .map_err(|e| format!("创建配置目录失败: {}", e))?;
-    std::fs::write(config_dir.join("ai-services.json"), &json)
-        .map_err(|e| format!("写入 AI 服务列表失败: {}", e))?;
+    crate::config::atomic_write(&config_dir.join("ai-services.json"), &json)?;
     Ok(())
 }

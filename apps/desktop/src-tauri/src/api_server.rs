@@ -84,8 +84,7 @@ fn write_api_json(port: u16, token: &str) -> Result<(), String> {
     };
     let json = serde_json::to_string_pretty(&info)
         .map_err(|e| format!("序列化 api.json 失败: {}", e))?;
-    std::fs::write(&path, json)
-        .map_err(|e| format!("写入 api.json 失败: {}", e))?;
+    crate::config::atomic_write(&path, &json)?;
 
     // 仅当前用户可读写（Unix）
     #[cfg(unix)]

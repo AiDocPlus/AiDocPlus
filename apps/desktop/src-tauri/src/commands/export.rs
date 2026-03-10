@@ -3,7 +3,27 @@
 use crate::config::AppState;
 use crate::error::Result;
 use crate::native_export;
+use std::time::{Duration, SystemTime};
 use tauri::State;
+
+/// 临时文件最大保留时间（24 小时）
+const TEMP_FILE_MAX_AGE: Duration = Duration::from_secs(24 * 60 * 60);
+
+/// 清理指定临时目录中超过 max_age 的旧文件（静默忽略错误）
+fn cleanup_old_temp_files(dir: &std::path::Path, max_age: Duration) {
+    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let now = SystemTime::now();
+    for entry in entries.flatten() {
+        let Ok(metadata) = entry.metadata() else { continue };
+        if !metadata.is_file() { continue; }
+        let Ok(modified) = metadata.modified() else { continue };
+        if let Ok(age) = now.duration_since(modified) {
+            if age > max_age {
+                let _ = std::fs::remove_file(entry.path());
+            }
+        }
+    }
+}
 
 /// 原生导出（无需外部依赖，公文排版标准）
 #[tauri::command]
@@ -61,9 +81,10 @@ pub fn export_and_open(
     let title = &document.title;
     let export_content = contentOverride.as_deref().unwrap_or(&document.ai_generated_content);
 
-    // 构建临时文件路径
+    // 构建临时文件路径（导出前清理旧临时文件）
     let temp_dir = std::env::temp_dir().join("aidocplus_export");
     std::fs::create_dir_all(&temp_dir).map_err(|e| format!("创建临时目录失败: {}", e))?;
+    cleanup_old_temp_files(&temp_dir, TEMP_FILE_MAX_AGE);
 
     let safe_title = title.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
     let output_path = temp_dir.join(format!("{}.{}", safe_title, format));
@@ -260,5 +281,18 @@ pub fn get_temp_dir() -> Result<String> {
     let temp_dir = std::env::temp_dir().join("aidocplus_export");
     std::fs::create_dir_all(&temp_dir).map_err(|e| format!("创建临时目录失败: {}", e))?;
     Ok(temp_dir.to_string_lossy().to_string())
+}
+
+/// 清理所有 AiDocPlus 临时目录中的旧文件（启动时调用）
+#[tauri::command]
+pub fn cleanup_temp_files() -> Result<()> {
+    let base = std::env::temp_dir();
+    for subdir in ["aidocplus_export", "aidocplus_pandoc"] {
+        let dir = base.join(subdir);
+        if dir.exists() {
+            cleanup_old_temp_files(&dir, TEMP_FILE_MAX_AGE);
+        }
+    }
+    Ok(())
 }
 

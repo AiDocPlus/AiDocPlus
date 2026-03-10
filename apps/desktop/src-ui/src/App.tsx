@@ -1,14 +1,20 @@
 import { useEffect, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { invoke } from '@tauri-apps/api/core';
 import { MainLayout } from './components/layout/MainLayout';
-import { useAppStore } from './stores/useAppStore';
-import { useSettingsStore, getAIInvokeParams } from './stores/useSettingsStore';
-import { useTemplatesStore } from './stores/useTemplatesStore';
+import { useSettingsStore } from './stores/useSettingsStore';
 import { useWorkspaceAutosave } from './hooks/useWorkspaceAutosave';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { UpdateChecker } from './components/settings/UpdateChecker';
 import './i18n'; // Initialize i18n
-import { registerFrontendStateProvider } from './api/ApiBridge';
+import {
+  loadAppBootstrapResources,
+  restoreAppBootstrapWorkspace,
+  fallbackLoadProjectsAfterBootstrapFailure,
+  registerAppFrontendStateProvider,
+  resolveEffectiveAppTheme,
+  applyAppThemeClass,
+} from './App.helpers';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,49 +42,27 @@ function AppContent() {
       const t0 = performance.now();
 
       try {
-        // 第一批：互不依赖的操作并行执行（分别计时）
+        // 启动时静默清理旧临时文件（不阻塞）
+        invoke('cleanup_temp_files').catch(() => {});
+
+        // 第一批：互不依赖的操作并行执行
         const batch1Start = performance.now();
-        const [, , , ,] = await Promise.all([
-          (async () => { const s = performance.now(); await useAppStore.getState().loadPlugins(); console.log(`[Perf] loadPlugins: ${(performance.now() - s).toFixed(0)}ms`); })(),
-          (async () => { const s = performance.now(); await useAppStore.getState().loadDocTemplates(); console.log(`[Perf] loadDocTemplates: ${(performance.now() - s).toFixed(0)}ms`); })(),
-          (async () => { const s = performance.now(); await useAppStore.getState().loadDocTemplateCategories(); console.log(`[Perf] loadDocTemplateCategories: ${(performance.now() - s).toFixed(0)}ms`); })(),
-          (async () => { const s = performance.now(); await useTemplatesStore.getState().loadBuiltInTemplates(); console.log(`[Perf] loadBuiltInTemplates: ${(performance.now() - s).toFixed(0)}ms`); })(),
-          (async () => { const s = performance.now(); await useTemplatesStore.getState().loadBuiltInCategories(); console.log(`[Perf] loadBuiltInCategories: ${(performance.now() - s).toFixed(0)}ms`); })(),
-        ]);
+        await loadAppBootstrapResources();
         console.log(`[Perf] 第一批并行总耗时: ${(performance.now() - batch1Start).toFixed(0)}ms`);
 
         // 第二批：依赖第一批完成
         const batch2Start = performance.now();
-        await useAppStore.getState().restoreWorkspace();
+        await restoreAppBootstrapWorkspace();
         console.log(`[Perf] restoreWorkspace: ${(performance.now() - batch2Start).toFixed(0)}ms`);
       } catch (error) {
         console.error('[App] Failed to restore workspace, loading projects:', error);
-        // Fallback to loading projects if restore fails
-        await useAppStore.getState().loadProjects();
+        await fallbackLoadProjectsAfterBootstrapFailure();
       }
 
       console.log(`[Perf] 启动总耗时: ${(performance.now() - t0).toFixed(0)}ms`);
 
       // 注册前端状态提供者，让 API Bridge 能查询 UI 状态
-      registerFrontendStateProvider({
-        getActiveDocument: () => {
-          const { currentDocument } = useAppStore.getState();
-          if (!currentDocument) return null;
-          return {
-            id: currentDocument.id,
-            title: currentDocument.title,
-            projectId: currentDocument.projectId || '',
-            content: currentDocument.content || '',
-          };
-        },
-        getActiveProjectId: () => {
-          const { currentProject } = useAppStore.getState();
-          return currentProject?.id ?? null;
-        },
-        getAiConfig: () => {
-          return getAIInvokeParams();
-        },
-      });
+      registerAppFrontendStateProvider();
 
       setIsInitialized(true);
       setRestoring(false);
@@ -88,16 +72,8 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    // Apply theme from settings
-    const effectiveTheme = uiTheme === 'auto'
-      ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-      : uiTheme;
-
-    if (effectiveTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    applyAppThemeClass(document.documentElement, resolveEffectiveAppTheme(uiTheme, prefersDark));
   }, [uiTheme]);
 
   if (!isInitialized) {

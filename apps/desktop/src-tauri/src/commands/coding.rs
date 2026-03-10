@@ -130,7 +130,7 @@ pub fn save_coding_script(
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
     }
-    fs::write(&path, &content).map_err(|e| format!("写入文件失败: {}", e))?;
+    crate::config::atomic_write(&path, &content)?;
     Ok(path.to_string_lossy().to_string())
 }
 
@@ -184,7 +184,7 @@ pub fn load_coding_state() -> Result<Option<String>, String> {
 pub fn save_coding_state(json: String) -> Result<(), String> {
     ensure_scripts_dir()?;
     let path = coding_state_path();
-    fs::write(&path, &json).map_err(|e| format!("保存状态失败: {}", e))?;
+    crate::config::atomic_write(&path, &json)?;
     Ok(())
 }
 

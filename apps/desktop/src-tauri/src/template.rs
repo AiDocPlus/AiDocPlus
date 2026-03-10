@@ -212,8 +212,7 @@ fn write_custom_templates(file: &CustomDocTemplatesFile) -> Result<(), String> {
     ensure_doc_templates_dir();
     let json = serde_json::to_string_pretty(file)
         .map_err(|e| format!("Failed to serialize custom templates: {}", e))?;
-    fs::write(custom_templates_path(), json)
-        .map_err(|e| format!("Failed to write custom.json: {}", e))?;
+    crate::config::atomic_write(&custom_templates_path(), &json)?;
     Ok(())
 }
 
@@ -505,8 +504,7 @@ fn save_categories(cats: &[DocTemplateCategory]) -> Result<(), String> {
     let json = serde_json::to_string_pretty(cats)
         .map_err(|e| format!("Failed to serialize categories: {}", e))?;
     ensure_doc_templates_dir();
-    fs::write(categories_path(), json)
-        .map_err(|e| format!("Failed to write categories.json: {}", e))?;
+    crate::config::atomic_write(&categories_path(), &json)?;
     Ok(())
 }
 

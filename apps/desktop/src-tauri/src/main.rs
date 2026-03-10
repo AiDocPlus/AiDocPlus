@@ -15,6 +15,7 @@ mod plugin;
 mod project;
 mod template;
 mod tools;
+mod menu_i18n;
 mod workspace;
 
 use commands::{
@@ -80,14 +81,15 @@ fn main() {
             // Ensure templates directory exists
             template::ensure_doc_templates_dir();
 
-            // ── 构建原生系统菜单 ──
+            // ── 构建原生系统菜单（国际化） ──
             let handle = app.handle();
+            let t = menu_i18n::get_menu_texts();
 
             // macOS 应用菜单
             let app_menu = SubmenuBuilder::new(handle, "AiDocPlus")
                 .about(None)
                 .separator()
-                .item(&MenuItem::with_id(handle, "settings", "设置...", true, Some("CmdOrCtrl+,"))?)
+                .item(&MenuItem::with_id(handle, "settings", t.settings, true, Some("CmdOrCtrl+,"))?)
                 .separator()
                 .services()
                 .separator()
@@ -99,52 +101,52 @@ fn main() {
                 .build()?;
 
             // 文件菜单
-            let export_sub = SubmenuBuilder::new(handle, "导出")
+            let export_sub = SubmenuBuilder::new(handle, t.export)
                 .item(&MenuItem::with_id(handle, "export_md", "Markdown (.md)", true, None::<&str>)?)
                 .item(&MenuItem::with_id(handle, "export_html", "HTML (.html)", true, None::<&str>)?)
                 .item(&MenuItem::with_id(handle, "export_docx", "Word (.docx)", true, None::<&str>)?)
                 .item(&MenuItem::with_id(handle, "export_pdf", "PDF (.pdf)", true, None::<&str>)?)
-                .item(&MenuItem::with_id(handle, "export_txt", "纯文本 (.txt)", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "export_txt", t.export_txt, true, None::<&str>)?)
                 .build()?;
 
-            let file_menu = SubmenuBuilder::new(handle, "文件")
+            let file_menu = SubmenuBuilder::new(handle, t.file)
                 // ── 新建 ──
-                .item(&MenuItem::with_id(handle, "new_project", "新建项目", true, Some("CmdOrCtrl+Shift+N"))?)
-                .item(&MenuItem::with_id(handle, "new_document", "新建文档", true, Some("CmdOrCtrl+N"))?)
-                .item(&MenuItem::with_id(handle, "new_from_template", "从模板新建...", true, Some("CmdOrCtrl+Shift+T"))?)
+                .item(&MenuItem::with_id(handle, "new_project", t.new_project, true, Some("CmdOrCtrl+Shift+N"))?)
+                .item(&MenuItem::with_id(handle, "new_document", t.new_document, true, Some("CmdOrCtrl+N"))?)
+                .item(&MenuItem::with_id(handle, "new_from_template", t.new_from_template, true, Some("CmdOrCtrl+Shift+T"))?)
                 .separator()
                 // ── 保存 ──
-                .item(&MenuItem::with_id(handle, "save", "保存", true, Some("CmdOrCtrl+S"))?)
-                .item(&MenuItem::with_id(handle, "save_all", "全部保存", true, Some("CmdOrCtrl+Shift+S"))?)
+                .item(&MenuItem::with_id(handle, "save", t.save, true, Some("CmdOrCtrl+S"))?)
+                .item(&MenuItem::with_id(handle, "save_all", t.save_all, true, Some("CmdOrCtrl+Shift+S"))?)
                 .separator()
                 // ── 导入/导出文件 ──
-                .item(&MenuItem::with_id(handle, "import_file", "导入文件...", true, Some("CmdOrCtrl+I"))?)
+                .item(&MenuItem::with_id(handle, "import_file", t.import_file, true, Some("CmdOrCtrl+I"))?)
                 .item(&export_sub)
                 .separator()
                 // ── 项目管理 ──
-                .item(&MenuItem::with_id(handle, "project_rename", "重命名项目...", true, None::<&str>)?)
-                .item(&MenuItem::with_id(handle, "project_delete", "删除项目...", true, None::<&str>)?)
-                .item(&MenuItem::with_id(handle, "project_export_zip", "导出项目 (ZIP)...", true, None::<&str>)?)
-                .item(&MenuItem::with_id(handle, "project_import_zip", "导入项目 (ZIP)...", true, None::<&str>)?)
-                .item(&MenuItem::with_id(handle, "project_backup", "备份项目...", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "project_rename", t.project_rename, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "project_delete", t.project_delete, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "project_export_zip", t.project_export_zip, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "project_import_zip", t.project_import_zip, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "project_backup", t.project_backup, true, None::<&str>)?)
                 .separator()
                 // ── 模板 ──
-                .item(&MenuItem::with_id(handle, "save_as_template", "存为模板...", true, None::<&str>)?)
-                .item(&MenuItem::with_id(handle, "manage_templates", "管理模板...", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "save_as_template", t.save_as_template, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "manage_templates", t.manage_templates, true, None::<&str>)?)
                 .separator()
                 // ── 文档管理 ──
-                .item(&MenuItem::with_id(handle, "doc_rename", "重命名文档...", true, None::<&str>)?)
-                .item(&MenuItem::with_id(handle, "doc_delete", "删除文档...", true, None::<&str>)?)
-                .item(&MenuItem::with_id(handle, "doc_duplicate", "复制文档", true, None::<&str>)?)
-                .item(&MenuItem::with_id(handle, "doc_move_to", "移动文档到...", true, None::<&str>)?)
-                .item(&MenuItem::with_id(handle, "doc_copy_to", "复制文档到...", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "doc_rename", t.doc_rename, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "doc_delete", t.doc_delete, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "doc_duplicate", t.doc_duplicate, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "doc_move_to", t.doc_move_to, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "doc_copy_to", t.doc_copy_to, true, None::<&str>)?)
                 .separator()
                 // ── 关闭 ──
-                .item(&MenuItem::with_id(handle, "close_tab", "关闭文档", true, Some("CmdOrCtrl+W"))?)
+                .item(&MenuItem::with_id(handle, "close_tab", t.close_tab, true, Some("CmdOrCtrl+W"))?)
                 .build()?;
 
             // 编辑菜单（使用内置 PredefinedMenuItem 以确保剪贴板操作在所有输入框中正常工作）
-            let edit_menu = SubmenuBuilder::new(handle, "编辑")
+            let edit_menu = SubmenuBuilder::new(handle, t.edit)
                 .undo()
                 .redo()
                 .separator()
@@ -153,36 +155,36 @@ fn main() {
                 .paste()
                 .select_all()
                 .separator()
-                .item(&MenuItem::with_id(handle, "find", "查找...", true, Some("CmdOrCtrl+F"))?)
+                .item(&MenuItem::with_id(handle, "find", t.find, true, Some("CmdOrCtrl+F"))?)
                 .build()?;
 
             // 视图菜单
-            let view_menu = SubmenuBuilder::new(handle, "视图")
-                .item(&MenuItem::with_id(handle, "toggle_sidebar", "切换侧边栏", true, Some("CmdOrCtrl+B"))?)
-                .item(&MenuItem::with_id(handle, "toggle_chat", "切换 AI 助手", true, Some("CmdOrCtrl+J"))?)
+            let view_menu = SubmenuBuilder::new(handle, t.view)
+                .item(&MenuItem::with_id(handle, "toggle_sidebar", t.toggle_sidebar, true, Some("CmdOrCtrl+B"))?)
+                .item(&MenuItem::with_id(handle, "toggle_chat", t.toggle_chat, true, Some("CmdOrCtrl+J"))?)
                 .separator()
-                .item(&MenuItem::with_id(handle, "toggle_layout", "切换布局", true, Some("CmdOrCtrl+L"))?)
-                .item(&MenuItem::with_id(handle, "version_history", "版本历史", true, Some("CmdOrCtrl+H"))?)
+                .item(&MenuItem::with_id(handle, "toggle_layout", t.toggle_layout, true, Some("CmdOrCtrl+L"))?)
+                .item(&MenuItem::with_id(handle, "version_history", t.version_history, true, Some("CmdOrCtrl+H"))?)
                 .separator()
-                .item(&MenuItem::with_id(handle, "view_editor", "生成区", true, None::<&str>)?)
-                .item(&MenuItem::with_id(handle, "view_plugins", "内容区", true, None::<&str>)?)
-                .item(&MenuItem::with_id(handle, "view_composer", "合并区", true, None::<&str>)?)
-                .item(&MenuItem::with_id(handle, "view_functional", "功能区", true, None::<&str>)?)
-                .item(&MenuItem::with_id(handle, "view_coding", "编程区", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "view_editor", t.view_editor, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "view_plugins", t.view_plugins, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "view_composer", t.view_composer, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "view_functional", t.view_functional, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "view_coding", t.view_coding, true, None::<&str>)?)
                 .build()?;
 
             // 帮助菜单
-            let help_menu = SubmenuBuilder::new(handle, "帮助")
-                .item(&MenuItem::with_id(handle, "shortcuts_ref", "快捷键参考", true, None::<&str>)?)
-                .item(&MenuItem::with_id(handle, "first_run_guide", "新手引导", true, None::<&str>)?)
+            let help_menu = SubmenuBuilder::new(handle, t.help)
+                .item(&MenuItem::with_id(handle, "shortcuts_ref", t.shortcuts_ref, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "first_run_guide", t.first_run_guide, true, None::<&str>)?)
                 .separator()
-                .item(&MenuItem::with_id(handle, "help_website", "AiDocPlus 官网", true, None::<&str>)?)
-                .item(&MenuItem::with_id(handle, "help_docs", "使用文档", true, None::<&str>)?)
-                .item(&MenuItem::with_id(handle, "help_feedback", "反馈与建议", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "help_website", t.help_website, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "help_docs", t.help_docs, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "help_feedback", t.help_feedback, true, None::<&str>)?)
                 .separator()
-                .item(&MenuItem::with_id(handle, "check_update", "检查更新...", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "check_update", t.check_update, true, None::<&str>)?)
                 .separator()
-                .item(&MenuItem::with_id(handle, "about", "关于 AiDocPlus", true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "about", t.about, true, None::<&str>)?)
                 .build()?;
 
             let menu = MenuBuilder::new(handle)
@@ -288,6 +290,7 @@ fn main() {
             write_binary_file,
             open_file_with_app,
             get_temp_dir,
+            cleanup_temp_files,
 
             // AI commands
             chat,

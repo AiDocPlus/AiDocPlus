@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { getPluginsForDocument, getAllPlugins } from './registry';
 import { useAppStore } from '@/stores/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useTranslation } from '@/i18n';
 import { Settings2, Maximize2, Minimize2, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -70,7 +71,7 @@ function PluginHostProvider({
   activePlugin: { onActivate?: () => void; onDeactivate?: () => void; onDocumentChange?: () => void } | undefined;
   children: React.ReactNode;
 }) {
-  const { markTabAsDirty } = useAppStore();
+  const markTabAsDirty = useAppStore(s => s.markTabAsDirty);
   // showStatus 由 PluginHostAPI 提供给插件，插件自行管理状态显示
   // 此处仅作为默认实现（插件可通过 ToolPluginLayout 的 statusMsg 展示）
   const showStatus = useCallback((_msg: string, _isError?: boolean) => {
@@ -161,7 +162,14 @@ export function PluginToolArea({ document, tabId, aiContent, isMaximized, onMaxi
   // 记住最大化前的侧边栏状态，以便恢复
   const sidebarStateBeforeMaximize = useRef<{ left: boolean; right: boolean } | null>(null);
   const { t } = useTranslation('plugin-framework');
-  const { updatePluginData, markTabAsDirty, updateDocumentEnabledPlugins, saveDocument, setTabPanelState, pluginManifests } = useAppStore();
+  const { updatePluginData, markTabAsDirty, updateDocumentEnabledPlugins, saveDocument, setTabPanelState, pluginManifests } = useAppStore(useShallow(s => ({
+    updatePluginData: s.updatePluginData,
+    markTabAsDirty: s.markTabAsDirty,
+    updateDocumentEnabledPlugins: s.updateDocumentEnabledPlugins,
+    saveDocument: s.saveDocument,
+    setTabPanelState: s.setTabPanelState,
+    pluginManifests: s.pluginManifests,
+  })));
   const savedActivePluginId = useAppStore(s => s.tabs.find(tab => tab.id === tabId)?.panelState?.activePluginId);
   const { incrementPluginUsage } = useSettingsStore();
 

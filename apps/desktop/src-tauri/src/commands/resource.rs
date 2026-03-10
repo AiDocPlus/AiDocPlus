@@ -204,8 +204,7 @@ fn write_custom_templates(data: &CustomTemplatesFile) -> Result<(), String> {
     }
     let json_str = serde_json::to_string_pretty(data)
         .map_err(|e| format!("序列化失败: {}", e))?;
-    std::fs::write(&path, json_str)
-        .map_err(|e| format!("写入 custom.json 失败: {}", e))?;
+    crate::config::atomic_write(&path, &json_str)?;
     Ok(())
 }
 
@@ -360,8 +359,7 @@ pub fn export_custom_prompt_templates(output_path: String) -> Result<String, Str
 
     let json_str = serde_json::to_string_pretty(&custom)
         .map_err(|e| format!("序列化失败: {}", e))?;
-    std::fs::write(&output_path, json_str)
-        .map_err(|e| format!("写入文件失败: {}", e))?;
+    crate::config::atomic_write(&std::path::PathBuf::from(&output_path), &json_str)?;
 
     Ok(format!("已导出 {} 个自定义模板", custom.templates.len()))
 }

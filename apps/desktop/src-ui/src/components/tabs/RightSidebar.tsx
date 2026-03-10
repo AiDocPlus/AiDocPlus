@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, History } from 'lucide-react';
 import { Button } from '../ui/button';
 import { VersionHistoryPanel } from '../version/VersionHistoryPanel';
 import { useAppStore } from '@/stores/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/i18n';
 
@@ -13,7 +14,11 @@ interface RightSidebarProps {
 
 export function RightSidebar({ tabId, documentId }: RightSidebarProps) {
   const { t } = useTranslation();
-  const { tabs, documents, setTabPanelState } = useAppStore();
+  const { tabs, documents, setTabPanelState } = useAppStore(useShallow(s => ({
+    tabs: s.tabs,
+    documents: s.documents,
+    setTabPanelState: s.setTabPanelState,
+  })));
   const tab = tabs.find(t => t.id === tabId);
   const document = documents.find(d => d.id === documentId);
   const [isCollapsed, setIsCollapsed] = useState(!tab?.panelState.rightSidebarOpen);

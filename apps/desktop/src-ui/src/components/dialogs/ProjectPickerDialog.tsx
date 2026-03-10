@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '@/stores/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Folder } from 'lucide-react';
@@ -16,7 +17,12 @@ interface ProjectPickerDialogProps {
 
 export function ProjectPickerDialog({ open, mode, onClose }: ProjectPickerDialogProps) {
   const { t } = useTranslation();
-  const { projects, currentDocument, moveDocumentToProject, copyDocumentToProject } = useAppStore();
+  const { projects, currentDocument, moveDocumentToProject, copyDocumentToProject } = useAppStore(useShallow(s => ({
+    projects: s.projects,
+    currentDocument: s.currentDocument,
+    moveDocumentToProject: s.moveDocumentToProject,
+    copyDocumentToProject: s.copyDocumentToProject,
+  })));
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 

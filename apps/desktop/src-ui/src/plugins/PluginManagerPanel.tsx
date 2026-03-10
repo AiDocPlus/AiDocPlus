@@ -3,6 +3,7 @@ import { getAllPlugins } from './registry';
 import { DEFAULT_DOC_PLUGINS, getMergedMajorCategories, getMergedSubCategories } from './constants';
 import type { MergedCategory } from './constants';
 import { useAppStore } from '@/stores/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useTranslation } from '@/i18n';
 import { invoke } from '@tauri-apps/api/core';
@@ -105,7 +106,10 @@ export function PluginManagerPanel({
   filterCategory,
 }: PluginManagerPanelProps) {
   const { t } = useTranslation('plugin-framework');
-  const { pluginManifests, loadPlugins } = useAppStore();
+  const { pluginManifests, loadPlugins } = useAppStore(useShallow(s => ({
+    pluginManifests: s.pluginManifests,
+    loadPlugins: s.loadPlugins,
+  })));
   const { plugins: pluginsSettings, addCategory, renameCategory, deleteCategory } = useSettingsStore();
 
   const allPlugins = useMemo(() => getAllPlugins(), []);

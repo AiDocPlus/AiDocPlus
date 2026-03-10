@@ -80,3 +80,17 @@ pub use dirs;
 pub fn get_workspace_state_path(handle: &AppHandle) -> PathBuf {
     get_config_dir(handle).join("workspace-state.json")
 }
+
+/// 原子写入：先写临时文件再 rename，防止写入中断导致文件损坏
+pub fn atomic_write(path: &std::path::Path, content: &str) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create directory: {}", e))?;
+    }
+    let tmp = path.with_extension("tmp");
+    std::fs::write(&tmp, content)
+        .map_err(|e| format!("Failed to write temp file: {}", e))?;
+    std::fs::rename(&tmp, path)
+        .map_err(|e| format!("Failed to rename temp file: {}", e))?;
+    Ok(())
+}

@@ -21,6 +21,8 @@ pub struct TabPanelState {
 pub struct WorkspaceTabState {
     pub id: String,
     pub document_id: String,
+    #[serde(default)]
+    pub project_id: Option<String>,
     pub panel_state: TabPanelState,
 }
 
@@ -78,16 +80,9 @@ impl Default for WorkspaceState {
 }
 
 pub fn save_workspace_state(state: &WorkspaceState, path: &PathBuf) -> Result<(), String> {
-    // Ensure parent directory exists
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
-    }
-
     let json = serde_json::to_string_pretty(state)
         .map_err(|e| format!("Failed to serialize workspace state: {}", e))?;
-    fs::write(path, json)
-        .map_err(|e| format!("Failed to write workspace state: {}", e))?;
-    Ok(())
+    crate::config::atomic_write(path, &json)
 }
 
 pub fn load_workspace_state(path: &PathBuf) -> Result<Option<WorkspaceState>, String> {

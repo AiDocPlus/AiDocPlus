@@ -99,8 +99,7 @@ pub fn sync_plugin_manifests(manifests: Vec<PluginManifest>) -> Result<(), Strin
 
         let json = serde_json::to_string_pretty(&manifest)
             .map_err(|e| format!("Failed to serialize manifest {}: {}", manifest.id, e))?;
-        fs::write(&manifest_path, json)
-            .map_err(|e| format!("Failed to write manifest {}: {}", manifest.id, e))?;
+        crate::config::atomic_write(&manifest_path, &json)?;
     }
 
     Ok(())
@@ -156,8 +155,7 @@ pub fn set_plugin_enabled(plugin_id: &str, enabled: bool) -> Result<(), String> 
 
     let updated_json = serde_json::to_string_pretty(&manifest)
         .map_err(|e| format!("Failed to serialize manifest: {}", e))?;
-    fs::write(&manifest_path, updated_json)
-        .map_err(|e| format!("Failed to write manifest: {}", e))?;
+    crate::config::atomic_write(&manifest_path, &updated_json)?;
 
     Ok(())
 }

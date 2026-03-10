@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAppStore } from '@/stores/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import type { DocTemplateManifest, DocTemplateCategory } from '@aidocplus/shared-types';
 import { getDocTemplateCategories } from './constants';
 
@@ -21,7 +22,17 @@ export function TemplateManagerDialog({ open, onOpenChange }: TemplateManagerDia
     deleteDocTemplate, duplicateDocTemplate, updateDocTemplate,
     createDocTemplateCategory, updateDocTemplateCategory, deleteDocTemplateCategory,
     reorderDocTemplateCategories,
-  } = useAppStore();
+  } = useAppStore(useShallow(s => ({
+    docTemplates: s.docTemplates,
+    docTemplateCategories: s.docTemplateCategories,
+    deleteDocTemplate: s.deleteDocTemplate,
+    duplicateDocTemplate: s.duplicateDocTemplate,
+    updateDocTemplate: s.updateDocTemplate,
+    createDocTemplateCategory: s.createDocTemplateCategory,
+    updateDocTemplateCategory: s.updateDocTemplateCategory,
+    deleteDocTemplateCategory: s.deleteDocTemplateCategory,
+    reorderDocTemplateCategories: s.reorderDocTemplateCategories,
+  })));
   const { t } = useTranslation();
   const categories = getDocTemplateCategories(docTemplateCategories);
 

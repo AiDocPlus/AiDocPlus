@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Clock, Eye, RotateCcw, GitBranch, X, GitCompare, Trash2 } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from '@/i18n';
 import i18n from '@/i18n';
 import type { DocumentVersion } from '@aidocplus/shared-types';
@@ -22,7 +23,15 @@ interface VersionHistoryPanelProps {
 
 export function VersionHistoryPanel({ open, onClose, projectId, documentId }: VersionHistoryPanelProps) {
   const { t } = useTranslation();
-  const { currentDocument, documents, loadVersions, createVersion, restoreVersion, deleteVersion, deleteAllVersions } = useAppStore();
+  const { currentDocument, documents, loadVersions, createVersion, restoreVersion, deleteVersion, deleteAllVersions } = useAppStore(useShallow(s => ({
+    currentDocument: s.currentDocument,
+    documents: s.documents,
+    loadVersions: s.loadVersions,
+    createVersion: s.createVersion,
+    restoreVersion: s.restoreVersion,
+    deleteVersion: s.deleteVersion,
+    deleteAllVersions: s.deleteAllVersions,
+  })));
 
   // 如果传入了 projectId 和 documentId，使用它们；否则从 currentDocument 获取
   const effectiveDocumentId = documentId || currentDocument?.id;

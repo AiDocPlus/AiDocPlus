@@ -695,8 +695,7 @@ async fn handle_plugin(action: &str, params: &Value) -> HandlerResult {
             }
             let json_str = serde_json::to_string_pretty(&storage)
                 .map_err(|e| format!("序列化失败: {}", e))?;
-            std::fs::write(&storage_path, json_str)
-                .map_err(|e| format!("写入插件存储失败: {}", e))?;
+            crate::config::atomic_write(&storage_path, &json_str)?;
 
             Ok(json!({ "success": true }))
         }
@@ -789,7 +788,11 @@ async fn handle_ai(action: &str, params: &Value, app_handle: &AppHandle) -> Hand
                 .or(Some(default_max_tokens));
 
             let the_model = model.unwrap_or(default_model);
-            let client = reqwest::Client::new();
+            let client = reqwest::Client::builder()
+                .connect_timeout(std::time::Duration::from_secs(15))
+                .timeout(std::time::Duration::from_secs(300))
+                .build()
+                .unwrap_or_else(|_| reqwest::Client::new());
 
             // Anthropic Messages API 格式与 OpenAI 不同，需要单独处理
             let is_anthropic = provider == "anthropic";

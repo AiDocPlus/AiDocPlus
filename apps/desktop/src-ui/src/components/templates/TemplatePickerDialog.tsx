@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAppStore } from '@/stores/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from '@/i18n';
 import type { DocTemplateManifest } from '@aidocplus/shared-types';
 import { getDocTemplateCategories } from './constants';
@@ -18,7 +19,13 @@ interface TemplatePickerDialogProps {
 
 export function TemplatePickerDialog({ open, onOpenChange, projectId, onCreated }: TemplatePickerDialogProps) {
   const { t } = useTranslation();
-  const { docTemplates, docTemplateCategories, createDocumentFromDocTemplate, createDocument, openTab } = useAppStore();
+  const { docTemplates, docTemplateCategories, createDocumentFromDocTemplate, createDocument, openTab } = useAppStore(useShallow(s => ({
+    docTemplates: s.docTemplates,
+    docTemplateCategories: s.docTemplateCategories,
+    createDocumentFromDocTemplate: s.createDocumentFromDocTemplate,
+    createDocument: s.createDocument,
+    openTab: s.openTab,
+  })));
   const categories = getDocTemplateCategories(docTemplateCategories);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');

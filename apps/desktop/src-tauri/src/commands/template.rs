@@ -138,7 +138,7 @@ pub fn create_document_from_doc_template(
     let doc_path = state.get_document_path(&projectId, &document.id);
     document.save(&doc_path).map_err(|e| e.to_string())?;
 
-    Ok(document)
+    Ok(document.without_versions())
 }
 
 // ── 模板分类命令 ──

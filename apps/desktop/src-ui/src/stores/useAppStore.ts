@@ -8,6 +8,38 @@ import { useSettingsStore, getAIInvokeParamsForService } from './useSettingsStor
 import { isTauri } from '@/lib/isTauri';
 import i18n from '@/i18n';
 
+// Workspace 保存防抖（300ms，高频操作如连续关闭标签只触发一次保存）
+let _workspaceSaveTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleWorkspaceSave(saveFn: () => Promise<void>) {
+  if (_workspaceSaveTimer) clearTimeout(_workspaceSaveTimer);
+  _workspaceSaveTimer = setTimeout(() => {
+    _workspaceSaveTimer = null;
+    saveFn();
+  }, 300);
+}
+
+/**
+ * 释放不再被任何标签引用的文档的大字段内容，仅保留元数据。
+ * 当文档再次被打开（openTab）时，会从后端重新加载完整内容。
+ */
+function releaseUnreferencedDocContents(
+  documents: Document[],
+  remainingTabs: EditorTab[]
+): Document[] {
+  const referencedDocIds = new Set(remainingTabs.map(t => t.documentId));
+  return documents.map(doc => {
+    if (referencedDocIds.has(doc.id)) return doc;
+    // 文档未被任何标签引用，释放大字段
+    return {
+      ...doc,
+      content: '',
+      aiGeneratedContent: '',
+      authorNotes: '',
+      composedContent: '',
+    };
+  });
+}
+
 // Markdown 格式约束提示词：从设置中读取（用户可编辑）
 function getMarkdownModePrompt(): string {
   const ai = useSettingsStore.getState().ai;
@@ -1623,10 +1655,26 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     // 查找文档
-    const document = documents.find(d => d.id === documentId);
+    let document = documents.find(d => d.id === documentId);
     if (!document) {
       console.error('[Tabs] Document not found:', documentId);
       return;
+    }
+
+    // 如果文档内容已被释放（关闭标签后清空），从后端重新加载
+    if (!document.content && !document.aiGeneratedContent && document.projectId) {
+      try {
+        const freshDoc = await invoke<Document>('get_document', {
+          projectId: document.projectId,
+          documentId: document.id,
+        });
+        // 更新 documents 列表中的文档
+        const updatedDocs = documents.map(d => d.id === freshDoc.id ? freshDoc : d);
+        set({ documents: updatedDocs });
+        document = freshDoc;
+      } catch (e) {
+        console.warn('[Tabs] Failed to reload released document:', e);
+      }
     }
 
     // 创建新标签
@@ -1654,10 +1702,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       currentDocument: document
     }));
 
-    // 自动保存工作区状态
-    setTimeout(() => {
-      get().saveWorkspaceState();
-    }, 100);
+    scheduleWorkspaceSave(get().saveWorkspaceState);
   },
 
   closeTab: async (tabId, saveBeforeClose = true) => {
@@ -1702,36 +1747,78 @@ export const useAppStore = create<AppState>((set, get) => ({
     const newMessagesByTab = { ...aiMessagesByTab };
     delete newMessagesByTab[tabId];
 
+    // 释放不再被任何标签引用的文档大字段内容
+    const newDocuments = releaseUnreferencedDocContents(documents, newTabs);
+
     set({
       tabs: newTabs,
       activeTabId: newActiveTabId,
       currentDocument: newCurrentDocument,
+      documents: newDocuments,
       aiMessagesByTab: newMessagesByTab
     });
 
-    // 自动保存工作区状态
-    setTimeout(() => {
-      get().saveWorkspaceState();
-    }, 100);
+    scheduleWorkspaceSave(get().saveWorkspaceState);
   },
 
   closeOtherTabs: async (keepTabId) => {
-    const { tabs, closeTab } = get();
+    const { tabs, documents, saveDocument, aiMessagesByTab } = get();
     const otherTabs = tabs.filter(t => t.id !== keepTabId);
 
-    // 关闭其他所有标签
+    // 批量保存所有 dirty 文档
     for (const tab of otherTabs) {
-      await closeTab(tab.id, true);
+      if (tab.isDirty) {
+        const doc = documents.find(d => d.id === tab.documentId);
+        if (doc) await saveDocument(doc);
+      }
     }
+
+    // 单次 set 更新状态
+    const keepTab = tabs.find(t => t.id === keepTabId);
+    const newMessagesByTab = { ...aiMessagesByTab };
+    for (const tab of otherTabs) {
+      delete newMessagesByTab[tab.id];
+    }
+
+    // 释放不再被任何标签引用的文档大字段内容
+    const newTabs = keepTab ? [{ ...keepTab, isActive: true, order: 0 }] : [];
+    const newDocuments = releaseUnreferencedDocContents(documents, newTabs);
+
+    set({
+      tabs: newTabs,
+      activeTabId: keepTab ? keepTab.id : null,
+      currentDocument: keepTab ? documents.find(d => d.id === keepTab.documentId) || null : null,
+      documents: newDocuments,
+      aiMessagesByTab: newMessagesByTab,
+    });
+
+    scheduleWorkspaceSave(get().saveWorkspaceState);
   },
 
   closeAllTabs: async () => {
-    const { tabs, closeTab } = get();
+    const { tabs, documents, saveDocument } = get();
 
-    // 从右到左关闭所有标签（避免索引问题）
-    for (let i = tabs.length - 1; i >= 0; i--) {
-      await closeTab(tabs[i].id, true);
+    // 批量保存所有 dirty 文档
+    for (const tab of tabs) {
+      if (tab.isDirty) {
+        const doc = documents.find(d => d.id === tab.documentId);
+        if (doc) await saveDocument(doc);
+      }
     }
+
+    // 释放所有文档大字段内容（无标签引用）
+    const newDocuments = releaseUnreferencedDocContents(documents, []);
+
+    // 单次 set 清空状态
+    set({
+      tabs: [],
+      activeTabId: null,
+      currentDocument: null,
+      documents: newDocuments,
+      aiMessagesByTab: {},
+    });
+
+    scheduleWorkspaceSave(get().saveWorkspaceState);
   },
 
   switchTab: (tabId) => {
@@ -1749,18 +1836,18 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const document = documents.find(d => d.id === tab.documentId);
 
-    // 更新标签活动状态
+    // 更新标签活动状态（仅修改实际变化的 tab，复用其他引用）
     set((state) => ({
-      tabs: state.tabs.map(t => ({
-        ...t,
-        isActive: t.id === tabId
-      })),
+      tabs: state.tabs.map(t => {
+        if (t.id === tabId) return t.isActive ? t : { ...t, isActive: true };
+        if (t.id === activeTabId) return !t.isActive ? t : { ...t, isActive: false };
+        return t;
+      }),
       activeTabId: tabId,
       currentDocument: document || null
     }));
 
-    // 保存工作区状态
-    setTimeout(() => { get().saveWorkspaceState(); }, 100);
+    scheduleWorkspaceSave(get().saveWorkspaceState);
   },
 
   moveTab: (fromIndex, toIndex) => {
@@ -1778,8 +1865,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
     });
 
-    // 保存工作区状态
-    setTimeout(() => { get().saveWorkspaceState(); }, 100);
+    scheduleWorkspaceSave(get().saveWorkspaceState);
   },
 
   setTabPanelState: (tabId, panel, value) => {
@@ -1791,8 +1877,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       )
     }));
 
-    // 保存工作区状态
-    setTimeout(() => { get().saveWorkspaceState(); }, 100);
+    scheduleWorkspaceSave(get().saveWorkspaceState);
   },
 
   checkUnsavedChanges: (tabId) => {

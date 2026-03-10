@@ -42,7 +42,7 @@ pub fn create_project(
 
     // Save project metadata
     let project_json = serde_json::to_string_pretty(&project).map_err(|e| e.to_string())?;
-    fs::write(&project.path, project_json).map_err(|e| e.to_string())?;
+    crate::config::atomic_write(&project.path, &project_json)?;
 
     Ok(project)
 }
@@ -67,7 +67,7 @@ pub fn save_project(state: State<'_, AppState>, mut project: Project) -> Result<
     project.path = state.get_project_path(&project.id);
 
     let project_json = serde_json::to_string_pretty(&project).map_err(|e| e.to_string())?;
-    fs::write(&project.path, project_json).map_err(|e| e.to_string())?;
+    crate::config::atomic_write(&project.path, &project_json)?;
 
     Ok(project)
 }
@@ -87,7 +87,7 @@ pub fn rename_project(state: State<'_, AppState>, project_id: String, new_name: 
     project.updated_at = chrono::Utc::now().timestamp();
 
     let project_json = serde_json::to_string_pretty(&project).map_err(|e| e.to_string())?;
-    fs::write(&project_path, project_json).map_err(|e| e.to_string())?;
+    crate::config::atomic_write(&project_path, &project_json)?;
 
     Ok(project)
 }
@@ -276,7 +276,7 @@ pub fn import_project_zip(
 
     // 保存项目元数据
     let project_json = serde_json::to_string_pretty(&project).map_err(|e| e.to_string())?;
-    fs::write(&project.path, &project_json).map_err(|e| e.to_string())?;
+    crate::config::atomic_write(&project.path, &project_json)?;
 
     // 解压文档和版本文件
     for i in 0..archive.len() {

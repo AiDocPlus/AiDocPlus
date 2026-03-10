@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { useAppStore } from '@/stores/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from '@/i18n';
 import { getDocTemplateCategories } from './constants';
 
@@ -17,7 +18,10 @@ interface SaveAsTemplateDialogProps {
 
 export function SaveAsTemplateDialog({ open, onOpenChange, projectId, documentId, documentTitle }: SaveAsTemplateDialogProps) {
   const { t } = useTranslation();
-  const { saveAsDocTemplate, docTemplateCategories } = useAppStore();
+  const { saveAsDocTemplate, docTemplateCategories } = useAppStore(useShallow(s => ({
+    saveAsDocTemplate: s.saveAsDocTemplate,
+    docTemplateCategories: s.docTemplateCategories,
+  })));
   const categories = getDocTemplateCategories(docTemplateCategories);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');

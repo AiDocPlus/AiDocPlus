@@ -32,7 +32,7 @@ export function ConversationManager({ open, onClose, onSelectConversation }: Con
     togglePinConversation
   } = useConversationsStore();
 
-  const { currentDocument } = useAppStore();
+  const currentDocument = useAppStore(s => s.currentDocument);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const currentConversation = getCurrentConversation();

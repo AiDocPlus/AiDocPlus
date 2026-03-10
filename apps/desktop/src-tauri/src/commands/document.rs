@@ -17,7 +17,7 @@ pub fn create_document(
 
     document.save(&doc_path).map_err(|e| e.to_string())?;
 
-    Ok(document)
+    Ok(document.without_versions())
 }
 
 #[tauri::command]
@@ -73,7 +73,7 @@ pub fn save_document(
     // Save document
     document.save(&doc_path).map_err(|e| e.to_string())?;
 
-    Ok(document)
+    Ok(document.without_versions())
 }
 
 #[tauri::command]
@@ -145,7 +145,7 @@ pub fn rename_document(
     // Save document
     document.save(&doc_path).map_err(|e| e.to_string())?;
 
-    Ok(document)
+    Ok(document.without_versions())
 }
 
 #[tauri::command]
@@ -160,7 +160,7 @@ pub fn get_document(
         return Err(format!("Document not found: {}", documentId));
     }
 
-    Document::load(&doc_path).map_err(|e| e.to_string())
+    Document::load(&doc_path).map_err(|e| e.to_string()).map(|d| d.without_versions())
 }
 
 #[tauri::command]
@@ -182,7 +182,7 @@ pub fn list_documents(state: State<'_, AppState>, projectId: String) -> Result<V
 
         if path.extension().and_then(|s| s.to_str()) == Some("json") {
             if let Ok(document) = Document::load(&path) {
-                documents.push(document);
+                documents.push(document.without_versions());
             }
         }
     }
@@ -351,7 +351,7 @@ pub fn restore_version(
     // Save the restored document
     document.save(&doc_path).map_err(|e| e.to_string())?;
 
-    Ok(document)
+    Ok(document.without_versions())
 }
 
 #[tauri::command]
@@ -494,7 +494,7 @@ pub fn move_document(
     // 删除源文件
     std::fs::remove_file(&src_path).map_err(|e| e.to_string())?;
 
-    Ok(document)
+    Ok(document.without_versions())
 }
 
 /// 更新文档标签
@@ -527,7 +527,7 @@ pub fn update_document_tags(
 
     document.save(&doc_path).map_err(|e| e.to_string())?;
 
-    Ok(document)
+    Ok(document.without_versions())
 }
 
 /// 获取项目内所有已使用的标签（去重）
@@ -604,7 +604,7 @@ pub fn toggle_document_starred(
 
     document.save(&doc_path).map_err(|e| e.to_string())?;
 
-    Ok(document)
+    Ok(document.without_versions())
 }
 
 /// 将文档复制到另一个项目（生成新 ID）
@@ -649,5 +649,5 @@ pub fn copy_document(
     let dst_path = state.get_document_path(&toProjectId, &new_id);
     new_doc.save(&dst_path).map_err(|e| e.to_string())?;
 
-    Ok(new_doc)
+    Ok(new_doc.without_versions())
 }

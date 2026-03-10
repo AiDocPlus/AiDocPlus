@@ -20,7 +20,7 @@ pub fn save_settings(json: String) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
     }
-    fs::write(&path, &json).map_err(|e| format!("写入设置失败: {}", e))?;
+    crate::config::atomic_write(&path, &json)?;
     Ok(())
 }
 
@@ -42,7 +42,7 @@ pub fn save_plugin_storage(json: String) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
     }
-    fs::write(&path, &json).map_err(|e| format!("写入插件存储失败: {}", e))?;
+    crate::config::atomic_write(&path, &json)?;
     Ok(())
 }
 
@@ -70,7 +70,7 @@ pub fn save_conversations(json: String) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
     }
-    fs::write(&path, &json).map_err(|e| format!("写入对话记录失败: {}", e))?;
+    crate::config::atomic_write(&path, &json)?;
     Ok(())
 }
 
@@ -98,7 +98,7 @@ pub fn save_ui_preferences(json: String) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
     }
-    fs::write(&path, &json).map_err(|e| format!("写入UI偏好失败: {}", e))?;
+    crate::config::atomic_write(&path, &json)?;
     Ok(())
 }
 
