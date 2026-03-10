@@ -104,11 +104,21 @@ const DEFAULT_PLUGINS_SETTINGS: PluginsSettings = {
   usageCount: {},
 };
 
+export interface ImBotSettings {
+  /** 是否随应用启动自动启动 IM Bot */
+  autoStart: boolean;
+}
+
+const DEFAULT_IMBOT_SETTINGS: ImBotSettings = {
+  autoStart: true,
+};
+
 interface SettingsState extends AppSettings {
   // Settings state
   isLoading: boolean;
   error: string | null;
   plugins: PluginsSettings;
+  imBot: ImBotSettings;
 
   // Actions
   updateSettings: (settings: Partial<AppSettings>) => void;
@@ -128,6 +138,7 @@ interface SettingsState extends AppSettings {
   updateFileSettings: (settings: Partial<typeof DEFAULT_FILE_SETTINGS>) => void;
   updateAISettings: (settings: Partial<typeof DEFAULT_AI_SETTINGS>) => void;
   updateEmailSettings: (settings: Partial<typeof DEFAULT_EMAIL_SETTINGS>) => void;
+  updateImBotSettings: (settings: Partial<ImBotSettings>) => void;
   updateShortcut: (key: string, value: string) => void;
   resetSettings: () => void;
   resetCategory: (category: 'editor' | 'ui' | 'file' | 'ai') => void;
@@ -146,6 +157,7 @@ export const useSettingsStore = create<SettingsState>()(
       email: { ...DEFAULT_EMAIL_SETTINGS },
       shortcuts: { ...DEFAULT_SETTINGS.shortcuts },
       plugins: { ...DEFAULT_PLUGINS_SETTINGS },
+      imBot: { ...DEFAULT_IMBOT_SETTINGS },
       isLoading: false,
       error: null,
 
@@ -193,6 +205,13 @@ export const useSettingsStore = create<SettingsState>()(
       updateEmailSettings: (settings) => {
         set((state) => ({
           email: { ...state.email, ...settings }
+        }));
+      },
+
+      // Update IM Bot settings
+      updateImBotSettings: (settings) => {
+        set((state) => ({
+          imBot: { ...state.imBot, ...settings }
         }));
       },
 
@@ -406,6 +425,7 @@ export const useSettingsStore = create<SettingsState>()(
           email: { ...DEFAULT_EMAIL_SETTINGS },
           shortcuts: { ...DEFAULT_SETTINGS.shortcuts },
           plugins: { ...DEFAULT_PLUGINS_SETTINGS },
+          imBot: { ...DEFAULT_IMBOT_SETTINGS },
           error: null
         });
       },
@@ -461,6 +481,7 @@ export const useSettingsStore = create<SettingsState>()(
         email: state.email,
         shortcuts: state.shortcuts,
         plugins: state.plugins,
+        imBot: state.imBot,
       }),
       // 用深度合并替代版本迁移：缺失字段自动用默认值填充，无需 version + migrate()
       merge: (persisted, current) => {
@@ -479,6 +500,7 @@ export const useSettingsStore = create<SettingsState>()(
             customCategories: saved.plugins?.customCategories,
             pluginOrder: saved.plugins?.pluginOrder,
           },
+          imBot: deepMergeDefaults(DEFAULT_IMBOT_SETTINGS, saved.imBot || {}),
         };
       },
     }

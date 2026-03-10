@@ -589,6 +589,16 @@
       "github": "GitHub Repository",
       "license": "License"
     },
+    "imBot": {
+      "title": "IM Bot Service",
+      "description": "Remotely control AiDocPlus via Feishu, DingTalk and other IM platforms.",
+      "running": "Running",
+      "stopped": "Stopped",
+      "start": "Start",
+      "stop": "Stop",
+      "autoStart": "Auto-start with app",
+      "autoStartDesc": "Automatically start IM Bot service when AiDocPlus launches"
+    },
     "saved": "Settings saved",
     "reset": "Settings reset",
     "importSuccess": "Settings imported",

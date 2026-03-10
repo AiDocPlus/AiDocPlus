@@ -18,3 +18,4 @@ pub mod python;
 pub mod nodejs;
 pub mod coding;
 pub mod script_runner;
+pub mod imbot;

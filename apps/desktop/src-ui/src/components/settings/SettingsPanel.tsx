@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { X, Monitor, Type, Globe, Zap, Download, Upload, RotateCcw, Loader2, Puzzle, Plus, Pencil, Trash2, Check, Power, Mail, Search, ChevronDown, ChevronRight, LayoutTemplate, Gift, ExternalLink } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { X, Monitor, Type, Globe, Zap, Download, Upload, RotateCcw, Loader2, Puzzle, Plus, Pencil, Trash2, Check, Power, Mail, Search, ChevronDown, ChevronRight, LayoutTemplate, Gift, ExternalLink, Bot, Play, Square, Circle } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { invoke } from '@tauri-apps/api/core';
@@ -49,8 +49,48 @@ export function SettingsPanel({ open, onClose, defaultTab }: SettingsPanelProps)
     resetSettings,
     exportSettings,
     importSettings,
+    imBot,
+    updateImBotSettings,
     error
   } = useSettingsStore();
+
+  // IM Bot 状态
+  const [imBotRunning, setImBotRunning] = useState(false);
+  const [imBotLoading, setImBotLoading] = useState(false);
+  const imBotPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const pollImBotStatus = useCallback(async () => {
+    try {
+      const status = await invoke<{ running: boolean }>('get_imbot_status');
+      setImBotRunning(status.running);
+    } catch { setImBotRunning(false); }
+  }, []);
+
+  useEffect(() => {
+    if (open && activeTab === 'advanced') {
+      pollImBotStatus();
+      imBotPollRef.current = setInterval(pollImBotStatus, 3000);
+    }
+    return () => { if (imBotPollRef.current) clearInterval(imBotPollRef.current); };
+  }, [open, activeTab, pollImBotStatus]);
+
+  const handleStartImBot = async () => {
+    setImBotLoading(true);
+    try {
+      await invoke('start_imbot');
+      await pollImBotStatus();
+    } catch (e) { console.error('启动 IM Bot 失败:', e); }
+    finally { setImBotLoading(false); }
+  };
+
+  const handleStopImBot = async () => {
+    setImBotLoading(true);
+    try {
+      await invoke('stop_imbot');
+      await pollImBotStatus();
+    } catch (e) { console.error('停止 IM Bot 失败:', e); }
+    finally { setImBotLoading(false); }
+  };
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -1475,6 +1515,69 @@ export function SettingsPanel({ open, onClose, defaultTab }: SettingsPanelProps)
 
             {/* Advanced Settings */}
             <TabsContent value="advanced" className="space-y-6 p-4 bg-card h-full">
+              {/* IM Bot */}
+              <div>
+                <h3 className="text-lg font-semibold mb-4">
+                  <Bot className="w-5 h-5 inline-block mr-2" />
+                  {t('settings.imBot.title', { defaultValue: 'IM Bot 服务' })}
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {t('settings.imBot.description', { defaultValue: '通过飞书、钉钉等即时通讯平台远程操控 AiDocPlus。' })}
+                </p>
+
+                <div className="space-y-4">
+                  {/* 运行状态 + 启停按钮 */}
+                  <div className="flex items-center justify-between p-3 rounded-lg border bg-background">
+                    <div className="flex items-center gap-3">
+                      <Circle className={`w-3 h-3 ${imBotRunning ? 'fill-green-500 text-green-500' : 'fill-muted text-muted-foreground'}`} />
+                      <span className="text-sm font-medium">
+                        {imBotRunning
+                          ? t('settings.imBot.running', { defaultValue: '运行中' })
+                          : t('settings.imBot.stopped', { defaultValue: '已停止' })}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {imBotRunning ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleStopImBot}
+                          disabled={imBotLoading}
+                        >
+                          {imBotLoading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Square className="w-3 h-3 mr-1" />}
+                          {t('settings.imBot.stop', { defaultValue: '停止' })}
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleStartImBot}
+                          disabled={imBotLoading}
+                        >
+                          {imBotLoading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Play className="w-3 h-3 mr-1" />}
+                          {t('settings.imBot.start', { defaultValue: '启动' })}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 自动启动开关 */}
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="imbot-autostart">{t('settings.imBot.autoStart', { defaultValue: '随应用自动启动' })}</Label>
+                      <p className="text-xs text-muted-foreground">{t('settings.imBot.autoStartDesc', { defaultValue: 'AiDocPlus 启动后自动运行 IM Bot 服务' })}</p>
+                    </div>
+                    <Switch
+                      id="imbot-autostart"
+                      checked={imBot.autoStart}
+                      onCheckedChange={(checked) => updateImBotSettings({ autoStart: checked })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
               <div>
                 <h3 className="text-lg font-semibold mb-4">{t('settings.advancedSettings.title')}</h3>
 

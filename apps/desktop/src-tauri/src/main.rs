@@ -39,9 +39,11 @@ use commands::{
     nodejs::*,
     coding::*,
     script_runner::*,
+    imbot::*,
 };
 use commands::tts::TtsState;
 use commands::script_runner::RunningScriptState;
+use commands::imbot::ImBotState;
 use aidocplus_manager_rust::commands::DataDirState;
 use tauri::{Manager, Emitter, Listener};
 use tauri::menu::{
@@ -65,6 +67,7 @@ fn main() {
             app.manage(config::AppState::new());
             app.manage(TtsState(std::sync::Mutex::new(None)));
             app.manage(RunningScriptState::default());
+            app.manage(ImBotState::default());
             app.manage(DataDirState::new());
             app.manage(ManagerWindowState(std::sync::Mutex::new(None)));
 
@@ -447,6 +450,11 @@ fn main() {
             save_coding_state,
             pip_install,
             pip_list,
+
+            // IM Bot 子进程管理
+            start_imbot,
+            stop_imbot,
+            get_imbot_status,
 
         ])
         .run(tauri::generate_context!())

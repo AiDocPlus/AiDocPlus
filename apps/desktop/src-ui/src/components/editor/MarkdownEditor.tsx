@@ -310,8 +310,21 @@ export function MarkdownEditor({
       compRef.current.markdownLint.of(
         editorSettings.markdownLint !== false ? markdownLinterExtension : []
       ),
-      // --- 粘贴 URL 自动转链接 ---
+      // --- DOM 事件处理 ---
       EditorView.domEventHandlers({
+        // 修复：编辑器无焦点时点击会导致错误选区扩展
+        mousedown(event, view) {
+          if (!view.hasFocus && event.button === 0 && !event.shiftKey) {
+            const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+            if (pos != null) {
+              event.preventDefault();
+              view.dispatch({ selection: { anchor: pos } });
+              view.focus();
+              return true;
+            }
+          }
+          return false;
+        },
         paste(event, view) {
           const clipText = event.clipboardData?.getData('text/plain')?.trim();
           if (!clipText || !/^https?:\/\/\S+$/.test(clipText)) return false;

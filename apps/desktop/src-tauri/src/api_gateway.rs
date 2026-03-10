@@ -178,7 +178,7 @@ pub async fn dispatch(
 
     let result = match namespace {
         "app" => handle_app(action, &params, app_handle).await,
-        "document" => handle_document(action, &params, app_state).await,
+        "document" => handle_document(action, &params, app_state, app_handle).await,
         "project" => handle_project(action, &params, app_state).await,
         "search" => handle_search(action, &params, app_state).await,
         "template" => handle_template(action, &params).await,
@@ -263,7 +263,7 @@ async fn query_frontend_state(app_handle: &AppHandle, query_type: &str) -> Handl
 }
 
 /// document 命名空间
-async fn handle_document(action: &str, params: &Value, state: &AppState) -> HandlerResult {
+async fn handle_document(action: &str, params: &Value, state: &AppState, app_handle: &AppHandle) -> HandlerResult {
     match action {
         "list" => {
             let project_id = params.get("projectId")
@@ -330,6 +330,12 @@ async fn handle_document(action: &str, params: &Value, state: &AppState) -> Hand
             doc.save(&doc_path).map_err(|e| format!("保存文档失败: {}", e))?;
             let doc_json = serde_json::to_value(&doc)
                 .map_err(|e| format!("序列化文档失败: {}", e))?;
+            // 通知前端刷新文档列表
+            let _ = app_handle.emit("document:external-change", json!({
+                "action": "create",
+                "projectId": project_id,
+                "documentId": doc.id,
+            }));
             Ok(doc_json)
         }
         "save" => {
@@ -356,10 +362,19 @@ async fn handle_document(action: &str, params: &Value, state: &AppState) -> Hand
             if let Some(ai_content) = params.get("aiGeneratedContent").and_then(|v| v.as_str()) {
                 doc.ai_generated_content = ai_content.to_string();
             }
+            if let Some(notes) = params.get("authorNotes").and_then(|v| v.as_str()) {
+                doc.author_notes = notes.to_string();
+            }
             doc.metadata.updated_at = chrono::Utc::now().timestamp();
             doc.save(&doc_path).map_err(|e| format!("保存文档失败: {}", e))?;
             let doc_json = serde_json::to_value(&doc)
                 .map_err(|e| format!("序列化文档失败: {}", e))?;
+            // 通知前端刷新文档列表
+            let _ = app_handle.emit("document:external-change", json!({
+                "action": "save",
+                "projectId": project_id,
+                "documentId": document_id,
+            }));
             Ok(doc_json)
         }
         _ => Err(format!("document 命名空间未知操作: {}", action)),

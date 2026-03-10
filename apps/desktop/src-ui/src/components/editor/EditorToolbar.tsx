@@ -213,7 +213,7 @@ export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMod
   const runAction = (fn: (view: EditorView) => void) => {
     setTimeout(() => {
       const v = cmViewRef.current;
-      if (v) fn(v);
+      if (v) { fn(v); v.focus(); }
     }, 0);
   };
 

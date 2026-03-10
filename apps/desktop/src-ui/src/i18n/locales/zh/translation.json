@@ -590,6 +590,16 @@
       "github": "GitHub 仓库",
       "license": "许可证"
     },
+    "imBot": {
+      "title": "IM Bot 服务",
+      "description": "通过飞书、钉钉等即时通讯平台远程操控 AiDocPlus。",
+      "running": "运行中",
+      "stopped": "已停止",
+      "start": "启动",
+      "stop": "停止",
+      "autoStart": "随应用自动启动",
+      "autoStartDesc": "AiDocPlus 启动后自动运行 IM Bot 服务"
+    },
     "saved": "设置已保存",
     "reset": "设置已重置",
     "importSuccess": "设置已导入",

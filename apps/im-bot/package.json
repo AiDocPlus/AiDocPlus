@@ -1,0 +1,27 @@
+{
+  "name": "@aidocplus/im-bot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AiDocPlus IM Bot 桥接服务 — 飞书/钉钉/企业微信/QQ",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.36.2",
+    "dingtalk-stream": "^2.1.4",
+    "dotenv": "^16.4.7",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/ws": "^8.5.14",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
