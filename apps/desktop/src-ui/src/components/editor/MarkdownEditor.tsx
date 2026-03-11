@@ -20,7 +20,6 @@ import { closeBrackets, closeBracketsKeymap, autocompletion } from '@codemirror/
 import { oneDark } from '@codemirror/theme-one-dark';
 import { cn } from '@/lib/utils';
 import { useEditorSettings } from '@/stores/useSettingsStore';
-import { useTranslation } from '@/i18n';
 import { EditorToolbar } from './EditorToolbar';
 import { EditorStatusBar } from './EditorStatusBar';
 import { MarkdownPreview } from './MarkdownPreview';
@@ -141,7 +140,6 @@ export function MarkdownEditor({
   const docContentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debounceRef = useRef(value.length > LARGE_DOC_THRESHOLD ? LARGE_DOC_DEBOUNCE : NORMAL_DOC_DEBOUNCE);
 
-  const { t } = useTranslation();
   const editorSettings = useEditorSettings();
   const [localFontSize, setLocalFontSize] = useState(editorSettings.fontSize);
   const [cursorInfo, setCursorInfo] = useState({ line: 1, col: 1, selChars: 0, from: 0 });

@@ -149,7 +149,7 @@ function ContextReplyBox({
  * Memo 化的单条聊天消息，避免流式更新时所有历史消息重渲染
  */
 interface ChatMessageProps {
-  message: { role: string; content: string; timestamp?: number; contextMode?: ChatContextMode };
+  message: { role: string; content: string; timestamp?: number; contextMode?: ChatContextMode; images?: { data: string; mimeType: string }[] };
   turnNumber: number;
   totalMessages: number;
   enableThinking: boolean;
