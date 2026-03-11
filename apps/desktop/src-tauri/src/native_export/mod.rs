@@ -13,20 +13,21 @@ pub fn export_native(
     title: &str,
     output_path: &str,
     format: &str,
-) -> Result<String, String> {
+) -> crate::error::Result<String> {
+    use crate::error::AppError;
     // 确保输出目录存在
     if let Some(parent) = Path::new(output_path).parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("创建输出目录失败: {}", e))?;
+        fs::create_dir_all(parent).map_err(|e| AppError::ExportFailed(format!("创建输出目录失败: {}", e)))?;
     }
 
     match format {
         "md" => {
-            fs::write(output_path, markdown).map_err(|e| format!("写入文件失败: {}", e))?;
+            fs::write(output_path, markdown).map_err(|e| AppError::ExportFailed(format!("写入文件失败: {}", e)))?;
             Ok(output_path.to_string())
         }
         "html" => {
             let html_content = html::export_to_html(markdown, title)?;
-            fs::write(output_path, html_content).map_err(|e| format!("写入文件失败: {}", e))?;
+            fs::write(output_path, html_content).map_err(|e| AppError::ExportFailed(format!("写入文件失败: {}", e)))?;
             Ok(output_path.to_string())
         }
         "docx" => {
@@ -38,9 +39,9 @@ pub fn export_native(
         }
         "txt" => {
             let text = txt::export_to_txt(markdown)?;
-            fs::write(output_path, text).map_err(|e| format!("写入文件失败: {}", e))?;
+            fs::write(output_path, text).map_err(|e| AppError::ExportFailed(format!("写入文件失败: {}", e)))?;
             Ok(output_path.to_string())
         }
-        _ => Err(format!("不支持的导出格式: {}", format)),
+        _ => Err(AppError::ValidationError(format!("不支持的导出格式: {}", format))),
     }
 }

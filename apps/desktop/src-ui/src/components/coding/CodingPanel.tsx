@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useCodingStore, nextTabId, detectLangFromExt } from '@/stores/useCodingStore';
+import { formatBackendError } from '@/lib/backendError';
 import type { CodingTab } from '@/stores/useCodingStore';
 import { CodingAssistantPanel } from './CodingAssistantPanel';
 import { getApiServerPort, isApiServerReady } from '@/api/ApiBridge';
@@ -554,9 +555,9 @@ export function CodingPanel() {
       unlistenChunk();
       unlistenDone();
       updateTab(tabId, {
-        outputLines: [headerLine, { text: String(err), type: 'stderr' }],
+        outputLines: [headerLine, { text: formatBackendError(err), type: 'stderr' }],
       });
-      showStatus(String(err), true);
+      showStatus(formatBackendError(err), true);
       setRunning(false);
     }
   }, [running, activeTab, pythonInfo, nodeInfo, settings, scriptsDir, showStatus, t, updateTab]);
@@ -659,7 +660,7 @@ export function CodingPanel() {
         outputLines: [],
         lastExitCode: null,
       });
-    } catch (err) { showStatus(String(err), true); }
+    } catch (err) { showStatus(formatBackendError(err), true); }
   }, [tabs, addTab, setActiveTab, showStatus]);
 
   const handleSave = useCallback(async () => {
@@ -667,7 +668,7 @@ export function CodingPanel() {
     try {
       await saveFile(activeTab.id);
       showStatus(`✅ ${t('coding.saved', { defaultValue: '已保存' })}: ${activeTab.title}`);
-    } catch (err) { showStatus(String(err), true); }
+    } catch (err) { showStatus(formatBackendError(err), true); }
   }, [activeTab, saveFile, showStatus, t]);
   useEffect(() => { handleSaveRef.current = handleSave; }, [handleSave]);
 
@@ -705,7 +706,7 @@ export function CodingPanel() {
         outputLines: [],
         lastExitCode: null,
       });
-    } catch (err) { showStatus(String(err), true); }
+    } catch (err) { showStatus(formatBackendError(err), true); }
   }, [tabs, addTab, setActiveTab, showStatus]);
 
   // ── 拖拽分隔条 ──
@@ -1744,7 +1745,7 @@ export function CodingPanel() {
                     const existing = tabs.find(tb => tb.filePath === fp);
                     if (existing) updateTab(existing.id, { filePath: newPath, title: newName, dirty: false });
                     showStatus(t('coding.renamed', { defaultValue: '已重命名' }));
-                  }).catch(err => showStatus(String(err), true));
+                  }).catch(err => showStatus(formatBackendError(err), true));
                 }
                 setTabCtxMenu(null);
               }}>

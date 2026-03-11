@@ -8,6 +8,7 @@ import { buildQuizSystemPrompt, buildQuizUserPrompt, parseQuizFromAiResponse } f
 import { truncateContent } from '../_framework/pluginUtils';
 import { Button } from '../_framework/ui';
 import { usePluginHost } from '../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import { ClipboardList, Download, ExternalLink } from 'lucide-react';
 import { PluginPanelLayout } from '../_framework/PluginPanelLayout';
 
@@ -144,7 +145,7 @@ export function QuizPluginPanel({ document, content, pluginData, onPluginDataCha
       onRequestSave?.();
     } catch (err) {
       if (abortRef.current) return;
-      const errMsg = err instanceof Error ? err.message : String(err);
+      const errMsg = formatBackendError(err);
       showStatus(`测试题生成失败：${errMsg}`, true);
     } finally {
       setGenerating(false);
@@ -162,7 +163,7 @@ export function QuizPluginPanel({ document, content, pluginData, onPluginDataCha
       await host.platform.invoke('write_binary_file', { path: filePath, data });
       showStatus(`已导出: ${filePath}`);
     } catch (error) {
-      const errMsg = error instanceof Error ? error.message : String(error);
+      const errMsg = formatBackendError(error);
       showStatus(`导出失败: ${errMsg}`, true);
     }
   };
@@ -176,7 +177,7 @@ export function QuizPluginPanel({ document, content, pluginData, onPluginDataCha
       await host.platform.invoke('write_binary_file', { path: tempPath, data });
       await host.platform.invoke('open_file_with_app', { path: tempPath, appName: null });
     } catch (error) {
-      const errMsg = error instanceof Error ? error.message : String(error);
+      const errMsg = formatBackendError(error);
       showStatus(`导出并打开失败: ${errMsg}`, true);
     }
   };

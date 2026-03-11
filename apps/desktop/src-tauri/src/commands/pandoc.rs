@@ -97,18 +97,19 @@ pub fn pandoc_export(
     #[allow(non_snake_case)]
     extraArgs: Option<Vec<String>>,
     title: Option<String>,
-) -> Result<String, String> {
+) -> crate::error::Result<String> {
+    use crate::error::AppError;
     // 确保输出目录存在
     if let Some(parent) = std::path::Path::new(&outputPath).parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("创建输出目录失败: {}", e))?;
+        fs::create_dir_all(parent).map_err(|e| AppError::Internal(format!("创建输出目录失败: {}", e)))?;
     }
 
     // 创建临时 Markdown 文件
     let temp_dir = std::env::temp_dir().join("aidocplus_pandoc");
-    fs::create_dir_all(&temp_dir).map_err(|e| format!("创建临时目录失败: {}", e))?;
+    fs::create_dir_all(&temp_dir).map_err(|e| AppError::Internal(format!("创建临时目录失败: {}", e)))?;
 
     let temp_md = temp_dir.join("input.md");
-    fs::write(&temp_md, &markdown).map_err(|e| format!("写入临时文件失败: {}", e))?;
+    fs::write(&temp_md, &markdown).map_err(|e| AppError::Internal(format!("写入临时文件失败: {}", e)))?;
 
     // 构建 pandoc 命令
     let mut cmd = Command::new("pandoc");
@@ -145,7 +146,7 @@ pub fn pandoc_export(
     // 执行
     let output = cmd
         .output()
-        .map_err(|e| format!("执行 Pandoc 失败: {}。请确认 Pandoc 已正确安装。", e))?;
+        .map_err(|e| AppError::ExternalToolError(format!("执行 Pandoc 失败: {}。请确认 Pandoc 已正确安装。", e)))?;
 
     // 清理临时文件
     let _ = fs::remove_file(&temp_md);
@@ -154,6 +155,6 @@ pub fn pandoc_export(
         Ok(outputPath)
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        Err(format!("Pandoc 导出失败: {}", stderr))
+        Err(AppError::ExportFailed(format!("Pandoc 导出失败: {}", stderr)))
     }
 }

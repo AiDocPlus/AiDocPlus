@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { PluginPanelProps } from '../types';
 import { usePluginHost } from '../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import { ToolPluginLayout } from '../_framework/ToolPluginLayout';
 import { Button, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../_framework/ui';
 import {
@@ -198,7 +199,7 @@ export function PandocPluginPanel({
         showAdvanced,
       });
     } catch (err) {
-      showStatus(`${t('exportFailed')}: ${err instanceof Error ? err.message : String(err)}`, true);
+      showStatus(`${t('exportFailed')}: ${formatBackendError(err)}`, true);
     } finally {
       setExporting(false);
     }

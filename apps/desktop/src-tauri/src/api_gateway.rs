@@ -189,12 +189,12 @@ pub async fn dispatch(
         "file" => handle_file(action, &params).await,
         "tts" => handle_tts(action, &params).await,
         "script" => handle_script(action, &params).await,
-        _ => Err(format!("未知的命名空间: {}", namespace)),
+        _ => Err(crate::error::AppError::Internal(format!("未知的命名空间: {}", namespace))),
     };
 
     match result {
         Ok(value) => ApiResponse::success(req_id, value),
-        Err(msg) => ApiResponse::error(req_id, 500, msg),
+        Err(e) => ApiResponse::error(req_id, 500, e.to_string()),
     }
 }
 
@@ -202,7 +202,7 @@ pub async fn dispatch(
 // 各命名空间 handler（Phase 1 先实现核心子集，其余返回占位）
 // ============================================================
 
-type HandlerResult = Result<Value, String>;
+type HandlerResult = Result<Value, crate::error::AppError>;
 
 /// app 命名空间 — 程序状态
 async fn handle_app(action: &str, _params: &Value, app_handle: &AppHandle) -> HandlerResult {
@@ -221,7 +221,7 @@ async fn handle_app(action: &str, _params: &Value, app_handle: &AppHandle) -> Ha
         "getActiveProjectId" => {
             query_frontend_state(app_handle, "getActiveProjectId").await
         }
-        _ => Err(format!("app 命名空间未知操作: {}", action)),
+        _ => Err(crate::error::AppError::Internal(format!("app 命名空间未知操作: {}", action))),
     }
 }
 
@@ -257,8 +257,8 @@ async fn query_frontend_state(app_handle: &AppHandle, query_type: &str) -> Handl
 
     match result {
         Ok(Ok(value)) => Ok(value),
-        Ok(Err(_)) => Err("前端状态查询通道已关闭".to_string()),
-        Err(_) => Err("前端状态查询超时（3s）".to_string()),
+        Ok(Err(_)) => Err(crate::error::AppError::Internal("前端状态查询通道已关闭".to_string())),
+        Err(_) => Err(crate::error::AppError::Internal("前端状态查询超时（3s）".to_string())),
     }
 }
 
@@ -268,8 +268,8 @@ async fn handle_document(action: &str, params: &Value, state: &AppState, app_han
         "list" => {
             let project_id = params.get("projectId")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| "缺少参数 projectId".to_string())?;
-            let docs_dir = state.config.projects_dir
+                .ok_or_else(|| crate::error::AppError::Internal("缺少参数 projectId".to_string()))?;
+            let docs_dir = state.config().projects_dir
                 .join(project_id)
                 .join("documents");
             if !docs_dir.exists() {
@@ -277,7 +277,7 @@ async fn handle_document(action: &str, params: &Value, state: &AppState, app_han
             }
             let mut docs = Vec::new();
             let entries = std::fs::read_dir(&docs_dir)
-                .map_err(|e| format!("读取文档目录失败: {}", e))?;
+                .map_err(|e| crate::error::AppError::Internal(format!("读取文档目录失败: {}", e)))?;
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.extension().and_then(|e| e.to_str()) == Some("json") {
@@ -297,24 +297,24 @@ async fn handle_document(action: &str, params: &Value, state: &AppState, app_han
         "get" => {
             let project_id = params.get("projectId")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| "缺少参数 projectId".to_string())?;
+                .ok_or_else(|| crate::error::AppError::Internal("缺少参数 projectId".to_string()))?;
             let document_id = params.get("documentId")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| "缺少参数 documentId".to_string())?;
+                .ok_or_else(|| crate::error::AppError::Internal("缺少参数 documentId".to_string()))?;
             let doc_path = state.get_document_path(project_id, document_id);
             if !doc_path.exists() {
-                return Err(format!("文档不存在: {}", document_id));
+                return Err(crate::error::AppError::Internal(format!("文档不存在: {}", document_id)));
             }
             let content = std::fs::read_to_string(&doc_path)
-                .map_err(|e| format!("读取文档失败: {}", e))?;
+                .map_err(|e| crate::error::AppError::Internal(format!("读取文档失败: {}", e)))?;
             let doc: Value = serde_json::from_str(&content)
-                .map_err(|e| format!("解析文档 JSON 失败: {}", e))?;
+                .map_err(|e| crate::error::AppError::Internal(format!("解析文档 JSON 失败: {}", e)))?;
             Ok(doc)
         }
         "create" => {
             let project_id = params.get("projectId")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| "缺少参数 projectId".to_string())?;
+                .ok_or_else(|| crate::error::AppError::Internal("缺少参数 projectId".to_string()))?;
             let title = params.get("title")
                 .and_then(|v| v.as_str())
                 .unwrap_or("未命名文档");
@@ -327,9 +327,9 @@ async fn handle_document(action: &str, params: &Value, state: &AppState, app_han
                 author.to_string(),
             );
             let doc_path = state.get_document_path(project_id, &doc.id);
-            doc.save(&doc_path).map_err(|e| format!("保存文档失败: {}", e))?;
+            doc.save(&doc_path).map_err(|e| crate::error::AppError::Internal(format!("保存文档失败: {}", e)))?;
             let doc_json = serde_json::to_value(&doc)
-                .map_err(|e| format!("序列化文档失败: {}", e))?;
+                .map_err(|e| crate::error::AppError::Internal(format!("序列化文档失败: {}", e)))?;
             // 通知前端刷新文档列表
             let _ = app_handle.emit("document:external-change", json!({
                 "action": "create",
@@ -341,16 +341,16 @@ async fn handle_document(action: &str, params: &Value, state: &AppState, app_han
         "save" => {
             let project_id = params.get("projectId")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| "缺少参数 projectId".to_string())?;
+                .ok_or_else(|| crate::error::AppError::Internal("缺少参数 projectId".to_string()))?;
             let document_id = params.get("documentId")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| "缺少参数 documentId".to_string())?;
+                .ok_or_else(|| crate::error::AppError::Internal("缺少参数 documentId".to_string()))?;
             let doc_path = state.get_document_path(project_id, document_id);
             if !doc_path.exists() {
-                return Err(format!("文档不存在: {}", document_id));
+                return Err(crate::error::AppError::Internal(format!("文档不存在: {}", document_id)));
             }
             let mut doc = crate::document::Document::load(&doc_path)
-                .map_err(|e| format!("加载文档失败: {}", e))?;
+                .map_err(|e| crate::error::AppError::Internal(format!("加载文档失败: {}", e)))?;
             if let Some(title) = params.get("title").and_then(|v| v.as_str()) {
                 doc.title = title.to_string();
             }
@@ -366,9 +366,9 @@ async fn handle_document(action: &str, params: &Value, state: &AppState, app_han
                 doc.author_notes = notes.to_string();
             }
             doc.metadata.updated_at = chrono::Utc::now().timestamp();
-            doc.save(&doc_path).map_err(|e| format!("保存文档失败: {}", e))?;
+            doc.save(&doc_path).map_err(|e| crate::error::AppError::Internal(format!("保存文档失败: {}", e)))?;
             let doc_json = serde_json::to_value(&doc)
-                .map_err(|e| format!("序列化文档失败: {}", e))?;
+                .map_err(|e| crate::error::AppError::Internal(format!("序列化文档失败: {}", e)))?;
             // 通知前端刷新文档列表
             let _ = app_handle.emit("document:external-change", json!({
                 "action": "save",
@@ -377,7 +377,7 @@ async fn handle_document(action: &str, params: &Value, state: &AppState, app_han
             }));
             Ok(doc_json)
         }
-        _ => Err(format!("document 命名空间未知操作: {}", action)),
+        _ => Err(crate::error::AppError::Internal(format!("document 命名空间未知操作: {}", action))),
     }
 }
 
@@ -385,13 +385,13 @@ async fn handle_document(action: &str, params: &Value, state: &AppState, app_han
 async fn handle_project(action: &str, _params: &Value, state: &AppState) -> HandlerResult {
     match action {
         "list" => {
-            let projects_dir = &state.config.projects_dir;
+            let projects_dir = &state.config().projects_dir;
             if !projects_dir.exists() {
                 return Ok(json!([]));
             }
             let mut projects = Vec::new();
             let entries = std::fs::read_dir(projects_dir)
-                .map_err(|e| format!("读取项目目录失败: {}", e))?;
+                .map_err(|e| crate::error::AppError::Internal(format!("读取项目目录失败: {}", e)))?;
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.is_file() && path.extension().and_then(|e| e.to_str()) == Some("json") {
@@ -408,7 +408,7 @@ async fn handle_project(action: &str, _params: &Value, state: &AppState) -> Hand
             }
             Ok(Value::Array(projects))
         }
-        _ => Err(format!("project 命名空间未知操作: {}", action)),
+        _ => Err(crate::error::AppError::Internal(format!("project 命名空间未知操作: {}", action))),
     }
 }
 
@@ -418,11 +418,11 @@ async fn handle_search(action: &str, params: &Value, state: &AppState) -> Handle
         "documents" => {
             let query = params.get("query")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| "缺少参数 query".to_string())?;
+                .ok_or_else(|| crate::error::AppError::Internal("缺少参数 query".to_string()))?;
             let project_id = params.get("projectId")
                 .and_then(|v| v.as_str());
             // 简单搜索：遍历所有文档找关键词
-            let projects_dir = &state.config.projects_dir;
+            let projects_dir = &state.config().projects_dir;
             let mut results = Vec::new();
             let query_lower = query.to_lowercase();
 
@@ -431,7 +431,7 @@ async fn handle_search(action: &str, params: &Value, state: &AppState) -> Handle
                 vec![pid.to_string()]
             } else {
                 std::fs::read_dir(projects_dir)
-                    .map_err(|e| format!("读取目录失败: {}", e))?
+                    .map_err(|e| crate::error::AppError::Internal(format!("读取目录失败: {}", e)))?
                     .flatten()
                     .filter(|e| e.path().is_dir())
                     .filter_map(|e| e.file_name().into_string().ok())
@@ -473,7 +473,7 @@ async fn handle_search(action: &str, params: &Value, state: &AppState) -> Handle
             }
             Ok(json!({ "results": results, "total": results.len() }))
         }
-        _ => Err(format!("search 命名空间未知操作: {}", action)),
+        _ => Err(crate::error::AppError::Internal(format!("search 命名空间未知操作: {}", action))),
     }
 }
 
@@ -483,7 +483,7 @@ async fn handle_template(action: &str, params: &Value) -> HandlerResult {
     match action {
         "list" => {
             let templates = crate::commands::resource::list_prompt_templates()
-                .map_err(|e| format!("获取模板列表失败: {}", e))?;
+                .map_err(|e| crate::error::AppError::Internal(format!("获取模板列表失败: {}", e)))?;
             // 转换为简洁格式返回
             let list: Vec<Value> = templates.iter().map(|t| {
                 json!({
@@ -501,10 +501,10 @@ async fn handle_template(action: &str, params: &Value) -> HandlerResult {
             let template_id = params.get("templateId")
                 .or_else(|| params.get("id"))
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| "缺少参数 templateId".to_string())?;
+                .ok_or_else(|| crate::error::AppError::Internal("缺少参数 templateId".to_string()))?;
 
             let templates = crate::commands::resource::list_prompt_templates()
-                .map_err(|e| format!("获取模板列表失败: {}", e))?;
+                .map_err(|e| crate::error::AppError::Internal(format!("获取模板列表失败: {}", e)))?;
             let found = templates.iter().find(|t| t.id == template_id);
             match found {
                 Some(t) => Ok(json!({
@@ -516,10 +516,10 @@ async fn handle_template(action: &str, params: &Value) -> HandlerResult {
                     "variables": t.variables,
                     "isBuiltIn": t.is_built_in
                 })),
-                None => Err(format!("模板未找到: {}", template_id)),
+                None => Err(crate::error::AppError::Internal(format!("模板未找到: {}", template_id))),
             }
         }
-        _ => Err(format!("template 命名空间未知操作: {}", action)),
+        _ => Err(crate::error::AppError::Internal(format!("template 命名空间未知操作: {}", action))),
     }
 }
 
@@ -530,7 +530,7 @@ async fn handle_export(action: &str, params: &Value, state: &AppState) -> Handle
         "docx" => "docx",
         "pdf" => "pdf",
         "txt" => "txt",
-        _ => return Err(format!("export 命名空间未知操作: {}", action)),
+        _ => return Err(crate::error::AppError::Internal(format!("export 命名空间未知操作: {}", action))),
     };
 
     // 获取 Markdown 内容：优先使用 content 参数，其次从文档加载
@@ -543,10 +543,10 @@ async fn handle_export(action: &str, params: &Value, state: &AppState) -> Handle
     ) {
         let doc_path = state.get_document_path(project_id, doc_id);
         if !doc_path.exists() {
-            return Err(format!("文档未找到: {}", doc_id));
+            return Err(crate::error::AppError::Internal(format!("文档未找到: {}", doc_id)));
         }
         let document = crate::document::Document::load(&doc_path)
-            .map_err(|e| format!("加载文档失败: {}", e))?;
+            .map_err(|e| crate::error::AppError::Internal(format!("加载文档失败: {}", e)))?;
         // 优先使用 AI 生成内容，其次使用原始内容
         let content = if !document.ai_generated_content.is_empty() {
             document.ai_generated_content.clone()
@@ -555,19 +555,18 @@ async fn handle_export(action: &str, params: &Value, state: &AppState) -> Handle
         };
         (content, document.title.clone())
     } else {
-        return Err("export 需要 content 参数或 projectId + documentId 参数".to_string());
+        return Err(crate::error::AppError::Internal("export 需要 content 参数或 projectId + documentId 参数".to_string()));
     };
 
     // 确定输出路径
     let output_path = if let Some(path) = params.get("outputPath").and_then(|v| v.as_str()) {
         path.to_string()
     } else {
-        // 默认导出到 ~/AiDocPlus/exports/
-        let home = dirs::home_dir().ok_or("无法获取用户目录")?;
-        let export_dir = home.join("AiDocPlus").join("exports");
+        // 默认导出到 <data_root>/exports/
+        let export_dir = crate::config::current_data_root().join("exports");
         std::fs::create_dir_all(&export_dir)
-            .map_err(|e| format!("创建导出目录失败: {}", e))?;
-        let safe_title = title.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
+            .map_err(|e| crate::error::AppError::Internal(format!("创建导出目录失败: {}", e)))?;
+        let safe_title = crate::security::sanitize_filename(&title);
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -576,11 +575,11 @@ async fn handle_export(action: &str, params: &Value, state: &AppState) -> Handle
             .to_string_lossy().to_string()
     };
 
-    // 安全检查：输出路径必须在 ~/AiDocPlus/ 或临时目录下
+    // 安全检查：输出路径必须在 <data_root> 或临时目录下
     // 规范化路径以防止 ../ 遍历攻击
-    let home = dirs::home_dir().ok_or("无法获取用户目录")?;
-    let allowed_root = home.join("AiDocPlus").canonicalize()
-        .unwrap_or_else(|_| home.join("AiDocPlus"));
+    let data_root = crate::config::current_data_root();
+    let allowed_root = data_root.canonicalize()
+        .unwrap_or_else(|_| data_root);
     let temp_root = std::env::temp_dir().canonicalize()
         .unwrap_or_else(|_| std::env::temp_dir());
     let out = std::path::PathBuf::from(&output_path);
@@ -598,11 +597,11 @@ async fn handle_export(action: &str, params: &Value, state: &AppState) -> Handle
         out.clone()
     };
     if !out_resolved.starts_with(&allowed_root) && !out_resolved.starts_with(&temp_root) {
-        return Err("安全限制：导出路径须在 ~/AiDocPlus/ 或临时目录下".to_string());
+        return Err(crate::error::AppError::Internal("安全限制：导出路径须在 ~/AiDocPlus/ 或临时目录下".to_string()));
     }
 
     let result = crate::native_export::export_native(&markdown, &title, &output_path, format)
-        .map_err(|e| format!("导出失败: {}", e))?;
+        .map_err(|e| crate::error::AppError::Internal(format!("导出失败: {}", e)))?;
 
     Ok(json!({
         "outputPath": result,
@@ -651,7 +650,7 @@ async fn handle_plugin(action: &str, params: &Value) -> HandlerResult {
         "storage.get" => {
             let plugin_id = params.get("pluginId")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| "缺少参数 pluginId".to_string())?;
+                .ok_or_else(|| crate::error::AppError::Internal("缺少参数 pluginId".to_string()))?;
             let key = params.get("key").and_then(|v| v.as_str());
 
             let storage_path = dirs::home_dir()
@@ -664,9 +663,9 @@ async fn handle_plugin(action: &str, params: &Value) -> HandlerResult {
             }
 
             let content = std::fs::read_to_string(&storage_path)
-                .map_err(|e| format!("读取插件存储失败: {}", e))?;
+                .map_err(|e| crate::error::AppError::Internal(format!("读取插件存储失败: {}", e)))?;
             let storage: Value = serde_json::from_str(&content)
-                .map_err(|e| format!("解析插件存储失败: {}", e))?;
+                .map_err(|e| crate::error::AppError::Internal(format!("解析插件存储失败: {}", e)))?;
 
             // plugin-storage.json 结构: { "pluginId": { "key": value, ... }, ... }
             let plugin_data = storage.get(plugin_id).cloned().unwrap_or(json!(null));
@@ -679,10 +678,10 @@ async fn handle_plugin(action: &str, params: &Value) -> HandlerResult {
         "storage.set" => {
             let plugin_id = params.get("pluginId")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| "缺少参数 pluginId".to_string())?;
+                .ok_or_else(|| crate::error::AppError::Internal("缺少参数 pluginId".to_string()))?;
             let key = params.get("key")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| "缺少参数 key".to_string())?;
+                .ok_or_else(|| crate::error::AppError::Internal("缺少参数 key".to_string()))?;
             let value = params.get("value").cloned().unwrap_or(json!(null));
 
             let storage_path = dirs::home_dir()
@@ -692,7 +691,7 @@ async fn handle_plugin(action: &str, params: &Value) -> HandlerResult {
 
             let mut storage: Value = if storage_path.exists() {
                 let content = std::fs::read_to_string(&storage_path)
-                    .map_err(|e| format!("读取插件存储失败: {}", e))?;
+                    .map_err(|e| crate::error::AppError::Internal(format!("读取插件存储失败: {}", e)))?;
                 serde_json::from_str(&content).unwrap_or(json!({}))
             } else {
                 json!({})
@@ -706,15 +705,15 @@ async fn handle_plugin(action: &str, params: &Value) -> HandlerResult {
 
             if let Some(parent) = storage_path.parent() {
                 std::fs::create_dir_all(parent)
-                    .map_err(|e| format!("创建目录失败: {}", e))?;
+                    .map_err(|e| crate::error::AppError::Internal(format!("创建目录失败: {}", e)))?;
             }
             let json_str = serde_json::to_string_pretty(&storage)
-                .map_err(|e| format!("序列化失败: {}", e))?;
+                .map_err(|e| crate::error::AppError::Internal(format!("序列化失败: {}", e)))?;
             crate::config::atomic_write(&storage_path, &json_str)?;
 
             Ok(json!({ "success": true }))
         }
-        _ => Err(format!("plugin 命名空间未知操作: {}", action)),
+        _ => Err(crate::error::AppError::Internal(format!("plugin 命名空间未知操作: {}", action))),
     }
 }
 
@@ -723,7 +722,7 @@ async fn handle_email(action: &str, _params: &Value) -> HandlerResult {
         "send" | "testConnection" => {
             Ok(json!({ "note": format!("email.{} 将在后续阶段实现", action) }))
         }
-        _ => Err(format!("email 命名空间未知操作: {}", action)),
+        _ => Err(crate::error::AppError::Internal(format!("email 命名空间未知操作: {}", action))),
     }
 }
 
@@ -732,29 +731,37 @@ async fn handle_ai(action: &str, params: &Value, app_handle: &AppHandle) -> Hand
         "chat" | "generate" => {
             // 从前端获取 AI 配置
             let ai_config = query_frontend_state(app_handle, "getAiConfig").await
-                .map_err(|e| format!("获取 AI 配置失败: {}", e))?;
+                .map_err(|e| crate::error::AppError::Internal(format!("获取 AI 配置失败: {}", e)))?;
 
             let provider = ai_config.get("provider").and_then(|v| v.as_str()).unwrap_or("openai");
-            let api_key = ai_config.get("apiKey").and_then(|v| v.as_str());
+            let raw_api_key = ai_config.get("apiKey").and_then(|v| v.as_str());
+            let service_id = ai_config.get("serviceId").and_then(|v| v.as_str());
             let model = ai_config.get("model").and_then(|v| v.as_str());
             let base_url = ai_config.get("baseUrl").and_then(|v| v.as_str());
 
-            if api_key.is_none() || api_key == Some("") {
-                return Err("未配置 AI API Key，请在设置中配置 AI 服务".to_string());
+            // API Key 优先级：前端传入 → keyring → 报错
+            let api_key: Option<String> = match raw_api_key {
+                Some(k) if !k.is_empty() && k != "__KEYRING__" => Some(k.to_string()),
+                _ => service_id.and_then(crate::commands::credential::get_ai_key_from_keyring),
+            };
+
+            if api_key.is_none() {
+                return Err(crate::error::AppError::Internal("未配置 AI API Key，请在设置中配置 AI 服务".to_string()));
             }
+            let api_key = api_key.as_deref();
 
             // 构建 Chat Completions 请求
             let mut messages = if action == "generate" {
                 let prompt = params.get("prompt").and_then(|v| v.as_str()).unwrap_or("");
                 if prompt.is_empty() {
-                    return Err("generate 需要 prompt 参数".to_string());
+                    return Err(crate::error::AppError::Internal("generate 需要 prompt 参数".to_string()));
                 }
                 vec![json!({"role": "user", "content": prompt})]
             } else {
                 // chat: 需要 messages 数组
                 match params.get("messages").and_then(|v| v.as_array()) {
                     Some(msgs) => msgs.clone(),
-                    None => return Err("chat 需要 messages 参数（数组）".to_string()),
+                    None => return Err(crate::error::AppError::Internal("chat 需要 messages 参数（数组）".to_string())),
                 }
             };
 
@@ -767,36 +774,13 @@ async fn handle_ai(action: &str, params: &Value, app_handle: &AppHandle) -> Hand
                 }
             }
 
-            let default_model = match provider {
-                "openai" => "gpt-4.1",
-                "anthropic" => "claude-sonnet-4-20250514",
-                "gemini" => "gemini-2.5-flash-preview-05-20",
-                "xai" => "grok-3-mini",
-                "deepseek" => "deepseek-chat",
-                "qwen" => "qwen-plus",
-                "glm" | "glm-code" => "glm-4-flash",
-                "minimax" | "minimax-code" => "MiniMax-Text-01",
-                "kimi" => "moonshot-v1-auto",
-                "kimi-code" => "kimi-latest",
-                _ => "gpt-4.1",
-            };
+            let prov_defaults = crate::ai::get_provider_defaults(provider);
+            let default_model = prov_defaults.default_model;
 
-            // 根据 provider 使用推荐的默认 temperature
-            let default_temp = match provider {
-                "glm" | "glm-code" => 1.0,
-                "minimax" | "minimax-code" => 1.0,
-                _ => 0.7,
-            };
             let temperature = params.get("temperature")
                 .and_then(|v| v.as_f64())
-                .unwrap_or(default_temp);
-            // 根据 provider 使用推荐的默认 max_tokens
-            let default_max_tokens: u64 = match provider {
-                "glm" | "glm-code" => 8192,
-                "minimax" | "minimax-code" => 8192,
-                "anthropic" => 8192,
-                _ => 4096,
-            };
+                .unwrap_or(prov_defaults.default_temperature);
+            let default_max_tokens: u64 = prov_defaults.default_max_tokens as u64;
             let max_tokens_val = params.get("max_tokens")
                 .or_else(|| params.get("maxTokens"))
                 .and_then(|v| v.as_u64())
@@ -810,12 +794,11 @@ async fn handle_ai(action: &str, params: &Value, app_handle: &AppHandle) -> Hand
                 .unwrap_or_else(|_| reqwest::Client::new());
 
             // Anthropic Messages API 格式与 OpenAI 不同，需要单独处理
-            let is_anthropic = provider == "anthropic";
+            let is_anthropic = prov_defaults.auth_style == crate::ai::AuthStyle::ApiKeyHeader;
 
             let (response_body, is_anthropic_resp) = if is_anthropic {
-                let default_base = "https://api.anthropic.com";
-                let base = base_url.unwrap_or(default_base);
-                let url = format!("{}/v1/messages", base.trim_end_matches('/'));
+                let base = base_url.unwrap_or(prov_defaults.base_url);
+                let url = format!("{}/messages", base.trim_end_matches('/'));
 
                 // Anthropic: system 是顶层字段，不在 messages 中
                 let mut api_messages = Vec::new();
@@ -843,40 +826,29 @@ async fn handle_ai(action: &str, params: &Value, app_handle: &AppHandle) -> Hand
                     body["system"] = json!(system_text);
                 }
 
-                let resp = client.post(&url)
+                let mut req_b = client.post(&url)
                     .header("Content-Type", "application/json")
-                    .header("x-api-key", api_key.unwrap_or(""))
                     .header("anthropic-version", "2023-06-01")
-                    .json(&body)
+                    .json(&body);
+                if let Some(k) = api_key { req_b = req_b.header("x-api-key", k); }
+                let resp = req_b
                     .timeout(std::time::Duration::from_secs(120))
                     .send()
                     .await
-                    .map_err(|e| format!("Anthropic 服务连接失败: {}", e))?;
+                    .map_err(|e| crate::error::AppError::Internal(format!("Anthropic 服务连接失败: {}", e)))?;
 
                 if !resp.status().is_success() {
                     let status = resp.status();
                     let error_text = resp.text().await.unwrap_or_else(|_| "未知错误".to_string());
-                    return Err(format!("Anthropic API 错误 ({}): {}", status, error_text));
+                    return Err(crate::error::AppError::Internal(format!("Anthropic API 错误 ({}): {}", status, error_text)));
                 }
 
                 let b: Value = resp.json().await
-                    .map_err(|e| format!("解析 Anthropic 响应失败: {}", e))?;
+                    .map_err(|e| crate::error::AppError::Internal(format!("解析 Anthropic 响应失败: {}", e)))?;
                 (b, true)
             } else {
                 // OpenAI 兼容格式（含 DeepSeek/Qwen/GLM/MiniMax/Kimi/xAI/Gemini 等）
-                let default_base = match provider {
-                    "openai" => "https://api.openai.com/v1",
-                    "gemini" => "https://generativelanguage.googleapis.com/v1beta/openai",
-                    "xai" => "https://api.x.ai/v1",
-                    "deepseek" => "https://api.deepseek.com",
-                    "qwen" => "https://dashscope.aliyuncs.com/compatible-mode/v1",
-                    "glm" | "glm-code" => "https://open.bigmodel.cn/api/paas/v4",
-                    "minimax" | "minimax-code" => "https://api.minimaxi.com/v1",
-                    "kimi" => "https://api.moonshot.cn/v1",
-                    "kimi-code" => "https://api.kimi.com/coding/v1",
-                    _ => "https://api.openai.com/v1",
-                };
-                let base = base_url.unwrap_or(default_base);
+                let base = base_url.unwrap_or(prov_defaults.base_url);
                 let url = format!("{}/chat/completions", base.trim_end_matches('/'));
 
                 let mut body = json!({
@@ -887,23 +859,24 @@ async fn handle_ai(action: &str, params: &Value, app_handle: &AppHandle) -> Hand
                 });
                 body["max_tokens"] = json!(max_tokens_val.unwrap_or(default_max_tokens));
 
-                let resp = client.post(&url)
+                let mut req_b = client.post(&url)
                     .header("Content-Type", "application/json")
-                    .header("Authorization", format!("Bearer {}", api_key.unwrap_or("")))
-                    .json(&body)
+                    .json(&body);
+                if let Some(k) = api_key { req_b = req_b.header("Authorization", format!("Bearer {}", k)); }
+                let resp = req_b
                     .timeout(std::time::Duration::from_secs(120))
                     .send()
                     .await
-                    .map_err(|e| format!("AI 服务连接失败: {}", e))?;
+                    .map_err(|e| crate::error::AppError::Internal(format!("AI 服务连接失败: {}", e)))?;
 
                 if !resp.status().is_success() {
                     let status = resp.status();
                     let error_text = resp.text().await.unwrap_or_else(|_| "未知错误".to_string());
-                    return Err(format!("AI API 错误 ({}): {}", status, error_text));
+                    return Err(crate::error::AppError::Internal(format!("AI API 错误 ({}): {}", status, error_text)));
                 }
 
                 let b: Value = resp.json().await
-                    .map_err(|e| format!("解析 AI 响应失败: {}", e))?;
+                    .map_err(|e| crate::error::AppError::Internal(format!("解析 AI 响应失败: {}", e)))?;
                 (b, false)
             };
 
@@ -940,17 +913,17 @@ async fn handle_ai(action: &str, params: &Value, app_handle: &AppHandle) -> Hand
         }
         "chatStream" => {
             // 流式暂不通过 API Gateway 支持（HTTP 不适合 SSE 转发）
-            Err("ai.chatStream 暂不支持通过 API 调用，请使用 ai.chat 代替".to_string())
+            Err(crate::error::AppError::Internal("ai.chatStream 暂不支持通过 API 调用，请使用 ai.chat 代替".to_string()))
         }
-        _ => Err(format!("ai 命名空间未知操作: {}", action)),
+        _ => Err(crate::error::AppError::Internal(format!("ai 命名空间未知操作: {}", action))),
     }
 }
 
 async fn handle_file(action: &str, params: &Value) -> HandlerResult {
-    // 安全检查：只允许访问 ~/AiDocPlus/ 下的文件
-    let validate_path = |p: &str| -> Result<std::path::PathBuf, String> {
-        let home = dirs::home_dir().ok_or("无法获取用户目录")?;
-        let allowed_root = home.join("AiDocPlus");
+    // 安全检查：只允许访问 <data_root> 下的文件
+    let validate_path = |p: &str| -> Result<std::path::PathBuf, crate::error::AppError> {
+        let home = dirs::home_dir().ok_or_else(|| crate::error::AppError::Internal("无法获取用户目录".to_string()))?;
+        let allowed_root = crate::config::current_data_root();
         let resolved = if p.starts_with('~') {
             home.join(p.strip_prefix("~/").unwrap_or(p))
         } else {
@@ -965,9 +938,9 @@ async fn handle_file(action: &str, params: &Value) -> HandlerResult {
                     Err(std::io::Error::new(std::io::ErrorKind::NotFound, "路径无效"))
                 }
             })
-            .map_err(|e| format!("路径无效: {}", e))?;
+            .map_err(|e| crate::error::AppError::Internal(format!("路径无效: {}", e)))?;
         if !canonical.starts_with(&allowed_root) {
-            return Err(format!("安全限制：只允许访问 ~/AiDocPlus/ 下的文件，当前路径: {}", p));
+            return Err(crate::error::AppError::Internal(format!("安全限制：只允许访问 ~/AiDocPlus/ 下的文件，当前路径: {}", p)));
         }
         Ok(canonical)
     };
@@ -975,32 +948,32 @@ async fn handle_file(action: &str, params: &Value) -> HandlerResult {
     match action {
         "read" => {
             let path_str = params.get("path").and_then(|v| v.as_str())
-                .ok_or("read 需要 path 参数")?;
+                .ok_or_else(|| crate::error::AppError::Internal("read 需要 path 参数".to_string()))?;
             let path = validate_path(path_str)?;
             let content = std::fs::read_to_string(&path)
-                .map_err(|e| format!("读取文件失败: {}", e))?;
+                .map_err(|e| crate::error::AppError::Internal(format!("读取文件失败: {}", e)))?;
             Ok(json!({ "content": content, "path": path.to_string_lossy() }))
         }
         "write" => {
             let path_str = params.get("path").and_then(|v| v.as_str())
-                .ok_or("write 需要 path 参数")?;
+                .ok_or_else(|| crate::error::AppError::Internal("write 需要 path 参数".to_string()))?;
             let content = params.get("content").and_then(|v| v.as_str())
-                .ok_or("write 需要 content 参数")?;
+                .ok_or_else(|| crate::error::AppError::Internal("write 需要 content 参数".to_string()))?;
             let path = validate_path(path_str)?;
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent)
-                    .map_err(|e| format!("创建目录失败: {}", e))?;
+                    .map_err(|e| crate::error::AppError::Internal(format!("创建目录失败: {}", e)))?;
             }
             std::fs::write(&path, content)
-                .map_err(|e| format!("写入文件失败: {}", e))?;
+                .map_err(|e| crate::error::AppError::Internal(format!("写入文件失败: {}", e)))?;
             Ok(json!({ "success": true, "path": path.to_string_lossy() }))
         }
         "metadata" => {
             let path_str = params.get("path").and_then(|v| v.as_str())
-                .ok_or("metadata 需要 path 参数")?;
+                .ok_or_else(|| crate::error::AppError::Internal("metadata 需要 path 参数".to_string()))?;
             let path = validate_path(path_str)?;
             let meta = std::fs::metadata(&path)
-                .map_err(|e| format!("获取元数据失败: {}", e))?;
+                .map_err(|e| crate::error::AppError::Internal(format!("获取元数据失败: {}", e)))?;
             Ok(json!({
                 "path": path.to_string_lossy(),
                 "size": meta.len(),
@@ -1011,7 +984,7 @@ async fn handle_file(action: &str, params: &Value) -> HandlerResult {
                 })
             }))
         }
-        _ => Err(format!("file 命名空间未知操作: {}", action)),
+        _ => Err(crate::error::AppError::Internal(format!("file 命名空间未知操作: {}", action))),
     }
 }
 
@@ -1020,21 +993,20 @@ async fn handle_tts(action: &str, _params: &Value) -> HandlerResult {
         "speak" | "stop" | "listVoices" => {
             Ok(json!({ "note": format!("tts.{} 将在后续阶段实现", action) }))
         }
-        _ => Err(format!("tts 命名空间未知操作: {}", action)),
+        _ => Err(crate::error::AppError::Internal(format!("tts 命名空间未知操作: {}", action))),
     }
 }
 
 async fn handle_script(action: &str, _params: &Value) -> HandlerResult {
     match action {
         "listFiles" => {
-            let home = dirs::home_dir().ok_or("无法获取用户目录")?;
-            let dir = home.join("AiDocPlus").join("CodingScripts");
+            let dir = crate::config::current_data_root().join("CodingScripts");
             if !dir.exists() {
                 return Ok(json!({ "files": [] }));
             }
             let mut files = Vec::new();
             let entries = std::fs::read_dir(&dir)
-                .map_err(|e| format!("读取脚本目录失败: {}", e))?;
+                .map_err(|e| crate::error::AppError::Internal(format!("读取脚本目录失败: {}", e)))?;
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.is_file() {
@@ -1053,9 +1025,9 @@ async fn handle_script(action: &str, _params: &Value) -> HandlerResult {
         }
         "run" | "kill" => {
             // 脚本运行/终止需要通过前端 CodingPanel 触发，API 暂不直接支持
-            Err(format!("script.{} 暂不支持通过 API 直接调用，请在编程区中操作", action))
+            Err(crate::error::AppError::Internal(format!("script.{} 暂不支持通过 API 直接调用，请在编程区中操作", action)))
         }
-        _ => Err(format!("script 命名空间未知操作: {}", action)),
+        _ => Err(crate::error::AppError::Internal(format!("script 命名空间未知操作: {}", action))),
     }
 }
 

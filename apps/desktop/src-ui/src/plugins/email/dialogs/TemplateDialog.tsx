@@ -10,6 +10,7 @@ import {
   Search, Plus, Trash2, Pencil, Copy, Download, Upload,
   FileText, Lock, Archive,
 } from 'lucide-react';
+import { formatBackendError } from '@/lib/backendError';
 import { useEmailContext } from '../EmailContext';
 import { getPresetVariables, getPresetSnippets, replaceVariables, getCurrentDateString } from '../utils';
 import type { EmailStorageData, SubmissionTemplate, TextSnippet, VariableDef } from '../types';
@@ -334,7 +335,7 @@ export function TemplateDialog({ open, onOpenChange, onApplyTemplate, onInsertSn
       await host.platform.invoke('write_text_file', { path: savePath, content: JSON.stringify(data, null, 2) });
       showStatus(t('tplExported', { count: templates.length, snippetCount: userSnippets.length }));
     } catch (err) {
-      showStatus(String(err), true);
+      showStatus(formatBackendError(err), true);
     }
   }, [templates, userSnippets, host, showStatus, t]);
 
@@ -362,7 +363,7 @@ export function TemplateDialog({ open, onOpenChange, onApplyTemplate, onInsertSn
       }
       showStatus(t('tplImported', { tplCount: newTpls.length, snpCount: newSnps.length }));
     } catch (err) {
-      showStatus(t('tplImportFailed') + ': ' + (err instanceof Error ? err.message : String(err)), true);
+      showStatus(t('tplImportFailed') + ': ' + formatBackendError(err), true);
     }
   }, [templates, userSnippets, host, saveToStorage, showStatus, t]);
 

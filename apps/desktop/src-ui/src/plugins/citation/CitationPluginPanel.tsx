@@ -6,6 +6,7 @@ import { buildCitationSystemPrompt, buildCitationUserPrompt, parseCitationsFromA
 import { truncateContent } from '../_framework/pluginUtils';
 import { Button } from '../_framework/ui';
 import { usePluginHost } from '../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import { BookOpen, Download, AlertTriangle, CheckCircle, Trash2, Pencil, Check, X } from 'lucide-react';
 import { PluginPanelLayout } from '../_framework/PluginPanelLayout';
 
@@ -120,7 +121,7 @@ export function CitationPluginPanel({ document, content, pluginData, onPluginDat
       onRequestSave?.();
     } catch (err) {
       if (abortRef.current) return;
-      showStatus(`提取失败：${err instanceof Error ? err.message : String(err)}`, true);
+      showStatus(`提取失败：${formatBackendError(err)}`, true);
     } finally {
       setGenerating(false);
     }
@@ -178,7 +179,7 @@ export function CitationPluginPanel({ document, content, pluginData, onPluginDat
       await host.platform.invoke('write_binary_file', { path: filePath, data });
       showStatus(`已导出 BibTeX: ${filePath}`);
     } catch (error) {
-      showStatus(`导出失败: ${error instanceof Error ? error.message : String(error)}`, true);
+      showStatus(`导出失败: ${formatBackendError(error)}`, true);
     }
   };
 
@@ -197,7 +198,7 @@ export function CitationPluginPanel({ document, content, pluginData, onPluginDat
       await host.platform.invoke('write_binary_file', { path: filePath, data });
       showStatus(`已导出: ${filePath}`);
     } catch (error) {
-      showStatus(`导出失败: ${error instanceof Error ? error.message : String(error)}`, true);
+      showStatus(`导出失败: ${formatBackendError(error)}`, true);
     }
   };
 

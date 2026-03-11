@@ -1,5 +1,6 @@
 import React, { useMemo, useEffect, useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { useTranslation } from '@/i18n';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -8,6 +9,22 @@ import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
 import mermaid from 'mermaid';
 import 'katex/dist/katex.min.css';
+
+// 大文档预览截断阈值（字符数），超过此值只渲染前半部分
+const PREVIEW_TRUNCATE_THRESHOLD = 80_000;
+// Mermaid SVG 缓存：避免每次 content 变化时重新渲染未变更的图表
+const mermaidCache = new Map<string, string>();
+
+// 简单哈希函数，用于 Mermaid 缓存键
+function simpleHash(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + ch;
+    hash |= 0;
+  }
+  return hash.toString(36);
+}
 
 // 模块级常量：避免每次渲染创建新数组引用
 const REMARK_PLUGINS = [remarkGfm, remarkMath] as const;
@@ -33,6 +50,7 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = React.memo(({
   fontFamily,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation();
 
   // 初始化 Mermaid
   useEffect(() => {
@@ -48,7 +66,7 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = React.memo(({
     });
   }, [theme]);
 
-  // 渲染 Mermaid 图表
+  // 渲染 Mermaid 图表（带缓存）
   const renderMermaid = useCallback(async () => {
     const el = containerRef.current;
     if (!el) return;
@@ -57,16 +75,29 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = React.memo(({
       const pre = block.parentElement;
       if (!pre || pre.getAttribute('data-mermaid-rendered') === 'true') continue;
       const code = block.textContent || '';
+      const cacheKey = simpleHash(code);
+
+      // 优先使用缓存
+      const cached = mermaidCache.get(cacheKey);
+      if (cached) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'mermaid-diagram';
+        wrapper.innerHTML = cached;
+        pre.replaceWith(wrapper);
+        continue;
+      }
+
       const id = `mermaid-${Math.random().toString(36).slice(2, 9)}`;
       try {
         const { svg } = await mermaid.render(id, code);
+        mermaidCache.set(cacheKey, svg);
         const wrapper = document.createElement('div');
         wrapper.className = 'mermaid-diagram';
         wrapper.innerHTML = svg;
         pre.replaceWith(wrapper);
       } catch (e) {
         console.warn('[MarkdownPreview] Mermaid render failed:', e);
-        // 兜底清理 mermaid 可能残留在 body 中的临时渲染元素
+        // 兆底清理 mermaid 可能残留在 body 中的临时渲染元素
         document.getElementById(id)?.remove();
         document.getElementById(`d${id}`)?.remove();
         pre.setAttribute('data-mermaid-rendered', 'true');
@@ -112,8 +143,15 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = React.memo(({
         remarkPlugins={REMARK_PLUGINS as any}
         rehypePlugins={REHYPE_PLUGINS as any}
       >
-        {content}
+        {content.length > PREVIEW_TRUNCATE_THRESHOLD
+          ? content.slice(0, PREVIEW_TRUNCATE_THRESHOLD)
+          : content}
       </ReactMarkdown>
+      {content.length > PREVIEW_TRUNCATE_THRESHOLD && (
+        <div className="text-center py-4 text-muted-foreground text-sm border-t mt-4">
+          {t('editor.previewTruncated', { defaultValue: '文档较长（{{size}}K 字符），预览已截断以保证性能', size: Math.round(content.length / 1000) })}
+        </div>
+      )}
     </div>
   );
 });

@@ -26,7 +26,8 @@ pub async fn wechat_http_request(
     file_path: Option<String>,
     file_name: Option<String>,
     extra_form: Option<HashMap<String, String>>,
-) -> Result<serde_json::Value, String> {
+) -> crate::error::Result<serde_json::Value> {
+    use crate::error::AppError;
     let client = reqwest::Client::builder()
         .connect_timeout(std::time::Duration::from_secs(15))
         .timeout(std::time::Duration::from_secs(60))
@@ -52,7 +53,7 @@ pub async fn wechat_http_request(
         let fp = file_path.as_deref().unwrap();
         let path = PathBuf::from(fp);
         if !path.exists() {
-            return Err(format!("文件不存在: {}", fp));
+            return Err(AppError::ValidationError(format!("文件不存在: {}", fp)));
         }
 
         let fname = file_name
@@ -66,14 +67,14 @@ pub async fn wechat_http_request(
 
         let file_bytes = tokio::fs::read(&path)
             .await
-            .map_err(|e| format!("读取文件失败: {}", e))?;
+            .map_err(|e| AppError::Internal(format!("读取文件失败: {}", e)))?;
 
         let mime = guess_mime(&fname);
 
         let part = reqwest::multipart::Part::bytes(file_bytes)
             .file_name(fname)
             .mime_str(mime)
-            .map_err(|e| format!("构建上传数据失败: {}", e))?;
+            .map_err(|e| AppError::Internal(format!("构建上传数据失败: {}", e)))?;
 
         let field_name = file_field.unwrap_or_else(|| "media".to_string());
         let mut form = reqwest::multipart::Form::new().part(field_name, part);
@@ -94,20 +95,20 @@ pub async fn wechat_http_request(
     let resp = builder
         .send()
         .await
-        .map_err(|e| format!("请求失败: {}", e))?;
+        .map_err(|e| AppError::ExternalToolError(format!("请求失败: {}", e)))?;
 
     let status = resp.status().as_u16();
     let body: serde_json::Value = resp
         .json()
         .await
-        .map_err(|e| format!("解析响应失败: {}", e))?;
+        .map_err(|e| AppError::Internal(format!("解析响应失败: {}", e)))?;
 
     if status >= 400 {
-        return Err(format!(
+        return Err(AppError::ExternalToolError(format!(
             "HTTP {} : {}",
             status,
             serde_json::to_string(&body).unwrap_or_default()
-        ));
+        )));
     }
 
     Ok(body)

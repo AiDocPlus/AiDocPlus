@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import type { PluginPanelProps } from '../types';
 import { usePluginHost } from '../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import { ToolPluginLayout } from '../_framework/ToolPluginLayout';
 import { Button, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../_framework/ui';
 import { Droplets, Download, Trash2, Eye } from 'lucide-react';
@@ -112,7 +113,7 @@ for (let y = 0; y < window.innerHeight + 500; y += ${gap}) {
       await host.platform.invoke('write_binary_file', { path: filePath, data: Array.from(bytes) });
       showStatus(t('exportSuccess'));
     } catch (err) {
-      showStatus(`${t('exportFailed')}: ${err instanceof Error ? err.message : String(err)}`, true);
+      showStatus(`${t('exportFailed')}: ${formatBackendError(err)}`, true);
     }
   }, [getContent, document.title, host.ui, host.platform, t, showStatus, generateWatermarkHtml]);
 

@@ -1,4 +1,5 @@
 import type { QuizConfig } from './types';
+import { formatBackendError } from '@/lib/backendError';
 
 /**
  * 构造 AI 生成测试题的 system prompt
@@ -124,7 +125,7 @@ export function parseQuizFromAiResponse(text: string): Array<{
         explanation: String(q.explanation || ''),
       }));
     } catch (e) {
-      console.warn('[Quiz] 解析候选失败:', e instanceof Error ? e.message : e);
+      console.warn('[Quiz] 解析候选失败:', formatBackendError(e));
     }
   }
 

@@ -7,6 +7,8 @@ import { listen } from '@tauri-apps/api/event';
 import { useSettingsStore, getAIInvokeParamsForService } from './useSettingsStore';
 import { isTauri } from '@/lib/isTauri';
 import i18n from '@/i18n';
+import { formatBackendError } from '@/lib/backendError';
+import { truncateMessages } from '@/lib/tokenEstimator';
 
 // Workspace 保存防抖（300ms，高频操作如连续关闭标签只触发一次保存）
 let _workspaceSaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -29,13 +31,14 @@ function releaseUnreferencedDocContents(
   const referencedDocIds = new Set(remainingTabs.map(t => t.documentId));
   return documents.map(doc => {
     if (referencedDocIds.has(doc.id)) return doc;
-    // 文档未被任何标签引用，释放大字段
+    // 文档未被任何标签引用，释放大字段并清除内容已加载标志
     return {
       ...doc,
       content: '',
       aiGeneratedContent: '',
       authorNotes: '',
       composedContent: '',
+      _contentLoaded: false,
     };
   });
 }
@@ -134,7 +137,7 @@ interface AppState {
   setGeneratingContent: (generating: boolean) => void;
   setAiStreaming: (streaming: boolean, tabId?: string) => void;
   stopAiStreaming: () => void;
-  sendChatMessage: (tabId: string, content: string, enableWebSearch?: boolean, contextInfo?: { mode: ChatContextMode; content: string }, enableTools?: boolean, options?: { enableThinking?: boolean; planMode?: boolean }) => Promise<string>;
+  sendChatMessage: (tabId: string, content: string, enableWebSearch?: boolean, contextInfo?: { mode: ChatContextMode; content: string }, enableTools?: boolean, options?: { enableThinking?: boolean; planMode?: boolean; images?: import('@aidocplus/shared-types').ChatImage[] }) => Promise<string>;
   generateContent: (authorNotes: string, currentContent: string) => Promise<string>;
   generateContentStream: (authorNotes: string, currentContent: string, onChunk: (chunk: string) => void, conversationHistory?: AIMessage[], enableWebSearch?: boolean) => Promise<string>;
 
@@ -209,7 +212,7 @@ interface AppState {
   closeTab: (tabId: string, saveBeforeClose?: boolean) => Promise<void>;
   closeOtherTabs: (keepTabId: string) => Promise<void>;
   closeAllTabs: () => Promise<void>;
-  switchTab: (tabId: string) => void;
+  switchTab: (tabId: string) => void | Promise<void>;
   moveTab: (fromIndex: number, toIndex: number) => void;
   setTabPanelState: (tabId: string, panel: TabPanelKey, value: boolean | number | string) => void;
   checkUnsavedChanges: (tabId: string) => boolean;
@@ -318,7 +321,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       console.log(`[Perf] list_documents 并行 (${projects.length}个项目, ${allDocs.length}篇文档): ${(performance.now() - t1).toFixed(0)}ms`);
       set({ documents: allDocs });
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to load projects' });
+      set({ error: formatBackendError(error) });
     } finally {
       set({ isLoading: false });
     }
@@ -334,8 +337,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set((state) => ({ projects: [...state.projects, project] }));
       return project;
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Failed to create project';
-      set({ error: errorMsg });
+      set({ error: formatBackendError(error) });
       throw error;
     } finally {
       set({ isLoading: false });
@@ -357,8 +359,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
     } catch (error) {
       console.error('Failed to open project:', error);
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      set({ error: `Failed to open project: ${errorMsg}` });
+      set({ error: formatBackendError(error) });
     } finally {
       set({ isLoading: false });
     }
@@ -373,7 +374,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         currentProject: state.currentProject?.id === updated.id ? updated : state.currentProject
       }));
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to save project' });
+      set({ error: formatBackendError(error) });
     } finally {
       set({ isLoading: false });
     }
@@ -388,7 +389,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         currentProject: state.currentProject?.id === updated.id ? updated : state.currentProject
       }));
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to rename project' });
+      set({ error: formatBackendError(error) });
     } finally {
       set({ isLoading: false });
     }
@@ -403,7 +404,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         currentProject: state.currentProject?.id === projectId ? null : state.currentProject
       }));
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to delete project' });
+      set({ error: formatBackendError(error) });
     } finally {
       set({ isLoading: false });
     }
@@ -416,7 +417,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const documents = await invoke<Document[]>('list_documents', { projectId });
       set({ documents });
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to load documents' });
+      set({ error: formatBackendError(error) });
     } finally {
       set({ isLoading: false });
     }
@@ -430,14 +431,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         title,
         author
       });
+      document._contentLoaded = true;
       set((state) => ({
         documents: [...state.documents, document],
         currentDocument: document
       }));
       return document;
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Failed to create document';
-      set({ error: errorMsg });
+      set({ error: formatBackendError(error) });
       throw error;
     } finally {
       set({ isLoading: false });
@@ -460,12 +461,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         composedContent: document.composedContent || undefined,
         aiServiceId: document.aiServiceId || undefined
       });
+      updated._contentLoaded = true;
       set((state) => ({
         documents: state.documents.map(d => d.id === updated.id ? updated : d),
         currentDocument: state.currentDocument?.id === updated.id ? updated : state.currentDocument
       }));
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to save document' });
+      set({ error: formatBackendError(error) });
     } finally {
       set({ isLoading: false });
     }
@@ -486,7 +488,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         await closeTab(tab.id, false);
       }
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to delete document' });
+      set({ error: formatBackendError(error) });
     } finally {
       set({ isLoading: false });
     }
@@ -500,6 +502,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         documentId,
         newTitle
       });
+      updated._contentLoaded = true;
       set((state) => ({
         documents: state.documents.map(d => d.id === updated.id ? updated : d),
         currentDocument: state.currentDocument?.id === updated.id ? updated : state.currentDocument,
@@ -508,7 +511,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         ),
       }));
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to rename document' });
+      set({ error: formatBackendError(error) });
       throw error;
     } finally {
       set({ isLoading: false });
@@ -521,7 +524,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const result = await invoke<string>('export_project_zip', { projectId, outputPath });
       return result;
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : i18n.t('store.exportProjectFailed') });
+      set({ error: formatBackendError(error) });
       throw error;
     }
   },
@@ -536,7 +539,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ projects, isLoading: false });
       return project;
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : i18n.t('store.importProjectFailed'), isLoading: false });
+      set({ error: formatBackendError(error), isLoading: false });
       throw error;
     }
   },
@@ -563,7 +566,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
       return movedDoc;
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : i18n.t('store.moveDocFailed'), isLoading: false });
+      set({ error: formatBackendError(error), isLoading: false });
       throw error;
     }
   },
@@ -582,7 +585,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
       return newDoc;
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : i18n.t('store.copyDocFailed'), isLoading: false });
+      set({ error: formatBackendError(error), isLoading: false });
       throw error;
     }
   },
@@ -597,7 +600,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
       return versions;
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to load versions' });
+      set({ error: formatBackendError(error) });
       return [];
     } finally {
       set({ isLoading: false });
@@ -625,6 +628,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         projectId,
         documentId
       });
+      document._contentLoaded = true;
       set((state) => ({
         documents: state.documents.map(d => d.id === document.id ? document : d),
         currentDocument: state.currentDocument?.id === document.id ? document : state.currentDocument
@@ -632,7 +636,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       return versionId;
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to create version' });
+      set({ error: formatBackendError(error) });
       throw error;
     } finally {
       set({ isLoading: false });
@@ -649,6 +653,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         versionId,
         createBackup
       });
+      restored._contentLoaded = true;
 
       set((state) => ({
         documents: state.documents.map(d => d.id === restored.id ? restored : d),
@@ -660,7 +665,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       return restored;
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to restore version' });
+      set({ error: formatBackendError(error) });
       throw error;
     } finally {
       set({ isLoading: false });
@@ -689,6 +694,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   updateDocumentTags: async (projectId, documentId, tags) => {
     try {
       const updated = await invoke<Document>('update_document_tags', { projectId, documentId, tags });
+      updated._contentLoaded = true;
       set((state) => ({
         documents: state.documents.map(d => d.id === updated.id ? updated : d),
         currentDocument: state.currentDocument?.id === updated.id ? updated : state.currentDocument
@@ -720,6 +726,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   toggleDocumentStarred: async (projectId, documentId) => {
     try {
       const updated = await invoke<Document>('toggle_document_starred', { projectId, documentId });
+      updated._contentLoaded = true;
       set((state) => ({
         documents: state.documents.map(d => d.id === updated.id ? updated : d),
         currentDocument: state.currentDocument?.id === updated.id ? updated : state.currentDocument
@@ -847,7 +854,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       const userMessage: AIMessage = {
         role: 'user',
         content,
-        timestamp: Date.now() / 1000
+        timestamp: Date.now() / 1000,
+        images: options?.images,
       };
       get().addAiMessage(tabId, userMessage);
 
@@ -856,7 +864,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const aiSettings = useSettingsStore.getState().ai;
 
       // 构建消息列表，包含可选的 用户prompt + markdownMode 格式约束
-      const messages: { role: string; content: string }[] = [];
+      const messages: { role: string; content: string; images?: { data: string; mimeType: string }[] }[] = [];
       const userSystemPrompt = aiSettings.systemPrompt?.trim() || '';
       const mdPrompt = aiSettings.markdownMode ? getMarkdownModePrompt() : '';
       const planPrompt = options?.planMode ? '\n\n【计划模式】\n- 将任务分解为清晰的编号步骤（1. 2. 3. ...）\n- 每步说明目标和预期结果\n- 给出整体思路和建议\n- 不要直接给最终内容，先给出规划' : '';
@@ -879,10 +887,28 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       messages.push(...tabMessages.map((m: AIMessage) => ({
         role: m.role,
-        content: m.content
+        content: m.content,
+        ...(m.images && m.images.length > 0 ? { images: m.images } : {}),
       })));
 
       const assistantContextMode = contextInfo?.mode && contextInfo.mode !== 'none' ? contextInfo.mode : undefined;
+
+      // 获取文档级 AI 服务绑定（提前获取以便截断时使用 model/provider 信息）
+      const chatTab = get().tabs.find(t => t.id === tabId);
+      const chatDoc = chatTab ? get().documents.find(d => d.id === chatTab.documentId) : null;
+      const aiParams = getAIInvokeParamsForService(chatDoc?.aiServiceId);
+
+      // 滑动窗口截断：根据模型上下文窗口自动裁剪消息
+      const truncation = truncateMessages(messages, {
+        model: aiParams.model,
+        provider: aiParams.provider,
+        maxContextTokens: aiSettings.maxContextTokens || 0,
+        maxContextMessages: aiSettings.maxContextMessages || 0,
+      });
+      const finalMessages = truncation.messages;
+      if (truncation.truncatedCount > 0) {
+        console.log(`[Context] 截断 ${truncation.truncatedCount} 条消息，使用 ${truncation.usedTokens}/${truncation.contextWindow} tokens`);
+      }
 
       // 添加一条占位 assistant 消息，后续流式更新
       const placeholderMessage: AIMessage = {
@@ -916,12 +942,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       }));
 
-      // 获取文档级 AI 服务绑定
-      const chatTab = get().tabs.find(t => t.id === tabId);
-      const chatDoc = chatTab ? get().documents.find(d => d.id === chatTab.documentId) : null;
-      const aiParams = getAIInvokeParamsForService(chatDoc?.aiServiceId);
       await invoke<string>('chat_stream', {
-        messages,
+        messages: finalMessages,
         ...aiParams,
         enableWebSearch: enableWebSearch || undefined,
         enableThinking: (options?.enableThinking ?? aiSettings.enableThinking) || undefined,
@@ -941,8 +963,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       // 如果是被用户主动停止的，不抛错
       const streamState = get().streamStateByTab[tabId];
       if (streamState?.aborted) return '';
-      const errorMsg = error instanceof Error ? error.message : 'Failed to send message';
-      set({ error: errorMsg });
+      set({ error: formatBackendError(error) });
       throw error;
     } finally {
       if (unlisten) {
@@ -979,8 +1000,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       return generated;
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Failed to generate content';
-      set({ error: errorMsg });
+      set({ error: formatBackendError(error) });
       throw error;
     } finally {
       set({ isAiStreaming: false, aiStreamingTabId: null });
@@ -1081,7 +1101,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ isAiStreaming: false, aiStreamingTabId: null });
       return '';
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to generate content', isAiStreaming: false, aiStreamingTabId: null });
+      set({ error: formatBackendError(error), isAiStreaming: false, aiStreamingTabId: null });
       throw error;
     } finally {
       // 无论成功、失败还是中断，都确保清理监听器
@@ -1225,6 +1245,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const document = await invoke<Document>('create_document_from_doc_template', {
         projectId, templateId, title, author,
       });
+      document._contentLoaded = true;
       // 重新加载文档列表
       const documents = await invoke<Document[]>('list_documents', { projectId });
       set({ documents, isLoading: false });
@@ -1572,7 +1593,23 @@ export const useAppStore = create<AppState>((set, get) => ({
 
             // 设置活动标签
             const activeTabId = state.activeTabId || restoredTabs[0]?.id || null;
-            const activeDocument = allDocuments.find(d => d.id === restoredTabs.find(t => t.id === activeTabId)?.documentId) || null;
+            let activeDocument = allDocuments.find(d => d.id === restoredTabs.find(t => t.id === activeTabId)?.documentId) || null;
+
+            // 按需加载活动文档的完整内容
+            if (activeDocument && !activeDocument._contentLoaded && activeDocument.projectId) {
+              try {
+                const freshDoc = await invoke<Document>('get_document', {
+                  projectId: activeDocument.projectId,
+                  documentId: activeDocument.id,
+                });
+                freshDoc._contentLoaded = true;
+                const idx = allDocuments.findIndex(d => d.id === freshDoc.id);
+                if (idx >= 0) allDocuments[idx] = freshDoc;
+                activeDocument = freshDoc;
+              } catch (e) {
+                console.warn('[Workspace] Failed to load active document content:', e);
+              }
+            }
 
             set({
               tabs: restoredTabs.map(t => ({
@@ -1580,14 +1617,30 @@ export const useAppStore = create<AppState>((set, get) => ({
                 isActive: t.id === activeTabId
               })),
               activeTabId,
-              currentDocument: activeDocument
+              currentDocument: activeDocument,
+              documents: [...allDocuments],
             });
 
           } else if (state.currentDocumentId) {
             const allDocuments = get().documents;
-            const currentDoc = allDocuments.find(d => d.id === state.currentDocumentId);
+            let currentDoc = allDocuments.find(d => d.id === state.currentDocumentId) || null;
 
             if (currentDoc) {
+              // 按需加载完整内容
+              if (!currentDoc._contentLoaded && currentDoc.projectId) {
+                try {
+                  const freshDoc = await invoke<Document>('get_document', {
+                    projectId: currentDoc.projectId,
+                    documentId: currentDoc.id,
+                  });
+                  freshDoc._contentLoaded = true;
+                  const updatedDocs = allDocuments.map(d => d.id === freshDoc.id ? freshDoc : d);
+                  set({ documents: updatedDocs });
+                  currentDoc = freshDoc;
+                } catch (e) {
+                  console.warn('[Workspace] Failed to load current document content:', e);
+                }
+              }
 
               // 创建单个标签
               const newTab: EditorTab = {
@@ -1661,13 +1714,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
 
-    // 如果文档内容已被释放（关闭标签后清空），从后端重新加载
-    if (!document.content && !document.aiGeneratedContent && document.projectId) {
+    // 如果文档内容未加载（列表模式 / 关闭标签后释放），从后端按需加载完整内容
+    if (!document._contentLoaded && document.projectId) {
       try {
         const freshDoc = await invoke<Document>('get_document', {
           projectId: document.projectId,
           documentId: document.id,
         });
+        freshDoc._contentLoaded = true;
         // 更新 documents 列表中的文档
         const updatedDocs = documents.map(d => d.id === freshDoc.id ? freshDoc : d);
         set({ documents: updatedDocs });
@@ -1821,7 +1875,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     scheduleWorkspaceSave(get().saveWorkspaceState);
   },
 
-  switchTab: (tabId) => {
+  switchTab: async (tabId) => {
     const { tabs, documents, activeTabId } = get();
 
     // 已经是活动标签则不操作
@@ -1834,9 +1888,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
 
-    const document = documents.find(d => d.id === tab.documentId);
+    let document = documents.find(d => d.id === tab.documentId) || null;
 
-    // 更新标签活动状态（仅修改实际变化的 tab，复用其他引用）
+    // 先切换标签（立即响应 UI）
     set((state) => ({
       tabs: state.tabs.map(t => {
         if (t.id === tabId) return t.isActive ? t : { ...t, isActive: true };
@@ -1844,8 +1898,25 @@ export const useAppStore = create<AppState>((set, get) => ({
         return t;
       }),
       activeTabId: tabId,
-      currentDocument: document || null
+      currentDocument: document
     }));
+
+    // 按需加载文档完整内容
+    if (document && !document._contentLoaded && document.projectId) {
+      try {
+        const freshDoc = await invoke<Document>('get_document', {
+          projectId: document.projectId,
+          documentId: document.id,
+        });
+        freshDoc._contentLoaded = true;
+        set((state) => ({
+          documents: state.documents.map(d => d.id === freshDoc.id ? freshDoc : d),
+          currentDocument: state.currentDocument?.id === freshDoc.id ? freshDoc : state.currentDocument
+        }));
+      } catch (e) {
+        console.warn('[Tabs] Failed to load document content on switch:', e);
+      }
+    }
 
     scheduleWorkspaceSave(get().saveWorkspaceState);
   },

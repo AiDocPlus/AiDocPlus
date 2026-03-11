@@ -50,6 +50,32 @@ pub fn search_documents(
     project_id: String,
     options: SearchOptions,
 ) -> Result<Vec<SearchResult>> {
+    // FTS5 快速路径：简单文本搜索（非正则、非全词匹配、搜索内容）
+    if options.search_content && !options.use_regex && !options.match_whole_word && !options.match_case {
+        if let Ok(fts_results) = crate::search_store::fts_search(
+            &state.db,
+            &project_id,
+            &options.query,
+            options.limit.unwrap_or(100),
+        ) {
+            if !fts_results.is_empty() {
+                return Ok(fts_results.into_iter().map(|r| SearchResult {
+                    document_id: r.document_id,
+                    project_id: r.project_id,
+                    title: r.title,
+                    matches: vec![SearchMatch {
+                        match_type: SearchMatchType::Content,
+                        line: None,
+                        column: None,
+                        context: r.snippet.clone(),
+                        preview: r.snippet,
+                    }],
+                }).collect());
+            }
+        }
+        // FTS5 无结果或失败时，回退到文件遍历
+    }
+
     let query = if options.match_case {
         options.query.clone()
     } else {
@@ -64,13 +90,13 @@ pub fn search_documents(
                 .size_limit(REGEX_SIZE_LIMIT)
                 .dfa_size_limit(REGEX_DFA_SIZE_LIMIT)
                 .build()
-                .map_err(|e| format!("正则表达式无效: {}", e))?
+                .map_err(|e| crate::error::AppError::ValidationError(format!("正则表达式无效: {}", e)))?
         )
     } else {
         None
     };
 
-    let project_dir = state.config.projects_dir.join(&project_id);
+    let project_dir = state.config().projects_dir.join(&project_id);
     let docs_dir = project_dir.join("documents");
 
     if !docs_dir.exists() {
@@ -80,14 +106,14 @@ pub fn search_documents(
     let mut results = Vec::new();
     let limit = options.limit.unwrap_or(100);
 
-    let entries = std::fs::read_dir(&docs_dir).map_err(|e| e.to_string())?;
+    let entries = std::fs::read_dir(&docs_dir).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
 
     for entry in entries {
         if results.len() >= limit {
             break;
         }
 
-        let entry = entry.map_err(|e| e.to_string())?;
+        let entry = entry.map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
         let path = entry.path();
 
         if path.extension().and_then(|s| s.to_str()) == Some("json") {
@@ -275,7 +301,7 @@ pub fn get_search_suggestions(
     prefix: String,
     limit: Option<usize>,
 ) -> Result<Vec<String>> {
-    let project_dir = state.config.projects_dir.join(&project_id);
+    let project_dir = state.config().projects_dir.join(&project_id);
     let docs_dir = project_dir.join("documents");
 
     if !docs_dir.exists() || prefix.is_empty() {
@@ -286,14 +312,14 @@ pub fn get_search_suggestions(
     let limit = limit.unwrap_or(10);
     let prefix_lower = prefix.to_lowercase();
 
-    let entries = std::fs::read_dir(&docs_dir).map_err(|e| e.to_string())?;
+    let entries = std::fs::read_dir(&docs_dir).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
 
     for entry in entries {
         if suggestions.len() >= limit {
             break;
         }
 
-        let entry = entry.map_err(|e| e.to_string())?;
+        let entry = entry.map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
         let path = entry.path();
 
         if path.extension().and_then(|s| s.to_str()) == Some("json") {

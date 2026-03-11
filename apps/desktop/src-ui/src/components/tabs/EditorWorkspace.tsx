@@ -1,12 +1,14 @@
-import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, memo, lazy, Suspense } from 'react';
 import type { EditorTab, Attachment, Document } from '@aidocplus/shared-types';
 import { EditorPanel } from '../editor/EditorPanel';
-import { ChatPanel } from '../chat/ChatPanel';
 import { useAppStore } from '@/stores/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { ResizableHandle } from '../ui/resizable-handle';
 import type { DocumentPlugin } from '@/plugins/types';
-import { PluginAssistantPanel } from '@/plugins/_framework/PluginAssistantPanel';
+
+// 延迟加载聊天面板和插件助手面板（仅在右侧面板打开时需要）
+const ChatPanel = lazy(() => import('../chat/ChatPanel').then(m => ({ default: m.ChatPanel })));
+const PluginAssistantPanel = lazy(() => import('@/plugins/_framework/PluginAssistantPanel').then(m => ({ default: m.PluginAssistantPanel })));
 import { PluginHostContext, ThinkingContext, createPluginHostAPI, type CreatePluginHostAPIOptions } from '@/plugins/_framework/PluginHostAPI';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { logRender } from '@/lib/perfLog';
@@ -195,22 +197,24 @@ export const EditorWorkspace = memo(function EditorWorkspace({ tab }: EditorWork
           className="flex-shrink-0 overflow-hidden h-full flex flex-col"
           style={{ width: tabChatPanelWidth }}
         >
-          {showPluginAssistant ? (
-            <PluginAssistantWrapper
-              key={`plugin-assistant-${activePlugin!.id}`}
-              plugin={activePlugin!}
-              document={currentDoc!}
-              tabId={tab.id}
-              aiContent={aiContent}
-            />
-          ) : (
-            <ChatPanel
-              key={`chat-${tab.id}-${activeView}`}
-              tabId={activeView === 'editor' ? tab.id : `${tab.id}::${activeView}`}
-              onClose={() => handlePanelToggle('chatOpen', false)}
-              simpleMode={activeView === 'composer'}
-            />
-          )}
+          <Suspense fallback={<div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">加载中...</div>}>
+            {showPluginAssistant ? (
+              <PluginAssistantWrapper
+                key={`plugin-assistant-${activePlugin!.id}`}
+                plugin={activePlugin!}
+                document={currentDoc!}
+                tabId={tab.id}
+                aiContent={aiContent}
+              />
+            ) : (
+              <ChatPanel
+                key={`chat-${tab.id}-${activeView}`}
+                tabId={activeView === 'editor' ? tab.id : `${tab.id}::${activeView}`}
+                onClose={() => handlePanelToggle('chatOpen', false)}
+                simpleMode={activeView === 'composer'}
+              />
+            )}
+          </Suspense>
         </div>
       )}
     </div>

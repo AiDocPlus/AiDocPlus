@@ -11,7 +11,7 @@ pub fn save_workspace(
     tabs: Vec<WorkspaceTabState>,
     active_tab_id: Option<String>,
     ui_state: UIState,
-) -> Result<(), String> {
+) -> crate::error::Result<()> {
     let workspace_state = WorkspaceState {
         current_project_id,
         open_document_ids,
@@ -28,13 +28,13 @@ pub fn save_workspace(
 }
 
 #[tauri::command]
-pub fn load_workspace(handle: AppHandle) -> Result<Option<WorkspaceState>, String> {
+pub fn load_workspace(handle: AppHandle) -> crate::error::Result<Option<WorkspaceState>> {
     let path = get_workspace_state_path(&handle);
     load_workspace_state(&path)
 }
 
 #[tauri::command]
-pub fn clear_workspace(handle: AppHandle) -> Result<(), String> {
+pub fn clear_workspace(handle: AppHandle) -> crate::error::Result<()> {
     let path = get_workspace_state_path(&handle);
     clear_workspace_state(&path)
 }

@@ -381,8 +381,7 @@ fn execute_create_document(arguments: &str) -> String {
 }
 
 fn execute_list_projects() -> String {
-    let home = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
-    let projects_dir = home.join("AiDocPlus").join("Projects");
+    let projects_dir = crate::config::current_data_root().join("Projects");
 
     if !projects_dir.exists() {
         return json!({ "projects": [], "total": 0 }).to_string();

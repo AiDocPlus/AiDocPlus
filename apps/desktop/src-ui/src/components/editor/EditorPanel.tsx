@@ -2,11 +2,11 @@ import { useAppStore } from '@/stores/useAppStore';
 import { Save, SaveAll, FileText, PenLine, Columns, Rows, History, MessageSquare, FilePlus, Search, X, XCircle, Square, Copy, Minus, LayoutTemplate, ChevronDown, Terminal } from 'lucide-react';
 import { Button } from '../ui/button';
 import { PluginMenu, FunctionalPluginMenu } from '@/plugins/PluginMenu';
-import { PluginToolArea } from '@/plugins/PluginToolArea';
 import { MarkdownEditor } from './MarkdownEditor';
 import { useState, useEffect, useRef, useCallback, memo, lazy, Suspense } from 'react';
 
 // 延迟加载非默认可见的重型面板，减少首屏 JS 包大小
+const PluginToolArea = lazy(() => import('@/plugins/PluginToolArea').then(m => ({ default: m.PluginToolArea })));
 const ComposerPanel = lazy(() => import('./ComposerPanel').then(m => ({ default: m.ComposerPanel })));
 const VersionHistoryPanel = lazy(() => import('../version/VersionHistoryPanel').then(m => ({ default: m.VersionHistoryPanel })));
 const CodingPanel = lazy(() => import('../coding/CodingPanel').then(m => ({ default: m.CodingPanel })));
@@ -15,6 +15,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { message, save } from '@tauri-apps/plugin-dialog';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useTranslation } from '@/i18n';
+import { formatBackendError } from '@/lib/backendError';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -268,9 +269,10 @@ export const EditorPanel = memo(function EditorPanel({
       });
 
       if (format === 'pdf' && command === 'export_document_native') {
-        await message(t('editor.exportPdfHint', { defaultValue: '已在浏览器中打开公文格式文档，请使用浏览器的“打印”功能，选择“另存为 PDF”即可导出。\n\n文件位置: {{path}}', path: result }), {
-          title: t('editor.exportPdfTitle', { defaultValue: '导出为 PDF' }),
-          kind: 'info'
+        // 在应用内打开 PDF 预览窗口
+        await invoke('open_pdf_preview', {
+          htmlPath: result,
+          title: `PDF 预览 - ${document.title}`,
         });
       } else {
         await message(t('editor.exportSuccessMsg', { defaultValue: '导出成功: {{path}}', path: result }), {
@@ -281,20 +283,7 @@ export const EditorPanel = memo(function EditorPanel({
     } catch (error) {
       console.error('Export error:', error);
 
-      let errorMessage = 'Unknown error';
-      if (error) {
-        if (typeof error === 'string') {
-          errorMessage = error;
-        } else if (error instanceof Error) {
-          errorMessage = error.message;
-        } else if (error && typeof error === 'object' && 'message' in error) {
-          errorMessage = String((error as any).message);
-        } else {
-          errorMessage = JSON.stringify(error);
-        }
-      }
-
-      await message(t('editor.exportFailedMsg', { defaultValue: '导出失败: {{error}}', error: errorMessage }), {
+      await message(t('editor.exportFailedMsg', { defaultValue: '导出失败: {{error}}', error: formatBackendError(error) }), {
         title: t('editor.exportErrorTitle', { defaultValue: '导出错误' }),
         kind: 'error'
       });
@@ -318,10 +307,7 @@ export const EditorPanel = memo(function EditorPanel({
       });
     } catch (error) {
       console.error('Export and open error:', error);
-      let errorMessage = 'Unknown error';
-      if (typeof error === 'string') errorMessage = error;
-      else if (error instanceof Error) errorMessage = error.message;
-      await message(t('editor.exportOpenFailed', { defaultValue: '导出并打开失败: {{error}}', error: errorMessage }), { title: t('editor.exportErrorTitle', { defaultValue: '导出错误' }), kind: 'error' });
+      await message(t('editor.exportOpenFailed', { defaultValue: '导出并打开失败: {{error}}', error: formatBackendError(error) }), { title: t('editor.exportErrorTitle', { defaultValue: '导出错误' }), kind: 'error' });
     }
   };
 

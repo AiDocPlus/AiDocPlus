@@ -1,6 +1,7 @@
 import type { PluginHostAPI } from '../../_framework/PluginHostAPI';
 import type { ProxyConfig, WechatApiProvider, DraftParams } from '../wechatApiProvider';
 import { wechatHttpRequest, checkWxError } from '../wechatApiProvider';
+import { formatBackendError } from '@/lib/backendError';
 
 function apiHeaders(config: ProxyConfig): Record<string, string> {
   const h: Record<string, string> = {};
@@ -99,7 +100,7 @@ export function createProxyProvider(host: PluginHostAPI, config: ProxyConfig): W
         const result = await this.getAccessToken();
         return { ok: true, msg: `代理连接成功，token 有效期 ${Math.floor(result.expiresIn / 60)} 分钟` };
       } catch (err) {
-        return { ok: false, msg: err instanceof Error ? err.message : String(err) };
+        return { ok: false, msg: formatBackendError(err) };
       }
     },
   };

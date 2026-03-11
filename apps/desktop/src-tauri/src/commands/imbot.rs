@@ -96,7 +96,8 @@ fn find_npx() -> String {
 pub async fn start_imbot(
     _app: AppHandle,
     state: tauri::State<'_, ImBotState>,
-) -> Result<ImBotStatus, String> {
+) -> crate::error::Result<ImBotStatus> {
+    use crate::error::AppError;
     // 检查是否已在运行
     {
         let guard = state.child.lock().await;
@@ -110,7 +111,7 @@ pub async fn start_imbot(
     }
 
     let imbot_dir = find_imbot_dir()
-        .ok_or("找不到 IM Bot 目录。请确认 apps/im-bot 目录存在。")?;
+        .ok_or_else(|| AppError::Internal("找不到 IM Bot 目录。请确认 apps/im-bot 目录存在。".to_string()))?;
 
     let npx = find_npx();
 
@@ -145,9 +146,9 @@ pub async fn start_imbot(
     let _ = std::fs::create_dir_all(&log_dir);
     let log_path = log_dir.join("imbot.log");
     let stdout_file = std::fs::File::create(&log_path)
-        .map_err(|e| format!("创建 IM Bot 日志文件失败: {}", e))?;
+        .map_err(|e| AppError::Internal(format!("创建 IM Bot 日志文件失败: {}", e)))?;
     let stderr_file = stdout_file.try_clone()
-        .map_err(|e| format!("克隆日志文件句柄失败: {}", e))?;
+        .map_err(|e| AppError::Internal(format!("克隆日志文件句柄失败: {}", e)))?;
     cmd.stdout(std::process::Stdio::from(stdout_file));
     cmd.stderr(std::process::Stdio::from(stderr_file));
     println!("[IM Bot] 日志文件: {:?}", log_path);
@@ -161,7 +162,7 @@ pub async fn start_imbot(
 
     let child = cmd
         .spawn()
-        .map_err(|e| format!("启动 IM Bot 失败: {}", e))?;
+        .map_err(|e| AppError::ExternalToolError(format!("启动 IM Bot 失败: {}", e)))?;
 
     println!("[IM Bot] ✅ 子进程已启动, PID={:?}", child.id());
 
@@ -177,10 +178,10 @@ pub async fn start_imbot(
 #[tauri::command]
 pub async fn stop_imbot(
     state: tauri::State<'_, ImBotState>,
-) -> Result<ImBotStatus, String> {
+) -> crate::error::Result<ImBotStatus> {
     let mut guard = state.child.lock().await;
     if let Some(ref mut child) = *guard {
-        child.kill().await.map_err(|e| format!("停止 IM Bot 失败: {}", e))?;
+        child.kill().await.map_err(|e| crate::error::AppError::Internal(format!("停止 IM Bot 失败: {}", e)))?;
         println!("[IM Bot] 子进程已停止");
         *guard = None;
     }
@@ -191,7 +192,7 @@ pub async fn stop_imbot(
 #[tauri::command]
 pub async fn get_imbot_status(
     state: tauri::State<'_, ImBotState>,
-) -> Result<ImBotStatus, String> {
+) -> crate::error::Result<ImBotStatus> {
     let mut guard = state.child.lock().await;
     if let Some(ref mut child) = *guard {
         // 使用 try_wait 检测进程是否还在运行

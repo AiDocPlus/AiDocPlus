@@ -4,6 +4,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { usePluginHost, useThinkingContent } from '../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import { useSettingsStore, getAIInvokeParamsForService } from '@/stores/useSettingsStore';
 import { getProviderConfig, getActiveService } from '@aidocplus/shared-types';
 import type { PluginAssistantPanelProps } from '../types';
@@ -215,7 +216,7 @@ export function MermaidAssistantPanel({ aiContent }: PluginAssistantPanelProps) 
       }
     } catch (err) {
       if (!abort.signal.aborted) {
-        appendMessage({ id: genMsgId(), role: 'assistant', content: `❌ ${err instanceof Error ? err.message : String(err)}`, timestamp: Date.now(), isError: true });
+        appendMessage({ id: genMsgId(), role: 'assistant', content: `❌ ${formatBackendError(err)}`, timestamp: Date.now(), isError: true });
       }
     } finally { setStreaming(false); setStreamingContent(''); abortRef.current = null; }
   }, [streaming, aiAvailable, customPrompt, getMermaidData, aiContent, host, selectedServiceId, enableWebSearch, enableThinking, providerCaps, appendMessage, getLatestMessages, contextMode, activeSessionId]);

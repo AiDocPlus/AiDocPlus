@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { PluginPanelProps } from '../types';
 import { usePluginHost } from '../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import {
   Button, Input, Label,
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -193,7 +194,7 @@ export function WechatPublishPanel({ document, content, pluginData, onPluginData
     try {
       await getAccessToken();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = formatBackendError(err);
       appendLog(t('wxConnectFailed', { error: msg }), 'error');
     } finally {
       setConnecting(false);
@@ -310,7 +311,7 @@ ctx.fillText('标题文字', 60, 180);`,
 
       appendLog(t('wxThumbGenerated', { path: filePath }), 'success');
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = formatBackendError(err);
       appendLog(t('wxThumbGenerateFailed', { error: msg }), 'error');
     } finally {
       setGeneratingThumb(false);
@@ -395,12 +396,11 @@ ctx.fillText('标题文字', 60, 180);`,
             finalContent = finalContent.replace(src, imgResp.url);
             appendLog(t('wxImageUploaded', { index: i + 1, total: imagesToUpload.length }), 'info');
           } catch (imgErr) {
-            const imgMsg = imgErr instanceof Error ? imgErr.message : String(imgErr);
+            const imgMsg = formatBackendError(imgErr);
             appendLog(t('wxImageUploadFailed', { index: i + 1, error: imgMsg }), 'error');
           }
         }
       }
-
       // 自动摘要
       const finalDigest = digest || extractDigest(finalContent.replace(/<[^>]*>/g, ''));
 
@@ -433,7 +433,7 @@ ctx.fillText('标题文字', 60, 180);`,
       const history = [historyEntry, ...publishHistory].slice(0, 50);
       saveGlobal({ publishHistory: history });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = formatBackendError(err);
       appendLog(t('wxPublishFailed', { error: msg }), 'error');
       // 记录失败历史
       const historyEntry: WechatPublishHistoryEntry = {

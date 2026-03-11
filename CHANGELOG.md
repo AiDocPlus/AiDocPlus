@@ -2,6 +2,22 @@
 
 所有重要变更记录在此文件中。
 
+## [0.3.6] — 2026-03-11
+
+### 新增
+- **多模态 AI 聊天** — 支持在聊天中上传/粘贴图片（最多 5 张，单张最大 10MB），AI 可分析图片内容
+  - 自动适配 OpenAI Vision（image_url 格式）和 Anthropic（base64 source 格式）
+  - 输入框旁图片上传按钮 + Ctrl+V 粘贴图片
+  - 图片预览条（缩略图 + 删除按钮）
+  - 消息气泡中显示图片缩略图，点击可查看原图
+- **文档大纲增强** — 章节字数统计、当前标题高亮、面包屑导航
+- **编辑器性能优化** — 大文档检测、防抖优化、Mermaid 缓存、预览截断
+
+### 改进
+- 全链路多模态支持：chat / chat_stream / Responses API / Anthropic API 均已适配
+- Rust 后端 `ChatMessage` 新增可选 `images` 字段，向后兼容
+- 新增 i18n 翻译键（中英文）：uploadImage、removeImage、imagePreview、addMoreImages、imageAttachment
+
 ## [0.3.0] — 2026-02-26
 
 ### 新增

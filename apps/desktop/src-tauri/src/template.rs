@@ -139,8 +139,7 @@ struct CustomDocTemplateEntry {
 
 /// 用户自定义文档模板目录
 pub fn get_doc_templates_dir() -> PathBuf {
-    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-    home.join("AiDocPlus").join("DocTemplates")
+    crate::config::current_data_root().join("DocTemplates")
 }
 
 /// 确保文档模板目录存在
@@ -208,10 +207,11 @@ fn read_custom_templates() -> CustomDocTemplatesFile {
     CustomDocTemplatesFile { templates: Vec::new() }
 }
 
-fn write_custom_templates(file: &CustomDocTemplatesFile) -> Result<(), String> {
+fn write_custom_templates(file: &CustomDocTemplatesFile) -> crate::error::Result<()> {
+    use crate::error::AppError;
     ensure_doc_templates_dir();
     let json = serde_json::to_string_pretty(file)
-        .map_err(|e| format!("Failed to serialize custom templates: {}", e))?;
+        .map_err(|e| AppError::ResourceError(format!("Failed to serialize custom templates: {}", e)))?;
     crate::config::atomic_write(&custom_templates_path(), &json)?;
     Ok(())
 }
@@ -275,7 +275,7 @@ pub fn list_doc_templates() -> Vec<DocTemplateManifest> {
 }
 
 /// 读取指定文档模板的内容
-pub fn get_doc_template_content(template_id: &str) -> Result<DocTemplateContent, String> {
+pub fn get_doc_template_content(template_id: &str) -> crate::error::Result<DocTemplateContent> {
     // 1. 先在内置模板中查找
     for cat_file in load_bundled_category_files() {
         if let Some(tmpl) = cat_file.templates.iter().find(|t| t.id == template_id) {
@@ -299,7 +299,7 @@ pub fn get_doc_template_content(template_id: &str) -> Result<DocTemplateContent,
         });
     }
 
-    Err(format!("Doc template content not found: {}", template_id))
+    Err(crate::error::AppError::ResourceError(format!("Doc template content not found: {}", template_id)))
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -307,7 +307,7 @@ pub fn get_doc_template_content(template_id: &str) -> Result<DocTemplateContent,
 // ═══════════════════════════════════════════════════════════════
 
 /// 创建文档模板（保存到 custom.json）
-pub fn create_doc_template(manifest: DocTemplateManifest, content: DocTemplateContent) -> Result<DocTemplateManifest, String> {
+pub fn create_doc_template(manifest: DocTemplateManifest, content: DocTemplateContent) -> crate::error::Result<DocTemplateManifest> {
     let mut custom = read_custom_templates();
     let now = chrono::Utc::now().timestamp();
 
@@ -349,10 +349,10 @@ pub fn update_doc_template(
     icon: Option<String>,
     tags: Option<Vec<String>>,
     content: Option<DocTemplateContent>,
-) -> Result<DocTemplateManifest, String> {
+) -> crate::error::Result<DocTemplateManifest> {
     let mut custom = read_custom_templates();
     let entry = custom.templates.iter_mut().find(|t| t.id == template_id)
-        .ok_or_else(|| format!("自定义模板未找到: {}", template_id))?;
+        .ok_or_else(|| crate::error::AppError::ResourceError(format!("自定义模板未找到: {}", template_id)))?;
 
     if let Some(n) = name { entry.name = n; }
     if let Some(d) = description { entry.description = d; }
@@ -390,26 +390,26 @@ pub fn update_doc_template(
 }
 
 /// 删除文档模板（仅自定义模板）
-pub fn delete_doc_template(template_id: &str) -> Result<(), String> {
+pub fn delete_doc_template(template_id: &str) -> crate::error::Result<()> {
     let mut custom = read_custom_templates();
     let before = custom.templates.len();
     custom.templates.retain(|t| t.id != template_id);
     if custom.templates.len() == before {
-        return Err(format!("自定义模板未找到: {}", template_id));
+        return Err(crate::error::AppError::ResourceError(format!("自定义模板未找到: {}", template_id)));
     }
     write_custom_templates(&custom)?;
     Ok(())
 }
 
 /// 复制文档模板（内置或自定义 → 新的自定义模板）
-pub fn duplicate_doc_template(template_id: &str, new_name: &str) -> Result<DocTemplateManifest, String> {
+pub fn duplicate_doc_template(template_id: &str, new_name: &str) -> crate::error::Result<DocTemplateManifest> {
     // 读取源模板内容
     let source_content = get_doc_template_content(template_id)?;
 
     // 读取源 manifest 信息
     let all = list_doc_templates();
     let source = all.iter().find(|t| t.id == template_id)
-        .ok_or_else(|| format!("模板未找到: {}", template_id))?;
+        .ok_or_else(|| crate::error::AppError::ResourceError(format!("模板未找到: {}", template_id)))?;
 
     let new_id = uuid::Uuid::new_v4().to_string();
     let new_manifest = DocTemplateManifest {
@@ -500,19 +500,20 @@ pub fn list_doc_template_categories() -> Vec<DocTemplateCategory> {
     cats
 }
 
-fn save_categories(cats: &[DocTemplateCategory]) -> Result<(), String> {
+fn save_categories(cats: &[DocTemplateCategory]) -> crate::error::Result<()> {
+    use crate::error::AppError;
     let json = serde_json::to_string_pretty(cats)
-        .map_err(|e| format!("Failed to serialize categories: {}", e))?;
+        .map_err(|e| AppError::ResourceError(format!("Failed to serialize categories: {}", e)))?;
     ensure_doc_templates_dir();
     crate::config::atomic_write(&categories_path(), &json)?;
     Ok(())
 }
 
 /// 创建文档模板分类
-pub fn create_doc_template_category(key: &str, label: &str) -> Result<Vec<DocTemplateCategory>, String> {
+pub fn create_doc_template_category(key: &str, label: &str) -> crate::error::Result<Vec<DocTemplateCategory>> {
     let mut cats = list_doc_template_categories();
     if cats.iter().any(|c| c.key == key) {
-        return Err(format!("Category key already exists: {}", key));
+        return Err(crate::error::AppError::ValidationError(format!("Category key already exists: {}", key)));
     }
     let max_order = cats.iter().map(|c| c.order).max().unwrap_or(-1);
     cats.push(DocTemplateCategory {
@@ -526,19 +527,19 @@ pub fn create_doc_template_category(key: &str, label: &str) -> Result<Vec<DocTem
 }
 
 /// 更新文档模板分类
-pub fn update_doc_template_category(key: &str, label: Option<String>, new_key: Option<String>) -> Result<Vec<DocTemplateCategory>, String> {
+pub fn update_doc_template_category(key: &str, label: Option<String>, new_key: Option<String>) -> crate::error::Result<Vec<DocTemplateCategory>> {
     let mut cats = list_doc_template_categories();
 
     // 先检查 new_key 冲突（不可变借用）
     if let Some(ref nk) = new_key {
         if nk != key && cats.iter().any(|c| c.key == *nk) {
-            return Err(format!("Category key already exists: {}", nk));
+            return Err(crate::error::AppError::ValidationError(format!("Category key already exists: {}", nk)));
         }
     }
 
     // 再查找并修改（可变借用）
     let cat = cats.iter_mut().find(|c| c.key == key)
-        .ok_or_else(|| format!("Category not found: {}", key))?;
+        .ok_or_else(|| crate::error::AppError::ResourceError(format!("Category not found: {}", key)))?;
 
     if let Some(l) = label {
         cat.label = l;
@@ -551,19 +552,19 @@ pub fn update_doc_template_category(key: &str, label: Option<String>, new_key: O
 }
 
 /// 删除文档模板分类
-pub fn delete_doc_template_category(key: &str) -> Result<Vec<DocTemplateCategory>, String> {
+pub fn delete_doc_template_category(key: &str) -> crate::error::Result<Vec<DocTemplateCategory>> {
     let mut cats = list_doc_template_categories();
     let len_before = cats.len();
     cats.retain(|c| c.key != key);
     if cats.len() == len_before {
-        return Err(format!("Category not found: {}", key));
+        return Err(crate::error::AppError::ResourceError(format!("Category not found: {}", key)));
     }
     save_categories(&cats)?;
     Ok(cats)
 }
 
 /// 重新排序文档模板分类（接收有序的 key 列表）
-pub fn reorder_doc_template_categories(ordered_keys: &[String]) -> Result<Vec<DocTemplateCategory>, String> {
+pub fn reorder_doc_template_categories(ordered_keys: &[String]) -> crate::error::Result<Vec<DocTemplateCategory>> {
     let mut cats = list_doc_template_categories();
     for (i, key) in ordered_keys.iter().enumerate() {
         if let Some(cat) = cats.iter_mut().find(|c| &c.key == key) {

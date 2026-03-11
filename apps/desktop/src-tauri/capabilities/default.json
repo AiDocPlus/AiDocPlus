@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Default capabilities for the main window",
-  "windows": ["main"],
+  "windows": ["main", "pdf-preview"],
   "permissions": [
     "core:app:default",
     "core:path:default",

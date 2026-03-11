@@ -345,42 +345,43 @@ pub fn run_python_script(
     timeoutSecs: Option<u64>,
     #[allow(non_snake_case)]
     customPythonPath: Option<String>,
-) -> Result<PythonRunResult, String> {
+) -> crate::error::Result<PythonRunResult> {
+    use crate::error::AppError;
     let start = Instant::now();
     let timeout = Duration::from_secs(timeoutSecs.unwrap_or(30));
 
     // 查找 Python
     let python = find_python(customPythonPath.as_deref())
-        .ok_or_else(|| "未找到 Python，请安装 Python 3 或在设置中指定路径".to_string())?;
+        .ok_or_else(|| AppError::ExternalToolError("未找到 Python，请安装 Python 3 或在设置中指定路径".to_string()))?;
 
     // 准备临时目录
     let temp_dir = std::env::temp_dir().join("aidocplus_python");
     std::fs::create_dir_all(&temp_dir)
-        .map_err(|e| format!("创建临时目录失败: {}", e))?;
+        .map_err(|e| AppError::Internal(format!("创建临时目录失败: {}", e)))?;
 
     // 确定脚本路径
     let (script_file, is_temp_script) = if let Some(ref path) = scriptPath {
         // 脚本文件模式
         let p = std::path::PathBuf::from(path);
         if !p.exists() {
-            return Err(format!("脚本文件不存在: {}", path));
+            return Err(AppError::ValidationError(format!("脚本文件不存在: {}", path)));
         }
         (p, false)
     } else if let Some(ref code_str) = code {
         // 内联代码模式：写入临时文件
         let tmp = temp_dir.join("_aidocplus_inline.py");
         std::fs::write(&tmp, code_str)
-            .map_err(|e| format!("写入临时脚本失败: {}", e))?;
+            .map_err(|e| AppError::Internal(format!("写入临时脚本失败: {}", e)))?;
         (tmp, true)
     } else {
-        return Err("必须提供 scriptPath 或 code 参数".to_string());
+        return Err(AppError::ValidationError("必须提供 scriptPath 或 code 参数".to_string()));
     };
 
     // 写入文档内容到临时文件（可选）
     let input_file = if let Some(ref content) = inputContent {
         let input_path = temp_dir.join("_aidocplus_input.md");
         std::fs::write(&input_path, content)
-            .map_err(|e| format!("写入输入文件失败: {}", e))?;
+            .map_err(|e| AppError::Internal(format!("写入输入文件失败: {}", e)))?;
         Some(input_path)
     } else {
         None
@@ -437,7 +438,7 @@ pub fn run_python_script(
 
     // 启动子进程
     let mut child = cmd.spawn()
-        .map_err(|e| format!("启动 Python 进程失败: {}", e))?;
+        .map_err(|e| AppError::ExternalToolError(format!("启动 Python 进程失败: {}", e)))?;
 
     // 等待完成（带超时）
     let result = loop {

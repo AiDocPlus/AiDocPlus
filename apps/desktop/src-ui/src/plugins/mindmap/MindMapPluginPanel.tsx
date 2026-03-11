@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import type { PluginPanelProps } from '../types';
 import { Button } from '../_framework/ui';
 import { usePluginHost } from '../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import {
   Brain, Download, Copy, Check, ListTree,
   Maximize2, Minimize2, Scan, ChevronDown, Image, FileCode,
@@ -348,7 +349,7 @@ export function MindMapPluginPanel({ document, content, pluginData, onPluginData
       await host.platform.invoke('write_binary_file', { path: filePath, data: Array.from(new TextEncoder().encode(svgStr)) });
       showStatus(`已导出: ${filePath}`);
     } catch (error) {
-      showStatus(`导出失败: ${error instanceof Error ? error.message : String(error)}`, true);
+      showStatus(`导出失败: ${formatBackendError(error)}`, true);
     }
   };
 
@@ -366,7 +367,7 @@ export function MindMapPluginPanel({ document, content, pluginData, onPluginData
       await host.platform.invoke('write_binary_file', { path: filePath, data: Array.from(bytes) });
       showStatus(`已导出: ${filePath}`);
     } catch (error) {
-      showStatus(`导出失败: ${error instanceof Error ? error.message : String(error)}`, true);
+      showStatus(`导出失败: ${formatBackendError(error)}`, true);
     }
   };
 
@@ -379,7 +380,7 @@ export function MindMapPluginPanel({ document, content, pluginData, onPluginData
       await host.platform.invoke('write_binary_file', { path: filePath, data: Array.from(new TextEncoder().encode(md)) });
       showStatus(`已导出: ${filePath}`);
     } catch (error) {
-      showStatus(`导出失败: ${error instanceof Error ? error.message : String(error)}`, true);
+      showStatus(`导出失败: ${formatBackendError(error)}`, true);
     }
   };
 
@@ -402,7 +403,7 @@ ${md}
       await host.platform.invoke('write_binary_file', { path: filePath, data: Array.from(new TextEncoder().encode(htmlContent)) });
       showStatus(`已导出: ${filePath}`);
     } catch (error) {
-      showStatus(`导出失败: ${error instanceof Error ? error.message : String(error)}`, true);
+      showStatus(`导出失败: ${formatBackendError(error)}`, true);
     }
   };
 
@@ -416,7 +417,7 @@ ${md}
       await host.platform.invoke('write_binary_file', { path: filePath, data: Array.from(new TextEncoder().encode(jsonStr)) });
       showStatus(`已导出: ${filePath}`);
     } catch (error) {
-      showStatus(`导出失败: ${error instanceof Error ? error.message : String(error)}`, true);
+      showStatus(`导出失败: ${formatBackendError(error)}`, true);
     }
   };
 
@@ -446,7 +447,7 @@ ${md}
       host.docData!.markDirty();
       showStatus(`已导入: ${filePath.split('/').pop() || filePath}`);
     } catch (error) {
-      showStatus(`导入失败: ${error instanceof Error ? error.message : String(error)}`, true);
+      showStatus(`导入失败: ${formatBackendError(error)}`, true);
     }
   };
 
@@ -467,7 +468,7 @@ ${md}
       host.docData!.markDirty();
       showStatus('AI 操作完成');
     } catch (err) {
-      showStatus(`AI 操作失败: ${err instanceof Error ? err.message : String(err)}`, true);
+      showStatus(`AI 操作失败: ${formatBackendError(err)}`, true);
     } finally {
       setAiNodeBusy(false);
     }

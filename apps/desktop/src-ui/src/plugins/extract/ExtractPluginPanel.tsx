@@ -9,6 +9,7 @@ import {
   parseExtractFromAiResponse,
 } from './extractAiPrompts';
 import { truncateContent } from '../_framework/pluginUtils';
+import { formatBackendError } from '@/lib/backendError';
 import { Button } from '../_framework/ui';
 import { usePluginHost } from '../_framework/PluginHostAPI';
 import { TableProperties, Download, Trash2, Plus, Check, X } from 'lucide-react';
@@ -135,8 +136,7 @@ export function ExtractPluginPanel({ document, content, pluginData, onPluginData
       onRequestSave?.();
     } catch (err) {
       if (abortRef.current) return;
-      const errMsg = err instanceof Error ? err.message : String(err);
-      showStatus(`提取失败：${errMsg}`, true);
+      showStatus(`提取失败：${formatBackendError(err)}`, true);
     } finally {
       setGenerating(false);
     }
@@ -211,7 +211,7 @@ export function ExtractPluginPanel({ document, content, pluginData, onPluginData
       await host.platform.invoke('write_binary_file', { path: filePath, data });
       showStatus(`已导出: ${filePath}`);
     } catch (error) {
-      showStatus(`导出失败: ${error instanceof Error ? error.message : String(error)}`, true);
+      showStatus(`导出失败: ${formatBackendError(error)}`, true);
     }
   };
 
@@ -228,7 +228,7 @@ export function ExtractPluginPanel({ document, content, pluginData, onPluginData
       await host.platform.invoke('write_binary_file', { path: filePath, data });
       showStatus(`已导出: ${filePath}`);
     } catch (error) {
-      showStatus(`导出失败: ${error instanceof Error ? error.message : String(error)}`, true);
+      showStatus(`导出失败: ${formatBackendError(error)}`, true);
     }
   };
 

@@ -6,6 +6,7 @@ import {
 } from '../../_framework/ui';
 import { Plus, Trash2, FileUp, FileText, Users, Star, Pencil, FolderOpen, UserPlus, Search } from 'lucide-react';
 import { useEmailContext } from '../EmailContext';
+import { formatBackendError } from '@/lib/backendError';
 import { ContactListSection } from '../ContactListSection';
 import { parseCSV, detectEmailColumn, detectNameColumn, getCurrentDateString } from '../utils';
 import type { Contact, ContactGroup, EmailStorageData } from '../types';
@@ -61,7 +62,7 @@ export function ContactDialog({ open, onOpenChange, currentRecipients, onUseSele
       const data = rows.slice(1);
       onOpenCsvImport(headers, data, detectEmailColumn(headers), detectNameColumn(headers));
     } catch (err) {
-      showStatus(t('csvReadFailed') + ': ' + (err instanceof Error ? err.message : String(err)), true);
+      showStatus(t('csvReadFailed') + ': ' + formatBackendError(err), true);
     }
   }, [host, showStatus, t, onOpenCsvImport]);
 
@@ -95,7 +96,7 @@ export function ContactDialog({ open, onOpenChange, currentRecipients, onUseSele
       await host.platform.invoke('write_text_file', { path: savePath, content: '\uFEFF' + csv });
       showStatus(t('exportContactsSuccess', { count: contactList.length }));
     } catch (err) {
-      showStatus(t('exportContactsFailed') + ': ' + (err instanceof Error ? err.message : String(err)), true);
+      showStatus(t('exportContactsFailed') + ': ' + formatBackendError(err), true);
     }
   }, [host, showStatus, t]);
 

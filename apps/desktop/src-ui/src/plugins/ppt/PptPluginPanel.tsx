@@ -6,6 +6,7 @@ import { SlideDeck } from './SlideDeck';
 import { PptGenerateDialog } from './PptGenerateDialog';
 import { buildSlideSystemPrompt, parseSlidesFromAiResponse } from './slideAiPrompts';
 import { usePluginHost } from '../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import { Presentation } from 'lucide-react';
 import { PluginPanelLayout } from '../_framework/PluginPanelLayout';
 import { truncateContent } from '../_framework/pluginUtils';
@@ -104,7 +105,7 @@ export function PptPluginPanel({ document, content, pluginData, onPluginDataChan
       onRequestSave?.();
     } catch (err) {
       if (pptAbortRef.current) return;
-      const errMsg = err instanceof Error ? err.message : String(err);
+      const errMsg = formatBackendError(err);
       showStatus(t('generateFailed', { error: errMsg }), true);
     } finally {
       setPptGenerating(false);
@@ -135,7 +136,7 @@ export function PptPluginPanel({ document, content, pluginData, onPluginDataChan
       await host.platform.invoke('write_binary_file', { path: filePath, data });
       showStatus(`已导出: ${filePath}`);
     } catch (error) {
-      const errMsg = error instanceof Error ? error.message : String(error);
+      const errMsg = formatBackendError(error);
       showStatus(`导出失败: ${errMsg}`, true);
     }
   };
@@ -154,7 +155,7 @@ export function PptPluginPanel({ document, content, pluginData, onPluginDataChan
 
       await host.platform.invoke('open_file_with_app', { path: tempPath, appName: app || null });
     } catch (error) {
-      const errMsg = error instanceof Error ? error.message : String(error);
+      const errMsg = formatBackendError(error);
       showStatus(`导出并打开失败: ${errMsg}`, true);
     }
   };

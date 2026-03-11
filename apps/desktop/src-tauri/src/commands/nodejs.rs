@@ -168,16 +168,17 @@ pub fn run_node_script(
     timeoutSecs: Option<u64>,
     #[allow(non_snake_case)]
     customNodePath: Option<String>,
-) -> Result<NodeRunResult, String> {
+) -> crate::error::Result<NodeRunResult> {
+    use crate::error::AppError;
     let start = Instant::now();
     let timeout = Duration::from_secs(timeoutSecs.unwrap_or(30));
 
     let node = find_node(customNodePath.as_deref())
-        .ok_or_else(|| "未找到 Node.js，请安装 Node.js 或在设置中指定路径".to_string())?;
+        .ok_or_else(|| AppError::ExternalToolError("未找到 Node.js，请安装 Node.js 或在设置中指定路径".to_string()))?;
 
     let script = std::path::PathBuf::from(&scriptPath);
     if !script.exists() {
-        return Err(format!("脚本文件不存在: {}", scriptPath));
+        return Err(AppError::ValidationError(format!("脚本文件不存在: {}", scriptPath)));
     }
 
     let mut cmd = Command::new(&node);
@@ -210,7 +211,7 @@ pub fn run_node_script(
     cmd.stderr(std::process::Stdio::piped());
 
     let mut child = cmd.spawn()
-        .map_err(|e| format!("启动 Node.js 进程失败: {}", e))?;
+        .map_err(|e| AppError::ExternalToolError(format!("启动 Node.js 进程失败: {}", e)))?;
 
     // 等待完成（带超时）
     let result = loop {

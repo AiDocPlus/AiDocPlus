@@ -6,6 +6,7 @@ import {
 } from '../_framework/ui';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { usePluginHost } from '../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import {
   Upload, Copy, Sparkles, Loader2,
   Columns3, Check, PanelTop, FileDown, Settings2,
@@ -296,7 +297,7 @@ export function TablePluginPanel({ document, content, pluginData, onPluginDataCh
       onRequestSave?.();
       setAiPopoverOpen(false);
     } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
+      const errMsg = formatBackendError(err);
       showStatus(t('generateFailed', { error: errMsg, defaultValue: '表格生成失败：{{error}}' }), true);
     } finally {
       setGenerating(false);
@@ -320,10 +321,10 @@ export function TablePluginPanel({ document, content, pluginData, onPluginDataCh
 
     if (ext === 'csv') {
       file.text().then(text => onParsed(parseCsvText(text)))
-        .catch(err => showStatus(t('importFailed', { defaultValue: '导入失败' }) + `: ${err instanceof Error ? err.message : String(err)}`, true));
+        .catch(err => showStatus(t('importFailed', { defaultValue: '导入失败' }) + `: ${formatBackendError(err)}`, true));
     } else {
       file.arrayBuffer().then(buffer => onParsed(parseXlsxFile(buffer)))
-        .catch(err => showStatus(t('importFailed', { defaultValue: '导入失败' }) + `: ${err instanceof Error ? err.message : String(err)}`, true));
+        .catch(err => showStatus(t('importFailed', { defaultValue: '导入失败' }) + `: ${formatBackendError(err)}`, true));
     }
   }, [onPluginDataChange, host, t, showStatus]);
 
@@ -391,7 +392,7 @@ export function TablePluginPanel({ document, content, pluginData, onPluginDataCh
       }
       if (path) showStatus(t('exportSuccess', { defaultValue: '导出成功' }) + `: ${path}`);
     } catch (e) {
-      showStatus(t('exportFailed', { defaultValue: '导出失败' }) + `: ${e instanceof Error ? e.message : String(e)}`, true);
+      showStatus(t('exportFailed', { defaultValue: '导出失败' }) + `: ${formatBackendError(e)}`, true);
     }
   }, [getCurrentTableSheets, docTitle, t, showStatus]);
 

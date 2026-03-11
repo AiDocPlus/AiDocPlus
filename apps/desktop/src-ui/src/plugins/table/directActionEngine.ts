@@ -10,6 +10,7 @@
 
 import type { Sheet, Cell } from '@fortune-sheet/core';
 import type { FortuneSheetRef } from './FortuneSheetWrapper';
+import { formatBackendError } from '@/lib/backendError';
 
 // ── 类型 ──
 
@@ -540,7 +541,7 @@ export function executeDirectAction(
   try {
     return handler(inst, opts);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = formatBackendError(err);
     return { ok: false, message: `操作执行失败: ${msg}` };
   }
 }

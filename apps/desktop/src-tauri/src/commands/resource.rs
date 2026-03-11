@@ -3,7 +3,8 @@
 pub fn open_resource_manager(
     app_handle: tauri::AppHandle,
     managerName: String,
-) -> Result<(), String> {
+) -> crate::error::Result<()> {
+    use crate::error::AppError;
     use tauri::Manager;
     use tauri::WebviewWindowBuilder;
     use tauri::WebviewUrl;
@@ -12,7 +13,7 @@ pub fn open_resource_manager(
     let resource_type = match managerName.as_str() {
         "提示词模板管理器" => "prompt-templates",
         "文档模板管理器" => "doc-templates",
-        _ => return Err(format!("未知管理器: {}", managerName)),
+        _ => return Err(AppError::ValidationError(format!("未知管理器: {}", managerName))),
     };
 
     // 计算数据目录（find_prompt_templates_dir 已处理 dev/release 模式切换）
@@ -58,7 +59,7 @@ pub fn open_resource_manager(
     }
 
     let url = if cfg!(debug_assertions) {
-        WebviewUrl::External(url_str.parse().map_err(|e| format!("URL 解析失败: {}", e))?)
+        WebviewUrl::External(url_str.parse().map_err(|e| AppError::Internal(format!("URL 解析失败: {}", e)))?)
     } else {
         // WebviewUrl::App(PathBuf) 不支持 query string（Windows 上 ? 是非法路径字符）
         // 改用 CustomProtocol 构造完整 URL
@@ -67,7 +68,7 @@ pub fn open_resource_manager(
         } else {
             format!("tauri://localhost/{}", url_str)
         };
-        WebviewUrl::CustomProtocol(full_url.parse().map_err(|e| format!("URL 解析失败: {}", e))?)
+        WebviewUrl::CustomProtocol(full_url.parse().map_err(|e| AppError::Internal(format!("URL 解析失败: {}", e)))?)
     };
 
     WebviewWindowBuilder::new(&app_handle, window_label, url)
@@ -76,7 +77,7 @@ pub fn open_resource_manager(
         .min_inner_size(800.0, 500.0)
         .resizable(true)
         .build()
-        .map_err(|e| format!("创建管理器窗口失败: {}", e))?;
+        .map_err(|e| AppError::Internal(format!("创建管理器窗口失败: {}", e)))?;
 
     Ok(())
 }
@@ -177,10 +178,9 @@ fn find_prompt_templates_dir() -> Option<std::path::PathBuf> {
     crate::paths::bundled_sub_dir("prompt-templates")
 }
 
-/// 获取用户自定义模板文件路径：~/AiDocPlus/PromptTemplates/custom.json
+/// 获取用户自定义模板文件路径：<data_root>/PromptTemplates/custom.json
 fn get_custom_templates_path() -> std::path::PathBuf {
-    let home = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
-    home.join("AiDocPlus").join("PromptTemplates").join("custom.json")
+    crate::config::current_data_root().join("PromptTemplates").join("custom.json")
 }
 
 /// 读取用户自定义模板文件
@@ -196,20 +196,21 @@ fn read_custom_templates() -> CustomTemplatesFile {
 }
 
 /// 写入用户自定义模板文件
-fn write_custom_templates(data: &CustomTemplatesFile) -> Result<(), String> {
+fn write_custom_templates(data: &CustomTemplatesFile) -> crate::error::Result<()> {
+    use crate::error::AppError;
     let path = get_custom_templates_path();
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
-            .map_err(|e| format!("创建目录失败: {}", e))?;
+            .map_err(|e| AppError::Internal(format!("创建目录失败: {}", e)))?;
     }
     let json_str = serde_json::to_string_pretty(data)
-        .map_err(|e| format!("序列化失败: {}", e))?;
+        .map_err(|e| AppError::Internal(format!("序列化失败: {}", e)))?;
     crate::config::atomic_write(&path, &json_str)?;
     Ok(())
 }
 
 #[tauri::command]
-pub fn list_prompt_templates() -> Result<Vec<PromptTemplateInfo>, String> {
+pub fn list_prompt_templates() -> crate::error::Result<Vec<PromptTemplateInfo>> {
     let mut templates = Vec::new();
 
     // 1. 从 bundled-resources/prompt-templates/*.json 加载内置模板
@@ -257,9 +258,9 @@ pub fn list_prompt_templates() -> Result<Vec<PromptTemplateInfo>, String> {
 }
 
 #[tauri::command]
-pub fn list_prompt_template_categories() -> Result<Vec<PromptCategoryInfo>, String> {
+pub fn list_prompt_template_categories() -> crate::error::Result<Vec<PromptCategoryInfo>> {
     let templates_dir = find_prompt_templates_dir()
-        .ok_or_else(|| "未找到 bundled-resources/prompt-templates 目录".to_string())?;
+        .ok_or_else(|| crate::error::AppError::ResourceError("未找到 bundled-resources/prompt-templates 目录".to_string()))?;
 
     let mut items: Vec<(i32, PromptCategoryInfo)> = Vec::new();
     if let Ok(entries) = std::fs::read_dir(&templates_dir) {
@@ -305,7 +306,7 @@ pub struct SaveCustomPromptTemplateRequest {
 }
 
 #[tauri::command]
-pub fn save_custom_prompt_template(template: SaveCustomPromptTemplateRequest) -> Result<(), String> {
+pub fn save_custom_prompt_template(template: SaveCustomPromptTemplateRequest) -> crate::error::Result<()> {
     let mut custom = read_custom_templates();
 
     let entry = CustomTemplateEntry {
@@ -328,7 +329,7 @@ pub fn save_custom_prompt_template(template: SaveCustomPromptTemplateRequest) ->
 }
 
 #[tauri::command]
-pub fn delete_custom_prompt_template(id: String) -> Result<(), String> {
+pub fn delete_custom_prompt_template(id: String) -> crate::error::Result<()> {
     let mut custom = read_custom_templates();
     let before = custom.templates.len();
     custom.templates.retain(|t| t.id != id);
@@ -351,14 +352,15 @@ pub struct PromptTemplateImportResult {
 
 /// 导出所有自定义提示词模板为 JSON 文件
 #[tauri::command]
-pub fn export_custom_prompt_templates(output_path: String) -> Result<String, String> {
+pub fn export_custom_prompt_templates(output_path: String) -> crate::error::Result<String> {
+    use crate::error::AppError;
     let custom = read_custom_templates();
     if custom.templates.is_empty() {
-        return Err("没有自定义模板可导出".to_string());
+        return Err(AppError::ValidationError("没有自定义模板可导出".to_string()));
     }
 
     let json_str = serde_json::to_string_pretty(&custom)
-        .map_err(|e| format!("序列化失败: {}", e))?;
+        .map_err(|e| AppError::Internal(format!("序列化失败: {}", e)))?;
     crate::config::atomic_write(&std::path::PathBuf::from(&output_path), &json_str)?;
 
     Ok(format!("已导出 {} 个自定义模板", custom.templates.len()))
@@ -366,11 +368,12 @@ pub fn export_custom_prompt_templates(output_path: String) -> Result<String, Str
 
 /// 从 JSON 文件批量导入自定义提示词模板
 #[tauri::command]
-pub fn import_custom_prompt_templates(json_path: String) -> Result<PromptTemplateImportResult, String> {
+pub fn import_custom_prompt_templates(json_path: String) -> crate::error::Result<PromptTemplateImportResult> {
+    use crate::error::AppError;
     let json_str = std::fs::read_to_string(&json_path)
-        .map_err(|e| format!("读取文件失败: {}", e))?;
+        .map_err(|e| AppError::Internal(format!("读取文件失败: {}", e)))?;
     let imported_file: CustomTemplatesFile = serde_json::from_str(&json_str)
-        .map_err(|e| format!("解析 JSON 失败: {}", e))?;
+        .map_err(|e| AppError::ImportFailed(format!("解析 JSON 失败: {}", e)))?;
 
     let total = imported_file.templates.len();
     let mut custom = read_custom_templates();

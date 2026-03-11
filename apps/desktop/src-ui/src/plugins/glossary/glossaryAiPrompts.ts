@@ -1,5 +1,6 @@
 import { generateTermId } from './types';
 import type { GlossaryTerm } from './types';
+import { formatBackendError } from '@/lib/backendError';
 
 /**
  * 构造术语表生成的 system prompt
@@ -94,7 +95,7 @@ export function parseGlossaryFromAiResponse(text: string): GlossaryTerm[] | null
         translation: item.translation ? String(item.translation) : undefined,
       }));
     } catch (e) {
-      console.warn('[Glossary] 解析候选失败:', e instanceof Error ? e.message : e);
+      console.warn('[Glossary] 解析候选失败:', formatBackendError(e));
     }
   }
 

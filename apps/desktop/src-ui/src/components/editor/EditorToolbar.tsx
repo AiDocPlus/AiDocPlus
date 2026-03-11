@@ -42,6 +42,7 @@ import {
   Download,
   ExternalLink,
 } from 'lucide-react';
+import { formatBackendError } from '@/lib/backendError';
 import React, { useState, useCallback } from 'react';
 import { EditorView } from '@codemirror/view';
 import { undo, redo } from '@codemirror/commands';
@@ -848,7 +849,7 @@ function ImportButton({
       }
     } catch (error) {
       console.error('[ImportButton] 导入失败:', error);
-      const errMsg = typeof error === 'string' ? error : (error instanceof Error ? error.message : String(error));
+      const errMsg = formatBackendError(error);
       runAction((v) => {
         cmInsert(v, `\n> ⚠️ ${t('editor.toolbar.importFailed', { defaultValue: '导入失败：{{error}}', error: errMsg })}\n`);
       });

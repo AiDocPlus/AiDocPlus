@@ -1,6 +1,6 @@
 #![allow(unused_assignments, unused_variables)]
 
-use crate::error::Result;
+use crate::error::{AppError, Result};
 use quick_xml::events::Event;
 use quick_xml::reader::Reader;
 use std::fs;
@@ -19,7 +19,7 @@ pub fn import_file(path: String) -> Result<String> {
     let file_path = Path::new(&path);
 
     if !file_path.exists() {
-        return Err(format!("文件不存在: {}", path));
+        return Err(AppError::Internal(format!("文件不存在: {}", path)));
     }
 
     let ext = file_path
@@ -32,42 +32,42 @@ pub fn import_file(path: String) -> Result<String> {
         // 纯文本类文件：直接读取
         "txt" | "md" | "markdown" | "json" | "xml" | "csv" | "html" | "htm" | "yaml" | "yml"
         | "toml" | "ini" | "log" | "rst" | "tex" | "rtf" => {
-            fs::read_to_string(&path).map_err(|e| format!("读取文件失败: {}", e))
+            fs::read_to_string(&path).map_err(|e| AppError::ImportFailed(format!("读取文件失败: {}", e)))
         }
         // Word 文档
         "docx" => import_docx(&path),
-        _ => Err(format!(
+        _ => Err(AppError::ValidationError(format!(
             "不支持的文件格式: .{}\n\n支持的格式：txt, md, json, xml, csv, html, yaml, toml, docx",
             ext
-        )),
+        ))),
     }
 }
 
 /// 解析 DOCX 文件，提取文本内容并转换为 Markdown
 fn import_docx(path: &str) -> Result<String> {
-    let file = fs::File::open(path).map_err(|e| format!("打开 DOCX 文件失败: {}", e))?;
+    let file = fs::File::open(path).map_err(|e| AppError::ImportFailed(format!("打开 DOCX 文件失败: {}", e)))?;
     let mut archive =
-        zip::ZipArchive::new(file).map_err(|e| format!("解压 DOCX 文件失败: {}", e))?;
+        zip::ZipArchive::new(file).map_err(|e| AppError::ImportFailed(format!("解压 DOCX 文件失败: {}", e)))?;
 
     // ZIP 炸弹防护：检查文件数量
     if archive.len() > MAX_FILE_COUNT {
-        return Err(format!(
+        return Err(AppError::SecurityError(format!(
             "DOCX 文件包含过多文件 ({} > {})，可能是 ZIP 炸弹攻击",
             archive.len(), MAX_FILE_COUNT
-        ));
+        )));
     }
 
     // ZIP 炸弹防护：检查总解压大小
     let mut total_uncompressed_size: u64 = 0;
     for i in 0..archive.len() {
-        let file = archive.by_index(i).map_err(|e| format!("读取 ZIP 条目失败: {}", e))?;
+        let file = archive.by_index(i).map_err(|e| AppError::ImportFailed(format!("读取 ZIP 条目失败: {}", e)))?;
         total_uncompressed_size += file.size();
 
         if total_uncompressed_size > MAX_UNCOMPRESSED_SIZE {
-            return Err(format!(
+            return Err(AppError::SecurityError(format!(
                 "DOCX 文件解压后过大 ({} > {} 字节)，可能是 ZIP 炸弹攻击",
                 total_uncompressed_size, MAX_UNCOMPRESSED_SIZE
-            ));
+            )));
         }
     }
 
@@ -76,21 +76,21 @@ fn import_docx(path: &str) -> Result<String> {
     {
         let doc_xml = archive
             .by_name("word/document.xml")
-            .map_err(|e| format!("读取 DOCX 内容失败: {}", e))?;
+            .map_err(|e| AppError::ImportFailed(format!("读取 DOCX 内容失败: {}", e)))?;
 
         // 检查单个文件大小
         if doc_xml.size() > MAX_SINGLE_FILE_SIZE {
-            return Err(format!(
+            return Err(AppError::SecurityError(format!(
                 "DOCX 内部文件过大 ({} > {} 字节)，拒绝处理",
                 doc_xml.size(), MAX_SINGLE_FILE_SIZE
-            ));
+            )));
         }
 
         // 限制读取大小，防止内存耗尽
         let mut limited_reader = doc_xml.take(MAX_SINGLE_FILE_SIZE);
         limited_reader
             .read_to_string(&mut xml_content)
-            .map_err(|e| format!("读取 XML 内容失败: {}", e))?;
+            .map_err(|e| AppError::ImportFailed(format!("读取 XML 内容失败: {}", e)))?;
     }
 
     parse_docx_xml(&xml_content)
@@ -312,7 +312,7 @@ fn parse_docx_xml(xml: &str) -> Result<String> {
             }
             Ok(Event::Eof) => break,
             Err(e) => {
-                return Err(format!("解析 DOCX XML 失败: {}", e));
+                return Err(AppError::ImportFailed(format!("解析 DOCX XML 失败: {}", e)));
             }
             _ => {}
         }
@@ -328,7 +328,7 @@ fn parse_docx_xml(xml: &str) -> Result<String> {
         .to_string();
 
     if result.is_empty() {
-        return Err("DOCX 文件内容为空或无法解析".to_string());
+        return Err(AppError::ImportFailed("DOCX 文件内容为空或无法解析".to_string()));
     }
 
     Ok(result)

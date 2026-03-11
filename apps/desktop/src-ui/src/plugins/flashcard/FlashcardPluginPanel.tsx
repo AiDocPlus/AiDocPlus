@@ -6,6 +6,7 @@ import { buildFlashcardSystemPrompt, buildFlashcardUserPrompt, parseFlashcardsFr
 import { truncateContent } from '../_framework/pluginUtils';
 import { Button } from '../_framework/ui';
 import { usePluginHost } from '../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import { Layers, Download, Shuffle, CheckCircle, Circle, Trash2, Eye, EyeOff } from 'lucide-react';
 import { PluginPanelLayout } from '../_framework/PluginPanelLayout';
 
@@ -108,7 +109,7 @@ export function FlashcardPluginPanel({ document, content, pluginData, onPluginDa
       onRequestSave?.();
     } catch (err) {
       if (abortRef.current) return;
-      showStatus(`生成失败：${err instanceof Error ? err.message : String(err)}`, true);
+      showStatus(`生成失败：${formatBackendError(err)}`, true);
     } finally {
       setGenerating(false);
     }
@@ -171,7 +172,7 @@ export function FlashcardPluginPanel({ document, content, pluginData, onPluginDa
       await host.platform.invoke('write_binary_file', { path: filePath, data });
       showStatus(`已导出 Anki 格式: ${filePath}`);
     } catch (error) {
-      showStatus(`导出失败: ${error instanceof Error ? error.message : String(error)}`, true);
+      showStatus(`导出失败: ${formatBackendError(error)}`, true);
     }
   };
 
@@ -191,7 +192,7 @@ export function FlashcardPluginPanel({ document, content, pluginData, onPluginDa
       await host.platform.invoke('write_binary_file', { path: filePath, data });
       showStatus(`已导出: ${filePath}`);
     } catch (error) {
-      showStatus(`导出失败: ${error instanceof Error ? error.message : String(error)}`, true);
+      showStatus(`导出失败: ${formatBackendError(error)}`, true);
     }
   };
 

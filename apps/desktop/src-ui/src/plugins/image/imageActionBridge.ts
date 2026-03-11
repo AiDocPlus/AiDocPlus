@@ -20,6 +20,7 @@
 import { useEffect, useRef } from 'react';
 import type { FabricCanvasEditorRef } from './FabricCanvasEditor';
 import type { ImageAiAction, ImageAiActionResult } from './types';
+import { formatBackendError } from '@/lib/backendError';
 
 interface AiActionDetail {
   type: string;
@@ -61,7 +62,7 @@ export function useImageActionBridge({ editorRef, showStatus }: UseImageActionBr
           detail: result,
         }));
       } catch (err) {
-        const msg = `执行失败：${err instanceof Error ? err.message : String(err)}`;
+        const msg = `执行失败：${formatBackendError(err)}`;
         optionsRef.current.showStatus(msg, true);
         window.dispatchEvent(new CustomEvent('image-ai-apply-result', {
           detail: { ok: false, message: msg, actionType: detail.type },

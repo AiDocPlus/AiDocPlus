@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { invoke } from '@tauri-apps/api/core';
+import { formatBackendError } from '@/lib/backendError';
 import type { AppSettings } from '@aidocplus/shared-types';
 import {
   DEFAULT_SETTINGS,
@@ -464,7 +465,7 @@ export const useSettingsStore = create<SettingsState>()(
           }));
         } catch (error) {
           set({
-            error: error instanceof Error ? error.message : 'Failed to import settings'
+            error: formatBackendError(error)
           });
           throw error;
         }
@@ -523,7 +524,7 @@ export function getAIInvokeParams() {
   const ai = useSettingsStore.getState().ai;
   const service = getActiveService(ai);
   if (!service) {
-    return { provider: undefined, apiKey: undefined, model: undefined, baseUrl: undefined };
+    return { provider: undefined, apiKey: undefined, model: undefined, baseUrl: undefined, serviceId: undefined, proxyUrl: undefined, connectTimeoutSecs: undefined, requestTimeoutSecs: undefined };
   }
   const providerConfig = getProviderConfig(service.provider);
   return {
@@ -531,6 +532,10 @@ export function getAIInvokeParams() {
     apiKey: service.apiKey || undefined,
     model: service.model || undefined,
     baseUrl: service.baseUrl || providerConfig?.baseUrl || undefined,
+    serviceId: service.id || undefined,
+    proxyUrl: ai.proxyUrl || undefined,
+    connectTimeoutSecs: ai.connectTimeoutSecs || undefined,
+    requestTimeoutSecs: ai.requestTimeoutSecs || undefined,
   };
 }
 
@@ -564,7 +569,7 @@ export function getAIInvokeParamsForService(serviceId?: string) {
     service = getActiveService(ai);
   }
   if (!service) {
-    return { provider: undefined, apiKey: undefined, model: undefined, baseUrl: undefined };
+    return { provider: undefined, apiKey: undefined, model: undefined, baseUrl: undefined, serviceId: undefined, proxyUrl: undefined, connectTimeoutSecs: undefined, requestTimeoutSecs: undefined };
   }
   const providerConfig = getProviderConfig(service.provider);
   return {
@@ -572,5 +577,9 @@ export function getAIInvokeParamsForService(serviceId?: string) {
     apiKey: service.apiKey || undefined,
     model: service.model || undefined,
     baseUrl: service.baseUrl || providerConfig?.baseUrl || undefined,
+    serviceId: service.id || undefined,
+    proxyUrl: ai.proxyUrl || undefined,
+    connectTimeoutSecs: ai.connectTimeoutSecs || undefined,
+    requestTimeoutSecs: ai.requestTimeoutSecs || undefined,
   };
 }

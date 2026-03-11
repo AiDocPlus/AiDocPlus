@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import type { PluginPanelProps } from '../types';
 import { Button } from '../_framework/ui';
 import { usePluginHost } from '../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import { ClipboardCheck, Copy, Check } from 'lucide-react';
 import { PluginPanelLayout } from '../_framework/PluginPanelLayout';
 import { truncateContent } from '../_framework/pluginUtils';
@@ -117,7 +118,7 @@ export function ReviewPluginPanel({ document, content, pluginData, onPluginDataC
       showStatus(t('generateSuccess'));
       onRequestSave?.();
     } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
+      const errMsg = formatBackendError(err);
       showStatus(t('generateFailed', { error: errMsg }), true);
     } finally {
       setGenerating(false);

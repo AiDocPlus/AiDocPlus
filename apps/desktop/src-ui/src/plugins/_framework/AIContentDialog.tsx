@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Wand2, Loader2, Check, X } from 'lucide-react';
 import { usePluginHost } from './PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import {
   Button,
   Dialog,
@@ -98,7 +99,7 @@ export function AIContentDialog({
       const generated = await host.ai.chat(messages, { maxTokens });
       setResult(generated);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(formatBackendError(err));
     } finally {
       setGenerating(false);
     }

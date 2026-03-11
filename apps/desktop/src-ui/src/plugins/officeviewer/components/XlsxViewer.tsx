@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { usePluginHost } from '../../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Button } from '../../_framework/ui';
 import {
   Table, Loader2, AlertCircle, Download, Printer,
@@ -101,7 +102,7 @@ export function XlsxViewer({ filePath, fileName, onError }: XlsxViewerProps) {
         setLoading(false);
       } catch (err) {
         if (cancelled) return;
-        const errorMsg = err instanceof Error ? err.message : String(err);
+        const errorMsg = formatBackendError(err);
         setError(errorMsg);
         onError(`Excel 解析失败: ${errorMsg}`);
         setLoading(false);
@@ -199,7 +200,7 @@ export function XlsxViewer({ filePath, fileName, onError }: XlsxViewerProps) {
       link.click();
       document.body.removeChild(link);
     } catch (err) {
-      onError(`下载失败: ${err instanceof Error ? err.message : String(err)}`);
+      onError(`下载失败: ${formatBackendError(err)}`);
     }
   };
 
@@ -241,7 +242,7 @@ export function XlsxViewer({ filePath, fileName, onError }: XlsxViewerProps) {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch (err) {
-      onError(`导出失败: ${err instanceof Error ? err.message : String(err)}`);
+      onError(`导出失败: ${formatBackendError(err)}`);
     }
   }, [currentSheet, fileName, activeSheet, onError]);
 

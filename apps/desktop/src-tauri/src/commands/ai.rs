@@ -42,22 +42,42 @@ fn friendly_reqwest_error(e: &reqwest::Error) -> String {
     format!("AI 服务通信错误: {}", e)
 }
 
+/// 创建带超时和代理配置的 HTTP 客户端
+fn build_ai_client(
+    connect_timeout: Duration,
+    request_timeout: Duration,
+    proxy_url: Option<&str>,
+) -> reqwest::Client {
+    let mut builder = reqwest::Client::builder()
+        .connect_timeout(connect_timeout)
+        .timeout(request_timeout);
+
+    if let Some(url) = proxy_url.filter(|u| !u.is_empty()) {
+        if let Ok(proxy) = reqwest::Proxy::all(url) {
+            builder = builder.proxy(proxy);
+        }
+    }
+
+    builder.build().unwrap_or_else(|_| reqwest::Client::new())
+}
+
 /// 创建带超时配置的 HTTP 客户端（非流式）
-fn ai_client() -> reqwest::Client {
-    reqwest::Client::builder()
-        .connect_timeout(CONNECT_TIMEOUT)
-        .timeout(REQUEST_TIMEOUT)
-        .build()
-        .unwrap_or_else(|_| reqwest::Client::new())
+fn ai_client_with_opts(proxy_url: Option<&str>, connect_secs: Option<u64>, request_secs: Option<u64>) -> reqwest::Client {
+    let ct = connect_secs.filter(|&s| s > 0).map(Duration::from_secs).unwrap_or(CONNECT_TIMEOUT);
+    let rt = request_secs.filter(|&s| s > 0).map(Duration::from_secs).unwrap_or(REQUEST_TIMEOUT);
+    build_ai_client(ct, rt, proxy_url)
 }
 
 /// 创建带超时配置的 HTTP 客户端（流式，超时更长）
+fn ai_stream_client_with_opts(proxy_url: Option<&str>, connect_secs: Option<u64>, request_secs: Option<u64>) -> reqwest::Client {
+    let ct = connect_secs.filter(|&s| s > 0).map(Duration::from_secs).unwrap_or(CONNECT_TIMEOUT);
+    let rt = request_secs.filter(|&s| s > 0).map(Duration::from_secs).unwrap_or(STREAM_TIMEOUT);
+    build_ai_client(ct, rt, proxy_url)
+}
+
+/// 向后兼容：无额外配置的流式客户端（用于内部辅助函数如 stream_openai_responses）
 fn ai_stream_client() -> reqwest::Client {
-    reqwest::Client::builder()
-        .connect_timeout(CONNECT_TIMEOUT)
-        .timeout(STREAM_TIMEOUT)
-        .build()
-        .unwrap_or_else(|_| reqwest::Client::new())
+    build_ai_client(CONNECT_TIMEOUT, STREAM_TIMEOUT, None)
 }
 
 #[tauri::command]
@@ -112,10 +132,14 @@ pub async fn chat(
     temperature: Option<f64>,
     max_tokens: Option<u32>,
     enable_web_search: Option<bool>,
+    service_id: Option<String>,
+    proxy_url: Option<String>,
+    connect_timeout_secs: Option<u64>,
+    request_timeout_secs: Option<u64>,
 ) -> Result<String> {
-    let config = get_ai_config(&app, provider, api_key, model, base_url);
+    let config = get_ai_config(&app, provider, api_key, model, base_url, service_id);
     let web_search = enable_web_search.unwrap_or(false);
-    let client = ai_client();
+    let client = ai_client_with_opts(proxy_url.as_deref(), connect_timeout_secs, request_timeout_secs);
 
     // OpenAI + 联网搜索 → Responses API（非流式）
     if config.provider == "openai" && web_search {
@@ -129,9 +153,10 @@ pub async fn chat(
 
     // 合并多个 system 消息为一个（部分 provider 如 MiniMax 不支持多 system 消息）
     let merged_messages = merge_system_messages(&messages);
+    let json_messages = messages_to_json(&merged_messages, &config.provider);
 
     let mut request_body = json!({
-        "messages": merged_messages,
+        "messages": json_messages,
         "model": config.get_default_model(),
         "temperature": temperature.unwrap_or_else(|| get_default_temperature(&config)),
         "stream": false
@@ -147,26 +172,14 @@ pub async fn chat(
 
     let url = format!("{}/chat/completions", config.get_base_url());
 
-    let mut request_builder = client.post(&url).json(&request_body);
-
-    // Set API key based on provider
-    if let Some(key) = config.api_key {
-        match config.provider.as_str() {
-            "anthropic" => {
-                request_builder = request_builder.header("x-api-key", key);
-            }
-            _ => {
-                request_builder = request_builder.header("Authorization", format!("Bearer {}", key));
-            }
-        }
-    }
+    let request_builder = config.apply_auth(client.post(&url).json(&request_body));
 
     let response = request_builder
         .header("Content-Type", "application/json")
         .timeout(Duration::from_secs(120))
         .send()
         .await
-        .map_err(|e| AppError::AIError(friendly_reqwest_error(&e)))?;
+        .map_err(|e| AppError::AiError(friendly_reqwest_error(&e)))?;
 
     if !response.status().is_success() {
         let status = response.status();
@@ -174,7 +187,7 @@ pub async fn chat(
             .text()
             .await
             .unwrap_or_else(|_| "Unknown error".to_string());
-        return Err(AppError::AIError(format!(
+        return Err(AppError::AiError(format!(
             "AI API error ({}): {}",
             status, error_text
         )));
@@ -183,7 +196,7 @@ pub async fn chat(
     let openai_response: OpenAIResponse = response
         .json()
         .await
-        .map_err(|e| AppError::AIError(format!("Failed to parse response: {}", e)))?;
+        .map_err(|e| AppError::AiError(format!("Failed to parse response: {}", e)))?;
 
     match openai_response {
         OpenAIResponse::Chat(resp) => {
@@ -196,7 +209,7 @@ pub async fn chat(
 
             Ok(content)
         }
-        OpenAIResponse::Stream(_) => Err(AppError::AIError(
+        OpenAIResponse::Stream(_) => Err(AppError::AiError(
             "Unexpected stream response in non-stream mode".to_string(),
         )),
     }
@@ -216,6 +229,10 @@ pub async fn chat_stream(
     enable_tools: Option<bool>,
     project_documents: Option<Vec<serde_json::Value>>,
     request_id: Option<String>,
+    service_id: Option<String>,
+    proxy_url: Option<String>,
+    connect_timeout_secs: Option<u64>,
+    request_timeout_secs: Option<u64>,
 ) -> Result<String> {
     let req_id = request_id.clone().unwrap_or_default();
 
@@ -235,7 +252,7 @@ pub async fn chat_stream(
     }
     let _guard = StreamGuard { request_id: req_id.clone() };
 
-    let config = get_ai_config(&app, provider, api_key, model, base_url);
+    let config = get_ai_config(&app, provider, api_key, model, base_url, service_id);
     let web_search = enable_web_search.unwrap_or(false);
     let use_tools = enable_tools.unwrap_or(false);
 
@@ -249,7 +266,7 @@ pub async fn chat_stream(
         return stream_anthropic_with_search(&config, &messages, &req_id, &window).await;
     }
 
-    let client = ai_stream_client();
+    let client = ai_stream_client_with_opts(proxy_url.as_deref(), connect_timeout_secs, request_timeout_secs);
     let url = format!("{}/chat/completions", config.get_base_url());
     let docs = project_documents.unwrap_or_default();
 
@@ -257,9 +274,7 @@ pub async fn chat_stream(
     let merged_messages = merge_system_messages(&messages);
 
     // Function Calling 循环：先用非流式检测 tool_calls，执行工具后再次调用
-    let mut current_messages: Vec<serde_json::Value> = merged_messages.iter().map(|m| {
-        json!({ "role": m.role, "content": m.content })
-    }).collect();
+    let mut current_messages: Vec<serde_json::Value> = messages_to_json(&merged_messages, &config.provider);
 
     if use_tools {
         let tool_defs = tools::get_builtin_tool_definitions();
@@ -280,32 +295,26 @@ pub async fn chat_stream(
                 inject_web_search_params(&mut tool_request, &config);
             }
 
-            let mut req_builder = client
-                .post(&url)
-                .header("Content-Type", "application/json")
-                .json(&tool_request);
-
-            if let Some(key) = &config.api_key {
-                match config.provider.as_str() {
-                    "anthropic" => { req_builder = req_builder.header("x-api-key", key); }
-                    _ => { req_builder = req_builder.header("Authorization", format!("Bearer {}", key)); }
-                }
-            }
+            let req_builder = config.apply_auth(
+                client.post(&url)
+                    .header("Content-Type", "application/json")
+                    .json(&tool_request)
+            );
 
             let resp = req_builder
                 .timeout(Duration::from_secs(120))
                 .send()
                 .await
-                .map_err(|e| AppError::AIError(friendly_reqwest_error(&e)))?;
+                .map_err(|e| AppError::AiError(friendly_reqwest_error(&e)))?;
 
             if !resp.status().is_success() {
                 let status = resp.status();
                 let err = resp.text().await.unwrap_or_default();
-                return Err(AppError::AIError(format!("Tool call error ({}): {}", status, err)));
+                return Err(AppError::AiError(format!("Tool call error ({}): {}", status, err)));
             }
 
             let json_resp: serde_json::Value = resp.json().await
-                .map_err(|e| AppError::AIError(format!("Parse tool response failed: {}", e)))?;
+                .map_err(|e| AppError::AiError(format!("Parse tool response failed: {}", e)))?;
 
             let choice = json_resp.get("choices")
                 .and_then(|c| c.get(0));
@@ -377,31 +386,21 @@ pub async fn chat_stream(
     let thinking = enable_thinking.unwrap_or(false);
     inject_thinking_params(&mut request_body, &config, thinking);
 
-    let mut req_builder = client
-        .post(&url)
-        .header("Content-Type", "application/json")
-        .body(request_body.to_string());
-
-    if let Some(key) = &config.api_key {
-        match config.provider.as_str() {
-            "anthropic" => {
-                req_builder = req_builder.header("x-api-key", key);
-            }
-            _ => {
-                req_builder = req_builder.header("Authorization", format!("Bearer {}", key));
-            }
-        }
-    }
+    let req_builder = config.apply_auth(
+        client.post(&url)
+            .header("Content-Type", "application/json")
+            .body(request_body.to_string())
+    );
 
     let response = req_builder
         .send()
         .await
-        .map_err(|e| AppError::AIError(friendly_reqwest_error(&e)))?;
+        .map_err(|e| AppError::AiError(friendly_reqwest_error(&e)))?;
 
     if !response.status().is_success() {
         let status = response.status();
         let error_text = response.text().await.unwrap_or_else(|_| "Unknown".to_string());
-        return Err(AppError::AIError(format!(
+        return Err(AppError::AiError(format!(
             "Stream failed ({}): {}", status, error_text
         )));
     }
@@ -418,6 +417,10 @@ pub async fn generate_content(
     api_key: Option<String>,
     model: Option<String>,
     base_url: Option<String>,
+    service_id: Option<String>,
+    proxy_url: Option<String>,
+    connect_timeout_secs: Option<u64>,
+    request_timeout_secs: Option<u64>,
 ) -> Result<String> {
     let user_prompt = if current_content.is_empty() {
         author_notes.clone()
@@ -432,10 +435,11 @@ pub async fn generate_content(
         ChatMessage {
             role: "user".to_string(),
             content: user_prompt,
+            images: None,
         },
     ];
 
-    let response = chat(app, messages, provider, api_key, model, base_url, None, None, None).await?;
+    let response = chat(app, messages, provider, api_key, model, base_url, None, None, None, service_id, proxy_url, connect_timeout_secs, request_timeout_secs).await?;
 
     Ok(response)
 }
@@ -455,6 +459,10 @@ pub async fn generate_content_stream(
     enable_web_search: Option<bool>,
     enable_thinking: Option<bool>,
     request_id: Option<String>,
+    service_id: Option<String>,
+    proxy_url: Option<String>,
+    connect_timeout_secs: Option<u64>,
+    request_timeout_secs: Option<u64>,
 ) -> Result<String> {
     let user_prompt = if current_content.is_empty() {
         author_notes.clone()
@@ -471,6 +479,7 @@ pub async fn generate_content_stream(
         messages.push(ChatMessage {
             role: "system".to_string(),
             content: sp,
+            images: None,
         });
     }
 
@@ -485,9 +494,10 @@ pub async fn generate_content_stream(
     messages.push(ChatMessage {
         role: "user".to_string(),
         content: user_prompt,
+        images: None,
     });
 
-    chat_stream(app, messages, provider, api_key, model, base_url, window, enable_web_search, enable_thinking, None, None, request_id).await
+    chat_stream(app, messages, provider, api_key, model, base_url, window, enable_web_search, enable_thinking, None, None, request_id, service_id, proxy_url, connect_timeout_secs, request_timeout_secs).await
 }
 
 #[tauri::command]
@@ -497,9 +507,13 @@ pub async fn test_api_connection(
     api_key: Option<String>,
     model: Option<String>,
     base_url: Option<String>,
+    service_id: Option<String>,
+    proxy_url: Option<String>,
+    connect_timeout_secs: Option<u64>,
+    request_timeout_secs: Option<u64>,
 ) -> Result<String> {
-    let config = get_ai_config(&app, provider, api_key, model, base_url);
-    let client = ai_client();
+    let config = get_ai_config(&app, provider, api_key, model, base_url, service_id);
+    let client = ai_client_with_opts(proxy_url.as_deref(), connect_timeout_secs, request_timeout_secs);
     let url = format!("{}/chat/completions", config.get_base_url());
 
     let request_body = json!({
@@ -509,34 +523,24 @@ pub async fn test_api_connection(
         "stream": false
     });
 
-    let mut req_builder = client
-        .post(&url)
-        .header("Content-Type", "application/json")
-        .json(&request_body);
-
-    if let Some(key) = &config.api_key {
-        match config.provider.as_str() {
-            "anthropic" => {
-                req_builder = req_builder.header("x-api-key", key);
-            }
-            _ => {
-                req_builder = req_builder.header("Authorization", format!("Bearer {}", key));
-            }
-        }
-    }
+    let req_builder = config.apply_auth(
+        client.post(&url)
+            .header("Content-Type", "application/json")
+            .json(&request_body)
+    );
 
     let response = req_builder
         .timeout(Duration::from_secs(15))
         .send()
         .await
-        .map_err(|e| AppError::AIError(friendly_reqwest_error(&e)))?;
+        .map_err(|e| AppError::AiError(friendly_reqwest_error(&e)))?;
 
     if response.status().is_success() {
         Ok(format!("连接成功！模型: {}", config.get_default_model()))
     } else {
         let status = response.status();
         let error_text = response.text().await.unwrap_or_default();
-        Err(AppError::AIError(format!("API 返回错误 ({}): {}", status, error_text)))
+        Err(AppError::AiError(format!("API 返回错误 ({}): {}", status, error_text)))
     }
 }
 
@@ -549,9 +553,7 @@ async fn call_openai_responses(
 ) -> Result<String> {
     let url = format!("{}/responses", config.get_base_url());
 
-    let input: Vec<serde_json::Value> = messages.iter().map(|m| {
-        json!({ "role": m.role, "content": m.content })
-    }).collect();
+    let input: Vec<serde_json::Value> = messages_to_json(messages, "openai");
 
     let mut request_body = json!({
         "model": config.get_default_model(),
@@ -563,29 +565,26 @@ async fn call_openai_responses(
         request_body["max_tokens"] = json!(mt);
     }
 
-    let mut req_builder = client
-        .post(&url)
-        .header("Content-Type", "application/json")
-        .json(&request_body);
-
-    if let Some(key) = &config.api_key {
-        req_builder = req_builder.header("Authorization", format!("Bearer {}", key));
-    }
+    let req_builder = config.apply_auth(
+        client.post(&url)
+            .header("Content-Type", "application/json")
+            .json(&request_body)
+    );
 
     let response = req_builder
         .timeout(Duration::from_secs(120))
         .send()
         .await
-        .map_err(|e| AppError::AIError(friendly_reqwest_error(&e)))?;
+        .map_err(|e| AppError::AiError(friendly_reqwest_error(&e)))?;
 
     if !response.status().is_success() {
         let status = response.status();
         let error_text = response.text().await.unwrap_or_else(|_| "Unknown".to_string());
-        return Err(AppError::AIError(format!("OpenAI Responses API error ({}): {}", status, error_text)));
+        return Err(AppError::AiError(format!("OpenAI Responses API error ({}): {}", status, error_text)));
     }
 
     let json_val: serde_json::Value = response.json().await
-        .map_err(|e| AppError::AIError(format!("Failed to parse Responses API response: {}", e)))?;
+        .map_err(|e| AppError::AiError(format!("Failed to parse Responses API response: {}", e)))?;
 
     // 从 output 数组中提取文本内容
     let output_text = json_val.get("output_text")
@@ -611,7 +610,7 @@ async fn call_anthropic_with_search(
         if msg.role == "system" {
             system_content = msg.content.clone();
         } else {
-            api_messages.push(json!({ "role": msg.role, "content": msg.content }));
+            api_messages.push(message_to_json(msg, "anthropic"));
         }
     }
 
@@ -630,31 +629,28 @@ async fn call_anthropic_with_search(
         request_body["system"] = json!(system_content);
     }
 
-    let mut req_builder = client
-        .post(&url)
-        .header("Content-Type", "application/json")
-        .header("anthropic-version", "2023-06-01")
-        .header("anthropic-beta", "web-search-2025-03-05")
-        .json(&request_body);
-
-    if let Some(key) = &config.api_key {
-        req_builder = req_builder.header("x-api-key", key);
-    }
+    let req_builder = config.apply_auth(
+        client.post(&url)
+            .header("Content-Type", "application/json")
+            .header("anthropic-version", "2023-06-01")
+            .header("anthropic-beta", "web-search-2025-03-05")
+            .json(&request_body)
+    );
 
     let response = req_builder
         .timeout(Duration::from_secs(120))
         .send()
         .await
-        .map_err(|e| AppError::AIError(friendly_reqwest_error(&e)))?;
+        .map_err(|e| AppError::AiError(friendly_reqwest_error(&e)))?;
 
     if !response.status().is_success() {
         let status = response.status();
         let error_text = response.text().await.unwrap_or_else(|_| "Unknown".to_string());
-        return Err(AppError::AIError(format!("Anthropic API error ({}): {}", status, error_text)));
+        return Err(AppError::AiError(format!("Anthropic API error ({}): {}", status, error_text)));
     }
 
     let json_val: serde_json::Value = response.json().await
-        .map_err(|e| AppError::AIError(format!("Failed to parse Anthropic response: {}", e)))?;
+        .map_err(|e| AppError::AiError(format!("Failed to parse Anthropic response: {}", e)))?;
 
     // 从 content 数组中提取文本
     let mut result = String::new();
@@ -699,10 +695,10 @@ where
         }
 
         let chunk = chunk_result
-            .map_err(|e| AppError::AIError(friendly_reqwest_error(&e)))?;
+            .map_err(|e| AppError::AiError(friendly_reqwest_error(&e)))?;
 
         if buffer.len() + chunk.len() > MAX_BUFFER_SIZE {
-            return Err(AppError::AIError("Response too large, exceeded buffer limit".to_string()));
+            return Err(AppError::AiError("Response too large, exceeded buffer limit".to_string()));
         }
 
         buffer.extend_from_slice(&chunk);
@@ -811,13 +807,8 @@ async fn stream_openai_responses(
     let base_url = config.get_base_url();
     let url = format!("{}/responses", base_url);
 
-    // 将 ChatMessage 转换为 Responses API 的 input 格式
-    let input: Vec<serde_json::Value> = messages.iter().map(|m| {
-        json!({
-            "role": m.role,
-            "content": m.content
-        })
-    }).collect();
+    // 将 ChatMessage 转换为 Responses API 的 input 格式（支持多模态图片）
+    let input: Vec<serde_json::Value> = messages_to_json(messages, "openai");
 
     let request_body = json!({
         "model": config.get_default_model(),
@@ -826,24 +817,21 @@ async fn stream_openai_responses(
         "stream": true
     });
 
-    let mut req_builder = client
-        .post(&url)
-        .header("Content-Type", "application/json")
-        .body(request_body.to_string());
-
-    if let Some(key) = &config.api_key {
-        req_builder = req_builder.header("Authorization", format!("Bearer {}", key));
-    }
+    let req_builder = config.apply_auth(
+        client.post(&url)
+            .header("Content-Type", "application/json")
+            .body(request_body.to_string())
+    );
 
     let response = req_builder
         .send()
         .await
-        .map_err(|e| AppError::AIError(friendly_reqwest_error(&e)))?;
+        .map_err(|e| AppError::AiError(friendly_reqwest_error(&e)))?;
 
     if !response.status().is_success() {
         let status = response.status();
         let error_text = response.text().await.unwrap_or_else(|_| "Unknown".to_string());
-        return Err(AppError::AIError(format!(
+        return Err(AppError::AiError(format!(
             "OpenAI Responses API failed ({}): {}", status, error_text
         )));
     }
@@ -902,10 +890,7 @@ async fn stream_anthropic_with_search(
         if msg.role == "system" {
             system_content = msg.content.clone();
         } else {
-            api_messages.push(json!({
-                "role": msg.role,
-                "content": msg.content
-            }));
+            api_messages.push(message_to_json(msg, "anthropic"));
         }
     }
 
@@ -925,26 +910,23 @@ async fn stream_anthropic_with_search(
         request_body["system"] = json!(system_content);
     }
 
-    let mut req_builder = client
-        .post(&url)
-        .header("Content-Type", "application/json")
-        .header("anthropic-version", "2023-06-01")
-        .header("anthropic-beta", "web-search-2025-03-05")
-        .body(request_body.to_string());
-
-    if let Some(key) = &config.api_key {
-        req_builder = req_builder.header("x-api-key", key);
-    }
+    let req_builder = config.apply_auth(
+        client.post(&url)
+            .header("Content-Type", "application/json")
+            .header("anthropic-version", "2023-06-01")
+            .header("anthropic-beta", "web-search-2025-03-05")
+            .body(request_body.to_string())
+    );
 
     let response = req_builder
         .send()
         .await
-        .map_err(|e| AppError::AIError(friendly_reqwest_error(&e)))?;
+        .map_err(|e| AppError::AiError(friendly_reqwest_error(&e)))?;
 
     if !response.status().is_success() {
         let status = response.status();
         let error_text = response.text().await.unwrap_or_else(|_| "Unknown".to_string());
-        return Err(AppError::AIError(format!(
+        return Err(AppError::AiError(format!(
             "Anthropic API failed ({}): {}", status, error_text
         )));
     }
@@ -1065,23 +1047,14 @@ fn inject_thinking_params(request_body: &mut serde_json::Value, config: &AIConfi
     }
 }
 
-/// 根据 provider 返回推荐的默认 temperature
+/// 根据 provider 返回推荐的默认 temperature（从注册表获取）
 fn get_default_temperature(config: &AIConfig) -> f64 {
-    match config.provider.as_str() {
-        "glm" | "glm-code" => 1.0,              // GLM-5 官方默认 1.0
-        "minimax" | "minimax-code" => 1.0,       // MiniMax 官方推荐 1.0
-        _ => 0.7,
-    }
+    config.defaults().default_temperature
 }
 
-/// 根据 provider 返回推荐的默认 max_tokens
+/// 根据 provider 返回推荐的默认 max_tokens（从注册表获取）
 fn get_default_max_tokens(config: &AIConfig) -> u32 {
-    match config.provider.as_str() {
-        "glm" | "glm-code" => 8192,             // GLM-5 默认仅 1024，太低
-        "minimax" | "minimax-code" => 8192,      // MiniMax 需要合理默认值
-        "anthropic" => 8192,
-        _ => 4096,
-    }
+    config.defaults().default_max_tokens
 }
 
 /// 合并多个 system 消息为一个（部分 provider 如 MiniMax 不支持多 system 消息）
@@ -1106,6 +1079,7 @@ fn merge_system_messages(messages: &[ChatMessage]) -> Vec<ChatMessage> {
                 result.push(ChatMessage {
                     role: "system".to_string(),
                     content: merged_system.clone(),
+                    images: None,
                 });
                 system_emitted = true;
             }
@@ -1118,20 +1092,75 @@ fn merge_system_messages(messages: &[ChatMessage]) -> Vec<ChatMessage> {
     result
 }
 
+/// 将 ChatMessage 转为 API 兼容的 JSON（支持多模态图片）
+/// 对于 Anthropic provider，图片使用 source.type=base64 格式
+/// 对于其他 provider（OpenAI 兼容），图片使用 image_url.url=data:... 格式
+fn message_to_json(msg: &ChatMessage, provider: &str) -> serde_json::Value {
+    let images = msg.images.as_deref().unwrap_or(&[]);
+    if images.is_empty() {
+        // 纯文本消息
+        return json!({ "role": msg.role, "content": msg.content });
+    }
+
+    // 多模态消息：text + images
+    let mut content_parts: Vec<serde_json::Value> = Vec::new();
+
+    // 文本部分
+    if !msg.content.is_empty() {
+        content_parts.push(json!({ "type": "text", "text": msg.content }));
+    }
+
+    // 图片部分
+    for img in images {
+        if provider == "anthropic" {
+            // Anthropic 原生格式
+            content_parts.push(json!({
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": img.mime_type,
+                    "data": img.data
+                }
+            }));
+        } else {
+            // OpenAI 兼容格式
+            content_parts.push(json!({
+                "type": "image_url",
+                "image_url": {
+                    "url": format!("data:{};base64,{}", img.mime_type, img.data)
+                }
+            }));
+        }
+    }
+
+    json!({ "role": msg.role, "content": content_parts })
+}
+
+/// 批量转换消息列表
+fn messages_to_json(messages: &[ChatMessage], provider: &str) -> Vec<serde_json::Value> {
+    messages.iter().map(|m| message_to_json(m, provider)).collect()
+}
+
 fn get_ai_config(
     _app: &AppHandle,
     provider: Option<String>,
     api_key: Option<String>,
     model: Option<String>,
     base_url: Option<String>,
+    service_id: Option<String>,
 ) -> AIConfig {
     let provider_val = provider.unwrap_or_else(|| {
         std::env::var("AI_PROVIDER").unwrap_or_else(|_| "openai".to_string())
     });
 
-    let api_key_val = api_key.or_else(|| {
-        std::env::var("AI_API_KEY").ok()
-    });
+    // API Key 优先级：传入值 → keyring → 环境变量
+    let api_key_val = api_key
+        .filter(|k| !k.is_empty() && k != "__KEYRING__")
+        .or_else(|| {
+            service_id.as_deref()
+                .and_then(super::credential::get_ai_key_from_keyring)
+        })
+        .or_else(|| std::env::var("AI_API_KEY").ok());
 
     let base_url_val = base_url
         .filter(|s| !s.is_empty())
@@ -1148,11 +1177,12 @@ fn get_ai_config(
 /// 导出全部 AI 服务列表到共享文件 ~/.aidocplus/ai-services.json
 /// 供资源管理器等外部工具读取，支持多服务切换
 #[tauri::command]
-pub fn export_ai_services(json: String) -> std::result::Result<(), String> {
-    let home = dirs::home_dir().ok_or("无法获取用户主目录")?;
+pub fn export_ai_services(json: String) -> crate::error::Result<()> {
+    use crate::error::AppError;
+    let home = dirs::home_dir().ok_or_else(|| AppError::Internal("无法获取用户主目录".to_string()))?;
     let config_dir = home.join(".aidocplus");
     std::fs::create_dir_all(&config_dir)
-        .map_err(|e| format!("创建配置目录失败: {}", e))?;
+        .map_err(|e| AppError::Internal(format!("创建配置目录失败: {}", e)))?;
     crate::config::atomic_write(&config_dir.join("ai-services.json"), &json)?;
     Ok(())
 }

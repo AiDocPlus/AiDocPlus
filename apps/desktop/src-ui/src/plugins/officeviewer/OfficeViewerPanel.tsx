@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import type { PluginPanelProps } from '../types';
 import { usePluginHost } from '../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import { ToolPluginLayout } from '../_framework/ToolPluginLayout';
 import { Button } from '../_framework/ui';
 import { FileSearch, Upload, Trash2 } from 'lucide-react';
@@ -69,7 +70,7 @@ export function OfficeViewerPanel(_props: PluginPanelProps) {
       // 更新最近文件列表
       updateRecentFiles(newFile);
     } catch (err) {
-      setStatusMsg(`${t('loadFailed')}: ${err instanceof Error ? err.message : String(err)}`);
+      setStatusMsg(`${t('loadFailed')}: ${formatBackendError(err)}`);
       setStatusIsError(true);
     } finally {
       setLoading(false);

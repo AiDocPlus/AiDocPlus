@@ -6,6 +6,7 @@ import {
 import { EMAIL_PROVIDER_PRESETS } from '@aidocplus/shared-types';
 import type { EmailAccount } from './types';
 import { isValidEmail } from './utils';
+import { formatBackendError } from '@/lib/backendError';
 
 export function AccountForm({ account, t, onSave, onCancel, onTestConnection }: {
   account: EmailAccount;
@@ -160,7 +161,7 @@ export function AccountForm({ account, t, onSave, onCancel, onTestConnection }: 
                 await onTestConnection(form);
                 setTestResult({ ok: true, msg: t('smtpTestSuccess') });
               } catch (err) {
-                setTestResult({ ok: false, msg: err instanceof Error ? err.message : String(err) });
+                setTestResult({ ok: false, msg: formatBackendError(err) });
               } finally {
                 setTesting(false);
               }

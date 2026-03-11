@@ -79,28 +79,28 @@ impl Default for WorkspaceState {
     }
 }
 
-pub fn save_workspace_state(state: &WorkspaceState, path: &PathBuf) -> Result<(), String> {
+pub fn save_workspace_state(state: &WorkspaceState, path: &PathBuf) -> crate::error::Result<()> {
     let json = serde_json::to_string_pretty(state)
-        .map_err(|e| format!("Failed to serialize workspace state: {}", e))?;
+        .map_err(|e| crate::error::AppError::Internal(format!("Failed to serialize workspace state: {}", e)))?;
     crate::config::atomic_write(path, &json)
 }
 
-pub fn load_workspace_state(path: &PathBuf) -> Result<Option<WorkspaceState>, String> {
+pub fn load_workspace_state(path: &PathBuf) -> crate::error::Result<Option<WorkspaceState>> {
     if !path.exists() {
         return Ok(None);
     }
 
     let json = fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read workspace state: {}", e))?;
+        .map_err(|e| crate::error::AppError::Internal(format!("Failed to read workspace state: {}", e)))?;
     let state: WorkspaceState = serde_json::from_str(&json)
-        .map_err(|e| format!("Failed to parse workspace state: {}", e))?;
+        .map_err(|e| crate::error::AppError::Internal(format!("Failed to parse workspace state: {}", e)))?;
     Ok(Some(state))
 }
 
-pub fn clear_workspace_state(path: &PathBuf) -> Result<(), String> {
+pub fn clear_workspace_state(path: &PathBuf) -> crate::error::Result<()> {
     if path.exists() {
         fs::remove_file(path)
-            .map_err(|e| format!("Failed to remove workspace state: {}", e))?;
+            .map_err(|e| crate::error::AppError::Internal(format!("Failed to remove workspace state: {}", e)))?;
     }
     Ok(())
 }

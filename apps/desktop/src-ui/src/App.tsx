@@ -9,12 +9,15 @@ import { UpdateChecker } from './components/settings/UpdateChecker';
 import './i18n'; // Initialize i18n
 import {
   loadAppBootstrapResources,
+  loadDeferredResources,
   restoreAppBootstrapWorkspace,
   fallbackLoadProjectsAfterBootstrapFailure,
   registerAppFrontendStateProvider,
   resolveEffectiveAppTheme,
   applyAppThemeClass,
+  migrateAiKeysToKeyring,
 } from './App.helpers';
+import { loadConversationsFromDB } from './stores/useConversationsStore';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -45,9 +48,15 @@ function AppContent() {
         // 启动时静默清理旧临时文件（不阻塞）
         invoke('cleanup_temp_files').catch(() => {});
 
+        // 一次性迁移：将明文 API Key 迁移到 OS 密钥链
+        migrateAiKeysToKeyring();
+
         // 第一批：互不依赖的操作并行执行
         const batch1Start = performance.now();
-        await loadAppBootstrapResources();
+        await Promise.all([
+          loadAppBootstrapResources(),
+          loadConversationsFromDB(),
+        ]);
         console.log(`[Perf] 第一批并行总耗时: ${(performance.now() - batch1Start).toFixed(0)}ms`);
 
         // 第二批：依赖第一批完成
@@ -66,6 +75,9 @@ function AppContent() {
 
       setIsInitialized(true);
       setRestoring(false);
+
+      // UI 可交互后，延后加载非关键资源（模板数据等）
+      loadDeferredResources();
     };
 
     initializeApp();

@@ -3,20 +3,26 @@
 > 基于对整个代码库的深入架构分析，按照高端商业软件标准，提出以下改进方向。
 > 每项改进标注了 **重要性**（⭐~⭐⭐⭐）、**可行性**（🔧容易 / 🔧🔧中等 / 🔧🔧🔧复杂）和 **优先级**（P0~P3）。
 
-### 最新状态（2026-02-27）
+### 最新状态（2026-03-11 更新）
 
-**✅ Monorepo 合并已完成**：6 个独立仓库（AiDocPlus-Main、AiDocPlus-Plugins、AiDocPlus-AIProviders、AiDocPlus-DocTemplates、AiDocPlus-PromptTemplates、AiDocPlus-ResourceManager）已合并为单一 `AiDocPlus` monorepo。
+**✅ Monorepo 合并已完成**：6 个独立仓库已合并为单一 `AiDocPlus` monorepo。
 
 **当前项目规模**：
-- Rust 后端：8,895 行（23 个源文件）
-- TypeScript 前端：45,754 行（197 个源文件）
-- 内置插件：27 个（含 `_framework/` SDK）
+
+- Rust 后端：12,137 行（43 个源文件）
+- TypeScript 前端：~53,000 行
+- IM Bot 服务：3,182 行（独立 Node.js 服务）
+- 内置插件：29 个（含 `_framework/` SDK）
 - AI 服务商：13 个
 - 提示词模板：1,481 个（53 个分类）
 - 文档模板：20 个（7 个分类）+ 8 个 PPT 主题
-- Zustand Store：6 个（useAppStore 1,782 行）
+- Zustand Store：6 个主 Store + 16 个 helper 模块（useAppStore 已拆分）
+- 当前版本：v0.3.5
 
 **已完成的架构改进**：
+
+*基础架构（2026-02-27 前完成）*：
+
 - ✅ 资源管理器合并到主程序（Tauri 多窗口）
 - ✅ 多仓库 → 单一 Monorepo（消除同步问题）
 - ✅ 插件 `_framework/` 统一为唯一一份
@@ -26,6 +32,23 @@
 - ✅ SQLite 资源引擎移除（回归 JSON 文件模式）
 - ✅ 角色系统、项目模板功能完全移除
 - ✅ 插件框架字体跨平台 fallback（7 处）
+
+*2026-02-27 ~ 2026-03-11 新完成*：
+
+- ✅ **自动更新**（`tauri-plugin-updater`）：GitHub Releases 检查 + 静默下载 + 提示安装（§10.3 + §16.4.1）
+- ✅ **macOS 代码签名 + Apple 公证**：`release.sh` 一键签名发布（§16.7）
+- ✅ **菜单国际化**：`menu_i18n.rs` 检测系统语言，动态构建中英文原生菜单（§9.2 部分）
+- ✅ **CLI 命令行**：`cli.rs` 支持 `--version`、`api status/schema/call`，无需启动 GUI
+- ✅ **Deep Link**：`tauri-plugin-deep-link`，`aidocplus://` URL Scheme
+- ✅ **IM Bot 桥接服务**：`apps/im-bot/`，飞书/钉钉/企微/QQ 四渠道消息机器人
+- ✅ **文档级 AI 服务切换**：每个文档可独立绑定不同 AI 服务（`document.aiServiceId`）
+- ✅ **useShallow 精确订阅**：17 个组件优化，减少不必要的重渲染（§7.3 部分）
+- ✅ **useAppStore 模块化拆分**：从单文件拆分为 16 个 helper 模块（§7.3 部分）
+- ✅ **keyring 安全存储**：email 插件 SMTP 密码已迁移到系统密钥链（§8.1 部分）
+- ✅ **文档外部变更通知**：`document:external-change` 事件驱动，IM Bot 创建文档后前端自动刷新
+- ✅ **临时文件自动清理**：关闭标签释放文档内容，减少内存占用（§7.2 部分）
+- ✅ **SSE 流式 API**：API Server 支持 SSE 流式返回
+- ✅ **消息去重**：飞书长连接 SDK 重发消息去重（message_id + 5 分钟 TTL）
 
 ---
 
@@ -47,13 +70,18 @@
   - 将文档内容建模为**块结构**（block-based），类似 Notion/飞书，便于段落级 AI 操作、拖拽重排和精细化版本追踪。
 - ⭐⭐ | 🔧🔧🔧 | **P2**
 
-### 1.3 编辑器性能优化
+### 1.3 编辑器性能优化 ✅ 已完成
 
 - **现状**：`MarkdownEditor.tsx` 使用 CodeMirror 6，支持语法高亮、自动补全、lint 等。大文档时可能存在性能瓶颈。
-- **建议**：
-  - 实现**虚拟滚动 / 文档分片**，对超长文档（>10 万字）仅渲染可视区域。
-  - 预览模式（`MarkdownPreview`）使用 `requestIdleCallback` 延迟渲染非可视区域。
-  - 自动保存节流：当前 `EditorPanel` 使用 `useRef` + `setInterval`，建议改为 **debounce + 脏标记**，减少不必要的磁盘写入。
+- **已实现**：
+  - ✅ **大文档模式**（>10 万字符自动启用）：动态增加 debounce（300ms→800ms），自动禁用 Markdown lint 和选中匹配高亮，状态栏显示"大文档模式"提示
+  - ✅ **统计计算 useMemo**：字符/词/行数统计用 `useMemo` 缓存，正则匹配替代 split+filter
+  - ✅ **EditorStatusBar memo**：`React.memo()` 包裹，避免不必要的重渲染
+  - ✅ **预览截断**：>80K 字符的文档预览自动截断，显示截断提示
+  - ✅ **Mermaid 渲染缓存**：用哈希键缓存已渲染的 Mermaid SVG，避免重复渲染
+  - ✅ **滚动同步 rAF 节流**：分屏滚动同步改为 requestAnimationFrame 节流，每帧最多同步一次
+  - 📋 自动保存已用 `setInterval` + `ref` + `baseline` 比较优化，无需改为 debounce（当前方案已避免频繁写入）
+  - 📋 CodeMirror 6 本身已实现虚拟滚动（仅渲染可视区域），无需额外实现
 - ⭐⭐ | 🔧🔧 | **P1**
 
 ### 1.4 富文本 / 所见即所得（WYSIWYG）模式
@@ -63,27 +91,31 @@
 - **建议**：基于 [ProseMirror](https://prosemirror.net/) 或 [Tiptap](https://tiptap.dev/) 增加可选的所见即所得模式，底层仍存储 Markdown，编辑时提供富文本体验。可作为高级付费功能。
 - ⭐⭐ | 🔧🔧🔧 | **P2**
 
-### 1.5 文档大纲与导航增强
+### 1.5 文档大纲与导航增强 ✅ 已完成
 
 - **现状**：`DocumentOutline` 组件已存在，但功能较基础。
-- **建议**：
-  - 支持**拖拽重排**章节（移动标题及其下属内容）。
-  - 显示每章节的字数统计。
-  - 支持**折叠/展开**编辑器中的章节。
-  - 增加**面包屑导航**，显示当前光标所在章节路径。
+- **已实现**：
+  - ✅ **章节字数统计**：大纲中每个标题旁显示该节字数（含子节），>1000 显示为 1.0k 格式
+  - ✅ **当前标题高亮**：根据光标位置实时高亮大纲中当前所在标题（bg-accent + font-medium）
+  - ✅ **面包屑导航**：状态栏中间区域显示当前光标所在的章节路径（H1 › H2 › H3），点击可跳转
+  - 📋 拖拽重排和编辑器内折叠复杂度较高，留待后续增强
 - ⭐ | 🔧 | **P1**
 
 ---
 
 ## 二、AI 功能链路（ai.rs / commands/ai.rs / ChatPanel）
 
-### 2.1 多模态支持（图像/文件理解）
+### 2.1 多模态支持（图像/文件理解） ✅ 已完成
 
 - **现状**：`ChatMessage` 只有 `role` 和 `content`（字符串），不支持图片/文件附件。虽然 `Document` 有 `attachments` 字段，但 AI 链路不使用它们。
-- **建议**：
-  - 扩展 `ChatMessage` 支持多模态内容（`content` 改为 `Vec<ContentPart>`，包含 text/image_url/file 类型）。
-  - 支持将文档附件（图片）发送给 Vision 模型进行分析。
-  - 支持 PDF/图片 OCR 后注入 AI 上下文。
+- **已实现**：
+  - ✅ **数据模型扩展**：`ChatMessage`（Rust）和 `AIMessage`（TS）新增可选 `images` 字段（`ChatImage[]`，base64 + mimeType）
+  - ✅ **多模态 API 适配**：Rust 后端 `message_to_json()` 自动将 images 转为 OpenAI `image_url` 格式或 Anthropic `source.base64` 格式
+  - ✅ **图片上传 UI**：ChatPanel 输入框旁添加图片上传按钮（ImagePlus 图标），支持点击选择、Ctrl+V 粘贴图片
+  - ✅ **图片预览条**：输入框上方显示待发送图片缩略图（56×56），悬停显示删除按钮，最多 5 张，单张最大 10MB
+  - ✅ **消息图片展示**：用户消息气泡中以 64×64 缩略图展示已发送图片，点击可在新窗口查看原图
+  - ✅ **全链路适配**：chat / chat_stream / Responses API / Anthropic API 所有路径均支持多模态
+  - 📋 PDF/图片 OCR 注入上下文留待后续增强
 - ⭐⭐⭐ | 🔧🔧 | **P0**
 
 ### 2.2 AI 服务提供商抽象层重构
@@ -107,15 +139,16 @@
   - 支持**并行工具调用**（当前是串行循环）。
 - ⭐⭐ | 🔧🔧 | **P1**
 
-### 2.4 对话上下文管理优化
+### 2.4 对话上下文管理优化 ✅ 已完成
 
 - **现状**：`useConversationsStore` 将对话持久化到 `~/AiDocPlus/conversations.json`（单文件）。所有对话消息全量序列化。
 - **问题**：对话量增长后，单文件读写性能下降。消息历史无限增长会超出 AI 模型的 token 限制。
-- **建议**：
-  - 实现**滑动窗口 + 摘要**策略：当消息数超过阈值时，自动用 AI 总结早期对话，保留摘要。
-  - 对话存储改为**按对话 ID 分文件**或使用嵌入式数据库（如 SQLite）。
-  - 支持**对话分支**（从某条消息重新开始不同方向的对话）。
-  - 显示**当前 token 使用量**指示器。
+- **已实现**：
+  - ✅ **Token 估算工具**（`src-ui/src/lib/tokenEstimator.ts`）：基于字符的 token 估算（中英文自动检测），模型上下文窗口映射表（覆盖 OpenAI/Anthropic/Gemini/xAI/DeepSeek/通义千问/GLM/MiniMax/Kimi 等主流模型）
+  - ✅ **滑动窗口消息截断**：`truncateMessages()` 函数，在 `sendChatMessage` 发送前自动裁剪消息。保留 system 消息 + 最近对话，截断时插入提示。支持按 token 数和消息条数双重限制。
+  - ✅ **Token 用量指示器**（`TokenUsageIndicator` 组件）：ChatPanel 输入框上方显示进度条 + 文字（`~1.2K / 128K tokens`），颜色分级（绿/黄/红）。
+  - ✅ **设置项**：`maxContextMessages`（最大消息条数）、`maxContextTokens`（最大 token 数），0=自动按模型检测。
+  - 📋 对话存储已在 §14 中迁移至 SQLite。对话摘要功能可后续作为增强项实现。
 - ⭐⭐ | 🔧🔧 | **P1**
 
 ### 2.5 RAG（检索增强生成）系统
@@ -276,33 +309,37 @@
 
 ## 七、性能优化
 
-### 7.1 应用启动速度
+### 7.1 应用启动速度 ✅ 已完成
 
-- **现状**：`App.tsx` 启动时并行加载插件、文档模板、提示词模板、分类，然后恢复工作区。
-- **建议**：
-  - 实现**渐进式加载**：先显示上次的工作区快照（缓存的 UI 状态），后台加载数据。
-  - **延迟初始化**非当前可见的面板（编程区、功能区等仅在首次切换时初始化）。
-  - 使用 **React.lazy + Suspense** 拆分代码，减小首屏 JS 包大小。
-  - Rust 侧：将 `AppState::new()` 中的目录创建改为异步。
+- **已完成**（2026-03-12）：
+  - ✅ **manualChunks 拆分大型第三方库**：CodeMirror(1,703kB)、Markdown渲染(778kB)、React(194kB)、Icons(59kB) 从主 chunk 拆出
+  - ✅ **React.lazy 拆分按需组件**：SettingsPanel、SearchPanel、ChatPanel、PluginAssistantPanel、PluginToolArea、6个Dialog 改为延迟加载
+  - ✅ **延后非关键数据加载**：模板数据(docTemplates/categories/builtInTemplates)从启动关键路径移除，UI 可交互后异步加载
+  - ✅ **Suspense fallback**：所有 lazy 组件添加 Suspense 包裹
+  - **效果**：main.js 从 7,639kB 降至 5,991kB（**-21.6%**），gzip 从 2,205kB 降至 1,695kB（**-23.1%**）
 - ⭐⭐ | 🔧🔧 | **P1**
 
-### 7.2 内存管理
+### 7.2 内存管理 🟡 部分完成
 
 - **现状**：`useAppStore` 在内存中保持所有文档的完整数据（包括 `content`、`ai_generated_content`、`versions` 数组）。
 - **问题**：打开多个大文档时内存占用线性增长。`versions` 数组可包含上千个全文快照。
-- **建议**：
+- **已完成**（2026-03-11）：
+  - ✅ 关闭标签页时**释放文档内容**，仅保留元数据缓存。
+  - ✅ 临时文件自动清理。
+- **待完成**：
   - **按需加载文档内容**：`documents` 列表只保存元数据，内容在打开标签页时按需加载。
   - **版本惰性加载**：`versions` 不随文档一起加载，仅在查看版本历史时请求。
-  - 关闭标签页时**释放文档内容**，仅保留元数据缓存。
-- ⭐⭐⭐ | 🔧🔧 | **P0**
+- ⭐⭐⭐ | 🔧🔧 | **P1**（原 P0，部分完成后降级）
 
-### 7.3 前端渲染优化
+### 7.3 前端渲染优化 🟡 部分完成
 
-- **现状**：`useAppStore` 是一个大型 Zustand store，包含 ~1800 行代码和几十个 action。所有组件从同一 store 读取状态。
-- **问题**：任何状态变化都可能触发大量不必要的重渲染。
-- **建议**：
-  - 将 `useAppStore` **拆分为多个独立 store**：`useProjectStore`、`useDocumentStore`、`useTabStore`、`useAIStore`。
-  - 使用 Zustand 的 **selector** 精确订阅，避免不相关状态变化触发重渲染。
+- **现状**：`useAppStore` 已从单文件拆分为 16 个 helper 模块，17 个组件已使用 `useShallow` 精确订阅。
+- **已完成**（2026-03-11）：
+  - ✅ `useAppStore` 拆分为 16 个 helper/commands 模块（`useAppStore.ai.helpers.ts`、`useAppStore.workspace.helpers.ts` 等）。
+  - ✅ 17 个组件使用 `useShallow` 精确订阅（TabBar、FileTree、EditorPanel、SettingsPanel 等）。
+  - ✅ 切换文档渲染减少 75%（v0.3.3 性能优化）。
+- **待完成**：
+  - 进一步拆分为完全独立的 store（`useProjectStore`、`useDocumentStore`、`useTabStore`、`useAIStore`）。
   - 对 `ChatPanel` 中的消息列表使用**虚拟化列表**（`react-window` 或 `@tanstack/react-virtual`）。
   - `EditorPanel` 的复杂 props 传递改为 **Context + Provider** 模式。
 - ⭐⭐ | 🔧🔧 | **P1**
@@ -311,14 +348,17 @@
 
 ## 八、安全性
 
-### 8.1 API Key 安全存储
+### 8.1 API Key 安全存储 🟡 部分完成
 
-- **现状**：AI 服务 API Key 存储在 `settings.json` 中，明文保存在 `~/AiDocPlus/settings.json`。
+- **现状**：AI 服务 API Key 仍存储在 `settings.json` 中，明文保存在 `~/AiDocPlus/settings.json`。
 - **问题**：任何能读取用户目录的程序都能获取 API Key。
-- **建议**：
-  - 使用**操作系统密钥链**存储敏感信息：macOS Keychain、Windows Credential Manager、Linux Secret Service。
-  - Tauri 2 提供 `tauri-plugin-keyring` 可直接使用。
+- **已完成**（2026-03-11）：
+  - ✅ `keyring` crate v3 已集成（`Cargo.toml`，支持 apple-native、windows-native、sync-secret-service）。
+  - ✅ email 插件 SMTP 密码已迁移到系统密钥链（`commands/email.rs`）。
+- **待完成**：
+  - 将 AI 服务 API Key 从 `settings.json` 明文迁移到 `keyring`。
   - `settings.json` 中只保存 Key 的引用标识符，实际值从密钥链获取。
+  - 向后兼容：首次运行时自动将旧明文 Key 迁移到密钥链。
 - ⭐⭐⭐ | 🔧 | **P0**
 
 ### 8.2 文件系统安全
@@ -354,13 +394,15 @@
   - 支持**Vim/Emacs 键绑定**（可选）。
 - ⭐⭐ | 🔧🔧 | **P1**
 
-### 9.2 国际化完善
+### 9.2 国际化完善 🟡 部分完成
 
-- **现状**：使用 `react-i18next`，有中英文支持。但 Rust 后端的错误消息和菜单文本是硬编码中文。
-- **问题**：`main.rs` 菜单文本如 "文件"、"编辑"、"视图" 等为硬编码中文，无法切换语言。后端错误消息如 "文档未找到"、"读取文件失败" 也是硬编码中文。
-- **建议**：
-  - Rust 后端错误消息改为**错误码**，前端根据错误码翻译显示。
-  - 系统菜单根据当前语言设置**动态构建**。
+- **现状**：使用 `react-i18next`，前端全面国际化已完成（批次 1-4）。Rust 原生菜单已国际化。
+- **已完成**（2026-03-11）：
+  - ✅ 前端所有 UI 文字通过 i18next 处理。
+  - ✅ Rust 原生菜单通过 `menu_i18n.rs` 实现动态中英文切换。
+  - ✅ Rust 后端错误消息改为**结构化错误码**（`error.rs` ErrorCode 枚举），前端通过 `formatBackendError` + `errors.backend.*` i18n 键翻译显示（2026-03-11）。
+  - ✅ 前端所有 `instanceof Error ? .message : String(...)` 模式统一替换为 `formatBackendError()`（2026-03-11）。
+- **待完成**：
   - 增加更多语言支持（日语、韩语等亚洲语言优先）。
 - ⭐⭐ | 🔧🔧 | **P1**
 
@@ -387,15 +429,15 @@
 
 ## 十、架构与工程化
 
-### 10.1 错误处理体系化
+### 10.1 错误处理体系化 ✅ 已完成
 
-- **现状**：`error.rs` 定义了 `AppError` 枚举，但 `Result<T>` 被重定义为 `Result<T, String>`，大量命令直接返回 `String` 错误。
-- **问题**：错误信息丢失了结构化类型，前端无法区分错误类别进行不同处理。
-- **建议**：
-  - 定义**结构化错误码**体系（类似 HTTP 状态码）。
-  - 后端返回 `{ code: string, message: string, details?: object }` 格式。
-  - 前端根据错误码显示对应的用户友好消息和可选的操作建议。
-  - 实现**全局错误边界**（React Error Boundary）和崩溃报告。
+- **已完成**（2026-07-13）：
+  - ✅ `error.rs` 定义结构化 `AppError` 枚举（`Internal`/`ValidationError`/`DocumentNotFound`/`ResourceError`/`SecurityError`/`ImportFailed`/`ExportFailed`/`ExternalToolError`）和 `ErrorCode` 枚举。
+  - ✅ `AppError` 实现 `Serialize`，后端返回 `{ code: string, message: string }` 结构化 JSON。
+  - ✅ 全局类型别名 `Result<T> = std::result::Result<T, AppError>`。
+  - ✅ 所有 Tauri 命令、辅助函数、模块全部迁移到结构化 `AppError`，消除 `Result<T, String>` 和字符串错误。
+  - ✅ 涉及文件：`error.rs`、`config.rs`、`plugin.rs`、`template.rs`、`workspace.rs`、`api_server.rs`、`api_gateway.rs`、`native_export/`、`commands/`（ai/coding/document/export/file_system/import/project/resource/settings/workspace）。
+  - ✅ `cargo check` 零错误通过。
 - ⭐⭐ | 🔧🔧 | **P1**
 
 ### 10.2 日志与遥测
@@ -408,15 +450,20 @@
   - 提供**日志查看器**（帮助菜单中可打开日志文件）。
 - ⭐⭐ | 🔧🔧 | **P1**
 
-### 10.3 自动更新
+### 10.3 自动更新 ✅ 已完成
 
-- **现状**：未实现自动更新机制。
-- **建议**：
-  - 使用 Tauri 2 的 `tauri-plugin-updater` 实现**自动检查更新**。
-  - 支持**静默后台下载 + 提示安装**。
-  - 实现**增量更新**（仅下载变更部分）。
-  - 支持**更新通道**（稳定版 / 预览版 / 测试版）。
-- ⭐⭐⭐ | 🔧🔧 | **P0**
+- **已完成**（2026-03-11）：
+  - ✅ `tauri-plugin-updater` 集成，检查 GitHub Releases `latest.json`。
+  - ✅ `tauri.conf.json` 配置 updater pubkey + endpoint。
+  - ✅ `UpdateChecker.tsx` 组件：检查更新 + 下载 + 提示安装。
+  - ✅ 菜单「检查更新」菜单项（`check_update`）。
+  - ✅ `scripts/release.sh` 一键发布脚本（构建 + 签名 + 公证 + 上传 + 创建 Release）。
+  - ✅ `createUpdaterArtifacts: true`，构建自动生成更新 manifest。
+  - ✅ 安装模式：`passive`（静默后台下载，提示安装）。
+- **待优化**（P2）：
+  - 增量更新（仅下载变更部分）。
+  - 更新通道（稳定版 / 预览版 / 测试版）。
+- ~~⭐⭐⭐ | 🔧🔧 | **P0**~~ → **已完成**
 
 ### 10.4 测试体系建设
 
@@ -446,13 +493,14 @@
 
 ### 11.2 商业化收费模式：Freemium + 开放核心
 
-| 层级 | 定价 | 内容 |
-|------|------|------|
-| **社区版**（免费） | ¥0 | 本地 AI 写作全功能（用户自带 API Key）、基础插件（~10 个）、3 个项目 / 每项目 50 文档、单设备 |
-| **专业版** | ¥99~199/年 | 无限项目和文档、全部 27 个插件、多设备同步、高级导出模板、RAG 知识库、优先邮件支持 |
-| **企业版** | 按需 | 私有化部署、SSO/LDAP、批量授权、定制开发、专属技术支持 |
+| 层级                     | 定价        | 内容                                                                                          |
+| ------------------------ | ----------- | --------------------------------------------------------------------------------------------- |
+| **社区版**（免费） | ¥0         | 本地 AI 写作全功能（用户自带 API Key）、基础插件（~10 个）、3 个项目 / 每项目 50 文档、单设备 |
+| **专业版**         | ¥99~199/年 | 无限项目和文档、全部 27 个插件、多设备同步、高级导出模板、RAG 知识库、优先邮件支持            |
+| **企业版**         | 按需        | 私有化部署、SSO/LDAP、批量授权、定制开发、专属技术支持                                        |
 
 #### 授权验证技术方案
+
 - 用户注册 → 服务器颁发 license key（JWT 格式，含过期时间 + 功能列表）
 - 客户端每 7 天向服务器验证有效性，离线宽限期 30 天
 - 功能开关存储在前端 store，根据 license 动态启用/禁用
@@ -460,16 +508,16 @@
 
 ### 11.3 低成本后端服务架构
 
-| 服务 | 推荐方案 | 月成本（起步） |
-|------|----------|---------------|
-| 授权验证 API | Cloudflare Workers | **¥0** |
-| 用户数据库 | Supabase 免费层 | **¥0** |
-| 文件同步存储 | Cloudflare R2 (10GB 免费) | **¥0~20** |
-| 支付网关 | LemonSqueezy / 支付宝 | **按交易量** |
-| 官网 + 文档 | GitHub Pages / Cloudflare Pages | **¥0** |
-| 自动更新分发 | GitHub Releases | **¥0** |
-| 错误监控 | Sentry 免费层 (5000 事件/月) | **¥0** |
-| 社区论坛 | GitHub Discussions / Discord | **¥0** |
+| 服务         | 推荐方案                        | 月成本（起步）     |
+| ------------ | ------------------------------- | ------------------ |
+| 授权验证 API | Cloudflare Workers              | **¥0**      |
+| 用户数据库   | Supabase 免费层                 | **¥0**      |
+| 文件同步存储 | Cloudflare R2 (10GB 免费)       | **¥0~20**   |
+| 支付网关     | LemonSqueezy / 支付宝           | **按交易量** |
+| 官网 + 文档  | GitHub Pages / Cloudflare Pages | **¥0**      |
+| 自动更新分发 | GitHub Releases                 | **¥0**      |
+| 错误监控     | Sentry 免费层 (5000 事件/月)    | **¥0**      |
+| 社区论坛     | GitHub Discussions / Discord    | **¥0**      |
 
 **起步阶段月成本可控制在 ¥0~50 之内。**
 
@@ -519,6 +567,7 @@
 ### 13.2 建议方案：迁移到 VitePress
 
 **VitePress** 是最佳选择：
+
 1. **技术栈一致**：项目前端用 Vite，文档也用 VitePress，零学习成本
 2. **内置左侧目录 + 右侧 TOC**：正是所需的"左边目录、右边内容"格式
 3. **全文搜索**：内置本地搜索（MiniSearch），无需后端
@@ -527,6 +576,7 @@
 6. **国际化 + 深色模式**：内置支持
 
 **迁移工作量**：1~2 天，具体步骤：
+
 1. 安装 VitePress（`pnpm add -D vitepress`）
 2. 创建 `docs/.vitepress/config.ts`，配置侧边栏导航结构
 3. 移除 Jekyll 配置（`_config.yml`、frontmatter 中的 `layout: default`）
@@ -537,12 +587,12 @@
 
 ### 13.3 方案对比
 
-| 方案 | 左侧目录 | 搜索 | 成本 | 技术栈一致 |
-|------|----------|------|------|----------|
-| **VitePress** ⭐ | ✅ 内置 | ✅ 本地搜索 | 免费 | ✅ Vite 生态 |
-| Docusaurus | ✅ 内置 | ✅ Algolia | 免费 | ❌ React 但较重 |
-| Jekyll just-the-docs | ✅ 内置 | ✅ 内置 | 免费 | ❌ Ruby 生态 |
-| GitBook | ✅ 内置 | ✅ 内置 | 付费/限制 | ❌ |
+| 方案                   | 左侧目录 | 搜索        | 成本      | 技术栈一致      |
+| ---------------------- | -------- | ----------- | --------- | --------------- |
+| **VitePress** ⭐ | ✅ 内置  | ✅ 本地搜索 | 免费      | ✅ Vite 生态    |
+| Docusaurus             | ✅ 内置  | ✅ Algolia  | 免费      | ❌ React 但较重 |
+| Jekyll just-the-docs   | ✅ 内置  | ✅ 内置     | 免费      | ❌ Ruby 生态    |
+| GitBook                | ✅ 内置  | ✅ 内置     | 付费/限制 | ❌              |
 
 ---
 
@@ -551,34 +601,36 @@
 ### 14.1 历史回顾与教训
 
 上次引入 `resource_engine.rs`（SQLite）在 2026-02-26 被**完全移除**，原因是：
+
 - 试图用 SQLite 管理**资源模板**（提示词/文档模板），这些资源需要人类可读、git 管理、资源管理器 UI 编辑
 - 把 JSON 文件模式和 SQLite 模式混用在同一数据类型上，导致两套代码路径难以维护
 - 与插件系统的开放设计（插件通过 PluginHostAPI 直接读写 JSON）产生冲突
 
 ### 14.2 数据类型适合度分析
 
-| 数据类型 | 当前存储 | SQLite 适合？ | 理由 |
-|----------|----------|-------------|------|
-| 文档内容 | `Projects/{pid}/documents/{did}.json` | ❌ | 插件 pluginData 灵活性、人类可读 |
-| 插件存储 | `plugin-storage.json` | ❌ | 按 pluginId 命名空间隔离，JSON 嵌套结构 |
-| 设置/偏好 | `settings.json` | ❌ | 小文件、低频写入 |
-| 工作区状态 | `workspace-state.json` | ❌ | 小文件 |
-| **版本历史** | 内嵌在文档 JSON | ✅ **非常适合** | 增长无限、全文快照膨胀 |
-| **对话记录** | `conversations.json` | ✅ **适合** | 单文件可能很大、频繁追加 |
-| **搜索索引** | 无（每次遍历文件） | ✅ **非常适合** | FTS5 性能远超文件遍历 |
+| 数据类型           | 当前存储                                | SQLite 适合？        | 理由                                    |
+| ------------------ | --------------------------------------- | -------------------- | --------------------------------------- |
+| 文档内容           | `Projects/{pid}/documents/{did}.json` | ❌                   | 插件 pluginData 灵活性、人类可读        |
+| 插件存储           | `plugin-storage.json`                 | ❌                   | 按 pluginId 命名空间隔离，JSON 嵌套结构 |
+| 设置/偏好          | `settings.json`                       | ❌                   | 小文件、低频写入                        |
+| 工作区状态         | `workspace-state.json`                | ❌                   | 小文件                                  |
+| **版本历史** | 内嵌在文档 JSON                         | ✅**非常适合** | 增长无限、全文快照膨胀                  |
+| **对话记录** | `conversations.json`                  | ✅**适合**     | 单文件可能很大、频繁追加                |
+| **搜索索引** | 无（每次遍历文件）                      | ✅**非常适合** | FTS5 性能远超文件遍历                   |
 
 ### 14.3 精准引入范围（仅 3 个 SQLite 数据库文件）
 
 1. **`~/AiDocPlus/versions.db`** — 版本历史存储
+
    - 将 `Document.versions[]` 数组从文档 JSON 中移出
    - 表结构：`versions(id, document_id, content, created_at, description)`
    - 文档 JSON 中只保留 `currentVersionId`
-
 2. **`~/AiDocPlus/conversations.db`** — 对话记录
+
    - 替代 `conversations.json` 单文件
    - 表结构：`conversations(id, title, created_at)` + `messages(id, conversation_id, role, content, timestamp)`
-
 3. **`~/AiDocPlus/search.db`** — 全文搜索索引
+
    - 使用 SQLite FTS5 扩展
    - 文档保存时自动更新索引，搜索走 FTS5 而非文件遍历
    - 索引损坏可从 JSON 文件重建，不影响数据安全
@@ -610,11 +662,11 @@
 ### 14.5 与插件系统的兼容性
 
 这种设计**完全兼容插件系统**：
+
 - 插件通过 `PluginHostAPI.docData` 读写 `Document.pluginData`（JSON 字段），仍在 JSON 文件中
 - 插件通过 `PluginHostAPI.storage` 读写 `plugin-storage.json`，不受影响
 - 插件通过 `PluginHostAPI.platform.invoke()` 调用后端命令，接口不变
 - SQLite 只存储**插件不需要直接访问的数据**（版本快照、对话消息、搜索索引）
-
 - ⭐⭐⭐ | 🔧🔧 | **P1**（更新原 §6.1 的方案）
 
 ---
@@ -623,21 +675,21 @@
 
 ### 15.1 免费资源清单
 
-| 需求 | 推荐方案 | 月成本 |
-|------|----------|--------|
-| CI/CD | GitHub Actions (2000 分钟/月) | ¥0 |
-| 官网托管 | Cloudflare Pages / GitHub Pages | ¥0 |
-| 文档站 | VitePress + GitHub Pages | ¥0 |
-| 自动更新 | GitHub Releases + `tauri-plugin-updater` | ¥0 |
-| 用户反馈 | GitHub Issues / Discussions | ¥0 |
-| 社区论坛 | Discord 或 GitHub Discussions | ¥0 |
-| 错误监控 | Sentry 免费层 (5000 事件/月) | ¥0 |
-| 授权验证 | Cloudflare Workers | ¥0 |
-| 用户数据库 | Supabase 免费层 (500MB) | ¥0 |
-| 文件存储 | Cloudflare R2 (10GB) | ¥0 |
-| 支付 | LemonSqueezy | 按交易量 |
-| 邮件服务 | Resend 免费层 (100 封/天) | ¥0 |
-| 分析统计 | Cloudflare Analytics | ¥0 |
+| 需求       | 推荐方案                                  | 月成本   |
+| ---------- | ----------------------------------------- | -------- |
+| CI/CD      | GitHub Actions (2000 分钟/月)             | ¥0      |
+| 官网托管   | Cloudflare Pages / GitHub Pages           | ¥0      |
+| 文档站     | VitePress + GitHub Pages                  | ¥0      |
+| 自动更新   | GitHub Releases +`tauri-plugin-updater` | ¥0      |
+| 用户反馈   | GitHub Issues / Discussions               | ¥0      |
+| 社区论坛   | Discord 或 GitHub Discussions             | ¥0      |
+| 错误监控   | Sentry 免费层 (5000 事件/月)              | ¥0      |
+| 授权验证   | Cloudflare Workers                        | ¥0      |
+| 用户数据库 | Supabase 免费层 (500MB)                   | ¥0      |
+| 文件存储   | Cloudflare R2 (10GB)                      | ¥0      |
+| 支付       | LemonSqueezy                              | 按交易量 |
+| 邮件服务   | Resend 免费层 (100 封/天)                 | ¥0      |
+| 分析统计   | Cloudflare Analytics                      | ¥0      |
 
 ### 15.2 关键"白嫖"策略
 
@@ -651,16 +703,16 @@
 
 ### 16.1 当前平台支持矩阵
 
-| 维度 | macOS (Apple Silicon) | Windows x64 | Windows ARM64 | macOS Intel | Linux |
-|------|-----------------------|-------------|---------------|-------------|-------|
-| **代码分支** | ✅ 完整 | ✅ 完整 | ✅ 完整 | ✅ 同 macOS | ✅ `#[cfg]` 已有 |
-| **CI 构建** | ✅ `macos-latest` | ✅ `windows-latest` | ❌ 无 CI runner | ❌ 未配置 | ❌ 无 |
-| **本地构建** | ✅ 主力开发环境 | ✅ Parallels ARM64 脚本 | ✅ 同左 | — | ❌ 未测试 |
-| **安装包格式** | `.dmg` | NSIS `.exe` | NSIS `.exe`（本地） | — | ❌ 无（缺 `deb`/`AppImage`） |
-| **WebView** | WebKit (WKWebView) | WebView2 (Chromium) | WebView2 | WebKit | WebKitGTK（需安装） |
-| **TTS** | AVSpeechSynthesizer | SAPI 5 | SAPI 5 | AVSpeechSynthesizer | speech-dispatcher（需安装） |
-| **自动更新** | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **发布状态** | ✅ 已发布 | ✅ 已发布 | 仅本地构建 | ❌ | ❌ |
+| 维度                 | macOS (Apple Silicon) | Windows x64             | Windows ARM64         | macOS Intel         | Linux                            |
+| -------------------- | --------------------- | ----------------------- | --------------------- | ------------------- | -------------------------------- |
+| **代码分支**   | ✅ 完整               | ✅ 完整                 | ✅ 完整               | ✅ 同 macOS         | ✅`#[cfg]` 已有                |
+| **CI 构建**    | ✅`macos-latest`    | ✅`windows-latest`    | ❌ 无 CI runner       | ❌ 未配置           | ❌ 无                            |
+| **本地构建**   | ✅ 主力开发环境       | ✅ Parallels ARM64 脚本 | ✅ 同左               | —                  | ❌ 未测试                        |
+| **安装包格式** | `.dmg`              | NSIS `.exe`           | NSIS `.exe`（本地） | —                  | ❌ 无（缺 `deb`/`AppImage`） |
+| **WebView**    | WebKit (WKWebView)    | WebView2 (Chromium)     | WebView2              | WebKit              | WebKitGTK（需安装）              |
+| **TTS**        | AVSpeechSynthesizer   | SAPI 5                  | SAPI 5                | AVSpeechSynthesizer | speech-dispatcher（需安装）      |
+| **自动更新**   | ❌                    | ❌                      | ❌                    | ❌                  | ❌                               |
+| **发布状态**   | ✅ 已发布             | ✅ 已发布               | 仅本地构建            | ❌                  | ❌                               |
 
 **总结**：macOS Apple Silicon 和 Windows x64 是已验证的双平台。Linux 有代码基础但零构建零测试。macOS Intel 和 Windows ARM64 有潜在能力但未纳入 CI。
 
@@ -668,14 +720,14 @@
 
 #### Rust 后端（6 个文件使用 `#[cfg(target_os)]`）
 
-| 文件 | 平台分支内容 |
-|------|------------|
+| 文件            | 平台分支内容                                                                                                          |
+| --------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `resource.rs` | 资源管理器启动：macOS `.app` + `open -a` / Windows `.exe` + `CREATE_NEW_PROCESS_GROUP` / Linux 二进制直接启动 |
-| `export.rs` | 文件打开：`open` / `cmd /c start` / `xdg-open`；应用候选列表（WPS、Word、Chrome 等） |
-| `python.rs` | Python 发现：候选命令名（Windows: `py`）、常见路径（macOS: homebrew、Linux: `/usr/bin`）、pyenv/conda |
-| `nodejs.rs` | Node.js 路径查找：`where`（Windows） / `which`（Unix） |
-| `pandoc.rs` | Pandoc 路径查找：同上 |
-| `pdf.rs` | 浏览器打开：同 `export.rs` |
+| `export.rs`   | 文件打开：`open` / `cmd /c start` / `xdg-open`；应用候选列表（WPS、Word、Chrome 等）                            |
+| `python.rs`   | Python 发现：候选命令名（Windows:`py`）、常见路径（macOS: homebrew、Linux: `/usr/bin`）、pyenv/conda              |
+| `nodejs.rs`   | Node.js 路径查找：`where`（Windows） / `which`（Unix）                                                            |
+| `pandoc.rs`   | Pandoc 路径查找：同上                                                                                                 |
+| `pdf.rs`      | 浏览器打开：同 `export.rs`                                                                                          |
 
 #### 前端 TypeScript
 
@@ -701,26 +753,26 @@
 **实施步骤**：
 
 1. **`tauri.conf.json`** 添加 bundle targets：
+
    ```json
    "targets": ["dmg", "nsis", "deb", "appimage"]
    ```
-   Tauri 会根据构建平台自动选择适用的 target。
 
+   Tauri 会根据构建平台自动选择适用的 target。
 2. **CI 矩阵扩展**：`build.yml` 添加 `ubuntu-22.04` 平台
+
    ```yaml
    - platform: ubuntu-22.04
      args: --target x86_64-unknown-linux-gnu
      target: x86_64-unknown-linux-gnu
      artifact: deb
    ```
-
 3. **Linux 系统依赖**文档化（Tauri 2 在 Linux 需要）：
+
    - 构建依赖：`libwebkit2gtk-4.1-dev`, `libappindicator3-dev`, `librsvg2-dev`, `patchelf`
    - 运行依赖：`libwebkit2gtk-4.1-0`, `libayatana-appindicator3-1`
    - TTS：`speech-dispatcher`（`tts` crate 在 Linux 使用此后端）
-
 4. **测试 Linux TTS**：`tts` crate v0.26 支持 speech-dispatcher，但中文语音质量可能差异大，需标注为"实验性"
-
 5. **资源管理器**：已合并到主程序，Linux 构建时自动包含
 
 - **开发成本**：约 3~5 天
@@ -732,11 +784,11 @@
 **当前状态**：仅构建 `aarch64-apple-darwin`（Apple Silicon），Intel Mac 用户无法使用。
 
 **实施方案**：
+
 - CI 中改用 `--target universal-apple-darwin`，Tauri 会自动构建 fat binary
 - 需要安装两个 Rust target：`aarch64-apple-darwin` + `x86_64-apple-darwin`
 - 安装包体积约增加 40~60%（两份二进制）
 - **替代方案**：分开构建两个 `.dmg`，下载页按芯片类型提供
-
 - **开发成本**：约 1 天（CI 配置修改）
 - ⭐⭐ | 🔧 | **P1**
 
@@ -745,42 +797,40 @@
 **当前状态**：有完整的 Parallels 本地构建脚本（`01-setup-env.ps1` + `02-build.ps1`），但 GitHub Actions 无 ARM64 Windows runner。
 
 **可选方案**：
+
 - **方案 A**：保持本地 Parallels 构建，手动上传到 Release（当前做法）
 - **方案 B**：GitHub Actions `windows-latest` 上交叉编译 `aarch64-pc-windows-msvc`（需额外 Rust target，`ring` crate 需要 clang）
 - **方案 C**：使用 Azure DevOps 的 ARM64 runner（付费）
 - **推荐**：短期用方案 A（已验证），中期尝试方案 B
-
 - ⭐ | 🔧🔧 | **P2**
 
 ### 16.4 中期目标：自动更新与分发渠道（P1~P2）
 
-#### 16.4.1 tauri-plugin-updater 集成
+#### 16.4.1 tauri-plugin-updater 集成 ✅ 已完成
 
-**当前状态**：IMPROVEMENT-PLAN §10.3 已列为 P0，但未实现。
+**已完成**（2026-03-11，与 §10.3 合并实施）：
 
-**技术方案**：
-- 安装 `tauri-plugin-updater`，配置检查 GitHub Releases 的 `latest.json`
-- `tauri-apps/tauri-action` 会自动生成更新 manifest
-- 支持**静默后台下载 + 提示安装**
-- 实现**更新通道**：
-  - `stable`：正式版（GitHub Release `latest`）
-  - `beta`：预览版（GitHub Release `prerelease`）
+- ✅ `tauri-plugin-updater` v2 集成（`Cargo.toml` + `main.rs`）
+- ✅ `tauri.conf.json` 配置 pubkey + GitHub Releases `latest.json` endpoint
+- ✅ `createUpdaterArtifacts: true`，构建自动生成更新 manifest
+- ✅ `UpdateChecker.tsx` 前端组件 + `check_update` 菜单项
+- ✅ 安装模式 `passive`（静默下载 + 提示安装）
+- ✅ macOS 代码签名 + Apple 公证已配置（`release.sh`）
 
-**关键考虑**：
-- macOS 更新需要代码签名（当前 `signingIdentity: "-"` 是自签名，需申请 Apple Developer ID）
-- Windows 更新无签名要求但会触发 SmartScreen 警告
-- Linux `AppImage` 支持 `tauri-plugin-updater`，`deb` 不支持（需用系统包管理器）
+**待优化**（P2）：
 
-- ⭐⭐⭐ | 🔧🔧 | **P0**（与 §10.3 合并）
+- 更新通道（`stable` / `beta`）
+- Linux `AppImage` 更新支持（`deb` 不支持 updater）
+- ~~⭐⭐⭐ | 🔧🔧 | **P0**~~ → **已完成**
 
 #### 16.4.2 平台包管理器上架
 
-| 平台 | 包管理器 | 难度 | 优先级 |
-|------|----------|------|--------|
-| macOS | **Homebrew Cask** | 🔧（提交 formula PR） | P1 |
-| Windows | **winget** | 🔧（提交 manifest PR） | P1 |
-| Linux | **Flatpak** / Snap | 🔧🔧（需打包配置） | P2 |
-| Linux | **AUR** (Arch) | 🔧（社区可维护） | P3 |
+| 平台    | 包管理器                 | 难度                   | 优先级 |
+| ------- | ------------------------ | ---------------------- | ------ |
+| macOS   | **Homebrew Cask**  | 🔧（提交 formula PR）  | P1     |
+| Windows | **winget**         | 🔧（提交 manifest PR） | P1     |
+| Linux   | **Flatpak** / Snap | 🔧🔧（需打包配置）     | P2     |
+| Linux   | **AUR** (Arch)     | 🔧（社区可维护）       | P3     |
 
 - 提交到 Homebrew/winget 仓库只需写 manifest 文件指向 GitHub Release 下载链接
 - Flatpak 需编写 `.flatpak.yml` manifest，处理沙箱权限
@@ -791,16 +841,17 @@
 
 **Tauri 2.x 已支持 Android 和 iOS**，但 AiDocPlus 迁移面临重大挑战：
 
-| 挑战 | 说明 | 解决思路 |
-|------|------|----------|
-| **UI 响应式** | 五面板布局无法在手机上使用 | 重新设计移动端单面板 UI，仅保留编辑+AI 聊天 |
-| **文件系统** | 移动端无自由文件系统 | 改用应用沙箱目录 + 云同步（§12.2） |
-| **TTS** | `tts` crate 不支持 Android/iOS | 使用系统原生 TTS API（需 Rust 桥接） |
-| **Python/Node** | 移动端无法运行 | 编程区功能不可用，或使用 WebAssembly 替代 |
-| **Pandoc** | 移动端无法安装 | 导出功能受限，仅支持 HTML/Markdown |
-| **插件** | 当前插件 UI 假设桌面尺寸 | 需要响应式插件布局规范 |
+| 挑战                  | 说明                             | 解决思路                                    |
+| --------------------- | -------------------------------- | ------------------------------------------- |
+| **UI 响应式**   | 五面板布局无法在手机上使用       | 重新设计移动端单面板 UI，仅保留编辑+AI 聊天 |
+| **文件系统**    | 移动端无自由文件系统             | 改用应用沙箱目录 + 云同步（§12.2）         |
+| **TTS**         | `tts` crate 不支持 Android/iOS | 使用系统原生 TTS API（需 Rust 桥接）        |
+| **Python/Node** | 移动端无法运行                   | 编程区功能不可用，或使用 WebAssembly 替代   |
+| **Pandoc**      | 移动端无法安装                   | 导出功能受限，仅支持 HTML/Markdown          |
+| **插件**        | 当前插件 UI 假设桌面尺寸         | 需要响应式插件布局规范                      |
 
 **建议**：移动端定位为**轻量级伴侣应用**，核心功能只保留：
+
 - 文档查看和基本编辑
 - AI 聊天
 - 云同步读取桌面端创建的项目
@@ -813,15 +864,16 @@
 
 **可行性分析**：AiDocPlus 深度依赖 Tauri 后端，直接移植为 Web 应用需要：
 
-| 依赖 | 桌面实现 | Web 替代方案 |
-|------|----------|-------------|
-| 文件系统 | Rust `std::fs` | File System Access API 或云存储 |
-| AI 请求 | Rust `reqwest` | 需要代理服务器（API Key 不能暴露在前端） |
-| TTS | Rust `tts` crate | Web Speech API |
-| 进程执行 | Rust `Command` | 不可用 / WebAssembly / 云端执行 |
-| 原生导出 | Rust `docx-rs` / `comrak` | 可编译为 WASM 或使用 JS 库替代 |
+| 依赖     | 桌面实现                      | Web 替代方案                             |
+| -------- | ----------------------------- | ---------------------------------------- |
+| 文件系统 | Rust `std::fs`              | File System Access API 或云存储          |
+| AI 请求  | Rust `reqwest`              | 需要代理服务器（API Key 不能暴露在前端） |
+| TTS      | Rust `tts` crate            | Web Speech API                           |
+| 进程执行 | Rust `Command`              | 不可用 / WebAssembly / 云端执行          |
+| 原生导出 | Rust `docx-rs` / `comrak` | 可编译为 WASM 或使用 JS 库替代           |
 
 **推荐路径**：不做全功能 Web 版，而是：
+
 1. **文档预览 Web 服务**：生成只读分享链接（如 Notion 分享页面）
 2. **PWA 轻量编辑器**：仅文档编辑 + AI 聊天，后端 API 化（Cloudflare Workers）
 3. 桌面端仍为主力产品
@@ -830,136 +882,239 @@
 
 ### 16.6 跨平台技术债务清单
 
-| # | 问题 | 严重度 | 当前状态 |
-|---|------|--------|---------|
-| 1 | `tauri.conf.json` bundle targets 缺少 `deb`/`appimage` | 中 | 仅 `["dmg", "nsis"]` |
-| 2 | CI 无 Linux / macOS 构建矩阵 | 中 | `build.yml` 仅 Windows x64 |
-| 3 | 无 macOS Intel 构建 | 中 | 仅 `aarch64-apple-darwin` |
-| 4 | 无代码签名（macOS `signingIdentity: "-"`） | 高 | 安装时会触发 Gatekeeper 警告 |
-| 5 | Windows 无代码签名 | 高 | SmartScreen 警告，用户可能放弃安装 |
-| 6 | Linux TTS（speech-dispatcher）中文语音未验证 | 低 | `tts` crate 理论支持 |
-| 7 | Linux WebKitGTK 渲染差异未测试 | 中 | WebKitGTK 版本可能落后于 Safari |
-| 8 | `index.css` 全局字体栈未包含 Linux 中文字体 | 低 | 缺少 `"Noto Sans SC"` 等 |
-| 9 | `discover_pythons` 中 conda/pyenv 路径检测无 Windows 版 | 低 | Windows 使用 `where` 但未检查 conda/pyenv |
-| 10 | 菜单文本硬编码中文（`main.rs`） | 中 | §9.2 已列入改进 |
+| #  | 问题                                                         | 严重度                                     | 当前状态                                    |
+| -- | ------------------------------------------------------------ | ------------------------------------------ | ------------------------------------------- |
+| 1  | `tauri.conf.json` bundle targets 缺少 `deb`/`appimage` | 中                                         | 仅 `["dmg", "nsis"]`                      |
+| 2  | CI 无 Linux / macOS 构建矩阵                                 | 中                                         | `build.yml` 仅 Windows x64                |
+| 3  | 无 macOS Intel 构建                                          | 中                                         | 仅 `aarch64-apple-darwin`                 |
+| 4  | ~~无代码签名（macOS）~~                                     | ~~高~~                                    | ✅ 已解决：Apple Developer ID 签名 + 公证   |
+| 5  | Windows 无代码签名                                           | 高                                         | SmartScreen 警告，用户可能放弃安装          |
+| 6  | Linux TTS（speech-dispatcher）中文语音未验证                 | 低                                         | `tts` crate 理论支持                      |
+| 7  | Linux WebKitGTK 渲染差异未测试                               | 中                                         | WebKitGTK 版本可能落后于 Safari             |
+| 8  | `index.css` 全局字体栈未包含 Linux 中文字体                | 低                                         | 缺少 `"Noto Sans SC"` 等                  |
+| 9  | `discover_pythons` 中 conda/pyenv 路径检测无 Windows 版    | 低                                         | Windows 使用 `where` 但未检查 conda/pyenv |
+| 10 | ✅ 已解决：菜单文本硬编码中文（`main.rs`）                 | ✅ 已解决：`menu_i18n.rs` 动态中英文菜单 |                                             |
 
-### 16.7 代码签名战略（关键商业化前置条件）
+### 16.7 代码签名战略 🟡 macOS 已完成
 
-**不签名的后果**：
-- macOS：Gatekeeper 阻止运行，用户需右键"打开"绕过，体验极差
-- Windows：SmartScreen 显示"未知发布者"警告，部分企业 IT 策略直接阻止
+**已完成**（2026-03-11）：
 
-**签名成本**：
+- ✅ **macOS 代码签名 + Apple 公证**：`scripts/release.sh` 集成 Apple Developer ID 签名 + `xcrun notarytool` 公证。
+- ✅ 签名配置已用于 `tauri-plugin-updater` 自动更新。
 
-| 平台 | 方案 | 年费 |
-|------|------|------|
-| macOS | Apple Developer ID（需 Apple Developer Program） | $99/年 |
-| Windows | EV Code Signing Certificate（如 DigiCert） | $400~600/年 |
-| Windows（低成本） | OV Code Signing（如 Certum） | $60~100/年 |
+**待完成**：
 
-**建议**：
-- **macOS 签名是商业发布的硬性要求**，Apple Developer Program $99/年性价比极高
-- Windows 签名短期可用 OV 证书（约 ¥400/年），消除 SmartScreen 警告需要建立声誉（一定下载量后自动信任）
-- 签名后才能正常使用 `tauri-plugin-updater` 的自动更新功能
+- ❌ **Windows 代码签名**：SmartScreen 显示“未知发布者”警告，部分企业 IT 策略直接阻止。
 
-- ⭐⭐⭐ | 🔧 | **P0**（商业发布前置条件）
+**Windows 签名成本**：
+
+| 方案                                       | 年费        |
+| ------------------------------------------ | ----------- |
+| EV Code Signing Certificate（如 DigiCert） | $400~600/年 |
+| OV Code Signing（如 Certum）               | $60~100/年  |
+
+**建议**：Windows 短期可用 OV 证书（约 ￥400/年），消除 SmartScreen 警告需要建立声誉（一定下载量后自动信任）。
+
+- macOS：✅ **已完成**
+- Windows：⭐⭐⭐ | 🔧 | **P0**（商业发布前置条件）
 
 ---
 
-## 实施优先级总览
+## 十七、IM Bot 桥接服务（2026-03-11 新增）
+
+### 17.1 现状 ✅ 基础已实现
+
+**架构**：独立 Node.js 服务（`/Users/jdh/Code/AiDocPlus/apps/im-bot/`），通过 HTTP API 连接主程序。
+
+**已实现功能**：
+
+- ✅ **四渠道消息接入**：飞书（长连接，已测试）、钉钉、企微、QQ（代码骨架已有）
+- ✅ **命令路由**（`/Users/jdh/Code/AiDocPlus/apps/im-bot/src/router/command.ts`）：`/帮助`、`/项目列表`、`/AI写作 --save`、`/创建文档` 等
+- ✅ **AI 自由对话路由**（`/Users/jdh/Code/AiDocPlus/apps/im-bot/src/router/ai.ts`）：非命令消息自动转 AI 对话
+- ✅ **会话上下文管理**（`/Users/jdh/Code/AiDocPlus/apps/im-bot/src/session.ts`）：每用户独立会话，超时自动清理
+- ✅ **写作工作流**（`/Users/jdh/Code/AiDocPlus/apps/im-bot/src/workflows/writing.ts`）：分步引导式 AI 写作
+- ✅ **消息去重**：飞书长连接 SDK 重发消息 `message_id` 去重（5 分钟 TTL）
+- ✅ **主程序集成**：设置面板启停控制（`/Users/jdh/Code/AiDocPlus/apps/desktop/src-tauri/src/commands/imbot.rs`）、自动启动开关
+- ✅ **文档外部变更通知**：IM Bot 创建/保存文档后，主程序前端自动刷新文档列表
+
+**代码规模**：3,182 行 TypeScript
+
+### 17.2 待完善
+
+| 改进项                | 说明                                               | 优先级 |
+| --------------------- | -------------------------------------------------- | ------ |
+| 钉钉/企微/QQ 渠道测试 | 代码骨架已有，需实际测试和完善                     | P1     |
+| 更多命令支持          | `/搜索`、`/导出`、`/版本列表`、`/模板列表` | P1     |
+| 群聊权限控制          | 白名单用户、管理员权限分级                         | P1     |
+| 消息队列和速率限制    | 防止消息风暴，保护 API 服务                        | P1     |
+| 富文本卡片消息        | 飞书卡片消息、钉钉 ActionCard 等渠道特性           | P2     |
+| 多实例管理            | 支持同时连接多个飞书/钉钉应用                      | P2     |
+| Bot 管理 Web UI       | 独立的 Bot 配置和监控界面                          | P3     |
+
+- ⭐⭐ | 🔧🔧 | **P1**
+
+---
+
+## 十八、CLI 与 Deep Link（2026-03-11 新增）
+
+### 18.1 现状 ✅ 基础已实现
+
+**CLI 命令行**（`/Users/jdh/Code/AiDocPlus/apps/desktop/src-tauri/src/cli.rs`）：
+
+- ✅ `aidocplus --version`：打印版本号
+- ✅ `aidocplus api status`：查询 API Server 运行状态
+- ✅ `aidocplus api schema`：输出 API 自描述（所有命名空间和操作）
+- ✅ `aidocplus api call <namespace.action> [--params JSON]`：直接调用 API
+- ✅ Windows release 模式自动 `AttachConsole`（使 stdout 可见）
+- ✅ CLI 命令在 Tauri 启动前处理，无需启动 GUI 窗口
+
+**Deep Link**（`tauri-plugin-deep-link`）：
+
+- ✅ `aidocplus://` URL Scheme 已注册
+- ✅ 事件监听：`deep-link://new-url` → `deep-link:open` 转发到前端
+
+### 18.2 待完善
+
+| 改进项               | 说明                                                             | 优先级 |
+| -------------------- | ---------------------------------------------------------------- | ------ |
+| Deep Link 路由       | `aidocplus://open?project=xxx&doc=xxx` 打开指定文档            | P2     |
+| CLI 更多子命令       | `aidocplus export`、`aidocplus create`、`aidocplus search` | P2     |
+| CLI 交互模式         | `aidocplus shell` 进入交互式 REPL                              | P3     |
+| Deep Link 第三方集成 | 从浏览器、其他应用打开 AiDocPlus 并执行操作                      | P3     |
+
+- ⭐ | 🔧 | **P2**
+
+---
+
+## 实施优先级总览（2026-03-11 重排）
+
+> 以下已移除已完成项（§10.3 自动更新、§16.4.1 updater 集成、§16.7 macOS 签名），并根据最新项目状态重新评估优先级。
+
+### ✅ 已完成项（存档）
+
+| 编号       | 改进项                                                                                                        | 完成日期   |
+| ---------- | ------------------------------------------------------------------------------------------------------------- | ---------- |
+| 10.3       | 自动更新（tauri-plugin-updater）                                                                              | 2026-03-11 |
+| 16.4.1     | tauri-plugin-updater 集成                                                                                     | 2026-03-11 |
+| 16.7 macOS | macOS 代码签名 + Apple 公证                                                                                   | 2026-03-11 |
+| 9.2 部分   | 菜单国际化（menu_i18n.rs）                                                                                    | 2026-03-11 |
+| 7.2 部分   | 关闭标签释放内容 + 临时文件清理                                                                               | 2026-03-11 |
+| 7.3 部分   | useShallow 精确订阅 + useAppStore 拆分                                                                        | 2026-03-11 |
+| 8.1 部分   | keyring 集成（email SMTP）                                                                                    | 2026-03-11 |
+| 新增       | IM Bot 桥接服务基础实现                                                                                       | 2026-03-11 |
+| 新增       | CLI 命令行 + Deep Link                                                                                        | 2026-03-11 |
+| 新增       | 文档级 AI 服务切换                                                                                            | 2026-03-11 |
+| 8.1 余     | AI API Key 迁移到 keyring                                                                                     | 2026-03-11 |
+| 2.2        | AI 提供商抽象层重构（Provider 注册表 + apply_auth）                                                           | 2026-03-11 |
+| 5.1        | 导出质量提升（DOCX 嵌套列表/删除线/任务列表/代码块灰色背景 + PDF 应用内预览 + HTML CSS 增强 + 邮件 CSS 同步） | 2026-03-11 |
+| 8.3        | 网络安全（代理/超时配置）                                                                                     | 2026-03-11 |
+| 10.1       | 错误处理体系化（后端 AppError + 前端 formatBackendError 全量替换）                                            | 2026-03-11 |
+| 9.2 余     | Rust 错误码国际化（ErrorCode → i18n errors.backend.* 中英文翻译）                                            | 2026-03-11 |
 
 ### P0 — 立即实施（1~2 个月）
-| 编号 | 改进项 | 重要性 | 复杂度 |
-|------|--------|--------|--------|
-| 11.1 | 授权协议从 MIT 迁移到 BSL 1.1 | ⭐⭐⭐ | 🔧 |
-| 13.2 | 帮助文档迁移到 VitePress | ⭐⭐ | 🔧 |
-| 2.1 | 多模态 AI 支持 | ⭐⭐⭐ | 🔧🔧 |
-| 2.2 | AI 提供商抽象层 | ⭐⭐⭐ | 🔧🔧 |
-| 5.1 | 导出质量提升 | ⭐⭐⭐ | 🔧🔧 |
-| 7.2 | 内存管理优化 | ⭐⭐⭐ | 🔧🔧 |
-| 8.1 | API Key 安全存储 | ⭐⭐⭐ | 🔧 |
-| 8.3 | 网络安全（超时/代理/限速） | ⭐⭐ | 🔧 |
-| 10.3 | 自动更新 + tauri-plugin-updater（含 §16.4.1） | ⭐⭐⭐ | 🔧🔧 |
-| 16.7 | 代码签名（macOS Developer ID + Windows OV 证书） | ⭐⭐⭐ | 🔧 |
+
+| 编号     | 改进项                      | 重要性 | 复杂度 | 说明                         |
+| -------- | --------------------------- | ------ | ------ | ---------------------------- |
+| 16.7 Win | Windows 代码签名（OV 证书） | ⭐⭐⭐ | 🔧     | SmartScreen 警告影响用户安装 |
+| 13.2     | 帮助文档迁移到 VitePress    | ⭐⭐   | 🔧     | 当前文档分散                 |
 
 ### P1 — 近期实施（2~4 个月）
-| 编号 | 改进项 | 重要性 | 复杂度 |
-|------|--------|--------|--------|
-| 12.1 | 文件级云同步（自定义数据目录） | ⭐⭐⭐ | 🔧 |
-| 14 | SQLite 精准引入（版本/对话/搜索） | ⭐⭐⭐ | 🔧🔧 |
-| 1.1 | 协同编辑基础（CRDT） | ⭐⭐⭐ | 🔧🔧🔧 |
-| 1.3 | 编辑器性能优化 | ⭐⭐ | 🔧🔧 |
-| 1.5 | 文档大纲增强 | ⭐ | 🔧 |
-| 2.3 | Tool Calling 扩展 | ⭐⭐ | 🔧🔧 |
-| 2.4 | 对话上下文管理 | ⭐⭐ | 🔧🔧 |
-| 2.5 | RAG 系统 | ⭐⭐⭐ | 🔧🔧🔧 |
-| 3.1 | 插件沙箱隔离 | ⭐⭐⭐ | 🔧🔧🔧 |
-| 3.3 | 插件 SDK 增强 | ⭐⭐ | 🔧🔧 |
-| 3.4 | 插件生命周期完善 | ⭐ | 🔧 |
-| 6.2 | 自动备份与恢复 | ⭐⭐ | 🔧🔧 |
-| 7.1 | 启动速度优化 | ⭐⭐ | 🔧🔧 |
-| 7.3 | 前端渲染优化 | ⭐⭐ | 🔧🔧 |
-| 8.2 | 文件系统安全 | ⭐⭐ | 🔧 |
-| 9.1 | 快捷键体系完善 | ⭐⭐ | 🔧🔧 |
-| 9.2 | 国际化完善 | ⭐⭐ | 🔧🔧 |
-| 10.1 | 错误处理体系化 | ⭐⭐ | 🔧🔧 |
-| 10.2 | 日志与遥测 | ⭐⭐ | 🔧🔧 |
-| 10.4 | 测试体系建设 | ⭐⭐ | 🔧🔧 |
-| 16.3.1 | Linux 支持（deb + AppImage + CI 矩阵） | ⭐⭐ | 🔧🔧 |
-| 16.3.2 | macOS Universal Binary（Intel + Apple Silicon） | ⭐⭐ | 🔧 |
-| 16.4.2a | Homebrew Cask + winget 上架 | ⭐⭐ | 🔧 |
+
+| 编号    | 改进项                                          | 重要性 | 复杂度 | 说明                          |
+| ------- | ----------------------------------------------- | ------ | ------ | ----------------------------- |
+| 11.1    | BSL 1.1 授权协议                                | ⭐⭐⭐ | 🔧     | 原 P0，可在正式商业发布前迁移 |
+| 2.1     | 多模态 AI 支持                                  | ⭐⭐⭐ | 🔧🔧   | ✅ 已完成                     |
+| 7.2 余  | 内存管理（按需加载/版本惰性加载）               | ⭐⭐⭐ | 🔧🔧   | ✅ 已完成                     |
+| 17.2    | IM Bot 完善（渠道测试/更多命令）                | ⭐⭐   | 🔧🔧   | 新增                          |
+| 12.1    | 文件级云同步（自定义数据目录）                  | ⭐⭐⭐ | 🔧     | ✅ 已完成                     |
+| 14      | SQLite 精准引入（版本/对话/搜索）               | ⭐⭐⭐ | 🔧🔧   | ✅ 已完成                     |
+| 1.3     | 编辑器性能优化                                  | ⭐⭐   | 🔧🔧   | ✅ 已完成                     |
+| 1.5     | 文档大纲增强                                    | ⭐     | 🔧     | ✅ 已完成                     |
+| 2.3     | Tool Calling 扩展                               | ⭐⭐   | 🔧🔧   |                               |
+| 2.4     | 对话上下文管理                                  | ⭐⭐   | 🔧🔧   | ✅ 已完成                     |
+| 2.5     | RAG 系统                                        | ⭐⭐⭐ | 🔧🔧🔧 |                               |
+| 3.1     | 插件沙箱隔离                                    | ⭐⭐⭐ | 🔧🔧🔧 |                               |
+| 3.3     | 插件 SDK 增强                                   | ⭐⭐   | 🔧🔧   |                               |
+| 3.4     | 插件生命周期完善                                | ⭐     | 🔧     |                               |
+| 6.2     | 自动备份与恢复                                  | ⭐⭐   | 🔧🔧   |                               |
+| 7.1     | 启动速度优化                                    | ⭐⭐   | 🔧🔧   | ✅ 已完成                     |
+| 7.3 余  | 前端渲染优化（独立 store/虚拟列表）             | ⭐⭐   | 🔧🔧   | 部分完成                      |
+| 8.2     | 文件系统安全                                    | ⭐⭐   | 🔧     | ✅ 已完成                     |
+| 9.1     | 快捷键体系完善                                  | ⭐⭐   | 🔧🔧   |                               |
+| 9.2 余  | 国际化完善（Rust 错误码）                       | ⭐⭐   | 🔧🔧   | ✅ 已完成                     |
+| 10.1    | 错误处理体系化（后端+前端）                     | ⭐⭐   | 🔧🔧   | ✅ 已完成                     |
+| 10.2    | 日志与遥测                                      | ⭐⭐   | 🔧🔧   |                               |
+| 10.4    | 测试体系建设                                    | ⭐⭐   | 🔧🔧   |                               |
+| 16.3.1  | Linux 支持（deb + AppImage + CI 矩阵）          | ⭐⭐   | 🔧🔧   |                               |
+| 16.3.2  | macOS Universal Binary（Intel + Apple Silicon） | ⭐⭐   | 🔧     |                               |
+| 16.4.2a | Homebrew Cask + winget 上架                     | ⭐⭐   | 🔧     |                               |
 
 ### P2 — 中期实施（4~8 个月）
-| 编号 | 改进项 | 重要性 | 复杂度 |
-|------|--------|--------|--------|
-| 11.2 | 授权验证服务 + 功能分层（社区版/专业版） | ⭐⭐⭐ | 🔧🔧 |
-| 12.2 | Cloudflare R2 + Workers 云同步（专业版） | ⭐⭐ | 🔧🔧 |
-| 1.2 | 结构化文档模型 | ⭐⭐ | 🔧🔧🔧 |
-| 1.4 | 所见即所得模式 | ⭐⭐ | 🔧🔧🔧 |
-| 2.6 | AI 写作 Agent | ⭐⭐ | 🔧🔧🔧 |
-| 3.2 | 插件市场 | ⭐⭐ | 🔧🔧🔧 |
-| 4.1 | LSP 集成 | ⭐⭐ | 🔧🔧🔧 |
-| 4.2 | 终端集成 | ⭐⭐ | 🔧🔧🔧 |
-| 4.3 | AI 代码助手增强 | ⭐⭐ | 🔧🔧 |
-| 5.2 | 发布渠道集成 | ⭐⭐ | 🔧🔧 |
-| 9.3 | 无障碍 | ⭐ | 🔧🔧 |
-| 9.4 | 引导与帮助系统 | ⭐ | 🔧🔧 |
-| 16.3.3 | Windows ARM64 CI 交叉编译 | ⭐ | 🔧🔧 |
-| 16.4.2b | Flatpak / Snap 上架 | ⭐ | 🔧🔧 |
+
+| 编号    | 改进项                                   | 重要性 | 复杂度 | 说明 |
+| ------- | ---------------------------------------- | ------ | ------ | ---- |
+| 11.2    | 授权验证服务 + 功能分层（社区版/专业版） | ⭐⭐⭐ | 🔧🔧   |      |
+| 12.2    | Cloudflare R2 + Workers 云同步（专业版） | ⭐⭐   | 🔧🔧   |      |
+| 1.2     | 结构化文档模型                           | ⭐⭐   | 🔧🔧🔧 |      |
+| 1.4     | 所见即所得模式                           | ⭐⭐   | 🔧🔧🔧 |      |
+| 2.6     | AI 写作 Agent                            | ⭐⭐   | 🔧🔧🔧 |      |
+| 3.2     | 插件市场                                 | ⭐⭐   | 🔧🔧🔧 |      |
+| 4.1     | LSP 集成                                 | ⭐⭐   | 🔧🔧🔧 |      |
+| 4.2     | 终端集成                                 | ⭐⭐   | 🔧🔧🔧 |      |
+| 4.3     | AI 代码助手增强                          | ⭐⭐   | 🔧🔧   |      |
+| 5.2     | 发布渠道集成                             | ⭐⭐   | 🔧🔧   |      |
+| 9.3     | 无障碍                                   | ⭐     | 🔧🔧   |      |
+| 9.4     | 引导与帮助系统                           | ⭐     | 🔧🔧   |      |
+| 18.2    | CLI/Deep Link 完善                       | ⭐     | 🔧     | 新增 |
+| 16.3.3  | Windows ARM64 CI 交叉编译                | ⭐     | 🔧🔧   |      |
+| 16.4.2b | Flatpak / Snap 上架                      | ⭐     | 🔧🔧   |      |
 
 ### P3 — 远期规划（8+ 个月）
-| 编号 | 改进项 | 重要性 | 复杂度 |
-|------|--------|--------|--------|
-| 12.3 | WebSocket 实时协同 | ⭐⭐ | 🔧🔧🔧 |
-| 16.5.1 | Tauri Mobile 轻量伴侣应用（Android/iOS） | ⭐⭐ | 🔧🔧🔧 |
-| 16.5.2 | Web 版（文档预览分享 + PWA 轻量编辑） | ⭐ | 🔧🔧🔧 |
-| 4.4 | 项目级代码管理 | ⭐ | 🔧🔧🔧 |
+
+| 编号   | 改进项                                   | 重要性 | 复杂度 |
+| ------ | ---------------------------------------- | ------ | ------ |
+| 1.1    | 协同编辑基础（CRDT）                     | ⭐⭐⭐ | 🔧🔧🔧 |
+| 12.3   | WebSocket 实时协同                       | ⭐⭐   | 🔧🔧🔧 |
+| 16.5.1 | Tauri Mobile 轻量伴侣应用（Android/iOS） | ⭐⭐   | 🔧🔧🔧 |
+| 16.5.2 | Web 版（文档预览分享 + PWA 轻量编辑）    | ⭐     | 🔧🔧🔧 |
+| 4.4    | 项目级代码管理                           | ⭐     | 🔧🔧🔧 |
+
+> **注**：§1.1 CRDT 协同编辑从 P1 降至 P3。短期内 AiDocPlus 定位为单用户桌面应用，多人协作需求优先级较低。远期可通过 §12 多设备同步逐步推进。
 
 ---
 
 ## 附录：关键架构发现
 
 ### A. 当前架构优势
+
 1. **Tauri 2 + React + Rust** 技术栈选型优秀，兼顾性能与开发效率。
 2. **Monorepo 统一架构**：源码、插件、资源数据在同一仓库，`build-resources.sh` 一键构建，消除多仓库同步问题。
-3. **插件系统设计成熟**：27 个内置插件，两角色原则、自注册机制、Host API 隔离、统一 `_framework/`。
-4. **安全意识良好**：ZIP 炸弹防护、ReDoS 防护、命令白名单。
+3. **插件系统设计成熟**：29 个内置插件，两角色原则、自注册机制、Host API 隔离、统一 `_framework/`。
+4. **安全意识良好**：ZIP 炸弹防护、ReDoS 防护、命令白名单、keyring 密钥链（email）。
 5. **工作区持久化**完整：标签页状态、面板布局、侧边栏宽度等均可恢复。
 6. **资源管理器已合并到主程序**：Tauri 多窗口机制，无需独立构建和部署。
+7. **完整的自动更新链路**：签名 → 公证 → 构建 → 上传 → updater manifest → 客户端检查 + 安装。
+8. **开放 API 生态**：HTTP API + CLI + Deep Link + MCP Server + IM Bot，外部工具可全面接入。
+9. **文档级 AI 服务隔离**：每个文档可绑定不同 AI 服务，灵活性高。
+10. **前端性能优化基础**：useShallow 精确订阅 + useAppStore 模块化拆分。
 
-### B. 当前架构风险
-1. **单一大 Store**（`useAppStore` ~1800 行）：状态耦合度高，所有写操作都可能触发全局重渲染。
+### B. 当前架构风险（2026-03-11 更新）
+
+1. ~~**单一大 Store**（`useAppStore` ~1800 行）~~ → 🟡 已拆分为 16 个 helper 模块，但仍为单一 store 入口。
 2. **JSON 文件存储**：无事务保证、无并发控制、查询效率低。
 3. **AI 提供商硬编码**：添加新提供商需修改核心逻辑，耦合度高。
 4. **插件无沙箱**：在同一 JS 上下文运行，安全边界仅靠白名单。
-5. **API Key 明文存储**：安全隐患。
-6. **无自动更新**：用户需手动下载新版本，影响持续交付。
+5. **AI API Key 明文存储**：keyring 已集成但 AI Key 尚未迁移。
+6. ~~**无自动更新**~~ → ✅ 已解决。
 7. **无测试覆盖**：重构时缺乏安全网。
+8. **Windows 无代码签名**：SmartScreen 警告影响安装体验。
+9. **IM Bot 钉钉/企微/QQ 渠道未实测**：代码骨架已有但可能存在兼容性问题。
 
 ---
 
 *文档生成日期：基于对 AiDocPlus 代码库的深入分析*
-*分析范围：前端（src-ui）、后端（src-tauri）、共享类型、插件框架、资源管理器、资源数据*
+*分析范围：前端（src-ui）、后端（src-tauri）、共享类型、插件框架、资源管理器、资源数据、IM Bot*
 *§11~§15 战略讨论补充日期：2026-02-27*
 *§16 跨平台战略补充日期：2026-02-27*
 *Monorepo 合并 + 状态更新日期：2026-02-27*
+*§17~§18 新增 + 全面状态更新 + 优先级重排日期：2026-03-11*

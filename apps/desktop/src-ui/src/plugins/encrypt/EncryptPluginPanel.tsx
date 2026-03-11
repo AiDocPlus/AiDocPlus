@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import type { PluginPanelProps } from '../types';
 import { usePluginHost } from '../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import { ToolPluginLayout } from '../_framework/ToolPluginLayout';
 import { Button, Label } from '../_framework/ui';
 import { Lock, Unlock, Copy, Shield } from 'lucide-react';
@@ -86,7 +87,7 @@ export function EncryptPluginPanel({
       setResultText(encrypted);
       showStatus(t('encryptSuccess'));
     } catch (err) {
-      showStatus(`${t('encryptFailed')}: ${err instanceof Error ? err.message : String(err)}`, true);
+      showStatus(`${t('encryptFailed')}: ${formatBackendError(err)}`, true);
     } finally {
       setProcessing(false);
     }
@@ -103,7 +104,7 @@ export function EncryptPluginPanel({
       setResultText(decrypted);
       showStatus(t('decryptSuccess'));
     } catch (err) {
-      showStatus(`${t('decryptFailed')}: ${err instanceof Error ? err.message : String(err)}`, true);
+      showStatus(`${t('decryptFailed')}: ${formatBackendError(err)}`, true);
     } finally {
       setProcessing(false);
     }

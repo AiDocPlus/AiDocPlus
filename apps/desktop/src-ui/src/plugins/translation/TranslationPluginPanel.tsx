@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import type { PluginPanelProps } from '../types';
 import { Button } from '../_framework/ui';
 import { usePluginHost } from '../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import { Languages, Copy, Check } from 'lucide-react';
 import { truncateContent } from '../_framework/pluginUtils';
 import { PluginPanelLayout } from '../_framework/PluginPanelLayout';
@@ -93,7 +94,7 @@ export function TranslationPluginPanel({ document, content, pluginData, onPlugin
       showStatus(t('generateSuccess'));
       onRequestSave?.();
     } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
+      const errMsg = formatBackendError(err);
       showStatus(t('generateFailed', { error: errMsg }), true);
     } finally {
       setGenerating(false);

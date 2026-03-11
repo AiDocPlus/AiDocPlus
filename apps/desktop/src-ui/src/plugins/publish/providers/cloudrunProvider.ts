@@ -1,6 +1,7 @@
 import type { PluginHostAPI } from '../../_framework/PluginHostAPI';
 import type { CloudRunConfig, WechatApiProvider, DraftParams } from '../wechatApiProvider';
 import { wechatHttpRequest, checkWxError } from '../wechatApiProvider';
+import { formatBackendError } from '@/lib/backendError';
 
 function apiHeaders(config: CloudRunConfig): Record<string, string> {
   return { 'X-API-Key': config.apiKey };
@@ -90,7 +91,7 @@ export function createCloudRunProvider(host: PluginHostAPI, config: CloudRunConf
         const result = await this.getAccessToken();
         return { ok: true, msg: `云托管连接成功，token 有效期 ${Math.floor(result.expiresIn / 60)} 分钟` };
       } catch (err) {
-        return { ok: false, msg: err instanceof Error ? err.message : String(err) };
+        return { ok: false, msg: formatBackendError(err) };
       }
     },
   };

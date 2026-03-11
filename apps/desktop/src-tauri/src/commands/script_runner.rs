@@ -57,7 +57,8 @@ pub async fn run_script_stream(
     #[allow(non_snake_case)]
     timeoutSecs: Option<u64>,
     cwd: Option<String>,
-) -> Result<(), String> {
+) -> crate::error::Result<()> {
+    use crate::error::AppError;
     let timeout_secs = timeoutSecs.unwrap_or(30);
     let start = std::time::Instant::now();
 
@@ -130,7 +131,7 @@ pub async fn run_script_stream(
     // Spawn
     let mut child = cmd
         .spawn()
-        .map_err(|e| format!("Failed to start process: {}", e))?;
+        .map_err(|e| AppError::ExternalToolError(format!("Failed to start process: {}", e)))?;
 
     // Take stdout and stderr handles
     let stdout = child.stdout.take();
@@ -254,10 +255,10 @@ pub async fn run_script_stream(
 #[tauri::command]
 pub async fn kill_running_script(
     state: tauri::State<'_, RunningScriptState>,
-) -> Result<(), String> {
+) -> crate::error::Result<()> {
     let mut guard = state.child.lock().await;
     if let Some(ref mut child) = *guard {
-        child.kill().await.map_err(|e| format!("Failed to kill process: {}", e))?;
+        child.kill().await.map_err(|e| crate::error::AppError::Internal(format!("Failed to kill process: {}", e)))?;
         *guard = None;
         Ok(())
     } else {

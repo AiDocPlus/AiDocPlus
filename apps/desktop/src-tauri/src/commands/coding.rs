@@ -4,10 +4,9 @@ use std::path::PathBuf;
 use std::process::Command;
 use super::python::find_python;
 
-/// 脚本目录: ~/AiDocPlus/CodingScripts/
+/// 脚本目录: <data_root>/CodingScripts/
 fn coding_scripts_dir() -> PathBuf {
-    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-    home.join("AiDocPlus").join("CodingScripts")
+    crate::config::current_data_root().join("CodingScripts")
 }
 
 /// 状态文件: ~/AiDocPlus/CodingScripts/.coding-state.json
@@ -16,9 +15,9 @@ fn coding_state_path() -> PathBuf {
 }
 
 /// 确保脚本目录存在
-fn ensure_scripts_dir() -> Result<(), String> {
+fn ensure_scripts_dir() -> crate::error::Result<()> {
     let dir = coding_scripts_dir();
-    fs::create_dir_all(&dir).map_err(|e| format!("创建脚本目录失败: {}", e))
+    fs::create_dir_all(&dir).map_err(|e| crate::error::AppError::Internal(format!("创建脚本目录失败: {}", e)))
 }
 
 /// 解析文件路径：相对路径基于 CodingScripts 目录，绝对路径直接使用
@@ -49,7 +48,7 @@ pub struct ScriptFileInfo {
 
 /// 获取脚本目录绝对路径
 #[tauri::command]
-pub fn get_coding_scripts_dir() -> Result<String, String> {
+pub fn get_coding_scripts_dir() -> crate::error::Result<String> {
     ensure_scripts_dir()?;
     let dir = coding_scripts_dir();
     Ok(dir.to_string_lossy().to_string())
@@ -57,12 +56,12 @@ pub fn get_coding_scripts_dir() -> Result<String, String> {
 
 /// 列出目录下所有 .py 文件
 #[tauri::command]
-pub fn list_coding_scripts() -> Result<Vec<ScriptFileInfo>, String> {
+pub fn list_coding_scripts() -> crate::error::Result<Vec<ScriptFileInfo>> {
     ensure_scripts_dir()?;
     let dir = coding_scripts_dir();
     let mut scripts = Vec::new();
 
-    let entries = fs::read_dir(&dir).map_err(|e| format!("读取目录失败: {}", e))?;
+    let entries = fs::read_dir(&dir).map_err(|e| crate::error::AppError::Internal(format!("读取目录失败: {}", e)))?;
     const SUPPORTED_EXTS: &[&str] = &[
         "py", "html", "htm", "js", "jsx", "ts", "tsx", "json", "md",
         "css", "txt", "xml", "yaml", "yml", "toml", "sh", "sql",
@@ -110,12 +109,12 @@ pub fn list_coding_scripts() -> Result<Vec<ScriptFileInfo>, String> {
 pub fn read_coding_script(
     #[allow(non_snake_case)]
     filePath: String,
-) -> Result<String, String> {
+) -> crate::error::Result<String> {
     let path = resolve_path(&filePath);
     if !path.exists() {
-        return Err(format!("文件不存在: {}", filePath));
+        return Err(crate::error::AppError::Internal(format!("文件不存在: {}", filePath)));
     }
-    fs::read_to_string(&path).map_err(|e| format!("读取文件失败: {}", e))
+    fs::read_to_string(&path).map_err(|e| crate::error::AppError::Internal(format!("读取文件失败: {}", e)))
 }
 
 /// 保存脚本文件
@@ -124,11 +123,11 @@ pub fn save_coding_script(
     #[allow(non_snake_case)]
     filePath: String,
     content: String,
-) -> Result<String, String> {
+) -> crate::error::Result<String> {
     ensure_scripts_dir()?;
     let path = resolve_path(&filePath);
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
+        fs::create_dir_all(parent).map_err(|e| crate::error::AppError::Internal(format!("创建目录失败: {}", e)))?;
     }
     crate::config::atomic_write(&path, &content)?;
     Ok(path.to_string_lossy().to_string())
@@ -139,10 +138,10 @@ pub fn save_coding_script(
 pub fn delete_coding_script(
     #[allow(non_snake_case)]
     filePath: String,
-) -> Result<(), String> {
+) -> crate::error::Result<()> {
     let path = resolve_path(&filePath);
     if path.exists() {
-        fs::remove_file(&path).map_err(|e| format!("删除文件失败: {}", e))?;
+        fs::remove_file(&path).map_err(|e| crate::error::AppError::Internal(format!("删除文件失败: {}", e)))?;
     }
     Ok(())
 }
@@ -154,34 +153,34 @@ pub fn rename_coding_script(
     filePath: String,
     #[allow(non_snake_case)]
     newName: String,
-) -> Result<String, String> {
+) -> crate::error::Result<String> {
     let old_path = resolve_path(&filePath);
     if !old_path.exists() {
-        return Err(format!("文件不存在: {}", filePath));
+        return Err(crate::error::AppError::Internal(format!("文件不存在: {}", filePath)));
     }
-    let parent = old_path.parent().ok_or("无法获取父目录")?;
+    let parent = old_path.parent().ok_or_else(|| crate::error::AppError::Internal("无法获取父目录".to_string()))?;
     let new_path = parent.join(&newName);
     if new_path.exists() {
-        return Err(format!("目标文件已存在: {}", newName));
+        return Err(crate::error::AppError::ValidationError(format!("目标文件已存在: {}", newName)));
     }
-    fs::rename(&old_path, &new_path).map_err(|e| format!("重命名失败: {}", e))?;
+    fs::rename(&old_path, &new_path).map_err(|e| crate::error::AppError::Internal(format!("重命名失败: {}", e)))?;
     Ok(new_path.to_string_lossy().to_string())
 }
 
 /// 加载编程区状态
 #[tauri::command]
-pub fn load_coding_state() -> Result<Option<String>, String> {
+pub fn load_coding_state() -> crate::error::Result<Option<String>> {
     let path = coding_state_path();
     if !path.exists() {
         return Ok(None);
     }
-    let content = fs::read_to_string(&path).map_err(|e| format!("读取状态失败: {}", e))?;
+    let content = fs::read_to_string(&path).map_err(|e| crate::error::AppError::Internal(format!("读取状态失败: {}", e)))?;
     Ok(Some(content))
 }
 
 /// 保存编程区状态
 #[tauri::command]
-pub fn save_coding_state(json: String) -> Result<(), String> {
+pub fn save_coding_state(json: String) -> crate::error::Result<()> {
     ensure_scripts_dir()?;
     let path = coding_state_path();
     crate::config::atomic_write(&path, &json)?;
@@ -254,7 +253,7 @@ fn build_file_tree(dir: &std::path::Path, base: &std::path::Path) -> Vec<FileTre
 
 /// 递归列出文件树
 #[tauri::command]
-pub fn list_coding_file_tree() -> Result<Vec<FileTreeNode>, String> {
+pub fn list_coding_file_tree() -> crate::error::Result<Vec<FileTreeNode>> {
     ensure_scripts_dir()?;
     let dir = coding_scripts_dir();
     Ok(build_file_tree(&dir, &dir))
@@ -265,10 +264,10 @@ pub fn list_coding_file_tree() -> Result<Vec<FileTreeNode>, String> {
 pub fn create_coding_folder(
     #[allow(non_snake_case)]
     folderPath: String,
-) -> Result<(), String> {
+) -> crate::error::Result<()> {
     ensure_scripts_dir()?;
     let path = resolve_path(&folderPath);
-    fs::create_dir_all(&path).map_err(|e| format!("创建文件夹失败: {}", e))
+    fs::create_dir_all(&path).map_err(|e| crate::error::AppError::Internal(format!("创建文件夹失败: {}", e)))
 }
 
 /// 删除文件夹（必须为空）
@@ -276,11 +275,11 @@ pub fn create_coding_folder(
 pub fn delete_coding_folder(
     #[allow(non_snake_case)]
     folderPath: String,
-) -> Result<(), String> {
+) -> crate::error::Result<()> {
     let path = resolve_path(&folderPath);
     if !path.exists() { return Ok(()); }
-    if !path.is_dir() { return Err("不是文件夹".to_string()); }
-    fs::remove_dir_all(&path).map_err(|e| format!("删除文件夹失败: {}", e))
+    if !path.is_dir() { return Err(crate::error::AppError::ValidationError("不是文件夹".to_string())); }
+    fs::remove_dir_all(&path).map_err(|e| crate::error::AppError::Internal(format!("删除文件夹失败: {}", e)))
 }
 
 /// 移动/重命名文件或文件夹
@@ -290,15 +289,15 @@ pub fn move_coding_item(
     fromPath: String,
     #[allow(non_snake_case)]
     toPath: String,
-) -> Result<(), String> {
+) -> crate::error::Result<()> {
     let from = resolve_path(&fromPath);
     let to = resolve_path(&toPath);
-    if !from.exists() { return Err(format!("源路径不存在: {}", fromPath)); }
-    if to.exists() { return Err(format!("目标已存在: {}", toPath)); }
+    if !from.exists() { return Err(crate::error::AppError::Internal(format!("源路径不存在: {}", fromPath))); }
+    if to.exists() { return Err(crate::error::AppError::ValidationError(format!("目标已存在: {}", toPath))); }
     if let Some(parent) = to.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
+        fs::create_dir_all(parent).map_err(|e| crate::error::AppError::Internal(format!("创建目录失败: {}", e)))?;
     }
-    fs::rename(&from, &to).map_err(|e| format!("移动失败: {}", e))
+    fs::rename(&from, &to).map_err(|e| crate::error::AppError::Internal(format!("移动失败: {}", e)))
 }
 
 /// 全局搜索文件内容
@@ -341,7 +340,7 @@ fn search_dir_recursive(dir: &std::path::Path, base: &std::path::Path, query: &s
 }
 
 #[tauri::command]
-pub fn search_coding_files(query: String) -> Result<Vec<SearchResult>, String> {
+pub fn search_coding_files(query: String) -> crate::error::Result<Vec<SearchResult>> {
     if query.trim().is_empty() { return Ok(vec![]); }
     ensure_scripts_dir()?;
     let dir = coding_scripts_dir();
@@ -352,11 +351,11 @@ pub fn search_coding_files(query: String) -> Result<Vec<SearchResult>, String> {
 
 /// 读取外部文件（绝对路径）
 #[tauri::command]
-pub fn read_external_file(path: String) -> Result<String, String> {
+pub fn read_external_file(path: String) -> crate::error::Result<String> {
     let p = std::path::PathBuf::from(&path);
-    if !p.exists() { return Err(format!("文件不存在: {}", path)); }
-    if !p.is_file() { return Err(format!("不是文件: {}", path)); }
-    fs::read_to_string(&p).map_err(|e| format!("读取失败: {}", e))
+    if !p.exists() { return Err(crate::error::AppError::Internal(format!("文件不存在: {}", path))); }
+    if !p.is_file() { return Err(crate::error::AppError::ValidationError(format!("不是文件: {}", path))); }
+    fs::read_to_string(&p).map_err(|e| crate::error::AppError::Internal(format!("读取失败: {}", e)))
 }
 
 // ── pip 包管理 ──
@@ -375,13 +374,13 @@ pub fn pip_install(
     packages: Vec<String>,
     #[allow(non_snake_case)]
     customPythonPath: Option<String>,
-) -> Result<PipInstallResult, String> {
+) -> crate::error::Result<PipInstallResult> {
     if packages.is_empty() {
-        return Err("未指定要安装的包".to_string());
+        return Err(crate::error::AppError::ValidationError("未指定要安装的包".to_string()));
     }
 
     let python = find_python(customPythonPath.as_deref())
-        .ok_or_else(|| "未找到 Python，请安装 Python 3 或在设置中指定路径".to_string())?;
+        .ok_or_else(|| crate::error::AppError::ExternalToolError("未找到 Python，请安装 Python 3 或在设置中指定路径".to_string()))?;
 
     let mut cmd = Command::new(&python);
     cmd.arg("-m").arg("pip").arg("install");
@@ -391,7 +390,7 @@ pub fn pip_install(
     cmd.stdout(std::process::Stdio::piped());
     cmd.stderr(std::process::Stdio::piped());
 
-    let output = cmd.output().map_err(|e| format!("执行 pip install 失败: {}", e))?;
+    let output = cmd.output().map_err(|e| crate::error::AppError::Internal(format!("执行 pip install 失败: {}", e)))?;
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
@@ -408,20 +407,20 @@ pub fn pip_install(
 pub fn pip_list(
     #[allow(non_snake_case)]
     customPythonPath: Option<String>,
-) -> Result<String, String> {
+) -> crate::error::Result<String> {
     let python = find_python(customPythonPath.as_deref())
-        .ok_or_else(|| "未找到 Python".to_string())?;
+        .ok_or_else(|| crate::error::AppError::ExternalToolError("未找到 Python".to_string()))?;
 
     let output = Command::new(&python)
         .arg("-m").arg("pip").arg("list").arg("--format=json")
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .output()
-        .map_err(|e| format!("执行 pip list 失败: {}", e))?;
+        .map_err(|e| crate::error::AppError::Internal(format!("执行 pip list 失败: {}", e)))?;
 
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
+        Err(crate::error::AppError::ExternalToolError(String::from_utf8_lossy(&output.stderr).to_string()))
     }
 }

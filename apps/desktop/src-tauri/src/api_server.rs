@@ -70,11 +70,12 @@ fn api_json_path() -> PathBuf {
 }
 
 /// 写入 api.json
-fn write_api_json(port: u16, token: &str) -> Result<(), String> {
+fn write_api_json(port: u16, token: &str) -> crate::error::Result<()> {
+    use crate::error::AppError;
     let path = api_json_path();
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
-            .map_err(|e| format!("创建 .aidocplus 目录失败: {}", e))?;
+            .map_err(|e| AppError::Internal(format!("创建 .aidocplus 目录失败: {}", e)))?;
     }
     let info = ApiJsonInfo {
         port,
@@ -83,7 +84,7 @@ fn write_api_json(port: u16, token: &str) -> Result<(), String> {
         version: env!("CARGO_PKG_VERSION").to_string(),
     };
     let json = serde_json::to_string_pretty(&info)
-        .map_err(|e| format!("序列化 api.json 失败: {}", e))?;
+        .map_err(|e| AppError::Internal(format!("序列化 api.json 失败: {}", e)))?;
     crate::config::atomic_write(&path, &json)?;
 
     // 仅当前用户可读写（Unix）
@@ -348,7 +349,7 @@ pub fn broadcast_event(state: &ApiServerState, event_type: &str, data: serde_jso
 
 /// 启动 HTTP API Server（在后台 tokio task 中运行）
 /// 返回 (端口号, Token)
-pub async fn start_api_server(app_handle: AppHandle) -> Result<(u16, String), String> {
+pub async fn start_api_server(app_handle: AppHandle) -> crate::error::Result<(u16, String)> {
     let token = generate_token();
     let app_state = AppState::new();
 
@@ -367,11 +368,11 @@ pub async fn start_api_server(app_handle: AppHandle) -> Result<(u16, String), St
     // 绑定到 127.0.0.1 的随机可用端口
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
-        .map_err(|e| format!("绑定端口失败: {}", e))?;
+        .map_err(|e| crate::error::AppError::Internal(format!("绑定端口失败: {}", e)))?;
 
     let addr: SocketAddr = listener
         .local_addr()
-        .map_err(|e| format!("获取端口失败: {}", e))?;
+        .map_err(|e| crate::error::AppError::Internal(format!("获取端口失败: {}", e)))?;
 
     let port = addr.port();
 

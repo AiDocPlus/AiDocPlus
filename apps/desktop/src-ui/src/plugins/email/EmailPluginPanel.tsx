@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useReducer, useMemo } from 'react';
 import type { PluginPanelProps } from '../types';
 import { usePluginHost } from '../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import {
   Button, Input, Label,
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -563,7 +564,7 @@ export function EmailPluginPanel(_props: PluginPanelProps) {
           password: passwordToStore,
         });
       } catch (err) {
-        showStatus(t('keyringStoreFailed') + ': ' + (err instanceof Error ? err.message : String(err)), true);
+        showStatus(t('keyringStoreFailed') + ': ' + formatBackendError(err), true);
         return;
       }
     }

@@ -7,6 +7,8 @@ mod api_server;
 mod cli;
 mod commands;
 mod config;
+mod conversation_store;
+mod database;
 mod document;
 mod error;
 mod native_export;
@@ -16,10 +18,15 @@ mod project;
 mod template;
 mod tools;
 mod menu_i18n;
+mod search_store;
+mod security;
+mod version_store;
 mod workspace;
 
 use commands::{
     ai::*,
+    conversation::*,
+    credential::*,
     document::*,
     email::*,
     export::*,
@@ -290,6 +297,7 @@ fn main() {
             export_document,
             export_document_native,
             export_and_open,
+            open_pdf_preview,
             write_binary_file,
             open_file_with_app,
             get_temp_dir,
@@ -323,8 +331,19 @@ fn main() {
             load_plugin_storage,
             save_conversations,
             load_conversations,
+            // SQLite 对话命令
+            load_all_conversations,
+            db_create_conversation,
+            db_add_message,
+            db_update_last_message,
+            db_rename_conversation,
+            db_pin_conversation,
+            db_delete_conversation,
             save_ui_preferences,
             load_ui_preferences,
+            get_data_root_path,
+            change_data_root,
+            migrate_data_to_new_root,
 
             // Plugin commands
             list_plugins,
@@ -351,6 +370,12 @@ fn main() {
             send_email,
             store_email_credential,
             delete_email_credential,
+
+            // AI Credential commands (keyring)
+            store_ai_credential,
+            get_ai_credential,
+            delete_ai_credential,
+            migrate_ai_keys_to_keyring,
 
             // Pandoc commands
             check_pandoc,

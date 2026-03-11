@@ -1,4 +1,4 @@
-use crate::error::Result;
+use crate::error::{AppError, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -16,7 +16,7 @@ pub struct FileSystemEntry {
 fn validate_path_in_allowed_dir(path: &Path, allowed_dirs: &[PathBuf]) -> Result<PathBuf> {
     // 规范化路径（解析 ..、. 和符号链接）
     let canonical = path.canonicalize()
-        .map_err(|e| format!("路径无效或不存在: {}", e))?;
+        .map_err(|e| AppError::ValidationError(format!("路径无效或不存在: {}", e)))?;
 
     // 检查路径是否在任一允许的目录内
     for allowed_dir in allowed_dirs {
@@ -27,17 +27,15 @@ fn validate_path_in_allowed_dir(path: &Path, allowed_dirs: &[PathBuf]) -> Result
         }
     }
 
-    Err("路径遍历尝试被检测到：路径不在允许的目录内".to_string())
+    Err(AppError::SecurityError("路径遍历尝试被检测到：路径不在允许的目录内".to_string()))
 }
 
 /// 获取允许的目录列表（应用数据目录 + 用户主目录）
 fn get_allowed_directories() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
 
-    // 应用项目目录
-    if let Some(home) = dirs::home_dir() {
-        dirs.push(home.join("AiDocPlus"));
-    }
+    // 应用数据目录
+    dirs.push(crate::config::current_data_root());
 
     // 用户主目录（用于导入文件）
     if let Some(home) = dirs::home_dir() {
@@ -55,7 +53,7 @@ pub fn read_directory(path: String) -> Result<FileSystemEntry> {
     let path_obj = Path::new(&path);
 
     if !path_obj.exists() {
-        return Err(format!("Path does not exist: {}", path));
+        return Err(AppError::Internal(format!("Path does not exist: {}", path)));
     }
 
     let name = path_obj
@@ -75,7 +73,7 @@ pub fn read_directory(path: String) -> Result<FileSystemEntry> {
     }
 
     let entries = fs::read_dir(&path)
-        .map_err(|e| e.to_string())?
+        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?
         .filter_map(|entry| entry.ok())
         .filter(|entry| {
             // Filter hidden files
@@ -115,9 +113,9 @@ pub fn read_directory(path: String) -> Result<FileSystemEntry> {
 #[tauri::command]
 pub fn read_file(path: String) -> Result<String> {
     if !Path::new(&path).exists() {
-        return Err(format!("File not found: {}", path));
+        return Err(AppError::Internal(format!("File not found: {}", path)));
     }
-    Ok(fs::read_to_string(&path).map_err(|e| e.to_string())?)
+    Ok(fs::read_to_string(&path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?)
 }
 
 #[tauri::command]
@@ -126,12 +124,12 @@ pub fn write_file(path: String, content: String) -> Result<()> {
     // 写操作需要严格的路径验证
     let allowed_dirs = get_allowed_directories();
     validate_path_in_allowed_dir(path, &allowed_dirs)
-        .map_err(|e| format!("写入文件失败: {}", e))?;
+        .map_err(|e| AppError::Internal(format!("写入文件失败: {}", e)))?;
 
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        fs::create_dir_all(parent).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
     }
-    Ok(fs::write(path, content).map_err(|e| e.to_string())?)
+    Ok(fs::write(path, content).map_err(|e| crate::error::AppError::Internal(e.to_string()))?)
 }
 
 #[tauri::command]
@@ -140,9 +138,9 @@ pub fn delete_file(path: String) -> Result<()> {
     // 删除操作需要严格的路径验证
     let allowed_dirs = get_allowed_directories();
     validate_path_in_allowed_dir(path, &allowed_dirs)
-        .map_err(|e| format!("删除文件失败: {}", e))?;
+        .map_err(|e| AppError::Internal(format!("删除文件失败: {}", e)))?;
 
-    Ok(fs::remove_file(path).map_err(|e| e.to_string())?)
+    Ok(fs::remove_file(path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?)
 }
 
 /// 读取文件并返回 base64 data URI（如 data:image/png;base64,...）
@@ -153,10 +151,10 @@ pub fn read_file_base64(path: String) -> Result<String> {
 
     let file_path = Path::new(&path);
     if !file_path.exists() {
-        return Err(format!("文件不存在: {}", path));
+        return Err(AppError::Internal(format!("文件不存在: {}", path)));
     }
 
-    let bytes = fs::read(file_path).map_err(|e| format!("读取文件失败: {}", e))?;
+    let bytes = fs::read(file_path).map_err(|e| AppError::Internal(format!("读取文件失败: {}", e)))?;
 
     let mime = match file_path
         .extension()
@@ -183,10 +181,10 @@ pub fn read_file_base64(path: String) -> Result<String> {
 pub fn read_text_file(path: String) -> Result<String> {
     let file_path = Path::new(&path);
     if !file_path.exists() {
-        return Err(format!("文件不存在: {}", path));
+        return Err(AppError::Internal(format!("文件不存在: {}", path)));
     }
 
-    let bytes = fs::read(file_path).map_err(|e| format!("读取文件失败: {}", e))?;
+    let bytes = fs::read(file_path).map_err(|e| AppError::Internal(format!("读取文件失败: {}", e)))?;
 
     // 先尝试 UTF-8
     if let Ok(s) = std::str::from_utf8(&bytes) {
@@ -213,9 +211,9 @@ pub fn create_directory(path: String) -> Result<()> {
     // 创建目录操作需要严格的路径验证
     let allowed_dirs = get_allowed_directories();
     validate_path_in_allowed_dir(path, &allowed_dirs)
-        .map_err(|e| format!("创建目录失败: {}", e))?;
+        .map_err(|e| AppError::Internal(format!("创建目录失败: {}", e)))?;
 
-    Ok(fs::create_dir_all(path).map_err(|e| e.to_string())?)
+    Ok(fs::create_dir_all(path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?)
 }
 
 /// 获取文件元数据（大小等），供插件查询附件大小
@@ -223,9 +221,9 @@ pub fn create_directory(path: String) -> Result<()> {
 pub fn get_file_metadata(path: String) -> Result<serde_json::Value> {
     let file_path = Path::new(&path);
     if !file_path.exists() {
-        return Err(format!("File not found: {}", path));
+        return Err(AppError::Internal(format!("File not found: {}", path)));
     }
-    let metadata = fs::metadata(file_path).map_err(|e| format!("Failed to read metadata: {}", e))?;
+    let metadata = fs::metadata(file_path).map_err(|e| AppError::Internal(format!("Failed to read metadata: {}", e)))?;
     Ok(serde_json::json!({
         "size": metadata.len(),
         "isFile": metadata.is_file(),
@@ -238,14 +236,14 @@ pub fn get_file_metadata(path: String) -> Result<serde_json::Value> {
 pub fn get_home_dir() -> Result<String> {
     dirs::home_dir()
         .map(|p| p.to_string_lossy().to_string())
-        .ok_or_else(|| "无法获取用户主目录".to_string())
+        .ok_or_else(|| AppError::Internal("无法获取用户主目录".to_string()))
 }
 
 /// 获取文档在磁盘上的文件路径（跨平台安全拼接）
 #[tauri::command]
 pub fn get_document_file_path(project_id: String, document_id: String) -> Result<String> {
     let home = dirs::home_dir()
-        .ok_or_else(|| "无法获取用户主目录".to_string())?;
+        .ok_or_else(|| AppError::Internal("无法获取用户主目录".to_string()))?;
     let doc_path = home
         .join("AiDocPlus")
         .join("Projects")
@@ -268,10 +266,10 @@ pub fn show_in_folder(path: String) -> Result<()> {
         if parent.exists() {
             parent.to_path_buf()
         } else {
-            return Err(format!("路径不存在: {}", path));
+            return Err(AppError::Internal(format!("路径不存在: {}", path)));
         }
     } else {
-        return Err(format!("路径不存在: {}", path));
+        return Err(AppError::Internal(format!("路径不存在: {}", path)));
     };
 
     #[cfg(target_os = "macos")]
@@ -279,7 +277,7 @@ pub fn show_in_folder(path: String) -> Result<()> {
         std::process::Command::new("open")
             .args(["-R", &target.to_string_lossy()])
             .spawn()
-            .map_err(|e| format!("打开 Finder 失败: {}", e))?;
+            .map_err(|e| AppError::Internal(format!("打开 Finder 失败: {}", e)))?;
     }
 
     #[cfg(target_os = "windows")]
@@ -289,7 +287,7 @@ pub fn show_in_folder(path: String) -> Result<()> {
         std::process::Command::new("explorer")
             .arg(format!("/select,{}", win_path))
             .spawn()
-            .map_err(|e| format!("打开资源管理器失败: {}", e))?;
+            .map_err(|e| AppError::Internal(format!("打开资源管理器失败: {}", e)))?;
     }
 
     #[cfg(target_os = "linux")]
@@ -298,7 +296,7 @@ pub fn show_in_folder(path: String) -> Result<()> {
             std::process::Command::new("xdg-open")
                 .arg(parent)
                 .spawn()
-                .map_err(|e| format!("打开文件管理器失败: {}", e))?;
+                .map_err(|e| AppError::Internal(format!("打开文件管理器失败: {}", e)))?;
         }
     }
 

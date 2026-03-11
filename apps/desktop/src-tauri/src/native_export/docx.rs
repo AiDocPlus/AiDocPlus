@@ -5,7 +5,8 @@ use std::fs::File;
 use super::styles;
 
 /// 将 Markdown 转换为符合公文排版标准的 DOCX 文件
-pub fn export_to_docx(markdown: &str, output_path: &str) -> Result<(), String> {
+pub fn export_to_docx(markdown: &str, output_path: &str) -> crate::error::Result<()> {
+    use crate::error::AppError;
     let arena = Arena::new();
     let mut options = Options::default();
     options.extension.table = true;
@@ -89,8 +90,8 @@ pub fn export_to_docx(markdown: &str, output_path: &str) -> Result<(), String> {
     }
 
     // 写入文件
-    let file = File::create(output_path).map_err(|e| format!("创建文件失败: {}", e))?;
-    docx.build().pack(file).map_err(|e| format!("生成 DOCX 失败: {}", e))?;
+    let file = File::create(output_path).map_err(|e| AppError::ExportFailed(format!("创建文件失败: {}", e)))?;
+    docx.build().pack(file).map_err(|e| AppError::ExportFailed(format!("生成 DOCX 失败: {}", e)))?;
 
     Ok(())
 }
@@ -146,47 +147,42 @@ fn process_node<'a>(node: &'a AstNode<'a>, docx: &mut Docx) {
             *docx = std::mem::take(docx).add_paragraph(para);
         }
         NodeValue::CodeBlock(cb) => {
+            // 代码块：用单行单列表格包裹，实现灰色背景效果
             let code_text = cb.literal.to_string();
+            let mut paragraphs: Vec<Paragraph> = Vec::new();
             for line in code_text.lines() {
                 let run = Run::new()
                     .add_text(line)
                     .fonts(RunFonts::new().ascii("Consolas").east_asia("Consolas").hi_ansi("Consolas"))
                     .size(styles::pt_to_half_point(styles::FONT_SIZE_FOOTNOTE));
-                let para = apply_standard_para_style(Paragraph::new()).add_run(run);
-                *docx = std::mem::take(docx).add_paragraph(para);
+                let para = Paragraph::new()
+                    .line_spacing(
+                        LineSpacing::new()
+                            .line_rule(LineSpacingType::Exact)
+                            .line(styles::pt_to_twip(14.0))
+                            .before(0)
+                            .after(0)
+                    )
+                    .add_run(run);
+                paragraphs.push(para);
             }
+            // 如果代码块为空，添加一个空段落
+            if paragraphs.is_empty() {
+                paragraphs.push(Paragraph::new());
+            }
+            let mut cell = TableCell::new();
+            for p in paragraphs {
+                cell = cell.add_paragraph(p);
+            }
+            cell = cell.shading(Shading::new().fill("F5F5F5"));
+            let row = TableRow::new(vec![cell]);
+            let table = Table::new(vec![row])
+                .set_grid(vec![])
+                .indent(0);
+            *docx = std::mem::take(docx).add_table(table);
         }
         NodeValue::List(list) => {
-            let is_ordered = list.list_type == ListType::Ordered;
-            let mut index = list.start as usize;
-            for item in node.children() {
-                let prefix = if is_ordered {
-                    let s = format!("{}. ", index);
-                    index += 1;
-                    s
-                } else {
-                    "• ".to_string()
-                };
-                let mut para = apply_standard_para_style(Paragraph::new());
-
-                // 添加列表前缀
-                let prefix_run = Run::new()
-                    .add_text(&prefix)
-                    .fonts(RunFonts::new().east_asia(styles::FONT_FANGSONG[0]).ascii(styles::FONT_WESTERN))
-                    .size(styles::pt_to_half_point(styles::FONT_SIZE_BODY));
-                para = para.add_run(prefix_run);
-
-                // 收集列表项内容
-                for item_child in item.children() {
-                    if let NodeValue::Paragraph = &item_child.data.borrow().value {
-                        let runs = collect_inline_runs(item_child);
-                        for run in runs {
-                            para = para.add_run(run);
-                        }
-                    }
-                }
-                *docx = std::mem::take(docx).add_paragraph(para);
-            }
+            process_list(node, docx, list.list_type == ListType::Ordered, list.start as usize, 0);
         }
         NodeValue::BlockQuote => {
             for child in node.children() {
@@ -221,7 +217,7 @@ fn process_node<'a>(node: &'a AstNode<'a>, docx: &mut Docx) {
 /// 收集节点内的所有内联元素为 Run 列表
 fn collect_inline_runs<'a>(node: &'a AstNode<'a>) -> Vec<Run> {
     let mut runs = Vec::new();
-    collect_inline_runs_recursive(node, &mut runs, false, false, false);
+    collect_inline_runs_recursive(node, &mut runs, false, false, false, false);
     runs
 }
 
@@ -231,6 +227,7 @@ fn collect_inline_runs_recursive<'a>(
     bold: bool,
     italic: bool,
     code: bool,
+    strikethrough: bool,
 ) {
     for child in node.children() {
         match &child.data.borrow().value {
@@ -241,6 +238,7 @@ fn collect_inline_runs_recursive<'a>(
                     .size(styles::pt_to_half_point(styles::FONT_SIZE_BODY));
                 if bold { run = run.bold(); }
                 if italic { run = run.italic(); }
+                if strikethrough { run = run.strike(); }
                 if code {
                     run = run.fonts(RunFonts::new().ascii("Consolas").east_asia("Consolas").hi_ansi("Consolas"));
                 }
@@ -258,18 +256,17 @@ fn collect_inline_runs_recursive<'a>(
                 runs.push(run);
             }
             NodeValue::Strong => {
-                collect_inline_runs_recursive(child, runs, true, italic, code);
+                collect_inline_runs_recursive(child, runs, true, italic, code, strikethrough);
             }
             NodeValue::Emph => {
-                collect_inline_runs_recursive(child, runs, bold, true, code);
+                collect_inline_runs_recursive(child, runs, bold, true, code, strikethrough);
             }
             NodeValue::Strikethrough => {
-                // docx-rs 不直接支持删除线，用普通文本代替
-                collect_inline_runs_recursive(child, runs, bold, italic, code);
+                collect_inline_runs_recursive(child, runs, bold, italic, code, true);
             }
             NodeValue::Link(link) => {
                 // 先输出链接文本，再输出 URL
-                collect_inline_runs_recursive(child, runs, bold, italic, code);
+                collect_inline_runs_recursive(child, runs, bold, italic, code, strikethrough);
                 let url = link.url.clone();
                 if !url.is_empty() {
                     let url_run = Run::new()
@@ -279,10 +276,92 @@ fn collect_inline_runs_recursive<'a>(
                     runs.push(url_run);
                 }
             }
+            NodeValue::TaskItem(task) => {
+                // 任务列表项：添加 ☑/☐ 前缀
+                let is_checked = task.symbol == Some('x') || task.symbol == Some('X');
+                let check_char = if is_checked { "☑ " } else { "☐ " };
+                let check_run = Run::new()
+                    .add_text(check_char)
+                    .fonts(RunFonts::new().east_asia(styles::FONT_FANGSONG[0]).ascii(styles::FONT_WESTERN))
+                    .size(styles::pt_to_half_point(styles::FONT_SIZE_BODY));
+                runs.push(check_run);
+                // 递归处理子内容
+                collect_inline_runs_recursive(child, runs, bold, italic, code, strikethrough);
+            }
             _ => {
-                collect_inline_runs_recursive(child, runs, bold, italic, code);
+                collect_inline_runs_recursive(child, runs, bold, italic, code, strikethrough);
             }
         }
+    }
+}
+
+/// 递归处理列表（支持嵌套列表和任务列表）
+fn process_list<'a>(node: &'a AstNode<'a>, docx: &mut Docx, is_ordered: bool, start: usize, depth: u32) {
+    let mut index = start;
+    let indent_twip = styles::chars_to_twip(styles::FIRST_LINE_INDENT) + (depth as i32) * styles::chars_to_twip(2);
+
+    for item in node.children() {
+        // 检查是否为任务列表项
+        let task_info = match &item.data.borrow().value {
+            NodeValue::TaskItem(t) => Some(t.symbol == Some('x') || t.symbol == Some('X')),
+            _ => None,
+        };
+
+        let prefix = if let Some(checked) = task_info {
+            if checked { "☑ ".to_string() } else { "☐ ".to_string() }
+        } else if is_ordered {
+            let s = format!("{}. ", index);
+            index += 1;
+            s
+        } else {
+            match depth {
+                0 => "• ".to_string(),
+                1 => "◦ ".to_string(),
+                _ => "▪ ".to_string(),
+            }
+        };
+
+        let mut para = Paragraph::new()
+            .indent(Some(indent_twip), None, None, None)
+            .line_spacing(
+                LineSpacing::new()
+                    .line_rule(LineSpacingType::Exact)
+                    .line(styles::pt_to_twip(styles::LINE_SPACING_PT))
+                    .before(0)
+                    .after(0)
+            );
+
+        // 添加列表前缀
+        let prefix_run = Run::new()
+            .add_text(&prefix)
+            .fonts(RunFonts::new().east_asia(styles::FONT_FANGSONG[0]).ascii(styles::FONT_WESTERN))
+            .size(styles::pt_to_half_point(styles::FONT_SIZE_BODY));
+        para = para.add_run(prefix_run);
+
+        // 收集列表项内容，同时递归处理子列表
+        for item_child in item.children() {
+            match &item_child.data.borrow().value {
+                NodeValue::Paragraph => {
+                    let runs = collect_inline_runs(item_child);
+                    for run in runs {
+                        para = para.add_run(run);
+                    }
+                }
+                NodeValue::List(sub_list) => {
+                    // 先输出当前项的段落
+                    *docx = std::mem::take(docx).add_paragraph(para);
+                    // 递归处理子列表
+                    process_list(item_child, docx, sub_list.list_type == ListType::Ordered, sub_list.start as usize, depth + 1);
+                    // 创建新的空段落（后续不再添加 run）
+                    para = Paragraph::new();
+                    // 标记不需要再输出
+                    continue;
+                }
+                _ => {}
+            }
+        }
+        // 如果段落非空则输出（跳过子列表处理后的空段落）
+        *docx = std::mem::take(docx).add_paragraph(para);
     }
 }
 

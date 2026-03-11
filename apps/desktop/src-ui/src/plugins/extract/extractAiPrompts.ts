@@ -1,4 +1,5 @@
 import type { ExtractField, ExtractTemplate } from './types';
+import { formatBackendError } from '@/lib/backendError';
 
 /**
  * 构造结构化数据提取的 system prompt
@@ -134,7 +135,7 @@ export function parseExtractFromAiResponse(text: string): {
         return { fields, rows };
       }
     } catch (e) {
-      console.warn('[Extract] 解析候选失败:', e instanceof Error ? e.message : e);
+      console.warn('[Extract] 解析候选失败:', formatBackendError(e));
     }
   }
 

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useAppStore } from '@/stores/useAppStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
@@ -6,14 +6,16 @@ import { useTranslation } from '@/i18n';
 import { useMenuEvents } from '@/hooks/useMenuEvents';
 import { FileTree } from '../file-tree/FileTree';
 import { TabArea } from '../tabs/TabArea';
-import { SettingsPanel } from '../settings/SettingsPanel';
-import { SearchPanel } from '../search/SearchPanel';
-import { ProjectPickerDialog } from '../dialogs/ProjectPickerDialog';
-import { ShortcutsDialog } from '../dialogs/ShortcutsDialog';
-import { AboutDialog } from '../dialogs/AboutDialog';
-import { FirstRunGuideDialog } from '../dialogs/FirstRunGuideDialog';
-import { TemplatePickerDialog } from '../templates/TemplatePickerDialog';
-import { SaveAsTemplateDialog } from '../templates/SaveAsTemplateDialog';
+
+// 延迟加载按需组件，减少首屏 JS 包大小
+const SettingsPanel = lazy(() => import('../settings/SettingsPanel').then(m => ({ default: m.SettingsPanel })));
+const SearchPanel = lazy(() => import('../search/SearchPanel').then(m => ({ default: m.SearchPanel })));
+const ProjectPickerDialog = lazy(() => import('../dialogs/ProjectPickerDialog').then(m => ({ default: m.ProjectPickerDialog })));
+const ShortcutsDialog = lazy(() => import('../dialogs/ShortcutsDialog').then(m => ({ default: m.ShortcutsDialog })));
+const AboutDialog = lazy(() => import('../dialogs/AboutDialog').then(m => ({ default: m.AboutDialog })));
+const FirstRunGuideDialog = lazy(() => import('../dialogs/FirstRunGuideDialog').then(m => ({ default: m.FirstRunGuideDialog })));
+const TemplatePickerDialog = lazy(() => import('../templates/TemplatePickerDialog').then(m => ({ default: m.TemplatePickerDialog })));
+const SaveAsTemplateDialog = lazy(() => import('../templates/SaveAsTemplateDialog').then(m => ({ default: m.SaveAsTemplateDialog })));
 import { cn } from '@/lib/utils';
 import { logRender } from '@/lib/perfLog';
 import { Menu, X } from 'lucide-react';
@@ -171,64 +173,92 @@ export function MainLayout() {
         </div>
       </main>
 
-      {/* Settings Panel */}
-      <SettingsPanel open={settingsOpen} defaultTab={settingsDefaultTab} onClose={() => {
-        setSettingsOpen(false);
-        setSettingsDefaultTab(undefined);
-        if (firstRunPaused) {
-          setFirstRunPaused(false);
-          setFirstRunIsAuto(true);
-          setShowFirstRunGuide(true);
-        }
-      }} />
+      {/* Settings Panel（lazy：仅打开时加载） */}
+      {settingsOpen && (
+        <Suspense fallback={null}>
+          <SettingsPanel open={settingsOpen} defaultTab={settingsDefaultTab} onClose={() => {
+            setSettingsOpen(false);
+            setSettingsDefaultTab(undefined);
+            if (firstRunPaused) {
+              setFirstRunPaused(false);
+              setFirstRunIsAuto(true);
+              setShowFirstRunGuide(true);
+            }
+          }} />
+        </Suspense>
+      )}
 
-      {/* Search Panel */}
-      <SearchPanel />
+      {/* Search Panel（lazy：仅打开时加载） */}
+      <Suspense fallback={null}>
+        <SearchPanel />
+      </Suspense>
 
-      {/* 文档移动/复制对话框 */}
-      <ProjectPickerDialog
-        open={docPickerMode !== null}
-        mode={docPickerMode || 'move'}
-        onClose={() => setDocPickerMode(null)}
-      />
+      {/* 文档移动/复制对话框（lazy） */}
+      {docPickerMode !== null && (
+        <Suspense fallback={null}>
+          <ProjectPickerDialog
+            open={docPickerMode !== null}
+            mode={docPickerMode || 'move'}
+            onClose={() => setDocPickerMode(null)}
+          />
+        </Suspense>
+      )}
 
-      {/* 快捷键参考对话框 */}
-      <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      {/* 快捷键参考对话框（lazy） */}
+      {shortcutsOpen && (
+        <Suspense fallback={null}>
+          <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+        </Suspense>
+      )}
 
-      {/* 关于对话框 */}
-      <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
+      {/* 关于对话框（lazy） */}
+      {aboutOpen && (
+        <Suspense fallback={null}>
+          <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
+        </Suspense>
+      )}
 
-      {/* 首次启动引导对话框 */}
-      <FirstRunGuideDialog
-        open={showFirstRunGuide}
-        onClose={handleFirstRunGuideClose}
-        onOpenSettings={() => {
-          setShowFirstRunGuide(false);
-          setFirstRunPaused(true);
-          setSettingsDefaultTab('ai');
-          setSettingsOpen(true);
-        }}
-      />
+      {/* 首次启动引导对话框（lazy） */}
+      {showFirstRunGuide && (
+        <Suspense fallback={null}>
+          <FirstRunGuideDialog
+            open={showFirstRunGuide}
+            onClose={handleFirstRunGuideClose}
+            onOpenSettings={() => {
+              setShowFirstRunGuide(false);
+              setFirstRunPaused(true);
+              setSettingsDefaultTab('ai');
+              setSettingsOpen(true);
+            }}
+          />
+        </Suspense>
+      )}
 
-      {/* 模板选择器 */}
-      <TemplatePickerDialog
-        open={templatePickerOpen}
-        onOpenChange={setTemplatePickerOpen}
-        projectId={useAppStore.getState().currentProject?.id || ''}
-      />
+      {/* 模板选择器（lazy） */}
+      {templatePickerOpen && (
+        <Suspense fallback={null}>
+          <TemplatePickerDialog
+            open={templatePickerOpen}
+            onOpenChange={setTemplatePickerOpen}
+            projectId={useAppStore.getState().currentProject?.id || ''}
+          />
+        </Suspense>
+      )}
 
-      {/* 存为模板 */}
+      {/* 存为模板（lazy） */}
       {saveAsTemplateOpen && (() => {
         const { currentDocument } = useAppStore.getState();
         if (!currentDocument) return null;
         return (
-          <SaveAsTemplateDialog
-            open={saveAsTemplateOpen}
-            onOpenChange={setSaveAsTemplateOpen}
-            projectId={currentDocument.projectId}
-            documentId={currentDocument.id}
-            documentTitle={currentDocument.title}
-          />
+          <Suspense fallback={null}>
+            <SaveAsTemplateDialog
+              open={saveAsTemplateOpen}
+              onOpenChange={setSaveAsTemplateOpen}
+              projectId={currentDocument.projectId}
+              documentId={currentDocument.id}
+              documentTitle={currentDocument.title}
+            />
+          </Suspense>
         );
       })()}
 

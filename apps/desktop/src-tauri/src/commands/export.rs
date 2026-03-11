@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use crate::config::AppState;
-use crate::error::Result;
+use crate::error::{AppError, Result};
 use crate::native_export;
 use std::time::{Duration, SystemTime};
 use tauri::State;
@@ -38,10 +38,10 @@ pub fn export_document_native(
     let doc_path = state.get_document_path(&projectId, &documentId);
 
     if !doc_path.exists() {
-        return Err(format!("文档未找到: {}", documentId));
+        return Err(AppError::DocumentNotFound(format!("文档未找到: {}", documentId)));
     }
 
-    let document = crate::document::Document::load(&doc_path).map_err(|e| e.to_string())?;
+    let document = crate::document::Document::load(&doc_path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
     let content = contentOverride.as_deref().unwrap_or(&document.ai_generated_content);
     let title = &document.title;
 
@@ -74,19 +74,19 @@ pub fn export_and_open(
     let doc_path = state.get_document_path(&projectId, &documentId);
 
     if !doc_path.exists() {
-        return Err(format!("文档未找到: {}", documentId));
+        return Err(AppError::DocumentNotFound(format!("文档未找到: {}", documentId)));
     }
 
-    let document = crate::document::Document::load(&doc_path).map_err(|e| e.to_string())?;
+    let document = crate::document::Document::load(&doc_path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
     let title = &document.title;
     let export_content = contentOverride.as_deref().unwrap_or(&document.ai_generated_content);
 
     // 构建临时文件路径（导出前清理旧临时文件）
     let temp_dir = std::env::temp_dir().join("aidocplus_export");
-    std::fs::create_dir_all(&temp_dir).map_err(|e| format!("创建临时目录失败: {}", e))?;
+    std::fs::create_dir_all(&temp_dir).map_err(|e| AppError::Internal(format!("创建临时目录失败: {}", e)))?;
     cleanup_old_temp_files(&temp_dir, TEMP_FILE_MAX_AGE);
 
-    let safe_title = title.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
+    let safe_title = crate::security::sanitize_filename(&title);
     let output_path = temp_dir.join(format!("{}.{}", safe_title, format));
     let output_str = output_path.to_string_lossy().to_string();
 
@@ -103,20 +103,20 @@ pub fn export_and_open(
         Ok(_) => Ok(output_str),
         Err(e) => {
             let app_desc = appName.unwrap_or_else(|| "默认程序".to_string());
-            Err(format!("无法使用 {} 打开文件: {}", app_desc, e))
+            Err(AppError::ExportFailed(format!("无法使用 {} 打开文件: {}", app_desc, e)))
         }
     }
 }
 
 /// 用默认程序打开文件
-fn open_with_default(file_path: &str) -> std::result::Result<(), String> {
+fn open_with_default(file_path: &str) -> crate::error::Result<()> {
     #[cfg(target_os = "macos")]
     {
         std::process::Command::new("open")
             .arg(file_path)
             .spawn()
             .map(|_| ())
-            .map_err(|e| e.to_string())
+            .map_err(|e| crate::error::AppError::Internal(e.to_string()))
     }
     #[cfg(target_os = "windows")]
     {
@@ -124,7 +124,7 @@ fn open_with_default(file_path: &str) -> std::result::Result<(), String> {
             .args(["/c", "start", "", file_path])
             .spawn()
             .map(|_| ())
-            .map_err(|e| e.to_string())
+            .map_err(|e| crate::error::AppError::Internal(e.to_string()))
     }
     #[cfg(target_os = "linux")]
     {
@@ -132,12 +132,12 @@ fn open_with_default(file_path: &str) -> std::result::Result<(), String> {
             .arg(file_path)
             .spawn()
             .map(|_| ())
-            .map_err(|e| e.to_string())
+            .map_err(|e| crate::error::AppError::Internal(e.to_string()))
     }
 }
 
 /// 用指定程序打开文件（跨平台）
-fn open_with_app(file_path: &str, app: &str) -> std::result::Result<(), String> {
+fn open_with_app(file_path: &str, app: &str) -> crate::error::Result<()> {
     #[cfg(target_os = "macos")]
     {
         // macOS: 先尝试 open -a "app"，失败则尝试备选名称
@@ -159,7 +159,7 @@ fn open_with_app(file_path: &str, app: &str) -> std::result::Result<(), String> 
                 }
             }
         }
-        Err(format!("尝试了 {:?}，均未成功: {}", candidates, last_err))
+        Err(AppError::ExternalToolError(format!("尝试了 {:?}，均未成功: {}", candidates, last_err)))
     }
     #[cfg(target_os = "windows")]
     {
@@ -183,7 +183,7 @@ fn open_with_app(file_path: &str, app: &str) -> std::result::Result<(), String> 
             Ok(_) => Ok(()),
             Err(e) => {
                 if last_err.is_empty() { last_err = e.to_string(); }
-                Err(format!("尝试了 {:?} 和 start 命令，均未成功: {}", exe_paths, last_err))
+                Err(AppError::ExternalToolError(format!("尝试了 {:?} 和 start 命令，均未成功: {}", exe_paths, last_err)))
             }
         }
     }
@@ -193,7 +193,7 @@ fn open_with_app(file_path: &str, app: &str) -> std::result::Result<(), String> 
             .arg(file_path)
             .spawn()
             .map(|_| ())
-            .map_err(|e| e.to_string())
+            .map_err(|e| crate::error::AppError::Internal(e.to_string()))
     }
 }
 
@@ -279,7 +279,7 @@ pub fn open_file_with_app(path: String, app_name: Option<String>) -> Result<()> 
 #[tauri::command]
 pub fn get_temp_dir() -> Result<String> {
     let temp_dir = std::env::temp_dir().join("aidocplus_export");
-    std::fs::create_dir_all(&temp_dir).map_err(|e| format!("创建临时目录失败: {}", e))?;
+    std::fs::create_dir_all(&temp_dir).map_err(|e| AppError::Internal(format!("创建临时目录失败: {}", e)))?;
     Ok(temp_dir.to_string_lossy().to_string())
 }
 
@@ -293,6 +293,48 @@ pub fn cleanup_temp_files() -> Result<()> {
             cleanup_old_temp_files(&dir, TEMP_FILE_MAX_AGE);
         }
     }
+    Ok(())
+}
+
+/// 在应用内打开 PDF 预览窗口（加载本地 HTML 文件）
+#[tauri::command]
+pub fn open_pdf_preview(
+    app_handle: tauri::AppHandle,
+    htmlPath: String,
+    title: Option<String>,
+) -> Result<()> {
+    use tauri::Manager;
+    use tauri::WebviewWindowBuilder;
+    use tauri::WebviewUrl;
+
+    let window_label = "pdf-preview";
+
+    // 如果预览窗口已存在，先关闭旧窗口
+    if let Some(existing) = app_handle.get_webview_window(window_label) {
+        let _ = existing.destroy();
+    }
+
+    // 将本地文件路径转换为 file:// URL
+    let file_url = if htmlPath.starts_with("file://") {
+        htmlPath.clone()
+    } else {
+        format!("file://{}", htmlPath.replace('\\', "/"))
+    };
+
+    let url = WebviewUrl::External(
+        file_url.parse().map_err(|e| AppError::Internal(format!("URL 解析失败: {}", e)))?
+    );
+
+    let win_title = title.unwrap_or_else(|| "PDF 预览 - 打印 / 另存为 PDF".to_string());
+
+    WebviewWindowBuilder::new(&app_handle, window_label, url)
+        .title(&win_title)
+        .inner_size(900.0, 700.0)
+        .min_inner_size(600.0, 400.0)
+        .resizable(true)
+        .build()
+        .map_err(|e| AppError::Internal(format!("创建预览窗口失败: {}", e)))?;
+
     Ok(())
 }
 

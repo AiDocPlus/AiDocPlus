@@ -1,14 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Monitor, Type, Globe, Zap, Download, Upload, RotateCcw, Loader2, Puzzle, Plus, Pencil, Trash2, Check, Power, Mail, Search, ChevronDown, ChevronRight, LayoutTemplate, Gift, ExternalLink, Bot, Play, Square, Circle } from 'lucide-react';
+import { X, Monitor, Type, Globe, Zap, Download, Upload, RotateCcw, Loader2, Puzzle, Plus, Pencil, Trash2, Check, Power, Mail, Search, ChevronDown, ChevronRight, LayoutTemplate, Gift, ExternalLink, Bot, Play, Square, Circle, FolderOpen } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { invoke } from '@tauri-apps/api/core';
 import { getVersion } from '@tauri-apps/api/app';
+import { open as openDialog, message, confirm } from '@tauri-apps/plugin-dialog';
 import { useTranslation } from '../../i18n';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import { AI_PROVIDERS, getProviderConfig, EMAIL_PROVIDER_PRESETS, getEmailPreset } from '@aidocplus/shared-types';
 import type { AIProvider, AIServiceConfig, EmailAccountConfig } from '@aidocplus/shared-types';
 import { SUPPORTED_LANGUAGES, type SupportedLanguage, changeAppLanguage } from '../../i18n';
+import { formatBackendError } from '@/lib/backendError';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Button } from '../ui/button';
@@ -29,17 +31,19 @@ export function SettingsPanel({ open, onClose, defaultTab }: SettingsPanelProps)
   const { t } = useTranslation();
   const [appVersion, setAppVersion] = useState('');
   const [activeTab, setActiveTab] = useState(defaultTab || 'editor');
+  const [dataRootPath, setDataRootPath] = useState('');
+  const [isDataMigrating, setIsDataMigrating] = useState(false);
 
   useEffect(() => {
     if (open) {
       setActiveTab(defaultTab || 'editor');
       getVersion().then(setAppVersion).catch(() => setAppVersion('0.3.0'));
+      invoke<string>('get_data_root_path').then(setDataRootPath).catch(() => {});
     }
   }, [open, defaultTab]);
   const {
     editor,
     ui,
-    file,
     ai,
     email,
     updateEditorSettings,
@@ -186,18 +190,42 @@ export function SettingsPanel({ open, onClose, defaultTab }: SettingsPanelProps)
     setTestResult(null);
   };
 
-  const handleEditService = (svc: AIServiceConfig) => {
-    setEditingService({ ...svc });
+  const handleEditService = async (svc: AIServiceConfig) => {
+    const editSvc = { ...svc };
+    // 如果 API Key 是 keyring 占位符，从密钥链读取真实值用于编辑显示
+    if (editSvc.apiKey === '__KEYRING__' || !editSvc.apiKey) {
+      try {
+        const realKey = await invoke<string>('get_ai_credential', { serviceId: svc.id });
+        if (realKey) {
+          editSvc.apiKey = realKey;
+        }
+      } catch {
+        // keyring 读取失败，保持原值
+      }
+    }
+    setEditingService(editSvc);
     setIsCreatingService(false);
     setTestResult(null);
   };
 
-  const handleSaveService = () => {
+  const handleSaveService = async () => {
     if (!editingService) return;
     // 自动命名：如果用户没填名称，用服务商名称
     const providerCfg = getProviderConfig(editingService.provider);
     const svcName = editingService.name.trim() || providerCfg?.name || editingService.provider;
-    const svc = { ...editingService, name: svcName };
+
+    // 将 API Key 存入 OS 密钥链
+    const realApiKey = editingService.apiKey;
+    if (realApiKey && realApiKey !== '__KEYRING__') {
+      try {
+        await invoke('store_ai_credential', { serviceId: editingService.id, apiKey: realApiKey });
+      } catch (e) {
+        console.warn('存储 API Key 到密钥链失败，将保留在配置文件中:', e);
+      }
+    }
+
+    // 配置文件中不再保存明文 API Key，改为占位符
+    const svc = { ...editingService, name: svcName, apiKey: realApiKey ? '__KEYRING__' : '' };
 
     const services = [...tempSettings.ai.services];
     const idx = services.findIndex(s => s.id === svc.id);
@@ -213,6 +241,8 @@ export function SettingsPanel({ open, onClose, defaultTab }: SettingsPanelProps)
   };
 
   const handleDeleteService = (id: string) => {
+    // 同步删除 keyring 中的凭证
+    invoke('delete_ai_credential', { serviceId: id }).catch(() => {});
     const services = tempSettings.ai.services.filter(s => s.id !== id);
     let activeId = tempSettings.ai.activeServiceId;
     if (activeId === id) {
@@ -258,7 +288,7 @@ export function SettingsPanel({ open, onClose, defaultTab }: SettingsPanelProps)
       setTestResult({ ok: true, msg: result });
       setEditingService(prev => prev ? { ...prev, lastTestOk: true } : prev);
     } catch (err: any) {
-      setTestResult({ ok: false, msg: String(err) });
+      setTestResult({ ok: false, msg: formatBackendError(err) });
       setEditingService(prev => prev ? { ...prev, lastTestOk: false } : prev);
     } finally {
       setTestingApi(false);
@@ -360,7 +390,7 @@ export function SettingsPanel({ open, onClose, defaultTab }: SettingsPanelProps)
       setSmtpTestResult({ ok: true, msg: result });
       setEditingEmailAccount(prev => prev ? { ...prev, lastTestOk: true } : prev);
     } catch (err: any) {
-      setSmtpTestResult({ ok: false, msg: String(err) });
+      setSmtpTestResult({ ok: false, msg: formatBackendError(err) });
       setEditingEmailAccount(prev => prev ? { ...prev, lastTestOk: false } : prev);
     } finally {
       setTestingSmtp(false);
@@ -1175,6 +1205,48 @@ export function SettingsPanel({ open, onClose, defaultTab }: SettingsPanelProps)
                       min={0}
                     />
                   </div>
+
+                  <Separator />
+
+                  <div className="space-y-4">
+                    <Label className="text-base font-semibold">{t('settings.networkSettings', { defaultValue: '网络设置' })}</Label>
+
+                    <div className="space-y-2">
+                      <Label>{t('settings.proxyUrl', { defaultValue: 'HTTP 代理' })}</Label>
+                      <p className="text-xs text-muted-foreground">{t('settings.proxyUrlDesc', { defaultValue: '留空表示不使用代理。支持 http:// 和 socks5:// 协议' })}</p>
+                      <Input
+                        value={tempSettings.ai.proxyUrl || ''}
+                        onChange={(e) => updateTempAI({ proxyUrl: e.target.value })}
+                        placeholder="http://127.0.0.1:7890"
+                        className="font-mono text-sm"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>{t('settings.connectTimeout', { defaultValue: '连接超时（秒）' })}</Label>
+                        <p className="text-xs text-muted-foreground">{t('settings.connectTimeoutDesc', { defaultValue: '0 使用默认值 15 秒' })}</p>
+                        <Input
+                          type="number"
+                          value={tempSettings.ai.connectTimeoutSecs || 0}
+                          onChange={(e) => updateTempAI({ connectTimeoutSecs: Math.max(0, parseInt(e.target.value) || 0) })}
+                          min={0}
+                          placeholder="0"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t('settings.requestTimeout', { defaultValue: '请求超时（秒）' })}</Label>
+                        <p className="text-xs text-muted-foreground">{t('settings.requestTimeoutDesc', { defaultValue: '0 使用默认值 300 秒' })}</p>
+                        <Input
+                          type="number"
+                          value={tempSettings.ai.requestTimeoutSecs || 0}
+                          onChange={(e) => updateTempAI({ requestTimeoutSecs: Math.max(0, parseInt(e.target.value) || 0) })}
+                          min={0}
+                          placeholder="0"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </TabsContent>
@@ -1583,8 +1655,46 @@ export function SettingsPanel({ open, onClose, defaultTab }: SettingsPanelProps)
 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label>{t('settings.advancedSettings.dataPath')}</Label>
-                    <Input value={file.defaultPath || '~/AiDocPlus'} disabled />
+                    <Label>{t('settings.advancedSettings.dataPath', { defaultValue: '数据存储路径' })}</Label>
+                    <div className="flex gap-2">
+                      <Input value={dataRootPath} readOnly className="flex-1 font-mono text-xs" />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        title={t('settings.advancedSettings.changeDataPath', { defaultValue: '更改数据目录' })}
+                        disabled={isDataMigrating}
+                        onClick={async () => {
+                          const selected = await openDialog({ directory: true, title: t('settings.advancedSettings.selectDataDir', { defaultValue: '选择数据存储目录' }) });
+                          if (!selected || typeof selected !== 'string') return;
+                          if (selected === dataRootPath) return;
+                          const doMigrate = await confirm(
+                            t('settings.advancedSettings.migrateConfirmMsg', { defaultValue: '是否将现有数据迁移（复制）到新目录？\n\n选择"是"：复制所有数据到新位置\n选择"否"：仅切换目录（不迁移数据）' }),
+                            { title: t('settings.advancedSettings.migrateConfirmTitle', { defaultValue: '数据迁移确认' }), kind: 'info' }
+                          );
+                          try {
+                            if (doMigrate) {
+                              setIsDataMigrating(true);
+                              const result = await invoke<string>('migrate_data_to_new_root', { newPath: selected });
+                              setIsDataMigrating(false);
+                              setDataRootPath(selected);
+                              await message(result + '\n\n' + t('settings.advancedSettings.restartHint', { defaultValue: '建议重启应用以确保所有功能正常。' }), { title: t('common.success', { defaultValue: '成功' }) });
+                            } else {
+                              await invoke('change_data_root', { newPath: selected });
+                              setDataRootPath(selected);
+                              await message(t('settings.advancedSettings.switchedNoMigrate', { defaultValue: '数据目录已切换。建议重启应用以确保所有功能正常。' }), { title: t('common.success', { defaultValue: '成功' }) });
+                            }
+                          } catch (err: any) {
+                            setIsDataMigrating(false);
+                            await message(formatBackendError(err), { title: t('common.error', { defaultValue: '错误' }), kind: 'error' });
+                          }
+                        }}
+                      >
+                        {isDataMigrating ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderOpen className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {t('settings.advancedSettings.dataPathHint', { defaultValue: '可将数据目录指向 iCloud Drive、OneDrive 等云同步文件夹，实现多设备数据同步。' })}
+                    </p>
                   </div>
 
                   <Separator />

@@ -6,6 +6,7 @@ import { FileText, Copy, Check } from 'lucide-react';
 import { PluginPanelLayout } from '../_framework/PluginPanelLayout';
 import { truncateContent } from '../_framework/pluginUtils';
 import { PluginPromptBuilderDialog } from '../_framework/PluginPromptBuilderDialog';
+import { formatBackendError } from '@/lib/backendError';
 
 /** 摘要插件数据 */
 interface SummaryPluginData {
@@ -90,8 +91,7 @@ export function SummaryPluginPanel({ document, content, pluginData, onPluginData
       showStatus(t('generateSuccess', { style: style.label }));
       onRequestSave?.();
     } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      showStatus(t('generateFailed', { error: errMsg }), true);
+      showStatus(t('generateFailed', { error: formatBackendError(err) }), true);
     } finally {
       setGenerating(false);
     }

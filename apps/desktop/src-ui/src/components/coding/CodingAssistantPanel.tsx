@@ -11,6 +11,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { formatBackendError } from '@/lib/backendError';
 import { Button } from '@/components/ui/button';
 import { useCodingStore, getDefaultSystemPrompt } from '@/stores/useCodingStore';
 import type { AssistantMode } from '@/stores/useCodingStore';
@@ -174,7 +175,7 @@ export function CodingAssistantPanel({
       if (!abort.signal.aborted) {
         const errMsg: ChatMessage = {
           id: genMsgId(), role: 'assistant',
-          content: `❌ ${err instanceof Error ? err.message : String(err)}`,
+          content: `❌ ${formatBackendError(err)}`,
           timestamp: Date.now(),
         };
         setMessages(prev => [...prev, errMsg]);

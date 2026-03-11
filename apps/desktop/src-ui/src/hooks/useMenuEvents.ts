@@ -4,6 +4,7 @@ import { open, save, message, confirm } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import { useAppStore } from '@/stores/useAppStore';
 import i18n from '@/i18n';
+import { formatBackendError } from '@/lib/backendError';
 
 /**
  * 监听 Tauri 原生系统菜单事件，分发到前端操作
@@ -191,7 +192,7 @@ async function handleProjectExportZip() {
     await exportProjectZip(currentProject.id, outputPath);
     await message(i18n.t('menu.exportedTo', { path: outputPath }), { title: i18n.t('menu.exportSuccess') });
   } catch (err) {
-    await message(i18n.t('menu.exportFailed', { error: String(err) }), { title: i18n.t('menu.exportError'), kind: 'error' });
+    await message(i18n.t('menu.exportFailed', { error: formatBackendError(err) }), { title: i18n.t('menu.exportError'), kind: 'error' });
   }
 }
 
@@ -209,7 +210,7 @@ async function handleProjectImportZip() {
     const project = await useAppStore.getState().importProjectZip(zipPath as string);
     await message(i18n.t('menu.importSuccess', { name: project.name }), { title: i18n.t('menu.importSuccessTitle') });
   } catch (err) {
-    await message(i18n.t('menu.importFailed', { error: String(err) }), { title: i18n.t('menu.importError'), kind: 'error' });
+    await message(i18n.t('menu.importFailed', { error: formatBackendError(err) }), { title: i18n.t('menu.importError'), kind: 'error' });
   }
 }
 
@@ -237,7 +238,7 @@ async function handleProjectBackup() {
     await exportProjectZip(currentProject.id, outputPath);
     await message(i18n.t('menu.backedUpTo', { path: outputPath }), { title: i18n.t('menu.backupSuccess') });
   } catch (err) {
-    await message(i18n.t('menu.backupFailed', { error: String(err) }), { title: i18n.t('menu.backupError'), kind: 'error' });
+    await message(i18n.t('menu.backupFailed', { error: formatBackendError(err) }), { title: i18n.t('menu.backupError'), kind: 'error' });
   }
 }
 
@@ -257,7 +258,7 @@ async function handleProjectRename() {
     await loadProjects();
     await message(i18n.t('menu.projectRenamed', { name: newName.trim() }), { title: i18n.t('menu.renameSuccess') });
   } catch (err) {
-    await message(i18n.t('menu.renameFailed', { error: String(err) }), { title: i18n.t('menu.renameError'), kind: 'error' });
+    await message(i18n.t('menu.renameFailed', { error: formatBackendError(err) }), { title: i18n.t('menu.renameError'), kind: 'error' });
   }
 }
 
@@ -286,7 +287,7 @@ async function handleProjectDelete() {
     }
     await message(i18n.t('menu.projectDeleted'), { title: i18n.t('menu.deleteSuccess') });
   } catch (err) {
-    await message(i18n.t('menu.deleteFailed', { error: String(err) }), { title: i18n.t('menu.deleteError'), kind: 'error' });
+    await message(i18n.t('menu.deleteFailed', { error: formatBackendError(err) }), { title: i18n.t('menu.deleteError'), kind: 'error' });
   }
 }
 
@@ -305,7 +306,7 @@ async function handleDocRename() {
     await renameDocument(currentDocument.projectId, currentDocument.id, newTitle.trim());
     await message(i18n.t('menu.docRenamed', { title: newTitle.trim() }), { title: i18n.t('menu.renameSuccess') });
   } catch (err) {
-    await message(i18n.t('menu.docRenameFailed', { error: String(err) }), { title: i18n.t('menu.renameError'), kind: 'error' });
+    await message(i18n.t('menu.docRenameFailed', { error: formatBackendError(err) }), { title: i18n.t('menu.renameError'), kind: 'error' });
   }
 }
 
@@ -332,7 +333,7 @@ async function handleDocDelete() {
     await deleteDocument(currentDocument.projectId, currentDocument.id);
     await message(i18n.t('menu.docDeleted'), { title: i18n.t('menu.deleteSuccess') });
   } catch (err) {
-    await message(i18n.t('menu.docDeleteFailed', { error: String(err) }), { title: i18n.t('menu.deleteError'), kind: 'error' });
+    await message(i18n.t('menu.docDeleteFailed', { error: formatBackendError(err) }), { title: i18n.t('menu.deleteError'), kind: 'error' });
   }
 }
 
@@ -362,6 +363,6 @@ async function handleDocDuplicate() {
       await openTab(newDoc.id);
     }
   } catch (err) {
-    await message(i18n.t('menu.duplicateFailed', { error: String(err) }), { title: i18n.t('menu.duplicateError'), kind: 'error' });
+    await message(i18n.t('menu.duplicateFailed', { error: formatBackendError(err) }), { title: i18n.t('menu.duplicateError'), kind: 'error' });
   }
 }

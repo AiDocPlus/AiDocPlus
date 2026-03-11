@@ -1,5 +1,6 @@
 import { generateCheckId } from './types';
 import type { CheckItem, RuleSet } from './types';
+import { formatBackendError } from '@/lib/backendError';
 
 /**
  * 构造合规检查的 system prompt
@@ -126,7 +127,7 @@ export function parseComplianceFromAiResponse(text: string): CheckItem[] | null 
         location: item.location ? String(item.location) : undefined,
       }));
     } catch (e) {
-      console.warn('[Compliance] 解析候选失败:', e instanceof Error ? e.message : e);
+      console.warn('[Compliance] 解析候选失败:', formatBackendError(e));
     }
   }
 

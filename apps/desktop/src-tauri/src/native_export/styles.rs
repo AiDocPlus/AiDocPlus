@@ -192,6 +192,29 @@ pub fn get_html_css() -> &'static str {
         text-indent: 0;
         line-height: 29pt;
     }
+    /* 任务列表 */
+    ul.contains-task-list {
+        list-style: none;
+        padding-left: 1em;
+    }
+    li.task-list-item {
+        position: relative;
+    }
+    li.task-list-item input[type="checkbox"] {
+        margin-right: 0.5em;
+        vertical-align: middle;
+        transform: scale(1.2);
+    }
+    /* 删除线 */
+    del, s {
+        text-decoration: line-through;
+        color: #999;
+    }
+    /* 嵌套列表缩进 */
+    li > ul, li > ol {
+        margin: 0;
+        padding-left: 2em;
+    }
     /* 引用块 */
     blockquote {
         border-left: 4px solid #ccc;

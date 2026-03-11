@@ -2,7 +2,7 @@ use comrak::{markdown_to_html, Options};
 use super::styles;
 
 /// 将 Markdown 转换为带公文样式的完整 HTML 文档
-pub fn export_to_html(markdown: &str, title: &str) -> Result<String, String> {
+pub fn export_to_html(markdown: &str, title: &str) -> crate::error::Result<String> {
     let mut options = Options::default();
     options.extension.table = true;
     options.extension.strikethrough = true;

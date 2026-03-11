@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { init, type PptxViewer as PptxViewerType } from 'pptx-preview';
 import { usePluginHost } from '../../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import { Button } from '../../_framework/ui';
 import {
   ChevronLeft, ChevronRight, Loader2, AlertCircle,
@@ -61,7 +62,7 @@ export function PptxViewer({ filePath, fileName, onError }: PptxViewerProps) {
         setLoading(false);
       } catch (err) {
         if (cancelled) return;
-        const errorMsg = err instanceof Error ? err.message : String(err);
+        const errorMsg = formatBackendError(err);
         setError(errorMsg);
         onError(`PPTX 加载失败: ${errorMsg}`);
         setLoading(false);
@@ -137,7 +138,7 @@ export function PptxViewer({ filePath, fileName, onError }: PptxViewerProps) {
       link.click();
       document.body.removeChild(link);
     } catch (err) {
-      onError(`下载失败: ${err instanceof Error ? err.message : String(err)}`);
+      onError(`下载失败: ${formatBackendError(err)}`);
     }
   };
 

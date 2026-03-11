@@ -1,58 +1,13 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 import { invoke } from '@tauri-apps/api/core';
 import type { Conversation, ConversationGroup, AIMessage } from '@aidocplus/shared-types';
 import { CONVERSATION_GROUPS } from '@aidocplus/shared-types';
-
-/**
- * 底层 storage adapter：通过 Tauri 后端读写 ~/AiDocPlus/conversations.json
- * 首次启动时自动从 localStorage 迁移数据
- */
-const tauriConversationsStorage: {
-  getItem: (name: string) => string | null | Promise<string | null>;
-  setItem: (name: string, value: string) => void | Promise<void>;
-  removeItem: (name: string) => void | Promise<void>;
-} = {
-  getItem: async (name: string): Promise<string | null> => {
-    try {
-      const json = await invoke<string | null>('load_conversations');
-      if (json) {
-        // 已有 Tauri 文件数据，清理 localStorage 残留
-        localStorage.removeItem(name);
-        return json;
-      }
-      // 首次启动：从 localStorage 迁移
-      const legacy = localStorage.getItem(name);
-      if (legacy) {
-        await invoke('save_conversations', { json: legacy }).catch(() => {});
-        localStorage.removeItem(name);
-        return legacy;
-      }
-      return null;
-    } catch {
-      return localStorage.getItem(name);
-    }
-  },
-  setItem: async (name: string, value: string): Promise<void> => {
-    try {
-      await invoke('save_conversations', { json: value });
-    } catch {
-      localStorage.setItem(name, value);
-    }
-  },
-  removeItem: async (name: string): Promise<void> => {
-    try {
-      await invoke('save_conversations', { json: '{}' });
-    } catch {
-      localStorage.removeItem(name);
-    }
-  },
-};
 
 interface ConversationsState {
   conversations: Conversation[];
   currentConversationId: string | null;
   searchQuery: string;
+  _loaded: boolean;
 
   // Actions
   setConversations: (conversations: Conversation[]) => void;
@@ -102,162 +57,242 @@ const generateConversationTitle = (messages: AIMessage[]): string => {
 };
 
 export const useConversationsStore = create<ConversationsState>()(
-  persist(
-    (set, get) => ({
-      conversations: [],
-      currentConversationId: null,
-      searchQuery: '',
+  (set, get) => ({
+    conversations: [],
+    currentConversationId: null,
+    searchQuery: '',
+    _loaded: false,
 
-      setConversations: (conversations) => set({ conversations }),
+    setConversations: (conversations) => set({ conversations }),
 
-      setCurrentConversation: (id) => set({ currentConversationId: id }),
+    setCurrentConversation: (id) => set({ currentConversationId: id }),
 
-      setSearchQuery: (query) => set({ searchQuery: query }),
+    setSearchQuery: (query) => set({ searchQuery: query }),
 
-      createConversation: (documentId, firstMessage) => {
-        const newConversation: Conversation = {
-          id: generateConversationId(),
-          documentId,
-          title: 'New Conversation',
-          messages: firstMessage ? [firstMessage] : [],
-          createdAt: Date.now() / 1000,
-          updatedAt: Date.now() / 1000,
-          isPinned: false
-        };
+    createConversation: (documentId, firstMessage) => {
+      const newConversation: Conversation = {
+        id: generateConversationId(),
+        documentId,
+        title: 'New Conversation',
+        messages: firstMessage ? [firstMessage] : [],
+        createdAt: Date.now() / 1000,
+        updatedAt: Date.now() / 1000,
+        isPinned: false
+      };
 
-        set((state) => ({
-          conversations: [newConversation, ...state.conversations],
-          currentConversationId: newConversation.id
-        }));
+      set((state) => ({
+        conversations: [newConversation, ...state.conversations],
+        currentConversationId: newConversation.id
+      }));
 
-        return newConversation;
-      },
+      // 异步持久化到 SQLite
+      invoke('db_create_conversation', {
+        id: newConversation.id,
+        documentId,
+        title: newConversation.title,
+        createdAt: newConversation.createdAt
+      }).catch(e => console.error('[conversations] 创建对话失败:', e));
 
-      updateConversation: (id, updates) => {
-        set((state) => ({
-          conversations: state.conversations.map(c =>
-            c.id === id
-              ? { ...c, ...updates, updatedAt: Date.now() / 1000 }
-              : c
-          )
-        }));
-      },
-
-      deleteConversation: (id) => {
-        set((state) => ({
-          conversations: state.conversations.filter(c => c.id !== id),
-          currentConversationId: state.currentConversationId === id ? null : state.currentConversationId
-        }));
-      },
-
-      addMessageToConversation: (conversationId, message) => {
-        set((state) => ({
-          conversations: state.conversations.map(c => {
-            if (c.id === conversationId) {
-              const updatedMessages = [...c.messages, message];
-              return {
-                ...c,
-                messages: updatedMessages,
-                title: c.title === 'New Conversation' ? generateConversationTitle(updatedMessages) : c.title,
-                updatedAt: Date.now() / 1000
-              };
-            }
-            return c;
-          })
-        }));
-      },
-
-      renameConversation: (id, newTitle) => {
-        get().updateConversation(id, { title: newTitle });
-      },
-
-      togglePinConversation: (id) => {
-        set((state) => ({
-          conversations: state.conversations.map(c =>
-            c.id === id
-              ? { ...c, isPinned: !c.isPinned }
-              : c
-          ).sort((a, b) => {
-            // Pinned conversations first
-            if (a.isPinned && !b.isPinned) return -1;
-            if (!a.isPinned && b.isPinned) return 1;
-            // Then by updated time (most recent first)
-            return b.updatedAt - a.updatedAt;
-          })
-        }));
-      },
-
-      getCurrentConversation: () => {
-        const { conversations, currentConversationId } = get();
-        return conversations.find(c => c.id === currentConversationId);
-      },
-
-      getConversationsByDocument: (documentId) => {
-        return get().conversations.filter(c => c.documentId === documentId);
-      },
-
-      getGroupedConversations: () => {
-        const { conversations, searchQuery } = get();
-        const filtered = searchQuery.trim()
-          ? conversations.filter(c =>
-              c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              c.messages.some(m => m.content.toLowerCase().includes(searchQuery.toLowerCase()))
-            )
-          : conversations;
-
-        const groups: Record<string, Conversation[]> = {};
-
-        filtered.forEach(conversation => {
-          const group = getConversationGroup(conversation.updatedAt * 1000);
-          if (!groups[group]) {
-            groups[group] = [];
-          }
-          groups[group].push(conversation);
-        });
-
-        // Convert to array and sort within groups
-        const result: ConversationGroup[] = Object.entries(groups).map(([label, conversations]) => ({
-          label,
-          conversations: conversations.sort((a, b) => b.updatedAt - a.updatedAt)
-        }));
-
-        // Sort groups by predefined order
-        const groupOrder: Array<'today' | 'yesterday' | 'lastWeek' | 'lastMonth' | 'older'> = [
-          CONVERSATION_GROUPS.today,
-          CONVERSATION_GROUPS.yesterday,
-          CONVERSATION_GROUPS.lastWeek,
-          CONVERSATION_GROUPS.lastMonth,
-          CONVERSATION_GROUPS.older
-        ];
-
-        result.sort((a, b) => {
-          return groupOrder.indexOf(a.label as any) - groupOrder.indexOf(b.label as any);
-        });
-
-        return result;
-      },
-
-      getFilteredConversations: () => {
-        const { conversations, searchQuery } = get();
-        if (!searchQuery.trim()) {
-          return conversations;
-        }
-        return conversations.filter(c =>
-          c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          c.messages.some(m => m.content.toLowerCase().includes(searchQuery.toLowerCase()))
-        );
+      if (firstMessage) {
+        invoke('db_add_message', {
+          conversationId: newConversation.id,
+          role: firstMessage.role,
+          content: firstMessage.content,
+          timestamp: firstMessage.timestamp ?? null,
+          contextMode: firstMessage.contextMode ?? null
+        }).catch(e => console.error('[conversations] 添加消息失败:', e));
       }
-    }),
-    {
-      name: 'aidocplus-conversations',
-      storage: createJSONStorage(() => tauriConversationsStorage),
-      partialize: (state) => ({
-        conversations: state.conversations,
-        currentConversationId: state.currentConversationId
-      })
+
+      return newConversation;
+    },
+
+    updateConversation: (id, updates) => {
+      set((state) => ({
+        conversations: state.conversations.map(c =>
+          c.id === id
+            ? { ...c, ...updates, updatedAt: Date.now() / 1000 }
+            : c
+        )
+      }));
+
+      // 如果更新了标题，同步到 SQLite
+      if (updates.title !== undefined) {
+        invoke('db_rename_conversation', {
+          conversationId: id,
+          title: updates.title
+        }).catch(e => console.error('[conversations] 重命名对话失败:', e));
+      }
+    },
+
+    deleteConversation: (id) => {
+      set((state) => ({
+        conversations: state.conversations.filter(c => c.id !== id),
+        currentConversationId: state.currentConversationId === id ? null : state.currentConversationId
+      }));
+
+      invoke('db_delete_conversation', { conversationId: id })
+        .catch(e => console.error('[conversations] 删除对话失败:', e));
+    },
+
+    addMessageToConversation: (conversationId, message) => {
+      let newTitle: string | null = null;
+
+      set((state) => ({
+        conversations: state.conversations.map(c => {
+          if (c.id === conversationId) {
+            const updatedMessages = [...c.messages, message];
+            const title = c.title === 'New Conversation' ? generateConversationTitle(updatedMessages) : c.title;
+            if (title !== c.title) newTitle = title;
+            return {
+              ...c,
+              messages: updatedMessages,
+              title,
+              updatedAt: Date.now() / 1000
+            };
+          }
+          return c;
+        })
+      }));
+
+      // 异步持久化消息到 SQLite
+      invoke('db_add_message', {
+        conversationId,
+        role: message.role,
+        content: message.content,
+        timestamp: message.timestamp ?? null,
+        contextMode: message.contextMode ?? null
+      }).catch(e => console.error('[conversations] 添加消息失败:', e));
+
+      // 如果标题更新了，同步到 SQLite
+      if (newTitle) {
+        invoke('db_rename_conversation', {
+          conversationId,
+          title: newTitle
+        }).catch(e => console.error('[conversations] 更新标题失败:', e));
+      }
+    },
+
+    renameConversation: (id, newTitle) => {
+      get().updateConversation(id, { title: newTitle });
+    },
+
+    togglePinConversation: (id) => {
+      const conv = get().conversations.find(c => c.id === id);
+      const newPinned = conv ? !conv.isPinned : false;
+
+      set((state) => ({
+        conversations: state.conversations.map(c =>
+          c.id === id
+            ? { ...c, isPinned: !c.isPinned }
+            : c
+        ).sort((a, b) => {
+          // Pinned conversations first
+          if (a.isPinned && !b.isPinned) return -1;
+          if (!a.isPinned && b.isPinned) return 1;
+          // Then by updated time (most recent first)
+          return b.updatedAt - a.updatedAt;
+        })
+      }));
+
+      invoke('db_pin_conversation', { conversationId: id, pinned: newPinned })
+        .catch(e => console.error('[conversations] 切换置顶失败:', e));
+    },
+
+    getCurrentConversation: () => {
+      const { conversations, currentConversationId } = get();
+      return conversations.find(c => c.id === currentConversationId);
+    },
+
+    getConversationsByDocument: (documentId) => {
+      return get().conversations.filter(c => c.documentId === documentId);
+    },
+
+    getGroupedConversations: () => {
+      const { conversations, searchQuery } = get();
+      const filtered = searchQuery.trim()
+        ? conversations.filter(c =>
+            c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            c.messages.some(m => m.content.toLowerCase().includes(searchQuery.toLowerCase()))
+          )
+        : conversations;
+
+      const groups: Record<string, Conversation[]> = {};
+
+      filtered.forEach(conversation => {
+        const group = getConversationGroup(conversation.updatedAt * 1000);
+        if (!groups[group]) {
+          groups[group] = [];
+        }
+        groups[group].push(conversation);
+      });
+
+      // Convert to array and sort within groups
+      const result: ConversationGroup[] = Object.entries(groups).map(([label, conversations]) => ({
+        label,
+        conversations: conversations.sort((a, b) => b.updatedAt - a.updatedAt)
+      }));
+
+      // Sort groups by predefined order
+      const groupOrder: Array<'today' | 'yesterday' | 'lastWeek' | 'lastMonth' | 'older'> = [
+        CONVERSATION_GROUPS.today,
+        CONVERSATION_GROUPS.yesterday,
+        CONVERSATION_GROUPS.lastWeek,
+        CONVERSATION_GROUPS.lastMonth,
+        CONVERSATION_GROUPS.older
+      ];
+
+      result.sort((a, b) => {
+        return groupOrder.indexOf(a.label as any) - groupOrder.indexOf(b.label as any);
+      });
+
+      return result;
+    },
+
+    getFilteredConversations: () => {
+      const { conversations, searchQuery } = get();
+      if (!searchQuery.trim()) {
+        return conversations;
+      }
+      return conversations.filter(c =>
+        c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.messages.some(m => m.content.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
     }
-  )
+  })
 );
+
+/**
+ * 从 SQLite 加载所有对话到内存（应用启动时调用一次）
+ */
+export async function loadConversationsFromDB(): Promise<void> {
+  if (useConversationsStore.getState()._loaded) return;
+  try {
+    const convs = await invoke<Conversation[]>('load_all_conversations');
+    useConversationsStore.setState({
+      conversations: convs ?? [],
+      _loaded: true
+    });
+  } catch (e) {
+    console.error('[conversations] 从 SQLite 加载对话失败:', e);
+    // 回退：尝试从旧的 JSON 命令加载
+    try {
+      const json = await invoke<string | null>('load_conversations');
+      if (json) {
+        const parsed = JSON.parse(json);
+        const state = parsed?.state;
+        if (state?.conversations) {
+          useConversationsStore.setState({
+            conversations: state.conversations,
+            currentConversationId: state.currentConversationId ?? null,
+            _loaded: true
+          });
+        }
+      }
+    } catch {
+      // 静默失败
+    }
+  }
+}
 
 // Helper to auto-create conversations when sending messages
 export function ensureConversationExists(documentId: string, _messages: AIMessage[]): string {

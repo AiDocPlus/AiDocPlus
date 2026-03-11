@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from 'pdfjs-dist';
 import { Button } from '../../_framework/ui';
 import { usePluginHost } from '../../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import {
   ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Loader2, AlertCircle,
   Maximize2, Download, Printer, RotateCw, Maximize
@@ -61,7 +62,7 @@ export function PdfViewer({ filePath, fileName, onError }: PdfViewerProps) {
         setCurrentPage(1);
       } catch (err) {
         if (cancelled) return;
-        const errorMsg = err instanceof Error ? err.message : String(err);
+        const errorMsg = formatBackendError(err);
         setError(errorMsg);
         onError(`PDF 加载失败: ${errorMsg}`);
       } finally {
@@ -148,7 +149,7 @@ export function PdfViewer({ filePath, fileName, onError }: PdfViewerProps) {
         await page.render(renderContext).promise;
       } catch (err) {
         if (cancelled) return;
-        onError(`页面渲染失败: ${err instanceof Error ? err.message : String(err)}`);
+        onError(`页面渲染失败: ${formatBackendError(err)}`);
       } finally {
         if (!cancelled) {
           setRendering(false);
@@ -242,7 +243,7 @@ export function PdfViewer({ filePath, fileName, onError }: PdfViewerProps) {
       printWindow.focus();
       printWindow.print();
     } catch (err) {
-      onError(`打印失败: ${err instanceof Error ? err.message : String(err)}`);
+      onError(`打印失败: ${formatBackendError(err)}`);
     }
   };
 
@@ -256,7 +257,7 @@ export function PdfViewer({ filePath, fileName, onError }: PdfViewerProps) {
       link.click();
       document.body.removeChild(link);
     } catch (err) {
-      onError(`下载失败: ${err instanceof Error ? err.message : String(err)}`);
+      onError(`下载失败: ${formatBackendError(err)}`);
     }
   };
 

@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { PluginPanelProps } from '../types';
 import { usePluginHost } from '../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import { ToolPluginLayout } from '../_framework/ToolPluginLayout';
 import { Button } from '../_framework/ui';
 import {
@@ -45,7 +46,7 @@ export function TimelinePluginPanel({
         showStatus(t('versionCount').replace('{count}', String(sorted.length)));
       }
     } catch (err) {
-      showStatus(`${t('loadError')}: ${err instanceof Error ? err.message : String(err)}`, true);
+      showStatus(`${t('loadError')}: ${formatBackendError(err)}`, true);
     } finally {
       setLoading(false);
     }

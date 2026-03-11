@@ -16,6 +16,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { usePluginHost, useThinkingContent } from '../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import { useSettingsStore, getAIInvokeParamsForService } from '@/stores/useSettingsStore';
 import { getProviderConfig, getActiveService } from '@aidocplus/shared-types';
 import type { PluginAssistantPanelProps } from '../types';
@@ -344,7 +345,7 @@ export function ImageAssistantPanel({
       if (!abort.signal.aborted) {
         const errMsg: AssistantMessage = {
           id: genMsgId(), role: 'assistant',
-          content: `❌ ${err instanceof Error ? err.message : String(err)}`,
+          content: `❌ ${formatBackendError(err)}`,
           timestamp: Date.now(),
           isError: true,
         };

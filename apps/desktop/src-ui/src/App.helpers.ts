@@ -1,7 +1,8 @@
 import type { UISettings } from '@aidocplus/shared-types';
+import { invoke } from '@tauri-apps/api/core';
 import { registerFrontendStateProvider } from './api/ApiBridge';
 import { useAppStore } from './stores/useAppStore';
-import { getAIInvokeParams } from './stores/useSettingsStore';
+import { getAIInvokeParams, useSettingsStore } from './stores/useSettingsStore';
 import { useTemplatesStore } from './stores/useTemplatesStore';
 
 type AppFrontendStateProvider = {
@@ -11,13 +12,23 @@ type AppFrontendStateProvider = {
 };
 
 export async function loadAppBootstrapResources(): Promise<void> {
-  await Promise.all([
-    useAppStore.getState().loadPlugins(),
+  // 关键路径：只加载插件注册表（影响 UI 渲染）
+  await useAppStore.getState().loadPlugins();
+}
+
+/**
+ * 延后加载非关键资源（模板数据），在 UI 可交互之后异步执行。
+ * 这些数据仅在用户打开模板选择器 / 新建文档时才需要。
+ */
+export function loadDeferredResources(): void {
+  Promise.all([
     useAppStore.getState().loadDocTemplates(),
     useAppStore.getState().loadDocTemplateCategories(),
     useTemplatesStore.getState().loadBuiltInTemplates(),
     useTemplatesStore.getState().loadBuiltInCategories(),
-  ]);
+  ]).catch(e => {
+    console.warn('[App] 延后资源加载失败:', e);
+  });
 }
 
 export async function restoreAppBootstrapWorkspace(): Promise<void> {
@@ -67,4 +78,36 @@ export function applyAppThemeClass(root: HTMLElement, effectiveTheme: 'light' | 
     return;
   }
   root.classList.remove('dark');
+}
+
+/**
+ * 一次性迁移：将 settings 中的明文 API Key 迁移到 OS 密钥链。
+ * 迁移成功后，将 apiKey 字段替换为占位符 '__KEYRING__'。
+ * 此函数是幂等的，已迁移的服务（apiKey === '__KEYRING__' 或空）会被跳过。
+ */
+export function migrateAiKeysToKeyring(): void {
+  const ai = useSettingsStore.getState().ai;
+  const needMigrate = ai.services.filter(
+    s => s.apiKey && s.apiKey !== '__KEYRING__'
+  );
+  if (needMigrate.length === 0) return;
+
+  const migratePayload = needMigrate.map(s => ({
+    serviceId: s.id,
+    apiKey: s.apiKey,
+  }));
+
+  invoke<string[]>('migrate_ai_keys_to_keyring', { services: migratePayload })
+    .then((migratedIds) => {
+      if (migratedIds.length === 0) return;
+      // 更新 store 中的 apiKey 为占位符
+      const updatedServices = ai.services.map(s =>
+        migratedIds.includes(s.id) ? { ...s, apiKey: '__KEYRING__' } : s
+      );
+      useSettingsStore.getState().updateAISettings({ services: updatedServices });
+      console.log(`[Security] 已将 ${migratedIds.length} 个 AI API Key 迁移到系统密钥链`);
+    })
+    .catch((e) => {
+      console.warn('[Security] API Key 迁移到密钥链失败（将在下次启动重试）:', e);
+    });
 }

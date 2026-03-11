@@ -25,6 +25,7 @@ import type { TableSheet } from './types';
 import { tableSheetsToFortune } from './tableDataBridge';
 import type { Sheet } from '@fortune-sheet/core';
 import { executeDirectAction } from './directActionEngine';
+import { formatBackendError } from '@/lib/backendError';
 
 /** AI 动作的 detail 结构（与 TableAssistantPanel 中的 ParsedAction 一致） */
 interface AiActionDetail {
@@ -110,7 +111,7 @@ export function useTableActionBridge({ sheetRef, onDataChange, showStatus }: Use
             optionsRef.current.showStatus(`未知操作类型：${detail.type}`, true);
         }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = formatBackendError(err);
         optionsRef.current.showStatus(`操作失败：${msg}`, true);
       }
     };

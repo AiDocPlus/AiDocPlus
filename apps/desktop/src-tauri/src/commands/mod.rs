@@ -1,4 +1,6 @@
 pub mod ai;
+pub mod conversation;
+pub mod credential;
 pub mod document;
 pub mod email;
 pub mod export;

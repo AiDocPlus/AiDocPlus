@@ -1,4 +1,5 @@
 import { generateCitationId } from './types';
+import { formatBackendError } from '@/lib/backendError';
 import type { Citation, CitationStyle } from './types';
 import { CITATION_STYLE_LABELS } from './types';
 
@@ -119,7 +120,7 @@ export function parseCitationsFromAiResponse(text: string): Citation[] | null {
         issues: Array.isArray(item.issues) ? item.issues.map(String) : [],
       }));
     } catch (e) {
-      console.warn('[Citation] 解析候选失败:', e instanceof Error ? e.message : e);
+      console.warn('[Citation] 解析候选失败:', formatBackendError(e));
     }
   }
 

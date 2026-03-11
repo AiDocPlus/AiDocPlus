@@ -1,3 +1,5 @@
+import { formatBackendError } from '@/lib/backendError';
+
 export function beginLoadingState(): { isLoading: true; error: null } {
   return {
     isLoading: true,
@@ -14,8 +16,8 @@ export function finishLoadingState<T extends object = Record<string, never>>(
   };
 }
 
-export function resolveAsyncErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
+export function resolveAsyncErrorMessage(error: unknown, _fallback?: string): string {
+  return formatBackendError(error);
 }
 
 export function errorState(error: unknown, fallback: string): { error: string } {

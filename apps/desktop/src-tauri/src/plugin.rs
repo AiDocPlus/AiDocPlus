@@ -54,8 +54,7 @@ fn default_true() -> bool {
 
 /// 获取插件目录路径
 pub fn get_plugins_dir() -> PathBuf {
-    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-    home.join("AiDocPlus").join("Plugins")
+    crate::config::current_data_root().join("Plugins")
 }
 
 /// 确保插件目录存在（应用启动时调用）
@@ -69,16 +68,17 @@ pub fn ensure_plugins_dir() {
 /// 同步插件 manifest 到磁盘（幂等）
 /// 前端发现插件后调用，将 manifest 写入 ~/AiDocPlus/Plugins/{id}/manifest.json
 /// 如果已存在，保留用户修改的 enabled 状态，只更新元数据
-pub fn sync_plugin_manifests(manifests: Vec<PluginManifest>) -> Result<(), String> {
+pub fn sync_plugin_manifests(manifests: Vec<PluginManifest>) -> crate::error::Result<()> {
+    use crate::error::AppError;
     let plugins_dir = get_plugins_dir();
-    fs::create_dir_all(&plugins_dir).map_err(|e| format!("Failed to create plugins dir: {}", e))?;
+    fs::create_dir_all(&plugins_dir).map_err(|e| AppError::ResourceError(format!("Failed to create plugins dir: {}", e)))?;
 
     let now = chrono::Utc::now().timestamp();
 
     for mut manifest in manifests {
         let plugin_dir = plugins_dir.join(&manifest.id);
         fs::create_dir_all(&plugin_dir)
-            .map_err(|e| format!("Failed to create plugin dir {}: {}", manifest.id, e))?;
+            .map_err(|e| AppError::ResourceError(format!("Failed to create plugin dir {}: {}", manifest.id, e)))?;
 
         let manifest_path = plugin_dir.join("manifest.json");
 
@@ -98,7 +98,7 @@ pub fn sync_plugin_manifests(manifests: Vec<PluginManifest>) -> Result<(), Strin
         }
 
         let json = serde_json::to_string_pretty(&manifest)
-            .map_err(|e| format!("Failed to serialize manifest {}: {}", manifest.id, e))?;
+            .map_err(|e| AppError::ResourceError(format!("Failed to serialize manifest {}: {}", manifest.id, e)))?;
         crate::config::atomic_write(&manifest_path, &json)?;
     }
 
@@ -137,24 +137,25 @@ pub fn list_plugins() -> Vec<PluginManifest> {
 }
 
 /// 修改指定插件的 enabled 状态
-pub fn set_plugin_enabled(plugin_id: &str, enabled: bool) -> Result<(), String> {
+pub fn set_plugin_enabled(plugin_id: &str, enabled: bool) -> crate::error::Result<()> {
+    use crate::error::AppError;
     let plugins_dir = get_plugins_dir();
     let manifest_path = plugins_dir.join(plugin_id).join("manifest.json");
 
     if !manifest_path.exists() {
-        return Err(format!("Plugin not found: {}", plugin_id));
+        return Err(AppError::ResourceError(format!("Plugin not found: {}", plugin_id)));
     }
 
     let json = fs::read_to_string(&manifest_path)
-        .map_err(|e| format!("Failed to read manifest: {}", e))?;
+        .map_err(|e| AppError::ResourceError(format!("Failed to read manifest: {}", e)))?;
     let mut manifest: PluginManifest = serde_json::from_str(&json)
-        .map_err(|e| format!("Failed to parse manifest: {}", e))?;
+        .map_err(|e| AppError::ResourceError(format!("Failed to parse manifest: {}", e)))?;
 
     manifest.enabled = enabled;
     manifest.updated_at = chrono::Utc::now().timestamp();
 
     let updated_json = serde_json::to_string_pretty(&manifest)
-        .map_err(|e| format!("Failed to serialize manifest: {}", e))?;
+        .map_err(|e| AppError::ResourceError(format!("Failed to serialize manifest: {}", e)))?;
     crate::config::atomic_write(&manifest_path, &updated_json)?;
 
     Ok(())

@@ -2,7 +2,7 @@ use comrak::{parse_document, Arena, Options};
 use comrak::nodes::NodeValue;
 
 /// 将 Markdown 转换为纯文本（去除所有格式标记）
-pub fn export_to_txt(markdown: &str) -> Result<String, String> {
+pub fn export_to_txt(markdown: &str) -> crate::error::Result<String> {
     let arena = Arena::new();
     let mut options = Options::default();
     options.extension.table = true;

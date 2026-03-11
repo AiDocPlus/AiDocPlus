@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { inlineEmailStyles } from './inlineStyles';
 import type { SendLimits, AccountHealth } from './types';
 import { canSendNow, isAccountAvailable } from './sendRateLimiter';
+import { formatBackendError } from '@/lib/backendError';
 
 // ── 类型定义 ──
 
@@ -227,7 +228,7 @@ export function useSendQueue(options: UseSendQueueOptions) {
       opts.onSendRecorded?.(completedAccountId);
       opts.persistImmediately?.();
     } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
+      const errMsg = formatBackendError(err);
       const failedAccountId = sendItem.accountId || accountId;
 
       // 通知账户健康变化（如果有高级模式）

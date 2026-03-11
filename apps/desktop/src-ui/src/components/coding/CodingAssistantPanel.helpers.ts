@@ -1,4 +1,5 @@
 import type { ChatMessage } from './codingAI';
+import { formatBackendError } from '@/lib/backendError';
 
 let nextMsgId = 1;
 
@@ -37,7 +38,7 @@ export function createCodingAssistantErrorMessage(error: unknown, now = Date.now
   return {
     id: createCodingAssistantMessageId(now),
     role: 'assistant',
-    content: `❌ ${error instanceof Error ? error.message : String(error)}`,
+    content: `❌ ${formatBackendError(error)}`,
     timestamp: now,
   };
 }

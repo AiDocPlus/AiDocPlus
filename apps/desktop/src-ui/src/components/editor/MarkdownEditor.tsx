@@ -20,6 +20,7 @@ import { closeBrackets, closeBracketsKeymap, autocompletion } from '@codemirror/
 import { oneDark } from '@codemirror/theme-one-dark';
 import { cn } from '@/lib/utils';
 import { useEditorSettings } from '@/stores/useSettingsStore';
+import { useTranslation } from '@/i18n';
 import { EditorToolbar } from './EditorToolbar';
 import { EditorStatusBar } from './EditorStatusBar';
 import { MarkdownPreview } from './MarkdownPreview';
@@ -29,7 +30,13 @@ import { linkHoverTooltip } from './extensions/linkTooltip';
 import { markdownLinterExtension } from './extensions/markdownLinter';
 import { lintKeymap } from '@codemirror/lint';
 import type { Document } from '@aidocplus/shared-types';
-import { DocumentOutline } from './DocumentOutline';
+import { DocumentOutline, parseHeadings, getBreadcrumb } from './DocumentOutline';
+
+// 大文档阈值（字符数），超过此值启用性能降级模式
+const LARGE_DOC_THRESHOLD = 100_000;
+// 大文档 debounce 时间（ms），正常文档使用 300ms
+const LARGE_DOC_DEBOUNCE = 800;
+const NORMAL_DOC_DEBOUNCE = 300;
 
 // 自定义高亮样式：基于 defaultHighlightStyle，去掉 heading 下划线，标题分级字号
 const markdownHighlightStyle = HighlightStyle.define([
@@ -132,13 +139,18 @@ export function MarkdownEditor({
   onCursorLineChangeRef.current = onCursorLineChange;
   const lastEmittedRef = useRef(value);
   const docContentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debounceRef = useRef(value.length > LARGE_DOC_THRESHOLD ? LARGE_DOC_DEBOUNCE : NORMAL_DOC_DEBOUNCE);
 
+  const { t } = useTranslation();
   const editorSettings = useEditorSettings();
   const [localFontSize, setLocalFontSize] = useState(editorSettings.fontSize);
-  const [cursorInfo, setCursorInfo] = useState({ line: 1, col: 1, selChars: 0 });
+  const [cursorInfo, setCursorInfo] = useState({ line: 1, col: 1, selChars: 0, from: 0 });
   const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode || editorSettings.defaultViewMode || 'edit');
   const [docContent, setDocContent] = useState(value);
   const [outlineOpen, setOutlineOpen] = useState(false);
+
+  // 大文档检测：超过阈值启用性能降级模式
+  const isLargeDoc = docContent.length > LARGE_DOC_THRESHOLD;
 
   // Markdown 快捷键
   const mdKeymap = useMemo(() => keymap.of([
@@ -239,11 +251,13 @@ export function MarkdownEditor({
         lastEmittedRef.current = newDoc;
         onChangeRef.current(newDoc);
         // debounced 更新 docContent（用于统计、大纲、预览）
+        // 大文档时使用更长的 debounce 减少重渲染
+        debounceRef.current = newDoc.length > LARGE_DOC_THRESHOLD ? LARGE_DOC_DEBOUNCE : NORMAL_DOC_DEBOUNCE;
         if (docContentTimerRef.current) clearTimeout(docContentTimerRef.current);
         docContentTimerRef.current = setTimeout(() => {
           setDocContent(newDoc);
           docContentTimerRef.current = null;
-        }, 300);
+        }, debounceRef.current);
       }
       // 更新光标（用 requestAnimationFrame 避免同步 setState 冲突，加值比较守卫避免不必要的重渲染）
       requestAnimationFrame(() => {
@@ -254,8 +268,8 @@ export function MarkdownEditor({
           const newCol = from - line.from + 1;
           const newSelChars = to - from;
           setCursorInfo(prev => {
-            if (prev.line === newLine && prev.col === newCol && prev.selChars === newSelChars) return prev;
-            return { line: newLine, col: newCol, selChars: newSelChars };
+            if (prev.line === newLine && prev.col === newCol && prev.selChars === newSelChars && prev.from === from) return prev;
+            return { line: newLine, col: newCol, selChars: newSelChars, from };
           });
           onCursorLineChangeRef.current?.(newLine);
         } catch { /* view may be destroyed */ }
@@ -427,7 +441,10 @@ export function MarkdownEditor({
       c.bracketMatching.reconfigure(editorSettings.bracketMatching !== false ? bracketMatching() : []),
       c.closeBrackets.reconfigure(editorSettings.closeBrackets !== false ? closeBrackets() : []),
       c.codeFolding.reconfigure(editorSettings.codeFolding !== false ? foldGutter() : []),
-      c.highlightSelMatch.reconfigure(editorSettings.highlightSelectionMatches !== false ? highlightSelectionMatches() : []),
+      // 大文档时自动禁用选中匹配高亮（全文扫描开销大）
+      c.highlightSelMatch.reconfigure(
+        editorSettings.highlightSelectionMatches !== false && !isLargeDoc ? highlightSelectionMatches() : []
+      ),
       c.autocompletion.reconfigure(
         editorSettings.autocompletion !== false
           ? autocompletion({ override: [markdownCompletions] })
@@ -440,7 +457,10 @@ export function MarkdownEditor({
       ),
       c.scrollPastEnd.reconfigure(editorSettings.scrollPastEnd !== false ? scrollPastEnd() : []),
       c.indentOnInput.reconfigure(editorSettings.indentOnInput !== false ? indentOnInput() : []),
-      c.markdownLint.reconfigure(editorSettings.markdownLint !== false ? markdownLinterExtension : []),
+      // 大文档时自动禁用 Markdown lint（逐行扫描开销大）
+      c.markdownLint.reconfigure(
+        editorSettings.markdownLint !== false && !isLargeDoc ? markdownLinterExtension : []
+      ),
     ];
     view.dispatch({ effects });
   }, [
@@ -449,7 +469,7 @@ export function MarkdownEditor({
     editorSettings.bracketMatching, editorSettings.closeBrackets, editorSettings.codeFolding,
     editorSettings.highlightSelectionMatches, editorSettings.autocompletion,
     editorSettings.multiCursor, editorSettings.scrollPastEnd, editorSettings.indentOnInput,
-    editorSettings.markdownLint,
+    editorSettings.markdownLint, isLargeDoc,
   ]);
 
   // 编辑器字体样式
@@ -459,26 +479,53 @@ export function MarkdownEditor({
     '--cm-line-height': `${editorSettings.lineHeight}`,
   } as React.CSSProperties), [localFontSize, editorSettings.fontFamily, editorSettings.lineHeight]);
 
-  // 统计数据
-  const characterCount = docContent.length;
-  const wordCount = docContent.split(/\s+/).filter((w: string) => w).length;
-  const lineCount = docContent.split('\n').length;
+  // 统计数据（useMemo 避免每次渲染重算）
+  const { characterCount, wordCount, lineCount } = useMemo(() => {
+    const chars = docContent.length;
+    // 用正则匹配计数代替 split+filter，减少大文档开销
+    const words = (docContent.match(/\S+/g) || []).length;
+    const lines = docContent.split('\n').length;
+    return { characterCount: chars, wordCount: words, lineCount: lines };
+  }, [docContent]);
+
+  // 面包屑导航：显示当前光标所在章节路径
+  const breadcrumb = useMemo(() => {
+    const headings = parseHeadings(docContent);
+    return getBreadcrumb(headings, cursorInfo.from);
+  }, [docContent, cursorInfo.from]);
+
+  const handleBreadcrumbClick = useCallback((from: number) => {
+    const view = cmViewRef.current;
+    if (!view) return;
+    try {
+      const pos = Math.min(from, view.state.doc.length);
+      view.dispatch({
+        selection: { anchor: pos },
+        effects: EditorView.scrollIntoView(pos, { y: 'start' }),
+      });
+      view.focus();
+    } catch { /* view may be destroyed */ }
+  }, []);
 
   const showPreview = viewMode === 'preview' || viewMode === 'split';
 
-  // 分屏滚动同步：编辑区 → 预览区
+  // 分屏滚动同步：编辑区 → 预览区（rAF 节流，每帧最多同步一次）
   const handleEditorScroll = useCallback(() => {
     if (viewMode !== 'split' || scrollSyncLock.current) return;
-    const editorEl = editorDivRef.current?.querySelector('.cm-scroller') as HTMLElement | null;
-    const previewEl = previewRef.current;
-    if (!editorEl || !previewEl) return;
-    const editorMaxScroll = editorEl.scrollHeight - editorEl.clientHeight;
-    if (editorMaxScroll <= 0) return;
-    const ratio = editorEl.scrollTop / editorMaxScroll;
-    const previewMaxScroll = previewEl.scrollHeight - previewEl.clientHeight;
     scrollSyncLock.current = true;
-    previewEl.scrollTop = ratio * previewMaxScroll;
-    requestAnimationFrame(() => { scrollSyncLock.current = false; });
+    requestAnimationFrame(() => {
+      const editorEl = editorDivRef.current?.querySelector('.cm-scroller') as HTMLElement | null;
+      const previewEl = previewRef.current;
+      if (editorEl && previewEl) {
+        const editorMaxScroll = editorEl.scrollHeight - editorEl.clientHeight;
+        if (editorMaxScroll > 0) {
+          const ratio = editorEl.scrollTop / editorMaxScroll;
+          const previewMaxScroll = previewEl.scrollHeight - previewEl.clientHeight;
+          previewEl.scrollTop = ratio * previewMaxScroll;
+        }
+      }
+      scrollSyncLock.current = false;
+    });
   }, [viewMode]);
 
   // 监听编辑区滚动
@@ -516,6 +563,7 @@ export function MarkdownEditor({
           <DocumentOutline
             cmViewRef={cmViewRef}
             content={docContent}
+            cursorPos={cursorInfo.from}
             className="border-r shrink-0"
           />
         )}
@@ -551,6 +599,9 @@ export function MarkdownEditor({
         cursorLine={cursorInfo.line}
         cursorCol={cursorInfo.col}
         selectionChars={cursorInfo.selChars}
+        isLargeDoc={isLargeDoc}
+        breadcrumb={breadcrumb}
+        onBreadcrumbClick={handleBreadcrumbClick}
       />
     </div>
   );

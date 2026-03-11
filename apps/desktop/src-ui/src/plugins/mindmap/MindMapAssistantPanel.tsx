@@ -9,6 +9,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { usePluginHost, useThinkingContent } from '../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import { useSettingsStore, getAIInvokeParamsForService } from '@/stores/useSettingsStore';
 import { getProviderConfig, getActiveService } from '@aidocplus/shared-types';
 import type { PluginAssistantPanelProps } from '../types';
@@ -295,7 +296,7 @@ export function MindMapAssistantPanel({
         const errMsg: AssistantMessage = {
           id: genMsgId(),
           role: 'assistant',
-          content: `❌ 生成失败: ${err instanceof Error ? err.message : String(err)}`,
+          content: `❌ 生成失败: ${formatBackendError(err)}`,
           timestamp: Date.now(),
           isError: true,
         };
@@ -517,7 +518,7 @@ export function MindMapAssistantPanel({
       if ((err as Error).name !== 'AbortError') {
         const errMsg: AssistantMessage = {
           id: genMsgId(), role: 'assistant',
-          content: `❌ 生成失败: ${err instanceof Error ? err.message : String(err)}`,
+          content: `❌ 生成失败: ${formatBackendError(err)}`,
           timestamp: Date.now(), isError: true,
         };
         updateActiveSession(s => ({

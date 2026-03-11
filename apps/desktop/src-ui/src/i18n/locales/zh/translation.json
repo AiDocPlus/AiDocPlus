@@ -309,8 +309,10 @@
     "statusBar": {
       "stats": "{{lines}} 行 · {{words}} 词 · {{chars}} 字符 · 约 {{readingTime}} 分钟",
       "selected": " · 选中 {{count}}",
-      "cursor": "行 {{line}}, 列 {{col}}"
+      "cursor": "行 {{line}}, 列 {{col}}",
+      "largeDocMode": "大文档模式"
     },
+    "previewTruncated": "文档较长（{{size}}K 字符），预览已截断以保证性能",
     "toolbar": {
       "undo": "撤销 (Cmd+Z)",
       "undoDone": "已撤销",
@@ -525,7 +527,8 @@
     "contextHintWith": "将「{{label}}」作为 AI 上下文",
     "chatPlaceholderContext": "针对「{{label}}」聊聊...",
     "chatPlaceholderNone": "随便聊聊...",
-    "attachmentRef": "附件参考资料"
+    "attachmentRef": "附件参考资料",
+    "tokenUsage": "~{{used}} / {{total}} tokens"
   },
   "settings": {
     "title": "设置",
@@ -570,7 +573,14 @@
     },
     "advancedSettings": {
       "title": "高级设置",
-      "dataPath": "数据路径",
+      "dataPath": "数据存储路径",
+      "changeDataPath": "更改数据目录",
+      "selectDataDir": "选择数据存储目录",
+      "migrateConfirmTitle": "数据迁移确认",
+      "migrateConfirmMsg": "是否将现有数据迁移（复制）到新目录？\n\n选择\"是\"：复制所有数据到新位置\n选择\"否\"：仅切换目录（不迁移数据）",
+      "restartHint": "建议重启应用以确保所有功能正常。",
+      "switchedNoMigrate": "数据目录已切换。建议重启应用以确保所有功能正常。",
+      "dataPathHint": "可将数据目录指向 iCloud Drive、OneDrive 等云同步文件夹，实现多设备数据同步。",
       "logPath": "日志路径",
       "version": "版本",
       "debugMode": "调试模式",
@@ -718,6 +728,13 @@
     "pluginContentLimit": "插件正文字数限制",
     "pluginContentLimitDesc": "插件发送给 AI 的正文最大字符数，0 表示不限制",
     "pluginContentLimitPlaceholder": "0（不限制）",
+    "networkSettings": "网络设置",
+    "proxyUrl": "HTTP 代理",
+    "proxyUrlDesc": "留空表示不使用代理。支持 http:// 和 socks5:// 协议",
+    "connectTimeout": "连接超时（秒）",
+    "connectTimeoutDesc": "0 使用默认值 15 秒",
+    "requestTimeout": "请求超时（秒）",
+    "requestTimeoutDesc": "0 使用默认值 300 秒",
     "createApiServiceTitle": "创建 API 服务",
     "editApiServiceTitle": "编辑 API 服务",
     "serviceNameLabel": "服务名称",
@@ -1718,7 +1735,22 @@
     "quotaExceeded": "配额已超限",
     "rateLimited": "请求过于频繁",
     "aiError": "AI 服务错误",
-    "unknown": "未知错误"
+    "unknown": "未知错误",
+    "backend": {
+      "IoError": "文件读写错误",
+      "SerializeError": "数据序列化错误",
+      "ProjectNotFound": "项目未找到",
+      "DocumentNotFound": "文档未找到",
+      "VersionNotFound": "版本未找到",
+      "ValidationError": "输入验证失败",
+      "ExportFailed": "导出失败",
+      "ImportFailed": "导入失败",
+      "AiError": "AI 服务错误",
+      "SecurityError": "安全校验失败",
+      "ResourceError": "资源操作失败",
+      "ExternalToolError": "外部工具执行失败",
+      "Internal": "内部错误"
+    }
   },
   "slides": {
     "pptView": "PPT 视图",
@@ -1864,6 +1896,11 @@
     "webSearchUnsupported": "当前模型不支持联网",
     "thinking": "深度思考",
     "thinkingUnsupported": "当前模型不支持深度思考",
+    "uploadImage": "上传图片",
+    "removeImage": "移除图片",
+    "imagePreview": "图片 {{index}}",
+    "addMoreImages": "添加更多图片（最多 {{max}} 张）",
+    "imageAttachment": "图片附件",
     "approvePlan": "同意方案，生成代码",
     "undo": "撤销",
     "redo": "重做",

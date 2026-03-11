@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import type { PluginPanelProps } from '../types';
 import { Button } from '../_framework/ui';
 import { usePluginHost } from '../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import { BookOpen, Download, Copy, Check } from 'lucide-react';
 import { truncateContent } from '../_framework/pluginUtils';
 import { PluginPanelLayout } from '../_framework/PluginPanelLayout';
@@ -108,7 +109,7 @@ export function LessonPlanPluginPanel({ document, content, pluginData, onPluginD
       showStatus(t('generateSuccess'));
       onRequestSave?.();
     } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
+      const errMsg = formatBackendError(err);
       showStatus(t('generateFailed', { error: errMsg }), true);
     } finally {
       setGenerating(false);
@@ -133,7 +134,7 @@ export function LessonPlanPluginPanel({ document, content, pluginData, onPluginD
       await host.platform.invoke('write_binary_file', { path: filePath, data: dataArr });
       showStatus(`已导出: ${filePath}`);
     } catch (error) {
-      showStatus(`导出失败: ${error instanceof Error ? error.message : String(error)}`, true);
+      showStatus(`导出失败: ${formatBackendError(error)}`, true);
     }
   };
 

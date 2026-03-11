@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { renderAsync } from 'docx-preview';
 import { usePluginHost } from '../../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import { Button } from '../../_framework/ui';
 import { Loader2, AlertCircle, Download, Printer, ZoomIn, ZoomOut } from 'lucide-react';
 
@@ -61,7 +62,7 @@ export function DocxViewer({ filePath, fileName, onError }: DocxViewerProps) {
         setLoading(false);
       } catch (err) {
         if (cancelled) return;
-        const errorMsg = err instanceof Error ? err.message : String(err);
+        const errorMsg = formatBackendError(err);
         setError(errorMsg);
         onError(`DOCX 渲染失败: ${errorMsg}`);
         setLoading(false);
@@ -119,7 +120,7 @@ export function DocxViewer({ filePath, fileName, onError }: DocxViewerProps) {
       link.click();
       document.body.removeChild(link);
     } catch (err) {
-      onError(`下载失败: ${err instanceof Error ? err.message : String(err)}`);
+      onError(`下载失败: ${formatBackendError(err)}`);
     }
   };
 

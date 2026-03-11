@@ -1,16 +1,18 @@
-import React, { useState, useRef, useEffect, memo } from 'react';
-import { Send, Sparkles, X, ChevronDown, ChevronUp, FileText, BookOpen, Square, Eraser, Trash2, Copy, Check, ArrowUpToLine, MessageSquareText, PenLine, Wand2, Brain, ListChecks } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
+import { Send, Sparkles, X, ChevronDown, ChevronUp, FileText, BookOpen, Square, Eraser, Trash2, Copy, Check, ArrowUpToLine, MessageSquareText, PenLine, Wand2, Brain, ListChecks, ImagePlus } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useAppStore } from '@/stores/useAppStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { PromptTemplates } from '../templates/PromptTemplates';
 import { invoke } from '@tauri-apps/api/core';
 import { timestampToDate, getProviderConfig, getActiveService } from '@aidocplus/shared-types';
-import type { PromptTemplate, Attachment, ChatContextMode } from '@aidocplus/shared-types';
+import type { PromptTemplate, Attachment, ChatContextMode, ChatImage } from '@aidocplus/shared-types';
 import { useTemplatesStore } from '@/stores/useTemplatesStore';
 import { useTranslation } from '@/i18n';
 import { parseThinkTags } from '@/utils/thinkTagParser';
+import { parseBackendError, formatBackendError } from '@/lib/backendError';
 import { MarkdownPreview } from '../editor/MarkdownPreview';
+import { TokenUsageIndicator } from './TokenUsageIndicator';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -209,7 +211,22 @@ const ChatMessage = memo(function ChatMessage({
             )}
           </div>
           {isUserTurn ? (
-            <div className="text-sm whitespace-pre-wrap break-words">{message.content}</div>
+            <div>
+              {message.content && <div className="text-sm whitespace-pre-wrap break-words">{message.content}</div>}
+              {message.images && message.images.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {message.images.map((img, i) => (
+                    <img
+                      key={i}
+                      src={`data:${img.mimeType};base64,${img.data}`}
+                      alt={`${t('chat.imageAttachment', { defaultValue: '图片附件' })} ${i + 1}`}
+                      className="h-16 w-16 object-cover rounded border border-primary-foreground/20 cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => window.open(`data:${img.mimeType};base64,${img.data}`, '_blank')}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           ) : (
             <div className="text-sm [&_.markdown-preview]:p-0 [&_.markdown-preview]:text-inherit">
               <MarkdownPreview content={(() => {
@@ -298,6 +315,65 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
   // 标记是否已完成初始化赋值（来自 currentDocument 的 authorNotes）
   const authorNotesReadyRef = useRef(false);
 
+  // 多模态图片：待发送图片列表
+  const [pendingImages, setPendingImages] = useState<ChatImage[]>([]);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const MAX_IMAGES = 5;
+  const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+
+  const fileToBase64 = useCallback((file: File): Promise<ChatImage | null> => {
+    return new Promise((resolve) => {
+      if (!file.type.startsWith('image/')) { resolve(null); return; }
+      if (file.size > MAX_IMAGE_SIZE) { resolve(null); return; }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        // data:image/png;base64,xxxx → 提取 base64 部分
+        const base64 = result.split(',')[1];
+        if (base64) {
+          resolve({ data: base64, mimeType: file.type });
+        } else {
+          resolve(null);
+        }
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+  }, []);
+
+  const addImages = useCallback(async (files: File[]) => {
+    const remaining = MAX_IMAGES - pendingImages.length;
+    if (remaining <= 0) return;
+    const toProcess = files.slice(0, remaining);
+    const results = await Promise.all(toProcess.map(fileToBase64));
+    const valid = results.filter((r): r is ChatImage => r !== null);
+    if (valid.length > 0) {
+      setPendingImages(prev => [...prev, ...valid].slice(0, MAX_IMAGES));
+    }
+  }, [pendingImages.length, fileToBase64]);
+
+  const removeImage = useCallback((index: number) => {
+    setPendingImages(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleImageFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) addImages(files);
+    e.target.value = '';
+  }, [addImages]);
+
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const items = Array.from(e.clipboardData.items);
+    const imageFiles = items
+      .filter(item => item.type.startsWith('image/'))
+      .map(item => item.getAsFile())
+      .filter((f): f is File => f !== null);
+    if (imageFiles.length > 0) {
+      e.preventDefault();
+      addImages(imageFiles);
+    }
+  }, [addImages]);
+
   // 提示词变化时同步到 store，使 EditorPanel 保存时能获取最新值
   // 只在用户真正编辑后才同步，避免初始化赋值覆盖 store 中的真实值
   useEffect(() => {
@@ -383,7 +459,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
         const content = await invoke<string>('import_file', { path: att.filePath });
         parts.push(`${t('chat.attachmentLabel', { defaultValue: '[附件: {{name}}]', name: att.fileName })}\n${content}`);
       } catch (err) {
-        parts.push(t('chat.attachmentError', { defaultValue: '[附件: {{name}}]\n(无法读取: {{error}})', name: att.fileName, error: String(err) }));
+        parts.push(t('chat.attachmentError', { defaultValue: '[附件: {{name}}]\n(无法读取: {{error}})', name: att.fileName, error: formatBackendError(err) }));
       }
     }
     return parts.join('\n\n');
@@ -401,17 +477,19 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
   };
 
   const handleSend = async () => {
-    if (!input.trim() || isCurrentTabStreaming) return;
+    if ((!input.trim() && pendingImages.length === 0) || isCurrentTabStreaming) return;
     const messageContent = input;
+    const imagesToSend = pendingImages.length > 0 ? [...pendingImages] : undefined;
     setInput('');
+    setPendingImages([]);
     try {
       const ctxInfo = effectiveContextMode !== 'none'
         ? { mode: effectiveContextMode, content: getContextContent() }
         : undefined;
-      await sendChatMessage(effectiveTabId, messageContent, webSearch && supportsWebSearch, ctxInfo, useTools && supportsFunctionCalling, { enableThinking: enableThinking && supportsThinking, planMode });
+      await sendChatMessage(effectiveTabId, messageContent, webSearch && supportsWebSearch, ctxInfo, useTools && supportsFunctionCalling, { enableThinking: enableThinking && supportsThinking, planMode, images: imagesToSend });
     } catch (error) {
       console.error('Failed to send message:', error);
-      const errMsg = typeof error === 'string' ? error : (error instanceof Error ? error.message : JSON.stringify(error));
+      const errMsg = formatBackendError(error);
       useAppStore.getState().addAiMessage(effectiveTabId, {
         role: 'assistant',
         content: t('chat.sendFailed', { defaultValue: '发送失败：{{error}}', error: errMsg }),
@@ -682,23 +760,23 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
       console.error('Error keys:', error ? Object.keys(error) : 'no error object');
       console.error('Error stringified:', JSON.stringify(error, null, 2));
 
-      // Provide helpful error message
-      let errorMsg = t('chat.unknownError', { defaultValue: '未知错误' });
-      if (error instanceof Error) {
-        errorMsg = error.message;
-        // Check for common error patterns
-        if (errorMsg.includes('connect') || errorMsg.includes('timeout')) {
-          errorMsg = t('chat.networkError', { defaultValue: '网络连接失败：{{error}}\n\n请检查网络连接或稍后重试。', error: errorMsg });
-        } else if (errorMsg.includes('401') || errorMsg.includes('Unauthorized') || errorMsg.includes('API key')) {
+      // Provide helpful error message based on structured error code
+      const parsed = parseBackendError(error);
+      let errorMsg: string;
+      if (parsed.code === 'AiError') {
+        // AI 错误：进一步检查 message 中的关键词以提供更精确的提示
+        const msg = parsed.message;
+        if (msg.includes('connect') || msg.includes('timeout')) {
+          errorMsg = t('chat.networkError', { defaultValue: '网络连接失败：{{error}}\n\n请检查网络连接或稍后重试。', error: msg });
+        } else if (msg.includes('401') || msg.includes('Unauthorized') || msg.includes('API key')) {
           errorMsg = t('chat.apiKeyError', { defaultValue: 'API Key 无效或未配置。\n\n请点击聊天面板下方的"设置"按钮，在设置面板的 AI 标签页中配置您的 API Key。' });
-        } else if (errorMsg.includes('429') || errorMsg.includes('rate limit')) {
+        } else if (msg.includes('429') || msg.includes('rate limit')) {
           errorMsg = t('chat.rateLimitError', { defaultValue: 'API 请求频率超限，请稍后重试。' });
+        } else {
+          errorMsg = formatBackendError(error);
         }
-      } else if (typeof error === 'string') {
-        errorMsg = error;
-      } else if (error && typeof error === 'object') {
-        // Handle Tauri error responses or other object errors
-        errorMsg = (error as any).message || (error as any).error || JSON.stringify(error);
+      } else {
+        errorMsg = formatBackendError(error);
       }
 
       // Add error message to chat
@@ -1050,6 +1128,8 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
 
       {/* 聊天输入 */}
       <div className="px-4 pt-2 pb-4 border-t flex-shrink-0 space-y-2">
+        {/* Token 用量指示器 */}
+        <TokenUsageIndicator tabId={effectiveTabId} />
         {/* 上下文模式切换（simpleMode 时隐藏） */}
         {!simpleMode && (
         <div className="flex items-center gap-1">
@@ -1072,42 +1152,96 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
           ))}
         </div>
         )}
+        {/* 图片预览条 */}
+        {pendingImages.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {pendingImages.map((img, i) => (
+              <div key={i} className="relative group">
+                <img
+                  src={`data:${img.mimeType};base64,${img.data}`}
+                  alt={t('chat.imagePreview', { defaultValue: '图片 {{index}}', index: i + 1 })}
+                  className="h-14 w-14 object-cover rounded border"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeImage(i)}
+                  className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  title={t('chat.removeImage', { defaultValue: '移除图片' })}
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              </div>
+            ))}
+            {pendingImages.length < MAX_IMAGES && (
+              <button
+                type="button"
+                onClick={() => imageInputRef.current?.click()}
+                className="h-14 w-14 rounded border border-dashed flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+                title={t('chat.addMoreImages', { defaultValue: '添加更多图片（最多 {{max}} 张）', max: MAX_IMAGES })}
+              >
+                <ImagePlus className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        )}
         {/* 输入框 + 发送 */}
         <div className="flex gap-2">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), isCurrentTabStreaming ? stopAiStreaming() : handleSend())}
-            placeholder={effectiveContextMode !== 'none' ? t('chat.chatPlaceholderContext', { defaultValue: '针对「{{label}}」聊聊...', label: CONTEXT_MODE_LABELS[effectiveContextMode] }) : t('chat.chatPlaceholderNone', { defaultValue: '随便聊聊...' })}
-            disabled={false}
-            spellCheck={false}
-            autoCorrect="off"
-            autoCapitalize="off"
-            rows={3}
-            className="flex-1 px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 text-sm resize-none min-h-[60px]"
-          />
-          {isCurrentTabStreaming ? (
+          <div className="flex-1 flex flex-col gap-1">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), isCurrentTabStreaming ? stopAiStreaming() : handleSend())}
+              onPaste={handlePaste}
+              placeholder={effectiveContextMode !== 'none' ? t('chat.chatPlaceholderContext', { defaultValue: '针对「{{label}}」聊聊...', label: CONTEXT_MODE_LABELS[effectiveContextMode] }) : t('chat.chatPlaceholderNone', { defaultValue: '随便聊聊...' })}
+              disabled={false}
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="off"
+              rows={3}
+              className="flex-1 px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 text-sm resize-none min-h-[60px]"
+            />
+          </div>
+          <div className="flex flex-col gap-1 self-end">
             <Button
-              onClick={stopAiStreaming}
+              variant="ghost"
               size="icon"
-              variant="destructive"
-              title={t('chat.stopGeneration', { defaultValue: '停止生成' })}
-              className="self-end"
+              onClick={() => imageInputRef.current?.click()}
+              title={t('chat.uploadImage', { defaultValue: '上传图片' })}
+              className="h-8 w-8"
             >
-              <Square className="h-4 w-4" />
+              <ImagePlus className="h-4 w-4" />
             </Button>
-          ) : (
-            <Button
-              onClick={handleSend}
-              disabled={!input.trim()}
-              size="icon"
-              title={t('common.send')}
-              className="self-end"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          )}
+            {isCurrentTabStreaming ? (
+              <Button
+                onClick={stopAiStreaming}
+                size="icon"
+                variant="destructive"
+                title={t('chat.stopGeneration', { defaultValue: '停止生成' })}
+              >
+                <Square className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                onClick={handleSend}
+                disabled={!input.trim() && pendingImages.length === 0}
+                size="icon"
+                title={t('common.send')}
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </div>
+        {/* 隐藏的图片文件选择器 */}
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          title={t('chat.uploadImage', { defaultValue: '上传图片' })}
+          onChange={handleImageFileChange}
+        />
         {/* AI 模式切换按钮 */}
         {!simpleMode && (
         <div className="flex items-center gap-1">

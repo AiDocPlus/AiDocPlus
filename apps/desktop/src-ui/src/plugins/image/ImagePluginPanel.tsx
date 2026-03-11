@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import type { PluginPanelProps } from '../types';
 import type { ImagePluginData, ImageCanvas } from './types';
 import { usePluginHost } from '../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import FabricCanvasEditor from './FabricCanvasEditor';
 import type { FabricCanvasEditorRef } from './FabricCanvasEditor';
 import { generateThumbnail, copyCanvasToClipboard, dataURLtoUint8Array } from './imageUtils';
@@ -396,7 +397,7 @@ export function ImagePluginPanel({ pluginData, onPluginDataChange, onRequestSave
       }
       showStatus(t('exportSuccess') + `: ${path}`);
     } catch (e) {
-      showStatus(t('exportFailed') + `: ${e instanceof Error ? e.message : String(e)}`, true);
+      showStatus(t('exportFailed') + `: ${formatBackendError(e)}`, true);
     }
   }, [activeCanvas, host, showStatus, t]);
 
@@ -422,7 +423,7 @@ export function ImagePluginPanel({ pluginData, onPluginDataChange, onRequestSave
       const mime = mimeMap[ext] || 'image/png';
       await editorRef.current?.addImageFromURL(`data:${mime};base64,${base64}`);
     } catch (e) {
-      showStatus(t('importFailed') + `: ${e instanceof Error ? e.message : String(e)}`, true);
+      showStatus(t('importFailed') + `: ${formatBackendError(e)}`, true);
     }
   }, [host, showStatus, t]);
 

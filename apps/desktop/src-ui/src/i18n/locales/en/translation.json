@@ -308,8 +308,10 @@
     "statusBar": {
       "stats": "{{lines}} lines · {{words}} words · {{chars}} chars · ~{{readingTime}} min",
       "selected": " · Selected {{count}}",
-      "cursor": "Ln {{line}}, Col {{col}}"
+      "cursor": "Ln {{line}}, Col {{col}}",
+      "largeDocMode": "Large Doc Mode"
     },
+    "previewTruncated": "Document is large ({{size}}K chars), preview truncated for performance",
     "toolbar": {
       "undo": "Undo (Cmd+Z)",
       "undoDone": "Undone",
@@ -524,7 +526,8 @@
     "contextHintWith": "Use \"{{label}}\" as AI context",
     "chatPlaceholderContext": "Chat about \"{{label}}\"...",
     "chatPlaceholderNone": "Just chat...",
-    "attachmentRef": "Attachment reference materials"
+    "attachmentRef": "Attachment reference materials",
+    "tokenUsage": "~{{used}} / {{total}} tokens"
   },
   "settings": {
     "title": "Settings",
@@ -569,7 +572,14 @@
     },
     "advancedSettings": {
       "title": "Advanced Settings",
-      "dataPath": "Data Path",
+      "dataPath": "Data Storage Path",
+      "changeDataPath": "Change Data Directory",
+      "selectDataDir": "Select Data Storage Directory",
+      "migrateConfirmTitle": "Data Migration Confirmation",
+      "migrateConfirmMsg": "Do you want to migrate (copy) existing data to the new directory?\n\nYes: Copy all data to the new location\nNo: Switch directory only (no migration)",
+      "restartHint": "It's recommended to restart the app to ensure everything works correctly.",
+      "switchedNoMigrate": "Data directory has been switched. It's recommended to restart the app to ensure everything works correctly.",
+      "dataPathHint": "Point the data directory to iCloud Drive, OneDrive, etc. to enable multi-device sync.",
       "logPath": "Log Path",
       "version": "Version",
       "debugMode": "Debug Mode",
@@ -717,6 +727,13 @@
     "pluginContentLimit": "Plugin Content Limit",
     "pluginContentLimitDesc": "Max characters of content sent to AI by plugins, 0 means no limit",
     "pluginContentLimitPlaceholder": "0 (No limit)",
+    "networkSettings": "Network Settings",
+    "proxyUrl": "HTTP Proxy",
+    "proxyUrlDesc": "Leave empty for no proxy. Supports http:// and socks5:// protocols",
+    "connectTimeout": "Connect Timeout (sec)",
+    "connectTimeoutDesc": "0 uses default of 15 seconds",
+    "requestTimeout": "Request Timeout (sec)",
+    "requestTimeoutDesc": "0 uses default of 300 seconds",
     "createApiServiceTitle": "Create API Service",
     "editApiServiceTitle": "Edit API Service",
     "serviceNameLabel": "Service Name",
@@ -1717,7 +1734,22 @@
     "quotaExceeded": "Quota exceeded",
     "rateLimited": "Too many requests",
     "aiError": "AI service error",
-    "unknown": "Unknown error"
+    "unknown": "Unknown error",
+    "backend": {
+      "IoError": "File I/O error",
+      "SerializeError": "Data serialization error",
+      "ProjectNotFound": "Project not found",
+      "DocumentNotFound": "Document not found",
+      "VersionNotFound": "Version not found",
+      "ValidationError": "Input validation failed",
+      "ExportFailed": "Export failed",
+      "ImportFailed": "Import failed",
+      "AiError": "AI service error",
+      "SecurityError": "Security check failed",
+      "ResourceError": "Resource operation failed",
+      "ExternalToolError": "External tool execution failed",
+      "Internal": "Internal error"
+    }
   },
   "slides": {
     "pptView": "PPT View",
@@ -1863,6 +1895,11 @@
     "webSearchUnsupported": "Current model does not support web search",
     "thinking": "Deep Thinking",
     "thinkingUnsupported": "Current model does not support deep thinking",
+    "uploadImage": "Upload Image",
+    "removeImage": "Remove Image",
+    "imagePreview": "Image {{index}}",
+    "addMoreImages": "Add more images (max {{max}})",
+    "imageAttachment": "Image Attachment",
     "approvePlan": "Approve plan & generate code",
     "undo": "Undo",
     "redo": "Redo",

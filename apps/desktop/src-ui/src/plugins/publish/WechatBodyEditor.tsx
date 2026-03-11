@@ -22,6 +22,7 @@ import { TableCell } from '@tiptap/extension-table-cell';
 import { Extension } from '@tiptap/react';
 
 import { usePluginHost } from '../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import {
   Button, Separator,
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -324,7 +325,7 @@ export function WechatBodyEditor({ value, onChange, placeholder, t, maximized, o
       const dataUri = await host.platform.invoke<string>('read_file_base64', { path: filePath });
       editor.chain().focus().setImage({ src: dataUri }).run();
     } catch (err) {
-      host.ui.showStatus(t('wxEditorImageError', { error: err instanceof Error ? err.message : String(err) }), true);
+      host.ui.showStatus(t('wxEditorImageError', { error: formatBackendError(err) }), true);
     }
   }, [editor, host.ui, host.platform, t]);
 

@@ -6,6 +6,7 @@ import { buildPosterSystemPrompt, buildPosterUserPrompt, extractHtmlFromResponse
 import { truncateContent } from '../_framework/pluginUtils';
 import { Button } from '../_framework/ui';
 import { usePluginHost } from '../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import { Image, Download, ExternalLink } from 'lucide-react';
 import { PluginPanelLayout } from '../_framework/PluginPanelLayout';
 
@@ -105,7 +106,7 @@ export function PosterPluginPanel({ document, content, pluginData, onPluginDataC
       onRequestSave?.();
     } catch (err) {
       if (abortRef.current) return;
-      showStatus(`生成失败：${err instanceof Error ? err.message : String(err)}`, true);
+      showStatus(`生成失败：${formatBackendError(err)}`, true);
     } finally {
       setGenerating(false);
     }
@@ -122,7 +123,7 @@ export function PosterPluginPanel({ document, content, pluginData, onPluginDataC
       await host.platform.invoke('write_binary_file', { path: filePath, data });
       showStatus(`已导出: ${filePath}`);
     } catch (error) {
-      showStatus(`导出失败: ${error instanceof Error ? error.message : String(error)}`, true);
+      showStatus(`导出失败: ${formatBackendError(error)}`, true);
     }
   };
 
@@ -136,7 +137,7 @@ export function PosterPluginPanel({ document, content, pluginData, onPluginDataC
       await host.platform.invoke('write_binary_file', { path: tempPath, data });
       await host.platform.invoke('open_file_with_app', { path: tempPath, appName: null });
     } catch (error) {
-      showStatus(`预览失败: ${error instanceof Error ? error.message : String(error)}`, true);
+      showStatus(`预览失败: ${formatBackendError(error)}`, true);
     }
   };
 

@@ -69,6 +69,14 @@ const SMTP_TIMEOUT_SECS: u64 = 30;
 /// 共享 HTML 邮件 CSS 样式
 const EMAIL_CSS: &str = r#"body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 14px; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
 h1, h2, h3, h4, h5, h6 { margin-top: 1em; margin-bottom: 0.5em; }
+ul, ol { margin: 0.3em 0; padding-left: 2em; }
+li { line-height: 1.6; }
+li > ul, li > ol { margin: 0; padding-left: 2em; }
+ul.contains-task-list { list-style: none; padding-left: 1em; }
+li.task-list-item input[type="checkbox"] { margin-right: 0.5em; vertical-align: middle; }
+del, s { text-decoration: line-through; color: #999; }
+a { color: #0066cc; text-decoration: underline; }
+hr { border: none; border-top: 1px solid #ddd; margin: 1em 0; }
 table { border-collapse: collapse; width: 100%; margin: 1em 0; }
 th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
 th { background-color: #f5f5f5; }
@@ -92,35 +100,38 @@ pub struct AttachmentInfo {
 /// 存储邮箱密码到 OS 密钥链
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn store_email_credential(accountId: String, password: String) -> Result<String, String> {
+pub fn store_email_credential(accountId: String, password: String) -> crate::error::Result<String> {
+    use crate::error::AppError;
     let entry = keyring::Entry::new(KEYRING_SERVICE, &accountId)
-        .map_err(|e| format!("KEYRING_INIT_FAILED: {}", e))?;
+        .map_err(|e| AppError::Internal(format!("KEYRING_INIT_FAILED: {}", e)))?;
     entry
         .set_password(&password)
-        .map_err(|e| format!("KEYRING_STORE_FAILED: {}", e))?;
+        .map_err(|e| AppError::Internal(format!("KEYRING_STORE_FAILED: {}", e)))?;
     Ok("CREDENTIAL_STORED".to_string())
 }
 
 /// 从 OS 密钥链删除邮箱密码
 #[tauri::command]
 #[allow(non_snake_case)]
-pub fn delete_email_credential(accountId: String) -> Result<String, String> {
+pub fn delete_email_credential(accountId: String) -> crate::error::Result<String> {
+    use crate::error::AppError;
     let entry = keyring::Entry::new(KEYRING_SERVICE, &accountId)
-        .map_err(|e| format!("KEYRING_INIT_FAILED: {}", e))?;
+        .map_err(|e| AppError::Internal(format!("KEYRING_INIT_FAILED: {}", e)))?;
     match entry.delete_credential() {
         Ok(()) => Ok("CREDENTIAL_DELETED".to_string()),
         Err(keyring::Error::NoEntry) => Ok("CREDENTIAL_NOT_FOUND".to_string()),
-        Err(e) => Err(format!("KEYRING_DELETE_FAILED: {}", e)),
+        Err(e) => Err(AppError::Internal(format!("KEYRING_DELETE_FAILED: {}", e))),
     }
 }
 
 /// 从 OS 密钥链读取邮箱密码（内部使用）
-fn get_credential(account_id: &str) -> Result<String, String> {
+fn get_credential(account_id: &str) -> crate::error::Result<String> {
+    use crate::error::AppError;
     let entry = keyring::Entry::new(KEYRING_SERVICE, account_id)
-        .map_err(|e| format!("KEYRING_INIT_FAILED: {}", e))?;
+        .map_err(|e| AppError::Internal(format!("KEYRING_INIT_FAILED: {}", e)))?;
     entry
         .get_password()
-        .map_err(|e| format!("KEYRING_GET_FAILED: {}", e))
+        .map_err(|e| AppError::Internal(format!("KEYRING_GET_FAILED: {}", e)))
 }
 
 /// 测试 SMTP 连接
@@ -136,17 +147,17 @@ pub async fn test_smtp_connection(
     email: String,
     password: Option<String>,
     accountId: Option<String>,
-) -> Result<String, String> {
+) -> crate::error::Result<String> {
+    use crate::error::AppError;
     let pwd = resolve_password(password, accountId.as_deref())?;
     let creds = Credentials::new(email.clone(), pwd);
 
-    let transport = build_smtp_transport(&smtpHost, smtpPort, &encryption, creds)
-        .map_err(|e| format!("SMTP_BUILD_FAILED: {}", e))?;
+    let transport = build_smtp_transport(&smtpHost, smtpPort, &encryption, creds)?;
 
     transport
         .test_connection()
         .await
-        .map_err(|e| format!("SMTP_TEST_FAILED: {}", e))?;
+        .map_err(|e| AppError::ExternalToolError(format!("SMTP_TEST_FAILED: {}", e)))?;
 
     Ok(format!("SMTP_TEST_OK: {}:{}", smtpHost, smtpPort))
 }
@@ -176,9 +187,10 @@ pub async fn send_email(
     attachments: Option<Vec<AttachmentInfo>>,
     requestReadReceipt: Option<bool>,
     priority: Option<String>,
-) -> Result<String, String> {
+) -> crate::error::Result<String> {
+    use crate::error::AppError;
     if to.is_empty() {
-        return Err("RECIPIENT_EMPTY".to_string());
+        return Err(AppError::ValidationError("RECIPIENT_EMPTY".to_string()));
     }
 
     let pwd = resolve_password(password, accountId.as_deref())?;
@@ -187,11 +199,11 @@ pub async fn send_email(
     let from_mailbox: Mailbox = if let Some(ref name) = displayName {
         format!("{} <{}>", name, email)
             .parse()
-            .map_err(|e| format!("SENDER_FORMAT_ERROR: {}", e))?
+            .map_err(|e| AppError::ValidationError(format!("SENDER_FORMAT_ERROR: {}", e)))?
     } else {
         email
             .parse()
-            .map_err(|e| format!("SENDER_FORMAT_ERROR: {}", e))?
+            .map_err(|e| AppError::ValidationError(format!("SENDER_FORMAT_ERROR: {}", e)))?
     };
 
     let mut builder = Message::builder()
@@ -221,7 +233,7 @@ pub async fn send_email(
         if !trimmed.is_empty() {
             let reply_mailbox: Mailbox = trimmed
                 .parse()
-                .map_err(|e| format!("REPLY_TO_FORMAT_ERROR: {} - {}", trimmed, e))?;
+                .map_err(|e| AppError::ValidationError(format!("REPLY_TO_FORMAT_ERROR: {} - {}", trimmed, e)))?;
             builder = builder.reply_to(reply_mailbox);
         }
     }
@@ -231,7 +243,7 @@ pub async fn send_email(
         let mailbox: Mailbox = addr
             .trim()
             .parse()
-            .map_err(|e| format!("RECIPIENT_FORMAT_ERROR: {} - {}", addr, e))?;
+            .map_err(|e| AppError::ValidationError(format!("RECIPIENT_FORMAT_ERROR: {} - {}", addr, e)))?;
         builder = builder.to(mailbox);
     }
 
@@ -243,7 +255,7 @@ pub async fn send_email(
         }
         let mailbox: Mailbox = trimmed
             .parse()
-            .map_err(|e| format!("CC_FORMAT_ERROR: {} - {}", addr, e))?;
+            .map_err(|e| AppError::ValidationError(format!("CC_FORMAT_ERROR: {} - {}", addr, e)))?;
         builder = builder.cc(mailbox);
     }
 
@@ -255,7 +267,7 @@ pub async fn send_email(
         }
         let mailbox: Mailbox = trimmed
             .parse()
-            .map_err(|e| format!("BCC_FORMAT_ERROR: {} - {}", addr, e))?;
+            .map_err(|e| AppError::ValidationError(format!("BCC_FORMAT_ERROR: {} - {}", addr, e)))?;
         builder = builder.bcc(mailbox);
     }
 
@@ -302,31 +314,30 @@ pub async fn send_email(
     let message = if attachment_list.is_empty() {
         builder
             .multipart(content_part)
-            .map_err(|e| format!("EMAIL_BUILD_FAILED: {}", e))?
+            .map_err(|e| AppError::Internal(format!("EMAIL_BUILD_FAILED: {}", e)))?
     } else {
         let mut mixed = MultiPart::mixed().multipart(content_part);
         for att in &attachment_list {
             validate_attachment_path(&att.path)?;
             let file_content = std::fs::read(&att.path)
-                .map_err(|e| format!("ATTACHMENT_READ_FAILED: {} - {}", att.filename, e))?;
+                .map_err(|e| AppError::Internal(format!("ATTACHMENT_READ_FAILED: {} - {}", att.filename, e)))?;
             let ct: ContentType = att.mimeType.parse().unwrap_or(ContentType::TEXT_PLAIN);
             let attachment_part = Attachment::new(att.filename.clone()).body(file_content, ct);
             mixed = mixed.singlepart(attachment_part);
         }
         builder
             .multipart(mixed)
-            .map_err(|e| format!("EMAIL_BUILD_FAILED: {}", e))?
+            .map_err(|e| AppError::Internal(format!("EMAIL_BUILD_FAILED: {}", e)))?
     };
 
     // 发送
     let creds = Credentials::new(email.clone(), pwd);
-    let transport = build_smtp_transport(&smtpHost, smtpPort, &encryption, creds)
-        .map_err(|e| format!("SMTP_BUILD_FAILED: {}", e))?;
+    let transport = build_smtp_transport(&smtpHost, smtpPort, &encryption, creds)?;
 
     transport
         .send(message)
         .await
-        .map_err(|e| format!("SEND_FAILED: {}", e))?;
+        .map_err(|e| AppError::ExternalToolError(format!("SEND_FAILED: {}", e)))?;
 
     let recipients: Vec<&str> = to.iter().map(|s| s.as_str()).collect();
     Ok(format!(
@@ -338,7 +349,7 @@ pub async fn send_email(
 // ── 内部工具函数 ──
 
 /// 解析密码：优先使用传入的 password，否则从密钥链通过 accountId 获取
-fn resolve_password(password: Option<String>, account_id: Option<&str>) -> Result<String, String> {
+fn resolve_password(password: Option<String>, account_id: Option<&str>) -> crate::error::Result<String> {
     if let Some(pwd) = password {
         if !pwd.is_empty() {
             return Ok(pwd);
@@ -347,14 +358,15 @@ fn resolve_password(password: Option<String>, account_id: Option<&str>) -> Resul
     if let Some(id) = account_id {
         return get_credential(id);
     }
-    Err("PASSWORD_REQUIRED: 需要提供密码或有效的 accountId".to_string())
+    Err(crate::error::AppError::ValidationError("PASSWORD_REQUIRED: 需要提供密码或有效的 accountId".to_string()))
 }
 
 /// 附件路径安全校验（Phase 1.3）
 /// 只允许访问用户主目录下的文件和系统临时目录
-fn validate_attachment_path(path: &str) -> Result<(), String> {
+fn validate_attachment_path(path: &str) -> crate::error::Result<()> {
+    use crate::error::AppError;
     let canonical = std::fs::canonicalize(path)
-        .map_err(|e| format!("ATTACHMENT_PATH_INVALID: {} - {}", path, e))?;
+        .map_err(|e| AppError::SecurityError(format!("ATTACHMENT_PATH_INVALID: {} - {}", path, e)))?;
     let canonical_str = canonical.to_string_lossy();
 
     // 允许用户主目录
@@ -370,10 +382,10 @@ fn validate_attachment_path(path: &str) -> Result<(), String> {
         return Ok(());
     }
 
-    Err(format!(
+    Err(AppError::SecurityError(format!(
         "ATTACHMENT_PATH_FORBIDDEN: 附件路径不在允许的目录范围内: {}",
         canonical_str
-    ))
+    )))
 }
 
 /// 构建 SMTP 传输（含超时设置 Phase 1.4）
@@ -382,15 +394,16 @@ fn build_smtp_transport(
     port: u16,
     encryption: &str,
     creds: Credentials,
-) -> Result<AsyncSmtpTransport<Tokio1Executor>, String> {
+) -> crate::error::Result<AsyncSmtpTransport<Tokio1Executor>> {
+    use crate::error::AppError;
     let timeout = Duration::from_secs(SMTP_TIMEOUT_SECS);
     match encryption {
         "tls" => {
             let tls_params = TlsParameters::new(host.to_string())
-                .map_err(|e| format!("TLS_PARAM_ERROR: {}", e))?;
+                .map_err(|e| AppError::ExternalToolError(format!("TLS_PARAM_ERROR: {}", e)))?;
             Ok(
                 AsyncSmtpTransport::<Tokio1Executor>::relay(host)
-                    .map_err(|e| format!("SMTP_RELAY_ERROR: {}", e))?
+                    .map_err(|e| AppError::ExternalToolError(format!("SMTP_RELAY_ERROR: {}", e)))?
                     .port(port)
                     .tls(Tls::Wrapper(tls_params))
                     .credentials(creds)
@@ -400,10 +413,10 @@ fn build_smtp_transport(
         }
         "starttls" => {
             let tls_params = TlsParameters::new(host.to_string())
-                .map_err(|e| format!("TLS_PARAM_ERROR: {}", e))?;
+                .map_err(|e| AppError::ExternalToolError(format!("TLS_PARAM_ERROR: {}", e)))?;
             Ok(
                 AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(host)
-                    .map_err(|e| format!("SMTP_STARTTLS_RELAY_ERROR: {}", e))?
+                    .map_err(|e| AppError::ExternalToolError(format!("SMTP_STARTTLS_RELAY_ERROR: {}", e)))?
                     .port(port)
                     .tls(Tls::Required(tls_params))
                     .credentials(creds)

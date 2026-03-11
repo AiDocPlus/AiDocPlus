@@ -3,7 +3,7 @@
 use crate::config::AppState;
 use crate::document::Document;
 use crate::template::{self, DocTemplateManifest, DocTemplateContent, DocTemplateCategory};
-use crate::error::Result;
+use crate::error::{AppError, Result};
 use tauri::State;
 
 #[tauri::command]
@@ -60,9 +60,9 @@ pub fn save_doc_template_from_document(
     // 加载文档
     let doc_path = state.get_document_path(&projectId, &documentId);
     if !doc_path.exists() {
-        return Err(format!("Document not found: {}", documentId));
+        return Err(AppError::DocumentNotFound(format!("文档未找到: {}", documentId)));
     }
-    let document = Document::load(&doc_path).map_err(|e| e.to_string())?;
+    let document = Document::load(&doc_path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
 
     let template_id = uuid::Uuid::new_v4().to_string();
 
@@ -136,7 +136,7 @@ pub fn create_document_from_doc_template(
 
     // 保存文档
     let doc_path = state.get_document_path(&projectId, &document.id);
-    document.save(&doc_path).map_err(|e| e.to_string())?;
+    document.save(&doc_path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
 
     Ok(document.without_versions())
 }

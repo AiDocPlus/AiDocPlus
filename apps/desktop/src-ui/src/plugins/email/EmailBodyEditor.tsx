@@ -10,6 +10,7 @@ import { TextStyle, Color, FontSize } from '@tiptap/extension-text-style';
 import { FontFamily } from '@tiptap/extension-font-family';
 import { Superscript } from '@tiptap/extension-superscript';
 import { Subscript } from '@tiptap/extension-subscript';
+import { formatBackendError } from '@/lib/backendError';
 import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table';
 import { Placeholder } from '@tiptap/extensions';
 
@@ -281,7 +282,7 @@ export function EmailBodyEditor({ value, onChange, placeholder, t, format = 'htm
       const dataUri = await host.platform.invoke<string>('read_file_base64', { path: filePath });
       editor.chain().focus().setImage({ src: dataUri }).run();
     } catch (err) {
-      host.ui.showStatus(t('editorImageError', { error: err instanceof Error ? err.message : String(err) }), true);
+      host.ui.showStatus(t('editorImageError', { error: formatBackendError(err) }), true);
     }
   }, [editor, host.ui, host.platform, t]);
 

@@ -34,6 +34,10 @@ export interface AIInvokeParams {
   apiKey: string | undefined;
   model: string | undefined;
   baseUrl: string | undefined;
+  serviceId: string | undefined;
+  proxyUrl: string | undefined;
+  connectTimeoutSecs: number | undefined;
+  requestTimeoutSecs: number | undefined;
 }
 
 export type SettingsSnapshot = Pick<AppSettings, 'editor' | 'ui' | 'file' | 'ai' | 'email' | 'shortcuts'>;
@@ -438,7 +442,7 @@ export function resolveAIInvokeParams(ai: AppSettings['ai'], serviceId?: string)
     service = getActiveService(ai);
   }
   if (!service) {
-    return { provider: undefined, apiKey: undefined, model: undefined, baseUrl: undefined };
+    return { provider: undefined, apiKey: undefined, model: undefined, baseUrl: undefined, serviceId: undefined, proxyUrl: undefined, connectTimeoutSecs: undefined, requestTimeoutSecs: undefined };
   }
   const providerConfig = getProviderConfig(service.provider);
   return {
@@ -446,6 +450,10 @@ export function resolveAIInvokeParams(ai: AppSettings['ai'], serviceId?: string)
     apiKey: service.apiKey || undefined,
     model: service.model || undefined,
     baseUrl: service.baseUrl || providerConfig?.baseUrl || undefined,
+    serviceId: service.id || undefined,
+    proxyUrl: ai.proxyUrl || undefined,
+    connectTimeoutSecs: ai.connectTimeoutSecs || undefined,
+    requestTimeoutSecs: ai.requestTimeoutSecs || undefined,
   };
 }
 

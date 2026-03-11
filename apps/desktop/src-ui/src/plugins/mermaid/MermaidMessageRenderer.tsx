@@ -11,6 +11,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Code, Eye, Play, AlertTriangle, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { formatBackendError } from '@/lib/backendError';
 
 interface MermaidBlockProps {
   code: string;
@@ -54,7 +55,7 @@ export function MermaidCodeBlock({ code, index, onApply, onFixError, t }: Mermai
         // 兜底清理 mermaid 可能残留在 body 中的临时渲染元素
         document.querySelectorAll('body > [id^="dmsg-mermaid-"]').forEach(el => el.remove());
         if (!cancelled) {
-          const msg = err instanceof Error ? err.message : String(err);
+          const msg = formatBackendError(err);
           setRenderError(msg);
           setSvgHtml('');
         }

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import type { PluginHostAPI } from '../_framework/PluginHostAPI';
+import { formatBackendError } from '@/lib/backendError';
 import {
   Button, Input, Label,
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -75,7 +76,7 @@ export function WechatConnectionDialog({
       const result = await provider.testConnection();
       setVerifyResult(result);
     } catch (err) {
-      setVerifyResult({ ok: false, msg: err instanceof Error ? err.message : String(err) });
+      setVerifyResult({ ok: false, msg: formatBackendError(err) });
     } finally {
       setVerifying(false);
     }

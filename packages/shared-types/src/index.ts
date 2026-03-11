@@ -52,6 +52,7 @@ export interface Document {
   enabledPlugins?: string[];  // 该文档启用的插件 UUID 列表（顺序即标签栏顺序）
   composedContent?: string;  // 合并内容（Markdown），汇集正文+插件片段+外部导入
   aiServiceId?: string;  // 文档级 AI 服务绑定（为空时使用全局 activeServiceId）
+  _contentLoaded?: boolean;  // 前端标志：内容是否已加载（区分元数据模式 vs 内容确实为空）
 }
 
 // ============================================================
@@ -184,11 +185,20 @@ export { AI_PROVIDERS, getProviderConfig } from './generated/ai-providers.genera
 
 export type ChatContextMode = 'none' | 'material' | 'prompt' | 'generated';
 
+/** 聊天中附带的图片（base64 编码） */
+export interface ChatImage {
+  /** base64 编码的图片数据（不含 data: 前缀） */
+  data: string;
+  /** MIME 类型，如 image/jpeg, image/png, image/gif, image/webp */
+  mimeType: string;
+}
+
 export interface AIMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
   timestamp?: number; // Unix timestamp in seconds
   contextMode?: ChatContextMode; // 聊天上下文模式（仅 assistant 消息使用）
+  images?: ChatImage[]; // 多模态图片（仅 user 消息使用）
 }
 
 export interface AIRequestOptions {
@@ -497,6 +507,16 @@ export interface AISettings {
   markdownModePrompt: string;
   /** 启用深度思考模式（对支持的模型启用推理/思考能力） */
   enableThinking: boolean;
+  /** HTTP 代理 URL（如 http://127.0.0.1:7890 或 socks5://...），空表示不使用代理 */
+  proxyUrl: string;
+  /** 连接超时秒数，0 表示使用默认值（15秒） */
+  connectTimeoutSecs: number;
+  /** 请求超时秒数，0 表示使用默认值（300秒） */
+  requestTimeoutSecs: number;
+  /** 最大上下文消息条数，0 表示不限（按 token 自动截断） */
+  maxContextMessages: number;
+  /** 最大上下文 token 数，0 表示按模型自动检测 */
+  maxContextTokens: number;
 }
 
 /** 获取当前激活的服务配置 */
@@ -667,6 +687,11 @@ export const DEFAULT_AI_SETTINGS: AISettings = {
 4. 合理使用标题层级、列表、表格等 Markdown 元素组织内容，但不要对正文中的词汇使用加粗
 5. 保持内容专业、准确、结构清晰`,
   enableThinking: false,
+  proxyUrl: '',
+  connectTimeoutSecs: 0,
+  requestTimeoutSecs: 0,
+  maxContextMessages: 0,
+  maxContextTokens: 0,
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {

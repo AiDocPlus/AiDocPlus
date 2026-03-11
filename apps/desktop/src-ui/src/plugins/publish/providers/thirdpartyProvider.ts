@@ -1,6 +1,7 @@
 import type { PluginHostAPI } from '../../_framework/PluginHostAPI';
 import type { ThirdPartyConfig, WechatApiProvider, DraftParams } from '../wechatApiProvider';
 import { wechatHttpRequest, checkWxError } from '../wechatApiProvider';
+import { formatBackendError } from '@/lib/backendError';
 
 function apiHeaders(config: ThirdPartyConfig): Record<string, string> {
   return { 'X-Auth-Token': config.authToken };
@@ -90,7 +91,7 @@ export function createThirdPartyProvider(host: PluginHostAPI, config: ThirdParty
         const result = await this.getAccessToken();
         return { ok: true, msg: `第三方服务连接成功，token 有效期 ${Math.floor(result.expiresIn / 60)} 分钟` };
       } catch (err) {
-        return { ok: false, msg: err instanceof Error ? err.message : String(err) };
+        return { ok: false, msg: formatBackendError(err) };
       }
     },
   };

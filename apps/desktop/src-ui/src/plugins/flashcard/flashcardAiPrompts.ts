@@ -1,5 +1,6 @@
 import { generateCardId } from './types';
 import type { Flashcard } from './types';
+import { formatBackendError } from '@/lib/backendError';
 
 /**
  * 构造闪卡生成的 system prompt
@@ -105,7 +106,7 @@ export function parseFlashcardsFromAiResponse(text: string): Flashcard[] | null 
         mastered: false,
       }));
     } catch (e) {
-      console.warn('[Flashcard] 解析候选失败:', e instanceof Error ? e.message : e);
+      console.warn('[Flashcard] 解析候选失败:', formatBackendError(e));
     }
   }
 

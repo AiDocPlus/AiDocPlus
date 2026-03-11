@@ -29,6 +29,39 @@ export default defineConfig({
         main: path.resolve(__dirname, 'index.html'),
         manager: path.resolve(__dirname, 'manager.html'),
       },
+      output: {
+        manualChunks(id) {
+          // CodeMirror 编辑器核心 + 语法高亮（约 2-3 MB）
+          if (id.includes('@codemirror/') || id.includes('@lezer/')) {
+            return 'vendor-codemirror';
+          }
+          // Markdown 渲染管线（react-markdown + remark + rehype + unified）
+          if (
+            id.includes('react-markdown') ||
+            id.includes('remark-') ||
+            id.includes('rehype-') ||
+            id.includes('unified') ||
+            id.includes('mdast-') ||
+            id.includes('hast-') ||
+            id.includes('micromark') ||
+            id.includes('unist-')
+          ) {
+            return 'vendor-markdown';
+          }
+          // 图标库
+          if (id.includes('lucide-react')) {
+            return 'vendor-icons';
+          }
+          // React 核心
+          if (
+            id.includes('node_modules/react/') ||
+            id.includes('node_modules/react-dom/') ||
+            id.includes('node_modules/scheduler/')
+          ) {
+            return 'vendor-react';
+          }
+        },
+      },
     },
   },
 })
