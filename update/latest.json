@@ -1,0 +1,19 @@
+{
+  "version": "0.3.7",
+  "notes": "v0.3.7: 重构编辑器工具栏、优化AI侧边栏布局、编程区修复、多项改进",
+  "pub_date": "2026-03-13T14:07:46.159Z",
+  "platforms": {
+    "darwin-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUldSdHVyTEcxOEFmRXFJZVBONFpQWlc0dHZGazM3aE1ObVd3QlhOSlFQOWlaZ1JmeFB0VDVJTEFsZkNmenFzOFRjTlJXSkRmakJCR05DM1ozUFZVNGl6SGd1cHlpUitsQmdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczNDA5OTk5CWZpbGU6QWlEb2NQbHVzLmFwcC50YXIuZ3oKWWtQK0xWV0xsVTByeE9vTVVCMUs1T3ZRUkg0ZFh4S1VtM3N0L3BGZXM0VWcwMkVSZWdaZDR1OTZXSnA3UW5qbUhaT2lKKzZLa0pmN3VSR1I2YXc1Q3c9PQo=",
+      "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.7/AiDocPlus.app.tar.gz"
+    },
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRWdrN3BCejhPeU1RYURkenp0WVZ3NGV1cUZkSHRnbjhPWjVsZ1I4b0JLcGNUSWRTSTNSV2c2QzdpempoNTZDZGZUcVNCQUNra0s3UlZFYUJBeEJJWGdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczNDEwODY0CWZpbGU6QWlEb2NQbHVzXzAuMy43X3g2NC1zZXR1cC5leGUKaEhYMFFiL095YVBHb3BzWGpEbk9WUjZ0UURjTFpjM0ZXSlZuREp5dHV4NWpYSm15blVEVlFKMlVzZjJ2bmU5N1RacVFzaDVvZjBNMGtiN1ZqbjJLQ1E9PQo=",
+      "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.7/AiDocPlus_0.3.7_x64-setup.exe"
+    },
+    "windows-x86_64-nsis": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRWdrN3BCejhPeU1RYURkenp0WVZ3NGV1cUZkSHRnbjhPWjVsZ1I4b0JLcGNUSWRTSTNSV2c2QzdpempoNTZDZGZUcVNCQUNra0s3UlZFYUJBeEJJWGdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczNDEwODY0CWZpbGU6QWlEb2NQbHVzXzAuMy43X3g2NC1zZXR1cC5leGUKaEhYMFFiL095YVBHb3BzWGpEbk9WUjZ0UURjTFpjM0ZXSlZuREp5dHV4NWpYSm15blVEVlFKMlVzZjJ2bmU5N1RacVFzaDVvZjBNMGtiN1ZqbjJLQ1E9PQo=",
+      "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.7/AiDocPlus_0.3.7_x64-setup.exe"
+    }
+  }
+}
