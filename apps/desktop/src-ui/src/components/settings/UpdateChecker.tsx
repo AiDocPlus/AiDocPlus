@@ -110,7 +110,7 @@ export function UpdateChecker() {
 
   return (
     <div className="fixed bottom-4 right-4 z-50 max-w-sm">
-      <div className="bg-card border border-border rounded-lg shadow-lg p-4 space-y-3">
+      <div className="update-banner border border-border rounded-lg shadow-lg p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
             {status === 'checking' && <RefreshCw className="w-5 h-5 text-primary shrink-0 animate-spin" />}

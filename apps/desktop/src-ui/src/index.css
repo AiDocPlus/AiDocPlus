@@ -356,6 +356,15 @@ div[role="dialog"] {
   max-width: 100%;
 }
 
+/* 更新进度窗口 — 强制不透明背景 */
+.update-banner {
+  opacity: 1 !important;
+  background-color: hsl(var(--card)) !important;
+  color: hsl(var(--card-foreground)) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
 /* 隐藏滚动条但保留滚动功能 */
 .scrollbar-hide {
   -ms-overflow-style: none;
