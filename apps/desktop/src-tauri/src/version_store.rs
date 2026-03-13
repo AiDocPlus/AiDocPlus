@@ -1,7 +1,7 @@
 use rusqlite::params;
 use crate::database::Database;
 use crate::document::DocumentVersion;
-use crate::error::{AppError, Result};
+use crate::error::{AppError, Result, ResultExt};
 
 /// 版本数量限制，防止存储耗尽
 const MAX_VERSIONS: usize = 1000;
@@ -26,7 +26,7 @@ pub fn insert_version(db: &Database, project_id: &str, version: &DocumentVersion
             version.enabled_plugins.as_ref().map(|v| serde_json::to_string(v).unwrap_or_default()),
             version.composed_content,
         ],
-    ).map_err(|e| AppError::Internal(format!("插入版本失败: {}", e)))?;
+    ).context("插入版本失败")?;
 
     // 版本数量限制：删除最旧的超限版本
     enforce_max_versions(&conn, &version.document_id)?;
@@ -40,11 +40,11 @@ pub fn list_versions(db: &Database, document_id: &str) -> Result<Vec<DocumentVer
     let mut stmt = conn.prepare(
         "SELECT id, document_id, content, author_notes, ai_generated_content, created_at, created_by, change_description, plugin_data, enabled_plugins, composed_content
          FROM versions WHERE document_id = ?1 ORDER BY created_at ASC"
-    ).map_err(|e| AppError::Internal(format!("查询版本失败: {}", e)))?;
+    ).context("查询版本失败")?;
 
     let versions = stmt.query_map(params![document_id], |row| {
         Ok(row_to_version(row))
-    }).map_err(|e| AppError::Internal(format!("查询版本失败: {}", e)))?
+    }).context("查询版本失败")?
     .filter_map(|r| r.ok())
     .collect();
 
@@ -68,19 +68,20 @@ pub fn delete_version(db: &Database, document_id: &str, version_id: &str) -> Res
     let affected = conn.execute(
         "DELETE FROM versions WHERE document_id = ?1 AND id = ?2",
         params![document_id, version_id],
-    ).map_err(|e| AppError::Internal(format!("删除版本失败: {}", e)))?;
+    ).context("删除版本失败")?;
 
     Ok(affected > 0)
 }
 
 /// 统计某文档的版本数量
+#[allow(dead_code)]
 pub fn count_versions(db: &Database, document_id: &str) -> Result<usize> {
     let conn = db.versions();
     let count: i64 = conn.query_row(
         "SELECT COUNT(*) FROM versions WHERE document_id = ?1",
         params![document_id],
         |row| row.get(0),
-    ).map_err(|e| AppError::Internal(format!("统计版本失败: {}", e)))?;
+    ).context("统计版本失败")?;
 
     Ok(count as usize)
 }
@@ -91,7 +92,7 @@ pub fn delete_all_versions(db: &Database, document_id: &str) -> Result<()> {
     conn.execute(
         "DELETE FROM versions WHERE document_id = ?1",
         params![document_id],
-    ).map_err(|e| AppError::Internal(format!("删除文档版本失败: {}", e)))?;
+    ).context("删除文档版本失败")?;
 
     Ok(())
 }
@@ -103,7 +104,7 @@ pub fn bulk_insert_versions(db: &Database, project_id: &str, versions: &[Documen
 
     // 使用事务提高批量插入性能
     conn.execute_batch("BEGIN TRANSACTION")
-        .map_err(|e| AppError::Internal(format!("开启事务失败: {}", e)))?;
+        .context("开启事务失败")?;
 
     for v in versions {
         let result = conn.execute(
@@ -131,7 +132,7 @@ pub fn bulk_insert_versions(db: &Database, project_id: &str, versions: &[Documen
     }
 
     conn.execute_batch("COMMIT")
-        .map_err(|e| AppError::Internal(format!("提交事务失败: {}", e)))?;
+        .context("提交事务失败")?;
 
     Ok(count)
 }
@@ -143,7 +144,7 @@ pub fn is_empty(db: &Database) -> Result<bool> {
         "SELECT COUNT(*) FROM versions",
         [],
         |row| row.get(0),
-    ).map_err(|e| AppError::Internal(format!("查询版本数失败: {}", e)))?;
+    ).context("查询版本数失败")?;
 
     Ok(count == 0)
 }
@@ -174,7 +175,7 @@ fn enforce_max_versions(conn: &rusqlite::Connection, document_id: &str) -> Resul
         "SELECT COUNT(*) FROM versions WHERE document_id = ?1",
         params![document_id],
         |row| row.get(0),
-    ).map_err(|e| AppError::Internal(format!("统计版本失败: {}", e)))?;
+    ).context("统计版本失败")?;
 
     if count as usize > MAX_VERSIONS {
         let excess = count as usize - MAX_VERSIONS;
@@ -184,7 +185,7 @@ fn enforce_max_versions(conn: &rusqlite::Connection, document_id: &str) -> Resul
                 ORDER BY created_at ASC LIMIT ?2
             )",
             params![document_id, excess],
-        ).map_err(|e| AppError::Internal(format!("清理超限版本失败: {}", e)))?;
+        ).context("清理超限版本失败")?;
     }
 
     Ok(())

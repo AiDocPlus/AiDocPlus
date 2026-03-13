@@ -10,6 +10,7 @@ import type { DocumentPlugin } from '@/plugins/types';
 const ChatPanel = lazy(() => import('../chat/ChatPanel').then(m => ({ default: m.ChatPanel })));
 const PluginAssistantPanel = lazy(() => import('@/plugins/_framework/PluginAssistantPanel').then(m => ({ default: m.PluginAssistantPanel })));
 import { PluginHostContext, ThinkingContext, createPluginHostAPI, type CreatePluginHostAPIOptions } from '@/plugins/_framework/PluginHostAPI';
+import { wrapWithSandbox } from '@/plugins/_framework/PluginSandbox';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { logRender } from '@/lib/perfLog';
 
@@ -296,7 +297,14 @@ function PluginAssistantWrapper({
         },
       };
     }
-    return createPluginHostAPI(opts);
+    const rawApi = createPluginHostAPI(opts);
+    // 从 manifest 获取信任等级，应用沙箱包装
+    const manifest = useAppStore.getState().pluginManifests.find(m => m.id === plugin.id);
+    return wrapWithSandbox(rawApi, {
+      pluginId: plugin.id,
+      trustLevel: manifest?.trustLevel ?? 'builtin',
+      declaredPermissions: manifest?.sandboxPermissions,
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plugin.id, plugin.i18nNamespace, plugin.majorCategory, tabId, updatePluginData, markTabAsDirty, saveDocument]);
 

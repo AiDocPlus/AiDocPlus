@@ -4,7 +4,6 @@ import { invoke } from '@tauri-apps/api/core';
 import { MainLayout } from './components/layout/MainLayout';
 import { useSettingsStore } from './stores/useSettingsStore';
 import { useWorkspaceAutosave } from './hooks/useWorkspaceAutosave';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { UpdateChecker } from './components/settings/UpdateChecker';
 import './i18n'; // Initialize i18n
 import {
@@ -19,14 +18,6 @@ import {
 } from './App.helpers';
 import { loadConversationsFromDB } from './stores/useConversationsStore';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
-});
 
 function AppContent() {
   const { t } = useTranslation();
@@ -108,11 +99,7 @@ function AppContent() {
 }
 
 function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <AppContent />
-    </QueryClientProvider>
-  );
+  return <AppContent />;
 }
 
 export default App;

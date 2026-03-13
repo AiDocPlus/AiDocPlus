@@ -1,6 +1,6 @@
 use rusqlite::params;
 use crate::database::Database;
-use crate::error::{AppError, Result};
+use crate::error::{Result, ResultExt};
 
 /// 更新文档的搜索索引（创建/修改文档时调用）
 pub fn upsert_document_index(
@@ -17,13 +17,13 @@ pub fn upsert_document_index(
     conn.execute(
         "DELETE FROM search_index WHERE document_id = ?1",
         params![document_id],
-    ).map_err(|e| AppError::Internal(format!("删除旧索引失败: {}", e)))?;
+    ).context("删除旧索引失败")?;
 
     conn.execute(
         "INSERT INTO search_index (document_id, project_id, title, content, author_notes)
          VALUES (?1, ?2, ?3, ?4, ?5)",
         params![document_id, project_id, title, content, author_notes],
-    ).map_err(|e| AppError::Internal(format!("更新搜索索引失败: {}", e)))?;
+    ).context("更新搜索索引失败")?;
 
     Ok(())
 }
@@ -34,12 +34,13 @@ pub fn remove_document_index(db: &Database, document_id: &str) -> Result<()> {
     conn.execute(
         "DELETE FROM search_index WHERE document_id = ?1",
         params![document_id],
-    ).map_err(|e| AppError::Internal(format!("删除搜索索引失败: {}", e)))?;
+    ).context("删除搜索索引失败")?;
 
     Ok(())
 }
 
 /// FTS5 全文搜索结果
+#[allow(dead_code)]
 pub struct FtsSearchResult {
     pub document_id: String,
     pub project_id: String,
@@ -68,7 +69,7 @@ pub fn fts_search(
          WHERE search_index MATCH ?1 AND project_id = ?2
          ORDER BY rank
          LIMIT ?3"
-    ).map_err(|e| AppError::Internal(format!("准备 FTS 查询失败: {}", e)))?;
+    ).context("准备 FTS 查询失败")?;
 
     let results = stmt.query_map(
         params![fts_query, project_id, limit as i64],
@@ -81,7 +82,7 @@ pub fn fts_search(
                 rank: row.get(4)?,
             })
         },
-    ).map_err(|e| AppError::Internal(format!("FTS 查询失败: {}", e)))?
+    ).context("FTS 查询失败")?
     .filter_map(|r| r.ok())
     .collect();
 
@@ -95,7 +96,7 @@ pub fn is_empty(db: &Database) -> Result<bool> {
         "SELECT COUNT(*) FROM search_index",
         [],
         |row| row.get(0),
-    ).map_err(|e| AppError::Internal(format!("查询索引数失败: {}", e)))?;
+    ).context("查询索引数失败")?;
 
     Ok(count == 0)
 }
@@ -106,7 +107,7 @@ pub fn rebuild_index(db: &Database, projects_dir: &std::path::Path) -> Result<us
 
     // 清空旧索引
     conn.execute("DELETE FROM search_index", [])
-        .map_err(|e| AppError::Internal(format!("清空索引失败: {}", e)))?;
+        .context("清空索引失败")?;
 
     if !projects_dir.exists() {
         return Ok(0);
@@ -114,7 +115,7 @@ pub fn rebuild_index(db: &Database, projects_dir: &std::path::Path) -> Result<us
 
     let mut count = 0usize;
     let project_entries = std::fs::read_dir(projects_dir)
-        .map_err(|e| AppError::Internal(format!("读取项目目录失败: {}", e)))?;
+        .context("读取项目目录失败")?;
 
     for entry in project_entries.flatten() {
         let path = entry.path();

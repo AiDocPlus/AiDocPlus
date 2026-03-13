@@ -41,6 +41,7 @@ class AiDocPlusClient:
     """AiDocPlus API 客户端"""
 
     def __init__(self, port: int, token: str, caller_level: str = "script"):
+        self._port = port
         self._base_url = f"http://127.0.0.1:{port}"
         self._token = token
         self._caller_level = caller_level
@@ -64,6 +65,8 @@ class AiDocPlusClient:
         """
         调用 API 方法
 
+        收到 401 时自动刷新 Token（从 api.json 重新读取）并重试一次。
+
         Args:
             method: 方法名，如 "document.list"
             params: 参数字典
@@ -75,6 +78,17 @@ class AiDocPlusClient:
             ApiError: 当 API 返回错误时
             ConnectionError: 当无法连接到 AiDocPlus 时
         """
+        try:
+            return self._do_call(method, params)
+        except ApiError as e:
+            if e.code == 401:
+                # Token 过期，尝试刷新后重试
+                if self._refresh_token():
+                    return self._do_call(method, params)
+            raise
+
+    def _do_call(self, method: str, params: Optional[Dict[str, Any]] = None) -> Any:
+        """执行单次 API 调用（内部方法）"""
         self._req_counter += 1
         req_id = f"py_{self._req_counter}"
 
@@ -108,7 +122,7 @@ class AiDocPlusClient:
                 raise ApiError(e.code, f"HTTP {e.code}: {e.reason}")
         except urllib.error.URLError as e:
             raise ConnectionError(
-                f"无法连接到 AiDocPlus (127.0.0.1:{self._base_url.split(':')[-1]}): {e.reason}"
+                f"无法连接到 AiDocPlus (127.0.0.1:{self._port}): {e.reason}"
             )
 
         if "error" in body and body["error"]:
@@ -116,6 +130,55 @@ class AiDocPlusClient:
             raise ApiError(err.get("code", 500), err.get("message", "未知错误"))
 
         return body.get("result")
+
+    def _refresh_token(self) -> bool:
+        """
+        尝试刷新 Token：先调用 /api/v1/refresh，失败则重新读取 api.json。
+        返回 True 表示 Token 已更新。
+        """
+        # 方式 1：调用 refresh 端点（用旧 Token 在宽限期内换取新 Token）
+        try:
+            refresh_req = urllib.request.Request(
+                f"{self._base_url}/api/v1/refresh",
+                headers={"Authorization": f"Bearer {self._token}"},
+            )
+            with urllib.request.urlopen(refresh_req, timeout=5) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                if "token" in data:
+                    self._token = data["token"]
+                    return True
+        except Exception:
+            pass
+
+        # 方式 2：重新读取 api.json
+        api_info = _read_api_json()
+        if api_info and api_info.get("token") and api_info["token"] != self._token:
+            self._token = api_info["token"]
+            # 端口可能也变了（虽然一般不会）
+            new_port = api_info.get("port", self._port)
+            if new_port != self._port:
+                self._port = new_port
+                self._base_url = f"http://127.0.0.1:{new_port}"
+            return True
+
+        return False
+
+    def refresh_token(self) -> Dict[str, Any]:
+        """
+        手动刷新 Token，返回 {"token": ..., "expiresIn": ...}。
+        """
+        req = urllib.request.Request(
+            f"{self._base_url}/api/v1/refresh",
+            headers={"Authorization": f"Bearer {self._token}"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                if "token" in data:
+                    self._token = data["token"]
+                return data
+        except urllib.error.HTTPError as e:
+            raise ApiError(e.code, f"Token 刷新失败: HTTP {e.code}")
 
     def status(self) -> Dict[str, Any]:
         """获取 AiDocPlus 运行状态（无需认证）"""

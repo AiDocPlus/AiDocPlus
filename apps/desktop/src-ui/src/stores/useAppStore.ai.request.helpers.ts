@@ -6,6 +6,18 @@ export interface ChatContextInfo {
   content: string;
 }
 
+/** sendChatMessage 的选项参数（将原7+参数收敛为对象） */
+export interface ChatMessageOptions {
+  tabId: string;
+  content: string;
+  enableWebSearch?: boolean;
+  contextInfo?: ChatContextInfo;
+  enableTools?: boolean;
+  enableThinking?: boolean;
+  planMode?: boolean;
+  images?: import('@aidocplus/shared-types').ChatImage[];
+}
+
 export interface AiSettingsPromptInput {
   systemPrompt?: string;
   markdownMode?: boolean;

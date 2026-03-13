@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 pub const MAX_DOCUMENT_SIZE: usize = 20 * 1024 * 1024;
 
 /// 单个项目最大文件数
+#[allow(dead_code)]
 pub const MAX_PROJECT_FILES: usize = 500;
 
 /// 文件名最大长度
@@ -77,20 +78,21 @@ pub fn validate_content_size(content: &str) -> crate::error::Result<()> {
 // ── 路径安全 ──
 
 /// 校验路径是否在允许的根目录下（防止路径遍历）
+#[allow(dead_code)]
 pub fn validate_path_under_root(path: &Path, root: &Path) -> crate::error::Result<PathBuf> {
-    use crate::error::AppError;
+    use crate::error::{AppError, ResultExt};
     // 先规范化
     let canonical = if path.exists() {
         path.canonicalize()
-            .map_err(|e| AppError::SecurityError(format!("路径无效: {}", e)))?
+            .context_as("路径无效", AppError::SecurityError)?
     } else if let Some(parent) = path.parent() {
         // 文件尚不存在，校验父目录
         if !parent.exists() {
             std::fs::create_dir_all(parent)
-                .map_err(|e| AppError::Internal(format!("创建目录失败: {}", e)))?;
+                .context("创建目录失败")?;
         }
         let canonical_parent = parent.canonicalize()
-            .map_err(|e| AppError::SecurityError(format!("父目录无效: {}", e)))?;
+            .context_as("父目录无效", AppError::SecurityError)?;
         canonical_parent.join(path.file_name().unwrap_or_default())
     } else {
         return Err(AppError::SecurityError("路径无效".to_string()));
@@ -129,5 +131,163 @@ pub fn sanitize_filename(name: &str) -> String {
         "untitled".to_string()
     } else {
         truncated
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── validate_id ──
+
+    #[test]
+    fn valid_uuid_id() {
+        assert!(validate_id("550e8400-e29b-41d4-a716-446655440000", "id").is_ok());
+    }
+
+    #[test]
+    fn valid_alphanumeric_id() {
+        assert!(validate_id("my_project-123", "id").is_ok());
+    }
+
+    #[test]
+    fn empty_id_rejected() {
+        let err = validate_id("", "testId").unwrap_err();
+        assert!(err.to_string().contains("不能为空"));
+    }
+
+    #[test]
+    fn id_too_long_rejected() {
+        let long_id = "a".repeat(129);
+        let err = validate_id(&long_id, "testId").unwrap_err();
+        assert!(err.to_string().contains("过长"));
+    }
+
+    #[test]
+    fn id_max_length_ok() {
+        let max_id = "a".repeat(128);
+        assert!(validate_id(&max_id, "testId").is_ok());
+    }
+
+    #[test]
+    fn id_with_path_traversal_rejected() {
+        assert!(validate_id("../etc/passwd", "id").is_err());
+        assert!(validate_id("foo/bar", "id").is_err());
+    }
+
+    #[test]
+    fn id_starting_with_dot_rejected() {
+        assert!(validate_id(".hidden", "id").is_err());
+        assert!(validate_id("..double", "id").is_err());
+    }
+
+    #[test]
+    fn id_with_special_chars_rejected() {
+        assert!(validate_id("hello world", "id").is_err());
+        assert!(validate_id("id@name", "id").is_err());
+        assert!(validate_id("id#1", "id").is_err());
+    }
+
+    // ── validate_title ──
+
+    #[test]
+    fn valid_title() {
+        let result = validate_title("我的文档").unwrap();
+        assert_eq!(result, "我的文档");
+    }
+
+    #[test]
+    fn title_trimmed() {
+        let result = validate_title("  hello  ").unwrap();
+        assert_eq!(result, "hello");
+    }
+
+    #[test]
+    fn empty_title_rejected() {
+        assert!(validate_title("").is_err());
+        assert!(validate_title("   ").is_err());
+    }
+
+    #[test]
+    fn title_too_long_rejected() {
+        let long_title = "a".repeat(MAX_TITLE_LENGTH + 1);
+        assert!(validate_title(&long_title).is_err());
+    }
+
+    #[test]
+    fn title_max_length_ok() {
+        let max_title = "a".repeat(MAX_TITLE_LENGTH);
+        assert!(validate_title(&max_title).is_ok());
+    }
+
+    #[test]
+    fn title_with_path_separator_rejected() {
+        assert!(validate_title("foo/bar").is_err());
+        assert!(validate_title("foo\\bar").is_err());
+        assert!(validate_title("foo\0bar").is_err());
+    }
+
+    // ── validate_content_size ──
+
+    #[test]
+    fn content_within_limit_ok() {
+        assert!(validate_content_size("hello world").is_ok());
+    }
+
+    #[test]
+    fn empty_content_ok() {
+        assert!(validate_content_size("").is_ok());
+    }
+
+    #[test]
+    fn content_at_limit_ok() {
+        let content = "a".repeat(MAX_DOCUMENT_SIZE);
+        assert!(validate_content_size(&content).is_ok());
+    }
+
+    #[test]
+    fn content_over_limit_rejected() {
+        let content = "a".repeat(MAX_DOCUMENT_SIZE + 1);
+        assert!(validate_content_size(&content).is_err());
+    }
+
+    // ── sanitize_filename ──
+
+    #[test]
+    fn clean_filename_unchanged() {
+        assert_eq!(sanitize_filename("hello.txt"), "hello.txt");
+    }
+
+    #[test]
+    fn dangerous_chars_replaced() {
+        assert_eq!(sanitize_filename("a/b\\c:d*e?f\"g<h>i|j"), "a_b_c_d_e_f_g_h_i_j");
+    }
+
+    #[test]
+    fn null_char_replaced() {
+        assert_eq!(sanitize_filename("foo\0bar"), "foo_bar");
+    }
+
+    #[test]
+    fn dot_prefix_escaped() {
+        assert_eq!(sanitize_filename(".hidden"), "_.hidden");
+        assert_eq!(sanitize_filename("..double"), "_..double");
+    }
+
+    #[test]
+    fn empty_name_becomes_untitled() {
+        assert_eq!(sanitize_filename(""), "untitled");
+    }
+
+    #[test]
+    fn long_name_truncated() {
+        let long_name = "a".repeat(300);
+        let result = sanitize_filename(&long_name);
+        assert_eq!(result.len(), MAX_FILENAME_LENGTH);
+    }
+
+    #[test]
+    fn unicode_filename_preserved() {
+        assert_eq!(sanitize_filename("我的文档.md"), "我的文档.md");
     }
 }

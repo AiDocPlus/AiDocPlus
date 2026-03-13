@@ -88,6 +88,7 @@ interface MarkdownEditorProps {
   importSources?: ImportSources;
   exportCallbacks?: import('./EditorToolbar').ExportCallbacks;
   initialViewMode?: 'edit' | 'preview' | 'split';
+  showStatusBar?: boolean;
 }
 
 // 创建一组 Compartment 实例（每个编辑器实例独立）
@@ -126,6 +127,7 @@ export function MarkdownEditor({
   importSources,
   exportCallbacks,
   initialViewMode,
+  showStatusBar = true,
 }: MarkdownEditorProps) {
   const editorDivRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -590,17 +592,19 @@ export function MarkdownEditor({
         )}
       </div>
 
-      <EditorStatusBar
-        lines={lineCount}
-        words={wordCount}
-        chars={characterCount}
-        cursorLine={cursorInfo.line}
-        cursorCol={cursorInfo.col}
-        selectionChars={cursorInfo.selChars}
-        isLargeDoc={isLargeDoc}
-        breadcrumb={breadcrumb}
-        onBreadcrumbClick={handleBreadcrumbClick}
-      />
+      {showStatusBar && (
+        <EditorStatusBar
+          lines={lineCount}
+          words={wordCount}
+          chars={characterCount}
+          cursorLine={cursorInfo.line}
+          cursorCol={cursorInfo.col}
+          selectionChars={cursorInfo.selChars}
+          isLargeDoc={isLargeDoc}
+          breadcrumb={breadcrumb}
+          onBreadcrumbClick={handleBreadcrumbClick}
+        />
+      )}
     </div>
   );
 }

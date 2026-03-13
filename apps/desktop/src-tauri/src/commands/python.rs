@@ -217,14 +217,6 @@ fn discover_pythons_sync() -> Vec<PythonInterpreter> {
                 "/Library/Frameworks/Python.framework/Versions/Current/bin/python3",
             ]
         }
-        #[cfg(target_os = "linux")]
-        {
-            vec![
-                "/usr/bin/python3",
-                "/usr/local/bin/python3",
-                "/usr/bin/python",
-            ]
-        }
         #[cfg(target_os = "windows")]
         { vec![] }
     };
@@ -346,7 +338,7 @@ pub fn run_python_script(
     #[allow(non_snake_case)]
     customPythonPath: Option<String>,
 ) -> crate::error::Result<PythonRunResult> {
-    use crate::error::AppError;
+    use crate::error::{AppError, ResultExt};
     let start = Instant::now();
     let timeout = Duration::from_secs(timeoutSecs.unwrap_or(30));
 
@@ -357,7 +349,7 @@ pub fn run_python_script(
     // 准备临时目录
     let temp_dir = std::env::temp_dir().join("aidocplus_python");
     std::fs::create_dir_all(&temp_dir)
-        .map_err(|e| AppError::Internal(format!("创建临时目录失败: {}", e)))?;
+        .context("创建临时目录失败")?;
 
     // 确定脚本路径
     let (script_file, is_temp_script) = if let Some(ref path) = scriptPath {
@@ -371,7 +363,7 @@ pub fn run_python_script(
         // 内联代码模式：写入临时文件
         let tmp = temp_dir.join("_aidocplus_inline.py");
         std::fs::write(&tmp, code_str)
-            .map_err(|e| AppError::Internal(format!("写入临时脚本失败: {}", e)))?;
+            .context("写入临时脚本失败")?;
         (tmp, true)
     } else {
         return Err(AppError::ValidationError("必须提供 scriptPath 或 code 参数".to_string()));
@@ -381,7 +373,7 @@ pub fn run_python_script(
     let input_file = if let Some(ref content) = inputContent {
         let input_path = temp_dir.join("_aidocplus_input.md");
         std::fs::write(&input_path, content)
-            .map_err(|e| AppError::Internal(format!("写入输入文件失败: {}", e)))?;
+            .context("写入输入文件失败")?;
         Some(input_path)
     } else {
         None

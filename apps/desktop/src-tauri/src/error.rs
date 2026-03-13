@@ -122,5 +122,183 @@ impl From<&str> for AppError {
     }
 }
 
+/// rusqlite 错误 → Internal（消除数据库操作中大量 map_err 样板）
+impl From<rusqlite::Error> for AppError {
+    fn from(e: rusqlite::Error) -> Self {
+        AppError::Internal(e.to_string())
+    }
+}
+
+/// reqwest 错误 → Internal（消除 HTTP 请求中大量 map_err 样板）
+impl From<reqwest::Error> for AppError {
+    fn from(e: reqwest::Error) -> Self {
+        AppError::Internal(e.to_string())
+    }
+}
+
+/// Mutex PoisonError → Internal（消除锁操作中的 map_err 样板）
+impl<T> From<std::sync::PoisonError<T>> for AppError {
+    fn from(e: std::sync::PoisonError<T>) -> Self {
+        AppError::Internal(e.to_string())
+    }
+}
+
+/// 为 Result 添加 `.context("描述")` / `.context_with(|| format!(...))` 方法，
+/// 自动将底层错误附加上下文信息，替代 `.map_err(|e| AppError::Internal(format!(...)))` 样板
+///
+/// 用法：
+/// - `conn.execute(...).context("插入版本失败")?;`
+/// - `fs::copy(&src, &dst).context_with(|| format!("复制文件失败 {:?}", name))?;`
+/// - `conn.open(path).context_as("打开数据库失败", AppError::ResourceError)?;`
+pub trait ResultExt<T> {
+    fn context(self, msg: &str) -> Result<T>;
+    fn context_with<F: FnOnce() -> String>(self, f: F) -> Result<T>;
+    fn context_as<F: FnOnce(String) -> AppError>(self, msg: &str, wrap: F) -> Result<T>;
+}
+
+impl<T, E: std::fmt::Display> ResultExt<T> for std::result::Result<T, E> {
+    fn context(self, msg: &str) -> Result<T> {
+        self.map_err(|e| AppError::Internal(format!("{}: {}", msg, e)))
+    }
+
+    fn context_with<F: FnOnce() -> String>(self, f: F) -> Result<T> {
+        self.map_err(|e| AppError::Internal(format!("{}: {}", f(), e)))
+    }
+
+    fn context_as<W: FnOnce(String) -> AppError>(self, msg: &str, wrap: W) -> Result<T> {
+        self.map_err(|e| wrap(format!("{}: {}", msg, e)))
+    }
+}
+
 /// 统一 Result 类型：所有 Tauri 命令使用此类型
 pub type Result<T> = std::result::Result<T, AppError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── 错误码映射 ──
+
+    #[test]
+    fn io_error_code() {
+        let err = AppError::Io(std::io::Error::new(std::io::ErrorKind::NotFound, "gone"));
+        assert!(matches!(err.code(), ErrorCode::IoError));
+    }
+
+    #[test]
+    fn project_not_found_code() {
+        let err = AppError::ProjectNotFound("p1".into());
+        assert!(matches!(err.code(), ErrorCode::ProjectNotFound));
+    }
+
+    #[test]
+    fn document_not_found_code() {
+        let err = AppError::DocumentNotFound("d1".into());
+        assert!(matches!(err.code(), ErrorCode::DocumentNotFound));
+    }
+
+    #[test]
+    fn validation_error_code() {
+        let err = AppError::ValidationError("bad".into());
+        assert!(matches!(err.code(), ErrorCode::ValidationError));
+    }
+
+    #[test]
+    fn ai_error_code() {
+        let err = AppError::AiError("timeout".into());
+        assert!(matches!(err.code(), ErrorCode::AiError));
+    }
+
+    #[test]
+    fn security_error_code() {
+        let err = AppError::SecurityError("path traversal".into());
+        assert!(matches!(err.code(), ErrorCode::SecurityError));
+    }
+
+    #[test]
+    fn internal_error_code() {
+        let err = AppError::Internal("oops".into());
+        assert!(matches!(err.code(), ErrorCode::Internal));
+    }
+
+    // ── JSON 序列化 ──
+
+    #[test]
+    fn serialize_has_code_and_message() {
+        let err = AppError::DocumentNotFound("文档未找到: doc_123".into());
+        let json = serde_json::to_value(&err).unwrap();
+        assert_eq!(json["code"], "DocumentNotFound");
+        assert_eq!(json["message"], "文档未找到: doc_123");
+    }
+
+    #[test]
+    fn serialize_internal_error() {
+        let err = AppError::Internal("unexpected".into());
+        let json = serde_json::to_value(&err).unwrap();
+        assert_eq!(json["code"], "Internal");
+        assert_eq!(json["message"], "unexpected");
+    }
+
+    #[test]
+    fn serialize_ai_error() {
+        let err = AppError::AiError("API 超时".into());
+        let json = serde_json::to_value(&err).unwrap();
+        assert_eq!(json["code"], "AiError");
+        assert!(json["message"].as_str().unwrap().contains("超时"));
+    }
+
+    // ── From 转换 ──
+
+    #[test]
+    fn from_string() {
+        let err: AppError = String::from("test error").into();
+        assert!(matches!(err, AppError::Internal(_)));
+        assert_eq!(err.to_string(), "test error");
+    }
+
+    #[test]
+    fn from_str() {
+        let err: AppError = "str error".into();
+        assert!(matches!(err, AppError::Internal(_)));
+        assert_eq!(err.to_string(), "str error");
+    }
+
+    // ── ResultExt ──
+
+    #[test]
+    fn context_adds_prefix() {
+        let res: std::result::Result<(), std::io::Error> =
+            Err(std::io::Error::new(std::io::ErrorKind::NotFound, "gone"));
+        let err = res.context("读取文件失败").unwrap_err();
+        assert!(matches!(err, AppError::Internal(_)));
+        assert!(err.to_string().contains("读取文件失败"));
+        assert!(err.to_string().contains("gone"));
+    }
+
+    #[test]
+    fn context_with_supports_format() {
+        let name = "test.txt";
+        let res: std::result::Result<(), std::io::Error> =
+            Err(std::io::Error::new(std::io::ErrorKind::NotFound, "gone"));
+        let err = res.context_with(|| format!("复制文件失败 {:?}", name)).unwrap_err();
+        assert!(matches!(err, AppError::Internal(_)));
+        assert!(err.to_string().contains("test.txt"));
+    }
+
+    #[test]
+    fn context_as_maps_to_variant() {
+        let res: std::result::Result<(), std::io::Error> =
+            Err(std::io::Error::new(std::io::ErrorKind::NotFound, "gone"));
+        let err = res.context_as("导出失败", AppError::ExportFailed).unwrap_err();
+        assert!(matches!(err, AppError::ExportFailed(_)));
+        assert!(err.to_string().contains("导出失败"));
+    }
+
+    // ── Display ──
+
+    #[test]
+    fn display_preserves_message() {
+        let err = AppError::ExportFailed("导出 PDF 失败".into());
+        assert_eq!(format!("{}", err), "导出 PDF 失败");
+    }
+}

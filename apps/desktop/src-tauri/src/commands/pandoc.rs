@@ -98,18 +98,18 @@ pub fn pandoc_export(
     extraArgs: Option<Vec<String>>,
     title: Option<String>,
 ) -> crate::error::Result<String> {
-    use crate::error::AppError;
+    use crate::error::{AppError, ResultExt};
     // 确保输出目录存在
     if let Some(parent) = std::path::Path::new(&outputPath).parent() {
-        fs::create_dir_all(parent).map_err(|e| AppError::Internal(format!("创建输出目录失败: {}", e)))?;
+        fs::create_dir_all(parent).context("创建输出目录失败")?;
     }
 
     // 创建临时 Markdown 文件
     let temp_dir = std::env::temp_dir().join("aidocplus_pandoc");
-    fs::create_dir_all(&temp_dir).map_err(|e| AppError::Internal(format!("创建临时目录失败: {}", e)))?;
+    fs::create_dir_all(&temp_dir).context("创建临时目录失败")?;
 
     let temp_md = temp_dir.join("input.md");
-    fs::write(&temp_md, &markdown).map_err(|e| AppError::Internal(format!("写入临时文件失败: {}", e)))?;
+    fs::write(&temp_md, &markdown).context("写入临时文件失败")?;
 
     // 构建 pandoc 命令
     let mut cmd = Command::new("pandoc");

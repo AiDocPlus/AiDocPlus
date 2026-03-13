@@ -1178,11 +1178,11 @@ fn get_ai_config(
 /// 供资源管理器等外部工具读取，支持多服务切换
 #[tauri::command]
 pub fn export_ai_services(json: String) -> crate::error::Result<()> {
-    use crate::error::AppError;
+    use crate::error::{AppError, ResultExt};
     let home = dirs::home_dir().ok_or_else(|| AppError::Internal("无法获取用户主目录".to_string()))?;
     let config_dir = home.join(".aidocplus");
     std::fs::create_dir_all(&config_dir)
-        .map_err(|e| AppError::Internal(format!("创建配置目录失败: {}", e)))?;
+        .context("创建配置目录失败")?;
     crate::config::atomic_write(&config_dir.join("ai-services.json"), &json)?;
     Ok(())
 }

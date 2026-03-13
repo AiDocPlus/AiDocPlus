@@ -284,12 +284,14 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
       // Copy content to the new document
       if (doc.content || doc.authorNotes || doc.aiGeneratedContent) {
         await invoke('save_document', {
-          document: {
-            ...newDoc,
+          payload: {
+            documentId: newDoc.id,
+            projectId: newDoc.projectId,
+            title: newDoc.title,
             content: doc.content || '',
             authorNotes: doc.authorNotes || '',
             aiGeneratedContent: doc.aiGeneratedContent || '',
-          }
+          },
         });
         await loadDocuments(projectId);
       }
@@ -461,12 +463,14 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
         if (newDoc) {
           // We need to save the document with the imported content
           await invoke('save_document', {
-            documentId: newDoc.id,
-            projectId: currentProject.id,
-            title: title,
-            content: content,
-            authorNotes: '',
-            aiGeneratedContent: ''
+            payload: {
+              documentId: newDoc.id,
+              projectId: currentProject.id,
+              title: title,
+              content: content,
+              authorNotes: '',
+              aiGeneratedContent: '',
+            },
           });
           importedCount++;
         }

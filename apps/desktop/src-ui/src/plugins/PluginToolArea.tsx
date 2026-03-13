@@ -5,10 +5,11 @@ import { useShallow } from 'zustand/react/shallow';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useTranslation } from '@/i18n';
 import { Settings2, Maximize2, Minimize2, ChevronLeft, ChevronRight } from 'lucide-react';
-import type { Document } from '@aidocplus/shared-types';
+import type { Document, PluginTrustLevel, PluginSandboxPermissions } from '@aidocplus/shared-types';
 import { PluginManagerPanel } from './PluginManagerPanel';
 import { PluginHostContext, ThinkingContext, createPluginHostAPI } from './_framework/PluginHostAPI';
 import type { CreatePluginHostAPIOptions } from './_framework/PluginHostAPI';
+import { wrapWithSandbox } from './_framework/PluginSandbox';
 
 /**
  * 插件面板 ErrorBoundary：捕获 HMR 等场景下的渲染错误，避免白屏
@@ -58,6 +59,8 @@ function PluginHostProvider({
   handlePluginDataChange,
   handleRequestSave,
   activePlugin,
+  trustLevel,
+  sandboxPermissions,
   children,
 }: {
   pluginId: string;
@@ -69,6 +72,8 @@ function PluginHostProvider({
   handlePluginDataChange: (pluginId: string) => (data: unknown) => void;
   handleRequestSave: () => Promise<void>;
   activePlugin: { onActivate?: () => void; onDeactivate?: () => void; onDocumentChange?: () => void } | undefined;
+  trustLevel: PluginTrustLevel;
+  sandboxPermissions?: PluginSandboxPermissions;
   children: React.ReactNode;
 }) {
   const markTabAsDirty = useAppStore(s => s.markTabAsDirty);
@@ -123,8 +128,13 @@ function PluginHostProvider({
         requestSave: handleRequestSave,
       };
     }
-    return createPluginHostAPI(opts);
-  }, [pluginId, document, tabId, aiContent, isFunctional, i18nNamespace, handlePluginDataChange, handleRequestSave, showStatus, markTabAsDirty, setThinkingContent]);
+    const rawApi = createPluginHostAPI(opts);
+    return wrapWithSandbox(rawApi, {
+      pluginId,
+      trustLevel,
+      declaredPermissions: sandboxPermissions,
+    });
+  }, [pluginId, document, tabId, aiContent, isFunctional, i18nNamespace, handlePluginDataChange, handleRequestSave, showStatus, markTabAsDirty, setThinkingContent, trustLevel, sandboxPermissions]);
 
   return (
     <PluginHostContext.Provider value={hostAPI}>
@@ -426,6 +436,8 @@ export function PluginToolArea({ document, tabId, aiContent, isMaximized, onMaxi
               handlePluginDataChange={handlePluginDataChange}
               handleRequestSave={handleRequestSave}
               activePlugin={activePlugin}
+              trustLevel={pluginManifests.find(m => m.id === activePlugin.id)?.trustLevel ?? 'builtin'}
+              sandboxPermissions={pluginManifests.find(m => m.id === activePlugin.id)?.sandboxPermissions}
             >
               <React.Suspense fallback={<div className="h-full flex items-center justify-center text-muted-foreground text-sm">加载插件...</div>}>
                 <activePlugin.PanelComponent

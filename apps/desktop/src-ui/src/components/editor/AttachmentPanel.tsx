@@ -119,7 +119,7 @@ export function AttachmentPanel({ attachments, onAttachmentsChange }: Attachment
   return (
     <div className="border-t bg-background flex-shrink-0">
       {/* 标题栏 */}
-      <div className="w-full px-4 py-1.5 flex items-center justify-between hover:bg-accent/50 transition-colors">
+      <div className="w-full px-4 h-6 flex items-center justify-between hover:bg-accent/50 transition-colors">
         <span
           className="flex items-center gap-2 text-xs font-medium text-muted-foreground cursor-pointer select-none flex-1"
           onClick={() => setCollapsed(!collapsed)}

@@ -443,14 +443,14 @@ export const EditorPanel = memo(function EditorPanel({
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       {/* Toolbar（插件最大化时隐藏） */}
       {!pluginMaximized && (
-      <div className="flex items-center gap-1 px-2 py-1 border-b bg-background flex-shrink-0">
+      <div className="flex items-center gap-1 px-2 h-6 border-b bg-background flex-shrink-0">
         {/* ── 五区切换按钮（生成区/内容区/合并区/功能区/编程区） ── */}
         <Button
           variant={activeView === 'editor' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setActiveView('editor')}
           title={t('editor.contentArea', { defaultValue: '生成区' })}
-          className={`gap-1 h-7 text-xs ${
+          className={`gap-1 h-5 text-xs ${
             activeView === 'editor'
               ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
               : 'border-yellow-500 text-yellow-500 hover:bg-yellow-500/10 animate-editor-breathe'
@@ -469,7 +469,7 @@ export const EditorPanel = memo(function EditorPanel({
           size="sm"
           onClick={() => setActiveView('composer')}
           title={t('editor.composerArea', { defaultValue: '合并区' })}
-          className={`gap-1 h-7 text-xs ${
+          className={`gap-1 h-5 text-xs ${
             activeView === 'composer'
               ? 'bg-green-600 hover:bg-green-700 text-white'
               : 'border-green-500 text-green-500 hover:bg-green-500/10 animate-composer-breathe'
@@ -488,7 +488,7 @@ export const EditorPanel = memo(function EditorPanel({
           size="sm"
           onClick={() => setActiveView(activeView === 'coding' ? 'editor' : 'coding')}
           title={t('editor.codingArea', { defaultValue: '编程区' })}
-          className={`gap-1 h-7 text-xs ${
+          className={`gap-1 h-5 text-xs ${
             activeView === 'coding'
               ? 'bg-blue-600 hover:bg-blue-700 text-white'
               : 'border-blue-500 text-blue-500 hover:bg-blue-500/10'
@@ -504,7 +504,7 @@ export const EditorPanel = memo(function EditorPanel({
           <DropdownMenuTrigger asChild>
             <Button
               variant="outline"
-              className="h-7 px-1.5 gap-0.5"
+              className="h-5 px-1.5 gap-0.5"
               title={`${t('editor.newDocumentInProject', { defaultValue: '新建文档' })} (${mod}N)`}
             >
               <FilePlus className="h-3.5 w-3.5" />
@@ -525,7 +525,7 @@ export const EditorPanel = memo(function EditorPanel({
         <Button
           variant="outline"
           size="icon"
-          className="h-7 w-7"
+          className="h-5 w-5"
           onClick={() => tabId && closeTab(tabId, false)}
           title={`${t('tabs.closeTab', { defaultValue: '关闭当前文档' })} (${mod}W)`}
         >
@@ -534,7 +534,7 @@ export const EditorPanel = memo(function EditorPanel({
         <Button
           variant="outline"
           size="icon"
-          className="h-7 w-7"
+          className="h-5 w-5"
           onClick={() => closeAllTabs()}
           title={t('tabs.closeAllTabs', { defaultValue: '关闭全部文档' })}
         >
@@ -546,7 +546,7 @@ export const EditorPanel = memo(function EditorPanel({
         <Button
           variant={isSaving ? "secondary" : "outline"}
           size="icon"
-          className="h-7 w-7"
+          className="h-5 w-5"
           disabled={isSaving}
           onClick={handleSave}
           title={`${t('editor.saveCurrent', { defaultValue: '保存当前文档' })} (${mod}S)`}
@@ -556,7 +556,7 @@ export const EditorPanel = memo(function EditorPanel({
         <Button
           variant="outline"
           size="icon"
-          className="h-7 w-7"
+          className="h-5 w-5"
           disabled={isSaving}
           onClick={handleSaveAll}
           title={`${t('editor.saveAll', { defaultValue: '保存全部文档' })} (${mod}⇧S)`}
@@ -566,7 +566,7 @@ export const EditorPanel = memo(function EditorPanel({
         <Button
           variant="outline"
           size="icon"
-          className="h-7 w-7"
+          className="h-5 w-5"
           onClick={() => window.dispatchEvent(new CustomEvent('menu-save-as-template'))}
           title={t('editor.saveAsTemplate', { defaultValue: '存为模板' })}
         >
@@ -578,7 +578,7 @@ export const EditorPanel = memo(function EditorPanel({
         <Button
           variant="outline"
           size="icon"
-          className="h-7 w-7"
+          className="h-5 w-5"
           onClick={() => onLayoutModeChange(layoutMode === 'vertical' ? 'horizontal' : 'vertical')}
           title={`${layoutMode === 'vertical' ? t('editor.layoutHorizontal', { defaultValue: '切换为左右布局' }) : t('editor.layoutVertical', { defaultValue: '切换为上下布局' })} (${mod}L)`}
           disabled={false}
@@ -594,7 +594,7 @@ export const EditorPanel = memo(function EditorPanel({
             <Button
               variant="outline"
               size="icon"
-              className="h-7 w-7"
+              className="h-5 w-5"
               title={t('editor.versionHistory', { defaultValue: '版本历史' })}
             >
               <History className="h-3.5 w-3.5" />
@@ -620,7 +620,7 @@ export const EditorPanel = memo(function EditorPanel({
         <Button
           variant="outline"
           size="icon"
-          className="h-7 w-7"
+          className="h-5 w-5"
           onClick={() => window.dispatchEvent(new CustomEvent('open-search'))}
           title={`${t('shortcuts.search', { defaultValue: '全局搜索' })} (${mod}⇧F)`}
         >
@@ -630,7 +630,7 @@ export const EditorPanel = memo(function EditorPanel({
           <Button
             variant={chatOpen ? 'default' : 'outline'}
             size="icon"
-            className="h-7 w-7"
+            className="h-5 w-5"
             onClick={onChatToggle}
             title={`${chatOpen ? t('editor.closeAI', { defaultValue: '关闭 AI 助手' }) : t('editor.openAI', { defaultValue: '打开 AI 助手' })} (${mod}J)`}
           >
@@ -725,7 +725,7 @@ export const EditorPanel = memo(function EditorPanel({
                     : { width: `${splitRatio}%` }
               )}
             >
-              <label className="block text-sm font-medium mb-1 flex items-center justify-between flex-shrink-0">
+              <label className="block text-xs font-medium h-6 flex items-center justify-between flex-shrink-0 px-1">
                 <div className="flex items-center gap-2">
                   <span>{t('editor.aiGeneratedContent', { defaultValue: '正文内容' })}</span>
                   <span className="text-xs text-muted-foreground font-normal">
@@ -767,6 +767,7 @@ export const EditorPanel = memo(function EditorPanel({
                       onExportAndOpen: handleExportAndOpen,
                       composedContent,
                     }}
+                    showStatusBar={false}
                   />
                 </div>
               )}
@@ -791,7 +792,7 @@ export const EditorPanel = memo(function EditorPanel({
                     : { width: `${100 - splitRatio}%` }
               )}
             >
-              <label className="block text-sm font-medium mb-1 flex items-center justify-between flex-shrink-0">
+              <label className="block text-xs font-medium h-6 flex items-center justify-between flex-shrink-0 px-1">
                 <div className="flex items-center gap-2">
                   <span>{t('editor.originalContent', { defaultValue: '素材内容' })}</span>
                   <span className="text-xs text-muted-foreground font-normal">
@@ -826,6 +827,7 @@ export const EditorPanel = memo(function EditorPanel({
                     theme={effectiveTheme}
                     editorId={`original-content-${document.id}`}
                     importSources={{ aiContent, document }}
+                    showStatusBar={false}
                   />
                 </div>
               )}

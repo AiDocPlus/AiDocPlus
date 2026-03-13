@@ -30,7 +30,7 @@ export function MainLayout() {
   const theme = useAppStore(s => s.theme);
   const sidebarWidth = useAppStore(s => s.sidebarWidth);
   const setSidebarWidth = useAppStore(s => s.setSidebarWidth);
-  const { ai } = useSettingsStore();
+  const aiServicesCount = useSettingsStore(s => s.ai.services.length);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsDefaultTab, setSettingsDefaultTab] = useState<string | undefined>(undefined);
   const [docPickerMode, setDocPickerMode] = useState<'move' | 'copy' | null>(null);
@@ -46,7 +46,7 @@ export function MainLayout() {
 
   // 检测是否为新用户（无 AI 服务配置）
   useEffect(() => {
-    if (ai.services.length === 0) {
+    if (aiServicesCount === 0) {
       // 未配置 AI 服务时，清除旧标记并显示引导
       localStorage.removeItem('aidocplus-first-run-guide-shown');
       const timer = setTimeout(() => {
@@ -55,14 +55,14 @@ export function MainLayout() {
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [ai.services.length]);
+  }, [aiServicesCount]);
 
   const handleFirstRunGuideClose = () => {
     setShowFirstRunGuide(false);
     if (firstRunIsAuto) {
       // 只有用户已配置 AI 服务时才标记为已完成
       // 未配置时关闭引导，下次启动仍会弹出
-      if (ai.services.length > 0) {
+      if (aiServicesCount > 0) {
         localStorage.setItem('aidocplus-first-run-guide-shown', 'true');
       }
       setFirstRunIsAuto(false);

@@ -27,7 +27,7 @@ pub async fn wechat_http_request(
     file_name: Option<String>,
     extra_form: Option<HashMap<String, String>>,
 ) -> crate::error::Result<serde_json::Value> {
-    use crate::error::AppError;
+    use crate::error::{AppError, ResultExt};
     let client = reqwest::Client::builder()
         .connect_timeout(std::time::Duration::from_secs(15))
         .timeout(std::time::Duration::from_secs(60))
@@ -67,14 +67,14 @@ pub async fn wechat_http_request(
 
         let file_bytes = tokio::fs::read(&path)
             .await
-            .map_err(|e| AppError::Internal(format!("读取文件失败: {}", e)))?;
+            .context("读取文件失败")?;
 
         let mime = guess_mime(&fname);
 
         let part = reqwest::multipart::Part::bytes(file_bytes)
             .file_name(fname)
             .mime_str(mime)
-            .map_err(|e| AppError::Internal(format!("构建上传数据失败: {}", e)))?;
+            .context("构建上传数据失败")?;
 
         let field_name = file_field.unwrap_or_else(|| "media".to_string());
         let mut form = reqwest::multipart::Form::new().part(field_name, part);
@@ -101,7 +101,7 @@ pub async fn wechat_http_request(
     let body: serde_json::Value = resp
         .json()
         .await
-        .map_err(|e| AppError::Internal(format!("解析响应失败: {}", e)))?;
+        .context("解析响应失败")?;
 
     if status >= 400 {
         return Err(AppError::ExternalToolError(format!(

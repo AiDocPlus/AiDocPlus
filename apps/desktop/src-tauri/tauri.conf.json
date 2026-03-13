@@ -1,12 +1,12 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
   "productName": "AiDocPlus",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "identifier": "com.aidocplus.app",
   "build": {
     "beforeDevCommand": "cd src-ui && pnpm dev",
-    "beforeBuildCommand": "cd src-ui && pnpm build",
-    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "cd ../im-bot && node esbuild.config.mjs && cp dist/imbot-bundle.mjs ../desktop/src-tauri/bundled-resources/imbot-bundle.mjs && cd ../desktop/src-ui && pnpm build",
+    "devUrl": "http://localhost:1420",
     "frontendDist": "../src-ui/dist"
   },
   "app": {
@@ -24,7 +24,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self' ipc: tauri:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https: tauri: asset:; font-src 'self' data:; connect-src 'self' ipc: tauri: https: http://127.0.0.1:* http://localhost:* ws://localhost:*; media-src 'self' blob: data:; worker-src 'self' blob:;"
     }
   },
   "bundle": {

@@ -44,17 +44,19 @@ export async function createDocumentCommand(projectId: string, title: string, au
 
 export async function saveDocumentCommand(document: Document): Promise<Document> {
   return invoke<Document>('save_document', {
-    documentId: document.id,
-    projectId: document.projectId,
-    title: document.title,
-    content: document.content,
-    authorNotes: document.authorNotes,
-    aiGeneratedContent: document.aiGeneratedContent,
-    attachments: document.attachments || undefined,
-    pluginData: document.pluginData || undefined,
-    enabledPlugins: document.enabledPlugins || undefined,
-    composedContent: document.composedContent || undefined,
-    aiServiceId: document.aiServiceId || undefined,
+    payload: {
+      documentId: document.id,
+      projectId: document.projectId,
+      title: document.title,
+      content: document.content,
+      authorNotes: document.authorNotes,
+      aiGeneratedContent: document.aiGeneratedContent,
+      attachments: document.attachments || undefined,
+      pluginData: document.pluginData || undefined,
+      enabledPlugins: document.enabledPlugins || undefined,
+      composedContent: document.composedContent || undefined,
+      aiServiceId: document.aiServiceId || undefined,
+    },
   });
 }
 

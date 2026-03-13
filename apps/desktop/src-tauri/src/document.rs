@@ -147,3 +147,172 @@ impl Document {
     }
 
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_test_doc() -> Document {
+        Document::new("proj-1".into(), "测试文档".into(), "author".into())
+    }
+
+    // ── 序列化 ──
+
+    #[test]
+    fn serialize_uses_camel_case_keys() {
+        let doc = make_test_doc();
+        let json = serde_json::to_string(&doc).unwrap();
+        assert!(json.contains("\"projectId\""));
+        assert!(json.contains("\"authorNotes\""));
+        assert!(json.contains("\"aiGeneratedContent\""));
+        assert!(json.contains("\"currentVersionId\""));
+        assert!(json.contains("\"createdAt\""));
+        assert!(json.contains("\"updatedAt\""));
+        assert!(json.contains("\"wordCount\""));
+        assert!(json.contains("\"characterCount\""));
+        // snake_case 不应出现
+        assert!(!json.contains("\"project_id\""));
+        assert!(!json.contains("\"author_notes\""));
+    }
+
+    #[test]
+    fn optional_none_fields_omitted() {
+        let doc = make_test_doc();
+        let json = serde_json::to_string(&doc).unwrap();
+        // pluginData / enabledPlugins / composedContent / aiServiceId 为 None 时不序列化
+        assert!(!json.contains("\"pluginData\""));
+        assert!(!json.contains("\"enabledPlugins\""));
+        assert!(!json.contains("\"composedContent\""));
+        assert!(!json.contains("\"aiServiceId\""));
+    }
+
+    #[test]
+    fn optional_some_fields_included() {
+        let mut doc = make_test_doc();
+        doc.plugin_data = Some(serde_json::json!({"key": "val"}));
+        doc.enabled_plugins = Some(vec!["p1".into()]);
+        doc.composed_content = Some("composed".into());
+        doc.ai_service_id = Some("svc-1".into());
+        let json = serde_json::to_string(&doc).unwrap();
+        assert!(json.contains("\"pluginData\""));
+        assert!(json.contains("\"enabledPlugins\""));
+        assert!(json.contains("\"composedContent\""));
+        assert!(json.contains("\"aiServiceId\""));
+    }
+
+    // ── 反序列化 ──
+
+    #[test]
+    fn deserialize_minimal_json() {
+        let json = r#"{
+            "id": "d1",
+            "projectId": "p1",
+            "title": "T",
+            "content": "C",
+            "authorNotes": "N",
+            "aiGeneratedContent": "G",
+            "currentVersionId": "v1",
+            "metadata": {
+                "createdAt": 1000,
+                "updatedAt": 2000,
+                "author": "A",
+                "tags": [],
+                "wordCount": 5,
+                "characterCount": 10
+            }
+        }"#;
+        let doc: Document = serde_json::from_str(json).unwrap();
+        assert_eq!(doc.id, "d1");
+        assert_eq!(doc.project_id, "p1");
+        assert_eq!(doc.title, "T");
+        assert!(doc.attachments.is_empty());
+        assert!(doc.plugin_data.is_none());
+        assert!(doc.enabled_plugins.is_none());
+        assert!(doc.composed_content.is_none());
+        assert!(doc.ai_service_id.is_none());
+    }
+
+    #[test]
+    fn roundtrip_serialize_deserialize() {
+        let mut doc = make_test_doc();
+        doc.content = "Hello World".into();
+        doc.author_notes = "Notes".into();
+        doc.ai_generated_content = "AI content".into();
+        doc.plugin_data = Some(serde_json::json!({"x": 1}));
+        doc.enabled_plugins = Some(vec!["email".into()]);
+        doc.ai_service_id = Some("openai-1".into());
+
+        let json = serde_json::to_string_pretty(&doc).unwrap();
+        let restored: Document = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(restored.id, doc.id);
+        assert_eq!(restored.project_id, doc.project_id);
+        assert_eq!(restored.title, doc.title);
+        assert_eq!(restored.content, doc.content);
+        assert_eq!(restored.author_notes, doc.author_notes);
+        assert_eq!(restored.ai_generated_content, doc.ai_generated_content);
+        assert_eq!(restored.ai_service_id, doc.ai_service_id);
+        assert_eq!(restored.enabled_plugins, doc.enabled_plugins);
+    }
+
+    // ── save / load 往返 ──
+
+    #[test]
+    fn save_and_load_roundtrip() {
+        let dir = std::env::temp_dir().join("aidocplus_test_doc_roundtrip");
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("test_doc.json");
+
+        let mut doc = make_test_doc();
+        doc.content = "测试内容".into();
+        doc.save(&path).unwrap();
+
+        let loaded = Document::load(&path).unwrap();
+        assert_eq!(loaded.id, doc.id);
+        assert_eq!(loaded.content, "测试内容");
+
+        // 清理
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_dir(&dir);
+    }
+
+    // ── without_versions / metadata_only ──
+
+    #[test]
+    fn without_versions_clears_versions() {
+        let mut doc = make_test_doc();
+        doc.versions.push(DocumentVersion {
+            id: "v1".into(),
+            document_id: doc.id.clone(),
+            content: "old".into(),
+            author_notes: String::new(),
+            ai_generated_content: String::new(),
+            created_at: 0,
+            created_by: "sys".into(),
+            change_description: None,
+            plugin_data: None,
+            enabled_plugins: None,
+            composed_content: None,
+        });
+        assert_eq!(doc.versions.len(), 1);
+        let doc = doc.without_versions();
+        assert!(doc.versions.is_empty());
+    }
+
+    #[test]
+    fn metadata_only_clears_content_fields() {
+        let mut doc = make_test_doc();
+        doc.content = "big content".into();
+        doc.author_notes = "notes".into();
+        doc.ai_generated_content = "ai".into();
+        doc.composed_content = Some("composed".into());
+        let doc = doc.metadata_only();
+        assert!(doc.content.is_empty());
+        assert!(doc.author_notes.is_empty());
+        assert!(doc.ai_generated_content.is_empty());
+        assert!(doc.composed_content.is_none());
+        // title 和 metadata 保留
+        assert_eq!(doc.title, "测试文档");
+        assert_eq!(doc.metadata.author, "author");
+    }
+}

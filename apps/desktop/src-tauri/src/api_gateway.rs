@@ -1039,6 +1039,18 @@ async fn handle_script(action: &str, _params: &Value) -> HandlerResult {
 pub fn get_api_schema() -> Value {
     json!({
         "version": 1,
+        "_meta": {
+            "authentication": {
+                "type": "Bearer Token",
+                "header": "Authorization: Bearer <token>",
+                "tokenSource": "~/.aidocplus/api.json",
+                "tokenTTL": "3600s（1小时）",
+                "gracePeriod": "300s（5分钟，旧Token仍可认证）",
+                "autoRotate": "每55分钟自动轮换，api.json 同步更新",
+                "refreshEndpoint": "GET /api/v1/refresh — 用当前/宽限期Token换取最新Token",
+                "on401": "SDK 自动重试：先调用 /api/v1/refresh，失败则重读 api.json"
+            }
+        },
         "namespaces": {
             "app": {
                 "actions": {

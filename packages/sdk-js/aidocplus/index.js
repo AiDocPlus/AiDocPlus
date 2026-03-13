@@ -80,12 +80,32 @@ class AiDocPlusClient {
   }
 
   /**
-   * 调用 API 方法
+   * 调用 API 方法（收到 401 时自动刷新 Token 并重试一次）
    * @param {string} method - 方法名，如 "document.list"
    * @param {object} [params] - 参数
    * @returns {Promise<any>} result 字段
    */
-  call(method, params) {
+  async call(method, params) {
+    try {
+      return await this._doCall(method, params);
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 401) {
+        const refreshed = await this._refreshToken();
+        if (refreshed) {
+          return await this._doCall(method, params);
+        }
+      }
+      throw e;
+    }
+  }
+
+  /**
+   * 执行单次 API 调用（内部方法）
+   * @param {string} method
+   * @param {object} [params]
+   * @returns {Promise<any>}
+   */
+  _doCall(method, params) {
     this._reqCounter++;
     const reqId = `js_${this._reqCounter}`;
 
@@ -139,6 +159,68 @@ class AiDocPlusClient {
 
       req.write(payload);
       req.end();
+    });
+  }
+
+  /**
+   * 尝试刷新 Token：先调用 /api/v1/refresh，失败则重新读取 api.json。
+   * @returns {Promise<boolean>} 是否成功更新 Token
+   */
+  async _refreshToken() {
+    // 方式 1：调用 refresh 端点
+    try {
+      const data = await this.refreshToken();
+      if (data && data.token) return true;
+    } catch {
+      // refresh 端点也失败了，尝试方式 2
+    }
+
+    // 方式 2：重新读取 api.json
+    const info = readApiJson();
+    if (info && info.token && info.token !== this._token) {
+      this._token = info.token;
+      if (info.port && info.port !== this._port) {
+        this._port = info.port;
+        this._baseUrl = `http://127.0.0.1:${info.port}`;
+      }
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * 手动刷新 Token
+   * @returns {Promise<{token: string, expiresIn: number}>}
+   */
+  refreshToken() {
+    return new Promise((resolve, reject) => {
+      const req = http.get(
+        {
+          hostname: '127.0.0.1',
+          port: this._port,
+          path: '/api/v1/refresh',
+          headers: { 'Authorization': `Bearer ${this._token}` },
+          timeout: 5000,
+        },
+        (res) => {
+          let data = '';
+          res.on('data', (chunk) => { data += chunk; });
+          res.on('end', () => {
+            try {
+              const body = JSON.parse(data);
+              if (body.token) {
+                this._token = body.token;
+              }
+              resolve(body);
+            } catch (e) {
+              reject(new ApiError(500, `解析刷新响应失败: ${e.message}`));
+            }
+          });
+        },
+      );
+      req.on('error', (e) => reject(new ApiError(500, `Token 刷新失败: ${e.message}`)));
+      req.on('timeout', () => { req.destroy(); reject(new ApiError(408, 'Token 刷新超时')); });
     });
   }
 

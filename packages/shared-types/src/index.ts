@@ -78,9 +78,31 @@ export interface PluginManifest {
   homepage?: string;             // 插件主页/文档链接
   license?: string;              // 许可证
   minAppVersion?: string;        // 最低应用版本要求
-  permissions?: string[];        // 所需权限
+  permissions?: string[];        // 所需权限（旧格式，兼容保留）
   dependencies?: string[];       // 依赖的其他插件 UUID
   conflicts?: string[];          // 互斥的插件 UUID
+  // ── 沙箱安全字段（Phase 4.20） ──
+  trustLevel?: PluginTrustLevel;       // 信任等级，默认 builtin
+  sandboxPermissions?: PluginSandboxPermissions;  // 结构化权限声明
+}
+
+/** 插件信任等级 */
+export type PluginTrustLevel = 'builtin' | 'trusted' | 'sandboxed';
+
+/** 插件沙箱权限声明 */
+export interface PluginSandboxPermissions {
+  /** 允许调用的 Tauri invoke 命令（白名单子集） */
+  invoke?: string[];
+  /** 是否允许网络请求（fetch） */
+  network?: boolean;
+  /** 是否允许使用插件存储 */
+  storage?: boolean;
+  /** 是否允许调用 AI 服务 */
+  ai?: boolean;
+  /** 是否允许剪贴板操作 */
+  clipboard?: boolean;
+  /** 是否允许文件对话框（保存/打开） */
+  fileDialog?: boolean;
 }
 
 // ============================================================

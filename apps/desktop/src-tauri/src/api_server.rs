@@ -13,13 +13,14 @@ use axum::{
 };
 use futures_util::stream::Stream;
 use std::convert::Infallible;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use rand::Rng;
 use serde_json::{json, Value};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::net::TcpListener;
+use tokio::sync::RwLock;
 use tower_http::cors::{Any, CorsLayer};
 
 use tauri::AppHandle;
@@ -28,13 +29,98 @@ use crate::api_gateway::{ApiRequest, ApiResponse, CallerLevel};
 use crate::config::AppState;
 
 // ============================================================
+// Token 生命周期常量
+// ============================================================
+
+/// Token 有效期（1 小时）
+const TOKEN_TTL: Duration = Duration::from_secs(3600);
+/// 旧 Token 宽限期（5 分钟）— 过期后仍可认证和刷新
+const TOKEN_GRACE_PERIOD: Duration = Duration::from_secs(300);
+/// 自动轮换间隔（55 分钟）— 在 TTL 前 5 分钟轮换
+const TOKEN_ROTATE_INTERVAL: Duration = Duration::from_secs(3300);
+
+// ============================================================
 // Server 状态
 // ============================================================
 
+/// Token 轮换状态
+pub struct TokenState {
+    /// 当前有效 Token
+    pub current_token: String,
+    /// 当前 Token 签发时间
+    pub issued_at: Instant,
+    /// 上一个 Token（宽限期内仍可用）
+    pub prev_token: Option<String>,
+    /// 上一个 Token 的失效时间（issued_at + TTL + GRACE）
+    pub prev_expires_at: Option<Instant>,
+    /// HTTP 端口号（轮换时需要更新 api.json）
+    pub port: u16,
+}
+
+impl TokenState {
+    /// 创建初始 Token 状态
+    fn new(token: String, port: u16) -> Self {
+        Self {
+            current_token: token,
+            issued_at: Instant::now(),
+            prev_token: None,
+            prev_expires_at: None,
+            port,
+        }
+    }
+
+    /// 验证 Token，返回验证结果
+    pub fn validate(&self, bearer_token: &str) -> TokenValidation {
+        if bearer_token == self.current_token {
+            return TokenValidation::Valid;
+        }
+        if let Some(ref prev) = self.prev_token {
+            if bearer_token == prev.as_str() {
+                if let Some(expires_at) = self.prev_expires_at {
+                    if Instant::now() < expires_at {
+                        return TokenValidation::GracePeriod;
+                    }
+                }
+            }
+        }
+        TokenValidation::Invalid
+    }
+
+    /// 轮换 Token：生成新 Token，将当前移入 prev
+    pub fn rotate(&mut self) -> &str {
+        let new_token = generate_token();
+        self.prev_token = Some(std::mem::replace(&mut self.current_token, new_token));
+        self.prev_expires_at = Some(Instant::now() + TOKEN_GRACE_PERIOD);
+        self.issued_at = Instant::now();
+        &self.current_token
+    }
+
+    /// 当前 Token 剩余有效期（秒）
+    pub fn expires_in_secs(&self) -> u64 {
+        let elapsed = self.issued_at.elapsed();
+        if elapsed >= TOKEN_TTL {
+            0
+        } else {
+            (TOKEN_TTL - elapsed).as_secs()
+        }
+    }
+}
+
+/// Token 验证结果
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TokenValidation {
+    /// 当前有效 Token
+    Valid,
+    /// 上一个 Token，宽限期内
+    GracePeriod,
+    /// 无效 Token
+    Invalid,
+}
+
 /// HTTP Server 共享状态
 pub struct ApiServerState {
-    /// 认证 Token
-    pub token: String,
+    /// Token 轮换状态（读写锁保护）
+    pub token_state: RwLock<TokenState>,
     /// 应用状态（文件路径等）
     pub app_state: AppState,
     /// Tauri AppHandle（用于事件桥接前端状态）
@@ -71,11 +157,11 @@ fn api_json_path() -> PathBuf {
 
 /// 写入 api.json
 fn write_api_json(port: u16, token: &str) -> crate::error::Result<()> {
-    use crate::error::AppError;
+    use crate::error::ResultExt;
     let path = api_json_path();
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
-            .map_err(|e| AppError::Internal(format!("创建 .aidocplus 目录失败: {}", e)))?;
+            .context("创建 .aidocplus 目录失败")?;
     }
     let info = ApiJsonInfo {
         port,
@@ -84,7 +170,7 @@ fn write_api_json(port: u16, token: &str) -> crate::error::Result<()> {
         version: env!("CARGO_PKG_VERSION").to_string(),
     };
     let json = serde_json::to_string_pretty(&info)
-        .map_err(|e| AppError::Internal(format!("序列化 api.json 失败: {}", e)))?;
+        .context("序列化 api.json 失败")?;
     crate::config::atomic_write(&path, &json)?;
 
     // 仅当前用户可读写（Unix）
@@ -210,6 +296,7 @@ fn build_router(state: Arc<ApiServerState>) -> Router {
         .route("/api/v1/status", get(handle_status))
         .route("/api/v1/schema", get(handle_schema))
         .route("/api/v1/call", post(handle_call))
+        .route("/api/v1/refresh", get(handle_refresh))
         .route("/api/v1/events", get(handle_sse_events))
         .layer(cors)
         .with_state(state)
@@ -229,6 +316,15 @@ async fn handle_schema() -> Json<Value> {
     Json(crate::api_gateway::get_api_schema())
 }
 
+/// 从 Authorization 头提取 Bearer Token
+fn extract_bearer_token(headers: &HeaderMap) -> &str {
+    headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.strip_prefix("Bearer "))
+        .unwrap_or("")
+}
+
 /// POST /api/v1/call — JSON-RPC 统一入口，需要 Token 认证
 async fn handle_call(
     AxumState(state): AxumState<Arc<ApiServerState>>,
@@ -236,31 +332,30 @@ async fn handle_call(
     Json(request): Json<ApiRequest>,
 ) -> (StatusCode, Json<ApiResponse>) {
     // Token 认证
-    let auth = headers
-        .get("authorization")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("");
+    let bearer = extract_bearer_token(&headers);
+    let validation = state.token_state.read().await.validate(bearer);
 
-    let caller_level = if auth == format!("Bearer {}", state.token) {
-        // 有效 Token — 根据 X-Caller-Level 头判断调用者级别
-        let level_header = headers
-            .get("x-caller-level")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("external");
-        match level_header {
-            "script" => CallerLevel::Script,
-            _ => CallerLevel::External,
+    let caller_level = match validation {
+        TokenValidation::Valid | TokenValidation::GracePeriod => {
+            let level_header = headers
+                .get("x-caller-level")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("external");
+            match level_header {
+                "script" => CallerLevel::Script,
+                _ => CallerLevel::External,
+            }
         }
-    } else {
-        // 无效 Token
-        return (
-            StatusCode::UNAUTHORIZED,
-            Json(ApiResponse::error(
-                request.id.clone(),
-                401,
-                "认证失败：缺少或无效的 Bearer Token",
-            )),
-        );
+        TokenValidation::Invalid => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(ApiResponse::error(
+                    request.id.clone(),
+                    401,
+                    "认证失败：Token 无效或已过期，请重新读取 api.json 或调用 /api/v1/refresh",
+                )),
+            );
+        }
     };
 
     let response = crate::api_gateway::dispatch(request, caller_level, &state.app_state, &state.app_handle).await;
@@ -285,18 +380,39 @@ async fn handle_call(
 // SSE 事件订阅
 // ============================================================
 
-/// GET /api/v1/events — SSE 事件流，需要 Token 认证（query 参数 token）
+/// GET /api/v1/refresh — 用当前/宽限期 Token 换取最新 Token
+async fn handle_refresh(
+    AxumState(state): AxumState<Arc<ApiServerState>>,
+    headers: HeaderMap,
+) -> (StatusCode, Json<Value>) {
+    let bearer = extract_bearer_token(&headers);
+    let validation = state.token_state.read().await.validate(bearer);
+
+    match validation {
+        TokenValidation::Valid | TokenValidation::GracePeriod => {
+            let ts = state.token_state.read().await;
+            (StatusCode::OK, Json(json!({
+                "token": ts.current_token,
+                "expiresIn": ts.expires_in_secs(),
+            })))
+        }
+        TokenValidation::Invalid => {
+            (StatusCode::UNAUTHORIZED, Json(json!({
+                "error": "Token 无效或已超过宽限期，请重新读取 api.json"
+            })))
+        }
+    }
+}
+
+/// GET /api/v1/events — SSE 事件流，需要 Token 认证
 async fn handle_sse_events(
     AxumState(state): AxumState<Arc<ApiServerState>>,
     headers: HeaderMap,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, StatusCode> {
-    // Token 认证：从 Authorization 头获取
-    let auth = headers
-        .get("authorization")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("");
+    let bearer = extract_bearer_token(&headers);
+    let validation = state.token_state.read().await.validate(bearer);
 
-    if auth != format!("Bearer {}", state.token) {
+    if validation == TokenValidation::Invalid {
         return Err(StatusCode::UNAUTHORIZED);
     }
 
@@ -336,6 +452,7 @@ async fn handle_sse_events(
 }
 
 /// 向所有 SSE 客户端广播事件（供其他模块调用）
+#[allow(dead_code)]
 pub fn broadcast_event(state: &ApiServerState, event_type: &str, data: serde_json::Value) {
     let _ = state.event_tx.send(SseEvent {
         event_type: event_type.to_string(),
@@ -356,15 +473,6 @@ pub async fn start_api_server(app_handle: AppHandle) -> crate::error::Result<(u1
     // SSE 广播通道（容量 100 条）
     let (event_tx, _) = tokio::sync::broadcast::channel::<SseEvent>(100);
 
-    let state = Arc::new(ApiServerState {
-        token: token.clone(),
-        app_state,
-        app_handle,
-        event_tx,
-    });
-
-    let router = build_router(state);
-
     // 绑定到 127.0.0.1 的随机可用端口
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
@@ -376,11 +484,41 @@ pub async fn start_api_server(app_handle: AppHandle) -> crate::error::Result<(u1
 
     let port = addr.port();
 
+    let state = Arc::new(ApiServerState {
+        token_state: RwLock::new(TokenState::new(token.clone(), port)),
+        app_state,
+        app_handle,
+        event_tx,
+    });
+
+    let router = build_router(Arc::clone(&state));
+
     // 写入 api.json
     write_api_json(port, &token)?;
 
     println!("[API Server] 启动于 http://127.0.0.1:{}", port);
     println!("[API Server] api.json 已写入: {:?}", api_json_path());
+    println!("[API Server] Token 有效期: {}s，自动轮换间隔: {}s", TOKEN_TTL.as_secs(), TOKEN_ROTATE_INTERVAL.as_secs());
+
+    // 后台 task: 自动轮换 Token
+    let rotate_state = Arc::clone(&state);
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(TOKEN_ROTATE_INTERVAL).await;
+
+            let mut ts = rotate_state.token_state.write().await;
+            let token_for_write = ts.rotate().to_string();
+            let port = ts.port;
+            drop(ts); // 释放写锁
+
+            // 更新 api.json
+            if let Err(e) = write_api_json(port, &token_for_write) {
+                eprintln!("[API Server] Token 轮换写入 api.json 失败: {}", e);
+            } else {
+                println!("[API Server] Token 已自动轮换，api.json 已更新");
+            }
+        }
+    });
 
     // 在后台 task 中运行 server
     tokio::spawn(async move {
@@ -390,4 +528,140 @@ pub async fn start_api_server(app_handle: AppHandle) -> crate::error::Result<(u1
     });
 
     Ok((port, token))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── TokenState::new ──
+
+    #[test]
+    fn new_token_state_has_no_prev() {
+        let ts = TokenState::new("abc123".into(), 8080);
+        assert_eq!(ts.current_token, "abc123");
+        assert_eq!(ts.port, 8080);
+        assert!(ts.prev_token.is_none());
+        assert!(ts.prev_expires_at.is_none());
+    }
+
+    // ── TokenState::validate ──
+
+    #[test]
+    fn validate_current_token_returns_valid() {
+        let ts = TokenState::new("token_a".into(), 8080);
+        assert_eq!(ts.validate("token_a"), TokenValidation::Valid);
+    }
+
+    #[test]
+    fn validate_wrong_token_returns_invalid() {
+        let ts = TokenState::new("token_a".into(), 8080);
+        assert_eq!(ts.validate("wrong"), TokenValidation::Invalid);
+    }
+
+    #[test]
+    fn validate_empty_token_returns_invalid() {
+        let ts = TokenState::new("token_a".into(), 8080);
+        assert_eq!(ts.validate(""), TokenValidation::Invalid);
+    }
+
+    #[test]
+    fn validate_prev_token_in_grace_period() {
+        let mut ts = TokenState::new("token_a".into(), 8080);
+        // 手动设置 prev_token（模拟轮换后）
+        ts.prev_token = Some("old_token".into());
+        ts.prev_expires_at = Some(Instant::now() + Duration::from_secs(60));
+        assert_eq!(ts.validate("old_token"), TokenValidation::GracePeriod);
+    }
+
+    #[test]
+    fn validate_prev_token_expired_returns_invalid() {
+        let mut ts = TokenState::new("token_a".into(), 8080);
+        ts.prev_token = Some("old_token".into());
+        // 设置为已过期
+        ts.prev_expires_at = Some(Instant::now() - Duration::from_secs(1));
+        assert_eq!(ts.validate("old_token"), TokenValidation::Invalid);
+    }
+
+    // ── TokenState::rotate ──
+
+    #[test]
+    fn rotate_generates_new_token() {
+        let mut ts = TokenState::new("original".into(), 8080);
+        let new = ts.rotate().to_string();
+        assert_ne!(new, "original");
+        assert_eq!(ts.current_token, new);
+        assert_eq!(ts.prev_token, Some("original".into()));
+        assert!(ts.prev_expires_at.is_some());
+    }
+
+    #[test]
+    fn rotate_old_token_still_valid_in_grace() {
+        let mut ts = TokenState::new("first".into(), 8080);
+        ts.rotate();
+        // first 现在是 prev_token，应在宽限期内有效
+        assert_eq!(ts.validate("first"), TokenValidation::GracePeriod);
+        // 新 token 有效
+        assert_eq!(ts.validate(&ts.current_token.clone()), TokenValidation::Valid);
+    }
+
+    #[test]
+    fn double_rotate_evicts_oldest_token() {
+        let mut ts = TokenState::new("v1".into(), 8080);
+        ts.rotate(); // v1 -> prev, v2 -> current
+        let v2 = ts.current_token.clone();
+        ts.rotate(); // v2 -> prev, v3 -> current
+        // v1 不再有效
+        assert_eq!(ts.validate("v1"), TokenValidation::Invalid);
+        // v2 在宽限期内
+        assert_eq!(ts.validate(&v2), TokenValidation::GracePeriod);
+    }
+
+    // ── TokenState::expires_in_secs ──
+
+    #[test]
+    fn expires_in_secs_is_near_ttl_initially() {
+        let ts = TokenState::new("t".into(), 8080);
+        let secs = ts.expires_in_secs();
+        // 刚创建的 token，剩余时间应接近 TTL（允许 2 秒误差）
+        assert!(secs >= TOKEN_TTL.as_secs() - 2);
+    }
+
+    // ── generate_token ──
+
+    #[test]
+    fn generate_token_is_64_hex_chars() {
+        let t = generate_token();
+        assert_eq!(t.len(), 64);
+        assert!(t.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn generate_token_is_unique() {
+        let t1 = generate_token();
+        let t2 = generate_token();
+        assert_ne!(t1, t2);
+    }
+
+    // ── extract_bearer_token ──
+
+    #[test]
+    fn extract_bearer_from_valid_header() {
+        let mut headers = HeaderMap::new();
+        headers.insert("authorization", "Bearer my_secret_token".parse().unwrap());
+        assert_eq!(extract_bearer_token(&headers), "my_secret_token");
+    }
+
+    #[test]
+    fn extract_bearer_from_missing_header() {
+        let headers = HeaderMap::new();
+        assert_eq!(extract_bearer_token(&headers), "");
+    }
+
+    #[test]
+    fn extract_bearer_from_wrong_scheme() {
+        let mut headers = HeaderMap::new();
+        headers.insert("authorization", "Basic abc123".parse().unwrap());
+        assert_eq!(extract_bearer_token(&headers), "");
+    }
 }

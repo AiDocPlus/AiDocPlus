@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use crate::config::AppState;
-use crate::error::{AppError, Result};
+use crate::error::{AppError, Result, ResultExt};
 use crate::native_export;
 use std::time::{Duration, SystemTime};
 use tauri::State;
@@ -41,7 +41,7 @@ pub fn export_document_native(
         return Err(AppError::DocumentNotFound(format!("文档未找到: {}", documentId)));
     }
 
-    let document = crate::document::Document::load(&doc_path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    let document = crate::document::Document::load(&doc_path)?;
     let content = contentOverride.as_deref().unwrap_or(&document.ai_generated_content);
     let title = &document.title;
 
@@ -77,13 +77,13 @@ pub fn export_and_open(
         return Err(AppError::DocumentNotFound(format!("文档未找到: {}", documentId)));
     }
 
-    let document = crate::document::Document::load(&doc_path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    let document = crate::document::Document::load(&doc_path)?;
     let title = &document.title;
     let export_content = contentOverride.as_deref().unwrap_or(&document.ai_generated_content);
 
     // 构建临时文件路径（导出前清理旧临时文件）
     let temp_dir = std::env::temp_dir().join("aidocplus_export");
-    std::fs::create_dir_all(&temp_dir).map_err(|e| AppError::Internal(format!("创建临时目录失败: {}", e)))?;
+    std::fs::create_dir_all(&temp_dir).context("创建临时目录失败")?;
     cleanup_old_temp_files(&temp_dir, TEMP_FILE_MAX_AGE);
 
     let safe_title = crate::security::sanitize_filename(&title);
@@ -115,25 +115,16 @@ fn open_with_default(file_path: &str) -> crate::error::Result<()> {
         std::process::Command::new("open")
             .arg(file_path)
             .spawn()
-            .map(|_| ())
-            .map_err(|e| crate::error::AppError::Internal(e.to_string()))
+            .map(|_| ())?;
     }
     #[cfg(target_os = "windows")]
     {
         std::process::Command::new("cmd")
             .args(["/c", "start", "", file_path])
             .spawn()
-            .map(|_| ())
-            .map_err(|e| crate::error::AppError::Internal(e.to_string()))
+            .map(|_| ())?;
     }
-    #[cfg(target_os = "linux")]
-    {
-        std::process::Command::new("xdg-open")
-            .arg(file_path)
-            .spawn()
-            .map(|_| ())
-            .map_err(|e| crate::error::AppError::Internal(e.to_string()))
-    }
+    Ok(())
 }
 
 /// 用指定程序打开文件（跨平台）
@@ -186,14 +177,6 @@ fn open_with_app(file_path: &str, app: &str) -> crate::error::Result<()> {
                 Err(AppError::ExternalToolError(format!("尝试了 {:?} 和 start 命令，均未成功: {}", exe_paths, last_err)))
             }
         }
-    }
-    #[cfg(target_os = "linux")]
-    {
-        std::process::Command::new(app)
-            .arg(file_path)
-            .spawn()
-            .map(|_| ())
-            .map_err(|e| crate::error::AppError::Internal(e.to_string()))
     }
 }
 
@@ -279,7 +262,7 @@ pub fn open_file_with_app(path: String, app_name: Option<String>) -> Result<()> 
 #[tauri::command]
 pub fn get_temp_dir() -> Result<String> {
     let temp_dir = std::env::temp_dir().join("aidocplus_export");
-    std::fs::create_dir_all(&temp_dir).map_err(|e| AppError::Internal(format!("创建临时目录失败: {}", e)))?;
+    std::fs::create_dir_all(&temp_dir).context("创建临时目录失败")?;
     Ok(temp_dir.to_string_lossy().to_string())
 }
 
@@ -322,7 +305,7 @@ pub fn open_pdf_preview(
     };
 
     let url = WebviewUrl::External(
-        file_url.parse().map_err(|e| AppError::Internal(format!("URL 解析失败: {}", e)))?
+        file_url.parse().context("URL 解析失败")?
     );
 
     let win_title = title.unwrap_or_else(|| "PDF 预览 - 打印 / 另存为 PDF".to_string());
@@ -333,7 +316,7 @@ pub fn open_pdf_preview(
         .min_inner_size(600.0, 400.0)
         .resizable(true)
         .build()
-        .map_err(|e| AppError::Internal(format!("创建预览窗口失败: {}", e)))?;
+        .context("创建预览窗口失败")?;
 
     Ok(())
 }

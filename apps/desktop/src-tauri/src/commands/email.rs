@@ -101,12 +101,12 @@ pub struct AttachmentInfo {
 #[tauri::command]
 #[allow(non_snake_case)]
 pub fn store_email_credential(accountId: String, password: String) -> crate::error::Result<String> {
-    use crate::error::AppError;
+    use crate::error::ResultExt;
     let entry = keyring::Entry::new(KEYRING_SERVICE, &accountId)
-        .map_err(|e| AppError::Internal(format!("KEYRING_INIT_FAILED: {}", e)))?;
+        .context("KEYRING_INIT_FAILED")?;
     entry
         .set_password(&password)
-        .map_err(|e| AppError::Internal(format!("KEYRING_STORE_FAILED: {}", e)))?;
+        .context("KEYRING_STORE_FAILED")?;
     Ok("CREDENTIAL_STORED".to_string())
 }
 
@@ -114,9 +114,9 @@ pub fn store_email_credential(accountId: String, password: String) -> crate::err
 #[tauri::command]
 #[allow(non_snake_case)]
 pub fn delete_email_credential(accountId: String) -> crate::error::Result<String> {
-    use crate::error::AppError;
+    use crate::error::{AppError, ResultExt};
     let entry = keyring::Entry::new(KEYRING_SERVICE, &accountId)
-        .map_err(|e| AppError::Internal(format!("KEYRING_INIT_FAILED: {}", e)))?;
+        .context("KEYRING_INIT_FAILED")?;
     match entry.delete_credential() {
         Ok(()) => Ok("CREDENTIAL_DELETED".to_string()),
         Err(keyring::Error::NoEntry) => Ok("CREDENTIAL_NOT_FOUND".to_string()),
@@ -126,12 +126,12 @@ pub fn delete_email_credential(accountId: String) -> crate::error::Result<String
 
 /// 从 OS 密钥链读取邮箱密码（内部使用）
 fn get_credential(account_id: &str) -> crate::error::Result<String> {
-    use crate::error::AppError;
+    use crate::error::ResultExt;
     let entry = keyring::Entry::new(KEYRING_SERVICE, account_id)
-        .map_err(|e| AppError::Internal(format!("KEYRING_INIT_FAILED: {}", e)))?;
+        .context("KEYRING_INIT_FAILED")?;
     entry
         .get_password()
-        .map_err(|e| AppError::Internal(format!("KEYRING_GET_FAILED: {}", e)))
+        .context("KEYRING_GET_FAILED")
 }
 
 /// 测试 SMTP 连接
@@ -188,7 +188,7 @@ pub async fn send_email(
     requestReadReceipt: Option<bool>,
     priority: Option<String>,
 ) -> crate::error::Result<String> {
-    use crate::error::AppError;
+    use crate::error::{AppError, ResultExt};
     if to.is_empty() {
         return Err(AppError::ValidationError("RECIPIENT_EMPTY".to_string()));
     }
@@ -314,20 +314,20 @@ pub async fn send_email(
     let message = if attachment_list.is_empty() {
         builder
             .multipart(content_part)
-            .map_err(|e| AppError::Internal(format!("EMAIL_BUILD_FAILED: {}", e)))?
+            .context("EMAIL_BUILD_FAILED")?
     } else {
         let mut mixed = MultiPart::mixed().multipart(content_part);
         for att in &attachment_list {
             validate_attachment_path(&att.path)?;
             let file_content = std::fs::read(&att.path)
-                .map_err(|e| AppError::Internal(format!("ATTACHMENT_READ_FAILED: {} - {}", att.filename, e)))?;
+                .context_with(|| format!("ATTACHMENT_READ_FAILED: {}", att.filename))?;
             let ct: ContentType = att.mimeType.parse().unwrap_or(ContentType::TEXT_PLAIN);
             let attachment_part = Attachment::new(att.filename.clone()).body(file_content, ct);
             mixed = mixed.singlepart(attachment_part);
         }
         builder
             .multipart(mixed)
-            .map_err(|e| AppError::Internal(format!("EMAIL_BUILD_FAILED: {}", e)))?
+            .context("EMAIL_BUILD_FAILED")?
     };
 
     // 发送

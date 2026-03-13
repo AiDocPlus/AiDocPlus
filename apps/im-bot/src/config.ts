@@ -11,8 +11,13 @@ import logger from './utils/logger.js';
 
 const TAG = 'Config';
 
-// 加载 .env
-dotenvConfig();
+// 加载 .env — 优先 ~/.aidocplus/im-bot/.env（生产模式），然后 cwd/.env（开发模式）
+const prodEnvPath = join(homedir(), '.aidocplus', 'im-bot', '.env');
+if (existsSync(prodEnvPath)) {
+  dotenvConfig({ path: prodEnvPath });
+} else {
+  dotenvConfig();
+}
 
 // ============================================================
 // 类型定义

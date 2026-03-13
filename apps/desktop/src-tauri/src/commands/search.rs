@@ -106,14 +106,14 @@ pub fn search_documents(
     let mut results = Vec::new();
     let limit = options.limit.unwrap_or(100);
 
-    let entries = std::fs::read_dir(&docs_dir).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    let entries = std::fs::read_dir(&docs_dir)?;
 
     for entry in entries {
         if results.len() >= limit {
             break;
         }
 
-        let entry = entry.map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+        let entry = entry?;
         let path = entry.path();
 
         if path.extension().and_then(|s| s.to_str()) == Some("json") {
@@ -312,14 +312,14 @@ pub fn get_search_suggestions(
     let limit = limit.unwrap_or(10);
     let prefix_lower = prefix.to_lowercase();
 
-    let entries = std::fs::read_dir(&docs_dir).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    let entries = std::fs::read_dir(&docs_dir)?;
 
     for entry in entries {
         if suggestions.len() >= limit {
             break;
         }
 
-        let entry = entry.map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+        let entry = entry?;
         let path = entry.path();
 
         if path.extension().and_then(|s| s.to_str()) == Some("json") {

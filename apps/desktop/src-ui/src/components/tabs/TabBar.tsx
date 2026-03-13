@@ -147,7 +147,7 @@ export function TabBar({ onSettingsOpen }: TabBarProps) {
   if (tabs.length === 0) {
     return (
       <>
-        <div className="h-8 border-b bg-muted/20 flex items-center justify-between px-4">
+        <div className="h-6 border-b bg-muted/20 flex items-center justify-between px-4">
           <span className="text-sm text-muted-foreground">{t('tabs.noOpenDocuments', { defaultValue: '没有打开的文档' })}</span>
           <Button
             variant="ghost"
@@ -166,7 +166,7 @@ export function TabBar({ onSettingsOpen }: TabBarProps) {
 
   return (
     <>
-    <div className="h-8 border-b bg-background flex items-center relative flex-shrink-0">
+    <div className="h-6 border-b bg-background flex items-center relative flex-shrink-0">
       {/* 左滚动按钮 */}
       {showLeftScroll && (
         <Button
@@ -201,7 +201,7 @@ export function TabBar({ onSettingsOpen }: TabBarProps) {
               onDragStart={(e) => handleDragStart(e, tab.id)}
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, tab.id)}
-              className="group relative flex items-center gap-1.5 px-2.5 h-8 cursor-pointer transition-all w-[150px] flex-shrink-0"
+              className="group relative flex items-center gap-1.5 px-2.5 h-6 cursor-pointer transition-all w-[150px] flex-shrink-0"
               style={{
                 backgroundColor: tab.isActive ? 'rgba(239,68,68,0.2)' : bgColor,
                 borderBottom: tab.isActive ? '2px solid rgba(239,68,68,0.6)' : '2px solid transparent',
@@ -242,7 +242,7 @@ export function TabBar({ onSettingsOpen }: TabBarProps) {
       </div>
 
       {/* 设置按钮区域 */}
-      <div className="flex items-center border-l h-8 px-1 bg-background">
+      <div className="flex items-center border-l h-6 px-1 bg-background">
         <Button
           variant="ghost"
           size="icon"

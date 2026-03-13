@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Project, Document, DocumentVersion, AIMessage, ChatContextMode, WorkspaceState, EditorTab, PluginManifest, DocTemplateManifest, DocTemplateCategory } from '@aidocplus/shared-types';
+import type { Project, Document, DocumentVersion, AIMessage, WorkspaceState, EditorTab, PluginManifest, DocTemplateManifest, DocTemplateCategory } from '@aidocplus/shared-types';
 import { buildPluginList, setPlugins } from '@/plugins/registry';
 import { syncManifestsToBackend } from '@/plugins/loader';
 import { invoke } from '@tauri-apps/api/core';
@@ -137,7 +137,7 @@ interface AppState {
   setGeneratingContent: (generating: boolean) => void;
   setAiStreaming: (streaming: boolean, tabId?: string) => void;
   stopAiStreaming: () => void;
-  sendChatMessage: (tabId: string, content: string, enableWebSearch?: boolean, contextInfo?: { mode: ChatContextMode; content: string }, enableTools?: boolean, options?: { enableThinking?: boolean; planMode?: boolean; images?: import('@aidocplus/shared-types').ChatImage[] }) => Promise<string>;
+  sendChatMessage: (options: import('./useAppStore.ai.request.helpers').ChatMessageOptions) => Promise<string>;
   generateContent: (authorNotes: string, currentContent: string) => Promise<string>;
   generateContentStream: (authorNotes: string, currentContent: string, onChunk: (chunk: string) => void, conversationHistory?: AIMessage[], enableWebSearch?: boolean) => Promise<string>;
 
@@ -449,17 +449,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       const updated = await invoke<Document>('save_document', {
-        documentId: document.id,
-        projectId: document.projectId,
-        title: document.title,
-        content: document.content,
-        authorNotes: document.authorNotes,
-        aiGeneratedContent: document.aiGeneratedContent,
-        attachments: document.attachments || undefined,
-        pluginData: document.pluginData || undefined,
-        enabledPlugins: document.enabledPlugins || undefined,
-        composedContent: document.composedContent || undefined,
-        aiServiceId: document.aiServiceId || undefined
+        payload: {
+          documentId: document.id,
+          projectId: document.projectId,
+          title: document.title,
+          content: document.content,
+          authorNotes: document.authorNotes,
+          aiGeneratedContent: document.aiGeneratedContent,
+          attachments: document.attachments || undefined,
+          pluginData: document.pluginData || undefined,
+          enabledPlugins: document.enabledPlugins || undefined,
+          composedContent: document.composedContent || undefined,
+          aiServiceId: document.aiServiceId || undefined,
+        },
       });
       updated._contentLoaded = true;
       set((state) => ({
@@ -802,7 +804,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ isAiStreaming: false, aiStreamingTabId: null });
   },
   // AI Actions（流式聊天，支持停止）
-  sendChatMessage: async (tabId, content, enableWebSearch, contextInfo, enableTools, options) => {
+  sendChatMessage: async ({ tabId, content, enableWebSearch, contextInfo, enableTools, enableThinking: optEnableThinking, planMode, images }) => {
     // 获取当前标签页的流状态
     const currentStreamState = get().streamStateByTab[tabId] || {
       unlistenFn: null,
@@ -855,7 +857,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         role: 'user',
         content,
         timestamp: Date.now() / 1000,
-        images: options?.images,
+        images,
       };
       get().addAiMessage(tabId, userMessage);
 
@@ -867,7 +869,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const messages: { role: string; content: string; images?: { data: string; mimeType: string }[] }[] = [];
       const userSystemPrompt = aiSettings.systemPrompt?.trim() || '';
       const mdPrompt = aiSettings.markdownMode ? getMarkdownModePrompt() : '';
-      const planPrompt = options?.planMode ? '\n\n【计划模式】\n- 将任务分解为清晰的编号步骤（1. 2. 3. ...）\n- 每步说明目标和预期结果\n- 给出整体思路和建议\n- 不要直接给最终内容，先给出规划' : '';
+      const planPrompt = planMode ? '\n\n【计划模式】\n- 将任务分解为清晰的编号步骤（1. 2. 3. ...）\n- 每步说明目标和预期结果\n- 给出整体思路和建议\n- 不要直接给最终内容，先给出规划' : '';
       const combinedSystemPrompt = [userSystemPrompt, mdPrompt, planPrompt].filter(Boolean).join('\n\n');
       if (combinedSystemPrompt) {
         messages.push({ role: 'system', content: combinedSystemPrompt });
@@ -946,7 +948,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         messages: finalMessages,
         ...aiParams,
         enableWebSearch: enableWebSearch || undefined,
-        enableThinking: (options?.enableThinking ?? aiSettings.enableThinking) || undefined,
+        enableThinking: (optEnableThinking ?? aiSettings.enableThinking) || undefined,
         enableTools: enableTools || undefined,
         requestId
       });

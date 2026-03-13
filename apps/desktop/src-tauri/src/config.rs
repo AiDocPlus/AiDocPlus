@@ -46,10 +46,10 @@ pub fn load_custom_data_root() -> Option<PathBuf> {
 
 /// 保存自定义数据根目录到配置文件
 pub fn save_custom_data_root(data_root: &PathBuf) -> crate::error::Result<()> {
-    use crate::error::AppError;
+    use crate::error::ResultExt;
     let path = data_dir_config_path();
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| AppError::Internal(format!("创建配置目录失败: {}", e)))?;
+        std::fs::create_dir_all(parent).context("创建配置目录失败")?;
     }
     let json = serde_json::json!({ "dataRoot": data_root.to_string_lossy() });
     atomic_write(&path, &serde_json::to_string_pretty(&json).unwrap_or_default())?;
@@ -127,10 +127,10 @@ impl AppState {
 
     /// 切换数据根目录（运行时）
     pub fn set_data_root(&self, new_root: PathBuf) -> crate::error::Result<()> {
-        use crate::error::AppError;
+        use crate::error::ResultExt;
         let new_config = AppConfig::with_data_root(new_root.clone());
         std::fs::create_dir_all(&new_config.projects_dir)
-            .map_err(|e| AppError::Internal(format!("创建项目目录失败: {}", e)))?;
+            .context("创建项目目录失败")?;
         save_custom_data_root(&new_root)?;
         *self.inner.write().unwrap() = new_config;
         eprintln!("[config] 数据根目录已切换为: {}", new_root.display());
@@ -189,15 +189,15 @@ pub fn get_workspace_state_path(handle: &AppHandle) -> PathBuf {
 
 /// 原子写入：先写临时文件再 rename，防止写入中断导致文件损坏
 pub fn atomic_write(path: &std::path::Path, content: &str) -> crate::error::Result<()> {
-    use crate::error::AppError;
+    use crate::error::ResultExt;
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
-            .map_err(|e| AppError::Internal(format!("Failed to create directory: {}", e)))?;
+            .context("Failed to create directory")?;
     }
     let tmp = path.with_extension("tmp");
     std::fs::write(&tmp, content)
-        .map_err(|e| AppError::Internal(format!("Failed to write temp file: {}", e)))?;
+        .context("Failed to write temp file")?;
     std::fs::rename(&tmp, path)
-        .map_err(|e| AppError::Internal(format!("Failed to rename temp file: {}", e)))?;
+        .context("Failed to rename temp file")?;
     Ok(())
 }

@@ -1,4 +1,4 @@
-use crate::error::{AppError, Result};
+use crate::error::{AppError, Result, ResultExt};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -72,8 +72,7 @@ pub fn read_directory(path: String) -> Result<FileSystemEntry> {
         });
     }
 
-    let entries = fs::read_dir(&path)
-        .map_err(|e| crate::error::AppError::Internal(e.to_string()))?
+    let entries = fs::read_dir(&path)?
         .filter_map(|entry| entry.ok())
         .filter(|entry| {
             // Filter hidden files
@@ -115,7 +114,7 @@ pub fn read_file(path: String) -> Result<String> {
     if !Path::new(&path).exists() {
         return Err(AppError::Internal(format!("File not found: {}", path)));
     }
-    Ok(fs::read_to_string(&path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?)
+    Ok(fs::read_to_string(&path)?)
 }
 
 #[tauri::command]
@@ -124,12 +123,12 @@ pub fn write_file(path: String, content: String) -> Result<()> {
     // 写操作需要严格的路径验证
     let allowed_dirs = get_allowed_directories();
     validate_path_in_allowed_dir(path, &allowed_dirs)
-        .map_err(|e| AppError::Internal(format!("写入文件失败: {}", e)))?;
+        .context("写入文件失败")?;
 
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+        fs::create_dir_all(parent)?;
     }
-    Ok(fs::write(path, content).map_err(|e| crate::error::AppError::Internal(e.to_string()))?)
+    Ok(fs::write(path, content)?)
 }
 
 #[tauri::command]
@@ -138,9 +137,9 @@ pub fn delete_file(path: String) -> Result<()> {
     // 删除操作需要严格的路径验证
     let allowed_dirs = get_allowed_directories();
     validate_path_in_allowed_dir(path, &allowed_dirs)
-        .map_err(|e| AppError::Internal(format!("删除文件失败: {}", e)))?;
+        .context("删除文件失败")?;
 
-    Ok(fs::remove_file(path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?)
+    Ok(fs::remove_file(path)?)
 }
 
 /// 读取文件并返回 base64 data URI（如 data:image/png;base64,...）
@@ -154,7 +153,7 @@ pub fn read_file_base64(path: String) -> Result<String> {
         return Err(AppError::Internal(format!("文件不存在: {}", path)));
     }
 
-    let bytes = fs::read(file_path).map_err(|e| AppError::Internal(format!("读取文件失败: {}", e)))?;
+    let bytes = fs::read(file_path).context("读取文件失败")?;
 
     let mime = match file_path
         .extension()
@@ -184,7 +183,7 @@ pub fn read_text_file(path: String) -> Result<String> {
         return Err(AppError::Internal(format!("文件不存在: {}", path)));
     }
 
-    let bytes = fs::read(file_path).map_err(|e| AppError::Internal(format!("读取文件失败: {}", e)))?;
+    let bytes = fs::read(file_path).context("读取文件失败")?;
 
     // 先尝试 UTF-8
     if let Ok(s) = std::str::from_utf8(&bytes) {
@@ -211,9 +210,9 @@ pub fn create_directory(path: String) -> Result<()> {
     // 创建目录操作需要严格的路径验证
     let allowed_dirs = get_allowed_directories();
     validate_path_in_allowed_dir(path, &allowed_dirs)
-        .map_err(|e| AppError::Internal(format!("创建目录失败: {}", e)))?;
+        .context("创建目录失败")?;
 
-    Ok(fs::create_dir_all(path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?)
+    Ok(fs::create_dir_all(path)?)
 }
 
 /// 获取文件元数据（大小等），供插件查询附件大小
@@ -223,7 +222,7 @@ pub fn get_file_metadata(path: String) -> Result<serde_json::Value> {
     if !file_path.exists() {
         return Err(AppError::Internal(format!("File not found: {}", path)));
     }
-    let metadata = fs::metadata(file_path).map_err(|e| AppError::Internal(format!("Failed to read metadata: {}", e)))?;
+    let metadata = fs::metadata(file_path).context("Failed to read metadata")?;
     Ok(serde_json::json!({
         "size": metadata.len(),
         "isFile": metadata.is_file(),
@@ -277,7 +276,7 @@ pub fn show_in_folder(path: String) -> Result<()> {
         std::process::Command::new("open")
             .args(["-R", &target.to_string_lossy()])
             .spawn()
-            .map_err(|e| AppError::Internal(format!("打开 Finder 失败: {}", e)))?;
+            .context("打开 Finder 失败")?;
     }
 
     #[cfg(target_os = "windows")]
@@ -287,17 +286,7 @@ pub fn show_in_folder(path: String) -> Result<()> {
         std::process::Command::new("explorer")
             .arg(format!("/select,{}", win_path))
             .spawn()
-            .map_err(|e| AppError::Internal(format!("打开资源管理器失败: {}", e)))?;
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        if let Some(parent) = target.parent() {
-            std::process::Command::new("xdg-open")
-                .arg(parent)
-                .spawn()
-                .map_err(|e| AppError::Internal(format!("打开文件管理器失败: {}", e)))?;
-        }
+            .context("打开资源管理器失败")?;
     }
 
     Ok(())

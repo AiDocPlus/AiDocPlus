@@ -12,7 +12,7 @@ export default defineConfig({
   },
   // Tauri expects a fixed port, fail if that port is not available
   server: {
-    port: 5173,
+    port: 1420,
     strictPort: true,
   },
   // Env prefix for Tauri

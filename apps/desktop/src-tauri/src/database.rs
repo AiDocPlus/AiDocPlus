@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
 use rusqlite::Connection;
-use crate::error::{AppError, Result};
+use crate::error::{Result, ResultExt};
 
 /// SQLite 数据库管理器
 /// 管理 versions.db / conversations.db / search.db 的连接
@@ -18,7 +18,7 @@ fn setup_pragmas(conn: &Connection) -> Result<()> {
          PRAGMA synchronous=NORMAL;
          PRAGMA foreign_keys=ON;
          PRAGMA busy_timeout=5000;"
-    ).map_err(|e| AppError::Internal(format!("设置 PRAGMA 失败: {}", e)))?;
+    ).context("设置 PRAGMA 失败")?;
     Ok(())
 }
 
@@ -28,7 +28,7 @@ impl Database {
         // ── versions.db ──
         let versions_path = data_root.join("versions.db");
         let versions_conn = Connection::open(&versions_path)
-            .map_err(|e| AppError::Internal(format!("打开 versions.db 失败: {}", e)))?;
+            .context("打开 versions.db 失败")?;
         setup_pragmas(&versions_conn)?;
 
         versions_conn.execute_batch(
@@ -48,14 +48,14 @@ impl Database {
             );
             CREATE INDEX IF NOT EXISTS idx_versions_document ON versions(document_id);
             CREATE INDEX IF NOT EXISTS idx_versions_created ON versions(document_id, created_at);"
-        ).map_err(|e| AppError::Internal(format!("创建 versions 表失败: {}", e)))?;
+        ).context("创建 versions 表失败")?;
 
         eprintln!("[database] versions.db 已初始化: {}", versions_path.display());
 
         // ── conversations.db ──
         let conversations_path = data_root.join("conversations.db");
         let conversations_conn = Connection::open(&conversations_path)
-            .map_err(|e| AppError::Internal(format!("打开 conversations.db 失败: {}", e)))?;
+            .context("打开 conversations.db 失败")?;
         setup_pragmas(&conversations_conn)?;
 
         conversations_conn.execute_batch(
@@ -80,14 +80,14 @@ impl Database {
                 FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
             );
             CREATE INDEX IF NOT EXISTS idx_msg_conv ON messages(conversation_id, timestamp);"
-        ).map_err(|e| AppError::Internal(format!("创建 conversations 表失败: {}", e)))?;
+        ).context("创建 conversations 表失败")?;
 
         eprintln!("[database] conversations.db 已初始化: {}", conversations_path.display());
 
         // ── search.db ──
         let search_path = data_root.join("search.db");
         let search_conn = Connection::open(&search_path)
-            .map_err(|e| AppError::Internal(format!("打开 search.db 失败: {}", e)))?;
+            .context("打开 search.db 失败")?;
         setup_pragmas(&search_conn)?;
 
         // FTS5 虚拟表：全文搜索索引
@@ -100,7 +100,7 @@ impl Database {
                 author_notes,
                 tokenize='unicode61'
             );"
-        ).map_err(|e| AppError::Internal(format!("创建 search_index FTS5 表失败: {}", e)))?;
+        ).context("创建 search_index FTS5 表失败")?;
 
         eprintln!("[database] search.db 已初始化: {}", search_path.display());
 
@@ -146,7 +146,7 @@ impl Database {
 
         // 遍历所有项目目录
         let project_entries = std::fs::read_dir(projects_dir)
-            .map_err(|e| AppError::Internal(format!("读取项目目录失败: {}", e)))?;
+            .context("读取项目目录失败")?;
 
         for entry in project_entries.flatten() {
             let path = entry.path();
@@ -228,11 +228,11 @@ impl Database {
         eprintln!("[database] 开始从 conversations.json 迁移对话数据...");
 
         let json_str = std::fs::read_to_string(&json_path)
-            .map_err(|e| AppError::Internal(format!("读取 conversations.json 失败: {}", e)))?;
+            .context("读取 conversations.json 失败")?;
 
         // zustand persist 格式: { "state": { "conversations": [...], "currentConversationId": "..." }, "version": 0 }
         let parsed: serde_json::Value = serde_json::from_str(&json_str)
-            .map_err(|e| AppError::Internal(format!("解析 conversations.json 失败: {}", e)))?;
+            .context("解析 conversations.json 失败")?;
 
         let convs_value = parsed
             .get("state")

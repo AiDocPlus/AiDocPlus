@@ -210,16 +210,20 @@ fn execute_search_documents(arguments: &str, documents: &[Value]) -> String {
         let id = doc.get("id").and_then(|i| i.as_str()).unwrap_or("");
 
         if title.to_lowercase().contains(&query_lower) || content.to_lowercase().contains(&query_lower) {
-            // 截取匹配位置附近的摘要
-            let snippet = if let Some(pos) = content.to_lowercase().find(&query_lower) {
-                let start = pos.saturating_sub(50);
-                let end = (pos + query.len() + 50).min(content.len());
-                // 确保在字符边界上截取
-                let start = content[..start].rfind(char::is_whitespace).map(|p| p + 1).unwrap_or(start);
-                let snippet = &content[start..end.min(content.len())];
-                snippet.to_string()
-            } else {
-                content.chars().take(100).collect::<String>()
+            // 截取匹配位置附近的摘要（使用字符级操作，安全处理多字节字符）
+            let snippet = {
+                let content_chars: Vec<char> = content.chars().collect();
+                let content_lower_chars: Vec<char> = content.to_lowercase().chars().collect();
+                let query_chars: Vec<char> = query_lower.chars().collect();
+                let char_pos = content_lower_chars.windows(query_chars.len())
+                    .position(|w| w == query_chars.as_slice());
+                if let Some(pos) = char_pos {
+                    let start = pos.saturating_sub(50);
+                    let end = (pos + query_chars.len() + 50).min(content_chars.len());
+                    content_chars[start..end].iter().collect::<String>()
+                } else {
+                    content_chars.iter().take(100).collect::<String>()
+                }
             };
 
             results.push(json!({
@@ -564,4 +568,228 @@ fn execute_count_words(arguments: &str, documents: &[Value]) -> String {
     }
 
     json!({ "error": format!("未找到文档: {}", doc_id) }).to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_docs() -> Vec<Value> {
+        vec![
+            json!({ "id": "doc1", "title": "项目说明", "content": "这是一个示例项目的说明文档。\n\n包含多个段落。\n\n第三段内容。" }),
+            json!({ "id": "doc2", "title": "API 设计", "content": "# API 概述\n\n## 认证\n\nBearer Token 认证\n\n## 端点\n\n### GET /users\n\n获取用户列表" }),
+            json!({ "id": "doc3", "title": "English Doc", "content": "Hello world, this is a test document with some content." }),
+        ]
+    }
+
+    #[test]
+    fn builtin_tools_not_empty() {
+        let tools = get_builtin_tool_definitions();
+        assert!(!tools.is_empty());
+        assert!(tools.len() >= 10);
+    }
+
+    #[test]
+    fn tool_definitions_have_correct_type() {
+        for t in get_builtin_tool_definitions() {
+            assert_eq!(t.tool_type, "function");
+            assert!(!t.function.name.is_empty());
+            assert!(!t.function.description.is_empty());
+        }
+    }
+
+    #[test]
+    fn search_finds_matching_document() {
+        let docs = sample_docs();
+        let result = execute_search_documents(r#"{"query":"示例"}"#, &docs);
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        let results = parsed["results"].as_array().unwrap();
+        assert!(!results.is_empty());
+        assert_eq!(results[0]["id"], "doc1");
+    }
+
+    #[test]
+    fn search_empty_query_returns_empty() {
+        let result = execute_search_documents(r#"{"query":""}"#, &sample_docs());
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert!(parsed["results"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn search_no_match_returns_empty() {
+        let result = execute_search_documents(r#"{"query":"zzzznotfound"}"#, &sample_docs());
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert!(parsed["results"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn search_is_case_insensitive() {
+        let result = execute_search_documents(r#"{"query":"hello"}"#, &sample_docs());
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert!(!parsed["results"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn read_existing_document_returns_content() {
+        let result = execute_read_document(r#"{"document_id":"doc2"}"#, &sample_docs());
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["title"], "API 设计");
+        assert!(parsed["content"].as_str().unwrap().contains("API 概述"));
+    }
+
+    #[test]
+    fn read_nonexistent_document_returns_error() {
+        let result = execute_read_document(r#"{"document_id":"nonexist"}"#, &sample_docs());
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert!(parsed["error"].as_str().is_some());
+    }
+
+    #[test]
+    fn read_empty_id_returns_error() {
+        let result = execute_read_document(r#"{"document_id":""}"#, &sample_docs());
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert!(parsed["error"].as_str().unwrap().contains("为空"));
+    }
+
+    #[test]
+    fn stats_correct_count() {
+        let result = execute_get_document_stats(&sample_docs());
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["total_documents"], 3);
+        assert!(parsed["total_characters"].as_u64().unwrap() > 0);
+    }
+
+    #[test]
+    fn stats_empty_docs() {
+        let result = execute_get_document_stats(&[]);
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["total_documents"], 0);
+        assert_eq!(parsed["total_characters"], 0);
+    }
+
+    #[test]
+    fn outline_extracts_headings() {
+        let result = execute_get_document_outline(r#"{"document_id":"doc2"}"#, &sample_docs());
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        let headings = parsed["headings"].as_array().unwrap();
+        assert!(headings.len() >= 3);
+        assert_eq!(headings[0]["level"], 1);
+        assert_eq!(headings[0]["text"], "API 概述");
+    }
+
+    #[test]
+    fn outline_nonexistent_doc_returns_error() {
+        let result = execute_get_document_outline(r#"{"document_id":"nope"}"#, &sample_docs());
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert!(parsed["error"].as_str().is_some());
+    }
+
+    #[test]
+    fn count_words_english_doc() {
+        let result = execute_count_words(r#"{"document_id":"doc3"}"#, &sample_docs());
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert!(parsed["characters"].as_u64().unwrap() > 0);
+        assert!(parsed["words"].as_u64().unwrap() > 0);
+        assert!(parsed["lines"].as_u64().unwrap() > 0);
+    }
+
+    #[test]
+    fn count_words_chinese_doc_paragraphs() {
+        let result = execute_count_words(r#"{"document_id":"doc1"}"#, &sample_docs());
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert!(parsed["characters"].as_u64().unwrap() > 0);
+        assert!(parsed["paragraphs"].as_u64().unwrap() >= 2);
+    }
+
+    #[test]
+    fn export_markdown_format() {
+        let result = execute_export_document(r#"{"document_id":"doc2","format":"markdown"}"#, &sample_docs());
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["format"], "markdown");
+        assert!(parsed["content"].as_str().unwrap().contains("# API 概述"));
+    }
+
+    #[test]
+    fn export_html_format() {
+        let result = execute_export_document(r#"{"document_id":"doc2","format":"html"}"#, &sample_docs());
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["format"], "html");
+        assert!(parsed["content"].as_str().unwrap().contains("<h1>"));
+    }
+
+    #[test]
+    fn export_txt_format() {
+        let result = execute_export_document(r#"{"document_id":"doc1","format":"txt"}"#, &sample_docs());
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["format"], "txt");
+    }
+
+    #[test]
+    fn export_nonexistent_returns_error() {
+        let result = execute_export_document(r#"{"document_id":"nope","format":"html"}"#, &sample_docs());
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert!(parsed["error"].as_str().is_some());
+    }
+
+    #[test]
+    fn execute_tool_routes_to_read() {
+        let tc = ToolCall {
+            id: "call_1".into(),
+            call_type: Some("function".into()),
+            function: FunctionCall {
+                name: "read_document".into(),
+                arguments: r#"{"document_id":"doc1"}"#.into(),
+            },
+        };
+        let result = execute_tool(&tc, &sample_docs());
+        assert_eq!(result.tool_call_id, "call_1");
+        assert_eq!(result.role, "tool");
+        let parsed: Value = serde_json::from_str(&result.content).unwrap();
+        assert_eq!(parsed["title"], "项目说明");
+    }
+
+    #[test]
+    fn execute_tool_unknown_returns_error() {
+        let tc = ToolCall {
+            id: "call_2".into(),
+            call_type: None,
+            function: FunctionCall {
+                name: "nonexistent_tool".into(),
+                arguments: "{}".into(),
+            },
+        };
+        let result = execute_tool(&tc, &[]);
+        assert!(result.content.contains("未知工具"));
+    }
+
+    #[test]
+    fn list_documents_returns_all() {
+        let result = execute_list_documents(&sample_docs());
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["total"], 3);
+        assert_eq!(parsed["documents"].as_array().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn list_documents_empty_returns_zero() {
+        let result = execute_list_documents(&[]);
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["total"], 0);
+    }
+
+    #[test]
+    fn create_document_with_title_and_content() {
+        let result = execute_create_document(r#"{"title":"新文档","content":"内容"}"#);
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["success"], true);
+        assert_eq!(parsed["title"], "新文档");
+    }
+
+    #[test]
+    fn create_document_no_content_defaults_empty() {
+        let result = execute_create_document(r#"{"title":"空文档"}"#);
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["success"], true);
+        assert_eq!(parsed["content_length"], 0);
+    }
 }

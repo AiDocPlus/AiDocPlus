@@ -2,9 +2,27 @@
 
 use crate::config::AppState;
 use crate::document::{Attachment, Document};
-use crate::error::{AppError, Result};
+use crate::error::{AppError, Result, ResultExt};
 use crate::security;
+use serde::Deserialize;
 use tauri::State;
+
+/// save_document 命令的载荷结构体（将原11个独立参数收敛为单一对象）
+#[derive(Debug, Deserialize)]
+#[allow(non_snake_case)]
+pub struct SaveDocumentPayload {
+    pub documentId: String,
+    pub projectId: String,
+    pub title: String,
+    pub content: String,
+    pub authorNotes: String,
+    pub aiGeneratedContent: String,
+    pub attachments: Option<Vec<Attachment>>,
+    pub pluginData: Option<serde_json::Value>,
+    pub enabledPlugins: Option<Vec<String>>,
+    pub composedContent: Option<String>,
+    pub aiServiceId: Option<String>,
+}
 
 #[tauri::command]
 pub fn create_document(
@@ -18,7 +36,7 @@ pub fn create_document(
     let document = Document::new(projectId.clone(), title, author);
     let doc_path = state.get_document_path(&projectId, &document.id);
 
-    document.save(&doc_path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    document.save(&doc_path)?;
 
     // 更新搜索索引
     let _ = crate::search_store::upsert_document_index(
@@ -31,18 +49,14 @@ pub fn create_document(
 #[tauri::command]
 pub fn save_document(
     state: State<'_, AppState>,
-    documentId: String,
-    projectId: String,
-    title: String,
-    content: String,
-    authorNotes: String,
-    aiGeneratedContent: String,
-    attachments: Option<Vec<Attachment>>,
-    pluginData: Option<serde_json::Value>,
-    enabledPlugins: Option<Vec<String>>,
-    composedContent: Option<String>,
-    aiServiceId: Option<String>,
+    payload: SaveDocumentPayload,
 ) -> Result<Document> {
+    let SaveDocumentPayload {
+        documentId, projectId, title, content, authorNotes,
+        aiGeneratedContent, attachments, pluginData,
+        enabledPlugins, composedContent, aiServiceId,
+    } = payload;
+
     security::validate_id(&projectId, "projectId")?;
     security::validate_id(&documentId, "documentId")?;
     security::validate_content_size(&content)?;
@@ -54,7 +68,7 @@ pub fn save_document(
     }
 
     // Load existing document
-    let mut document = Document::load(&doc_path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    let mut document = Document::load(&doc_path)?;
 
     // Update document fields
     document.title = title;
@@ -83,7 +97,7 @@ pub fn save_document(
     document.content = content;
 
     // Save document
-    document.save(&doc_path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    document.save(&doc_path)?;
 
     // 更新搜索索引
     let _ = crate::search_store::upsert_document_index(
@@ -108,7 +122,7 @@ pub fn delete_document(
     }
 
     // Remove document file
-    std::fs::remove_file(&doc_path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    std::fs::remove_file(&doc_path)?;
 
     // 删除搜索索引
     let _ = crate::search_store::remove_document_index(&state.db, &documentId);
@@ -139,16 +153,16 @@ pub fn rename_document(
     }
 
     // Load existing document
-    let mut document = Document::load(&doc_path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    let mut document = Document::load(&doc_path)?;
 
     // Check for duplicate titles in the same project
     let project_dir = state.config().projects_dir.join(&projectId);
     let docs_dir = project_dir.join("documents");
 
     if docs_dir.exists() {
-        let entries = std::fs::read_dir(&docs_dir).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+        let entries = std::fs::read_dir(&docs_dir)?;
         for entry in entries {
-            let entry = entry.map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+            let entry = entry?;
             let path = entry.path();
 
             if path.extension().and_then(|s| s.to_str()) == Some("json") {
@@ -168,7 +182,7 @@ pub fn rename_document(
     document.metadata.updated_at = chrono::Utc::now().timestamp();
 
     // Save document
-    document.save(&doc_path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    document.save(&doc_path)?;
 
     Ok(document.without_versions())
 }
@@ -187,7 +201,7 @@ pub fn get_document(
         return Err(AppError::DocumentNotFound(format!("文档未找到: {}", documentId)));
     }
 
-    Document::load(&doc_path).map_err(|e| crate::error::AppError::Internal(e.to_string())).map(|d| d.without_versions())
+    Document::load(&doc_path).map(|d| d.without_versions())
 }
 
 #[tauri::command]
@@ -202,10 +216,10 @@ pub fn list_documents(state: State<'_, AppState>, projectId: String) -> Result<V
 
     let mut documents = Vec::new();
 
-    let entries = std::fs::read_dir(&docs_dir).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    let entries = std::fs::read_dir(&docs_dir)?;
 
     for entry in entries {
-        let entry = entry.map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+        let entry = entry?;
         let path = entry.path();
 
         if path.extension().and_then(|s| s.to_str()) == Some("json") {
@@ -264,10 +278,10 @@ pub fn create_version(
     crate::version_store::insert_version(&state.db, &projectId, &version)?;
 
     // 更新文档的 currentVersionId 和 updatedAt
-    let mut document = Document::load(&doc_path).map_err(|e| AppError::Internal(e.to_string()))?;
+    let mut document = Document::load(&doc_path)?;
     document.current_version_id = version_id.clone();
     document.metadata.updated_at = now;
-    document.save(&doc_path).map_err(|e| AppError::Internal(e.to_string()))?;
+    document.save(&doc_path)?;
 
     Ok(version_id)
 }
@@ -315,7 +329,7 @@ pub fn restore_version(
         return Err(AppError::DocumentNotFound(format!("文档未找到: {}", documentId)));
     }
 
-    let mut document = Document::load(&doc_path).map_err(|e| AppError::Internal(e.to_string()))?;
+    let mut document = Document::load(&doc_path)?;
 
     // Create backup of current version if requested
     if createBackup {
@@ -370,7 +384,7 @@ pub fn restore_version(
     document.metadata.character_count = document.content.chars().count();
 
     // Save the restored document
-    document.save(&doc_path).map_err(|e| AppError::Internal(e.to_string()))?;
+    document.save(&doc_path)?;
 
     Ok(document.without_versions())
 }
@@ -391,7 +405,7 @@ pub fn delete_version(
         return Err(AppError::DocumentNotFound(format!("文档未找到: {}", documentId)));
     }
 
-    let document = Document::load(&doc_path).map_err(|e| AppError::Internal(e.to_string()))?;
+    let document = Document::load(&doc_path)?;
 
     // 不允许删除当前版本
     if document.current_version_id == versionId {
@@ -420,7 +434,7 @@ pub fn delete_all_versions(
         return Err(AppError::DocumentNotFound(format!("文档未找到: {}", documentId)));
     }
 
-    let document = Document::load(&doc_path).map_err(|e| AppError::Internal(e.to_string()))?;
+    let document = Document::load(&doc_path)?;
     let current_id = document.current_version_id.clone();
 
     // 从 SQLite 删除该文档所有版本，再把当前版本重新插入
@@ -468,7 +482,7 @@ pub fn write_binary_file(path: String, data: Vec<u8>) -> Result<()> {
 
     // 确保父目录存在（必须在 canonicalize 之前，否则目录不存在会报错）
     if let Some(parent) = file_path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| AppError::Internal(format!("创建目录失败: {}", e)))?;
+        std::fs::create_dir_all(parent).context("创建目录失败")?;
     }
 
     // 验证路径：对父目录做 canonicalize（文件本身可能尚不存在）
@@ -485,7 +499,7 @@ pub fn write_binary_file(path: String, data: Vec<u8>) -> Result<()> {
         return Err(AppError::SecurityError("路径不在允许的目录内".to_string()));
     }
 
-    std::fs::write(file_path, &data).map_err(|e| AppError::Internal(format!("写入文件失败: {}", e)))?;
+    std::fs::write(file_path, &data).context("写入文件失败")?;
     Ok(())
 }
 
@@ -513,19 +527,19 @@ pub fn move_document(
 
     // 确保目标 documents 目录存在
     let to_docs_dir = state.config().projects_dir.join(&toProjectId).join("documents");
-    std::fs::create_dir_all(&to_docs_dir).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    std::fs::create_dir_all(&to_docs_dir)?;
 
     // 加载文档并更新 projectId
-    let mut document = Document::load(&src_path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    let mut document = Document::load(&src_path)?;
     document.project_id = toProjectId.clone();
     document.metadata.updated_at = chrono::Utc::now().timestamp();
 
     // 保存到目标位置
     let dst_path = state.get_document_path(&toProjectId, &documentId);
-    document.save(&dst_path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    document.save(&dst_path)?;
 
     // 删除源文件
-    std::fs::remove_file(&src_path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    std::fs::remove_file(&src_path)?;
 
     Ok(document.without_versions())
 }
@@ -546,7 +560,7 @@ pub fn update_document_tags(
         return Err(AppError::DocumentNotFound(format!("文档未找到: {}", documentId)));
     }
 
-    let mut document = Document::load(&doc_path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    let mut document = Document::load(&doc_path)?;
 
     // 去重、去空、trim
     let clean_tags: Vec<String> = tags
@@ -560,7 +574,7 @@ pub fn update_document_tags(
     document.metadata.tags = clean_tags;
     document.metadata.updated_at = chrono::Utc::now().timestamp();
 
-    document.save(&doc_path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    document.save(&doc_path)?;
 
     Ok(document.without_versions())
 }
@@ -632,7 +646,7 @@ pub fn toggle_document_starred(
         return Err(AppError::DocumentNotFound(format!("文档未找到: {}", documentId)));
     }
 
-    let mut document = Document::load(&doc_path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    let mut document = Document::load(&doc_path)?;
 
     let starred_tag = "_starred".to_string();
     if document.metadata.tags.contains(&starred_tag) {
@@ -642,7 +656,7 @@ pub fn toggle_document_starred(
     }
     document.metadata.updated_at = chrono::Utc::now().timestamp();
 
-    document.save(&doc_path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    document.save(&doc_path)?;
 
     Ok(document.without_versions())
 }
@@ -671,10 +685,10 @@ pub fn copy_document(
 
     // 确保目标 documents 目录存在
     let to_docs_dir = state.config().projects_dir.join(&toProjectId).join("documents");
-    std::fs::create_dir_all(&to_docs_dir).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    std::fs::create_dir_all(&to_docs_dir)?;
 
     // 加载源文档
-    let src_doc = Document::load(&src_path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    let src_doc = Document::load(&src_path)?;
 
     // 创建新文档（新 ID）
     let new_id = uuid::Uuid::new_v4().to_string();
@@ -690,7 +704,7 @@ pub fn copy_document(
 
     // 保存到目标位置
     let dst_path = state.get_document_path(&toProjectId, &new_id);
-    new_doc.save(&dst_path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    new_doc.save(&dst_path)?;
 
     Ok(new_doc.without_versions())
 }

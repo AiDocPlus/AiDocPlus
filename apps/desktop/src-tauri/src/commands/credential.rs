@@ -9,7 +9,7 @@ const AI_KEYRING_SERVICE: &str = "com.aidocplus.ai";
 #[tauri::command]
 #[allow(non_snake_case)]
 pub fn store_ai_credential(serviceId: String, apiKey: String) -> crate::error::Result<String> {
-    use crate::error::AppError;
+    use crate::error::{AppError, ResultExt};
     if serviceId.is_empty() {
         return Err(AppError::ValidationError("服务 ID 不能为空".to_string()));
     }
@@ -17,10 +17,10 @@ pub fn store_ai_credential(serviceId: String, apiKey: String) -> crate::error::R
         return Err(AppError::ValidationError("API Key 不能为空".to_string()));
     }
     let entry = keyring::Entry::new(AI_KEYRING_SERVICE, &serviceId)
-        .map_err(|e| AppError::Internal(format!("KEYRING_INIT_FAILED: {}", e)))?;
+        .context("KEYRING_INIT_FAILED")?;
     entry
         .set_password(&apiKey)
-        .map_err(|e| AppError::Internal(format!("KEYRING_STORE_FAILED: {}", e)))?;
+        .context("KEYRING_STORE_FAILED")?;
     Ok("CREDENTIAL_STORED".to_string())
 }
 
@@ -28,12 +28,12 @@ pub fn store_ai_credential(serviceId: String, apiKey: String) -> crate::error::R
 #[tauri::command]
 #[allow(non_snake_case)]
 pub fn get_ai_credential(serviceId: String) -> crate::error::Result<String> {
-    use crate::error::AppError;
+    use crate::error::{AppError, ResultExt};
     if serviceId.is_empty() {
         return Err(AppError::ValidationError("服务 ID 不能为空".to_string()));
     }
     let entry = keyring::Entry::new(AI_KEYRING_SERVICE, &serviceId)
-        .map_err(|e| AppError::Internal(format!("KEYRING_INIT_FAILED: {}", e)))?;
+        .context("KEYRING_INIT_FAILED")?;
     match entry.get_password() {
         Ok(key) => Ok(key),
         Err(keyring::Error::NoEntry) => Ok(String::new()),
@@ -45,12 +45,12 @@ pub fn get_ai_credential(serviceId: String) -> crate::error::Result<String> {
 #[tauri::command]
 #[allow(non_snake_case)]
 pub fn delete_ai_credential(serviceId: String) -> crate::error::Result<String> {
-    use crate::error::AppError;
+    use crate::error::{AppError, ResultExt};
     if serviceId.is_empty() {
         return Err(AppError::ValidationError("服务 ID 不能为空".to_string()));
     }
     let entry = keyring::Entry::new(AI_KEYRING_SERVICE, &serviceId)
-        .map_err(|e| AppError::Internal(format!("KEYRING_INIT_FAILED: {}", e)))?;
+        .context("KEYRING_INIT_FAILED")?;
     match entry.delete_credential() {
         Ok(()) => Ok("CREDENTIAL_DELETED".to_string()),
         Err(keyring::Error::NoEntry) => Ok("CREDENTIAL_NOT_FOUND".to_string()),
@@ -75,7 +75,7 @@ pub fn get_ai_key_from_keyring(service_id: &str) -> Option<String> {
 #[tauri::command]
 #[allow(non_snake_case)]
 pub fn migrate_ai_keys_to_keyring(services: Vec<MigrateKeyInfo>) -> crate::error::Result<Vec<String>> {
-    use crate::error::AppError;
+    use crate::error::ResultExt;
     let mut migrated_ids = Vec::new();
     for svc in &services {
         if svc.apiKey.is_empty() || svc.serviceId.is_empty() {
@@ -86,10 +86,10 @@ pub fn migrate_ai_keys_to_keyring(services: Vec<MigrateKeyInfo>) -> crate::error
             continue;
         }
         let entry = keyring::Entry::new(AI_KEYRING_SERVICE, &svc.serviceId)
-            .map_err(|e| AppError::Internal(format!("KEYRING_INIT_FAILED for {}: {}", svc.serviceId, e)))?;
+            .context_with(|| format!("KEYRING_INIT_FAILED for {}", svc.serviceId))?;
         entry
             .set_password(&svc.apiKey)
-            .map_err(|e| AppError::Internal(format!("KEYRING_STORE_FAILED for {}: {}", svc.serviceId, e)))?;
+            .context_with(|| format!("KEYRING_STORE_FAILED for {}", svc.serviceId))?;
         migrated_ids.push(svc.serviceId.clone());
     }
     Ok(migrated_ids)

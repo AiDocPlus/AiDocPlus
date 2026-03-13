@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::State;
 use crate::config::AppState;
-use crate::error::{AppError, Result};
+use crate::error::{AppError, Result, ResultExt};
 
 /// 获取当前数据根目录
 fn data_root(state: &AppState) -> PathBuf {
@@ -36,7 +36,7 @@ fn ui_preferences_path(state: &AppState) -> PathBuf {
 pub fn save_settings(state: State<'_, AppState>, json: String) -> Result<()> {
     let path = settings_path(&state);
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| AppError::Internal(format!("创建目录失败: {}", e)))?;
+        fs::create_dir_all(parent).context("创建目录失败")?;
     }
     crate::config::atomic_write(&path, &json)?;
     Ok(())
@@ -49,7 +49,7 @@ pub fn load_settings(state: State<'_, AppState>) -> Result<Option<String>> {
     if !path.exists() {
         return Ok(None);
     }
-    let json = fs::read_to_string(&path).map_err(|e| AppError::Internal(format!("读取设置失败: {}", e)))?;
+    let json = fs::read_to_string(&path).context("读取设置失败")?;
     Ok(Some(json))
 }
 
@@ -60,7 +60,7 @@ pub fn load_settings(state: State<'_, AppState>) -> Result<Option<String>> {
 pub fn save_plugin_storage(state: State<'_, AppState>, json: String) -> Result<()> {
     let path = plugin_storage_path(&state);
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| AppError::Internal(format!("创建目录失败: {}", e)))?;
+        fs::create_dir_all(parent).context("创建目录失败")?;
     }
     crate::config::atomic_write(&path, &json)?;
     Ok(())
@@ -73,7 +73,7 @@ pub fn load_plugin_storage(state: State<'_, AppState>) -> Result<Option<String>>
     if !path.exists() {
         return Ok(None);
     }
-    let json = fs::read_to_string(&path).map_err(|e| AppError::Internal(format!("读取插件存储失败: {}", e)))?;
+    let json = fs::read_to_string(&path).context("读取插件存储失败")?;
     Ok(Some(json))
 }
 
@@ -84,7 +84,7 @@ pub fn load_plugin_storage(state: State<'_, AppState>) -> Result<Option<String>>
 pub fn save_conversations(state: State<'_, AppState>, json: String) -> Result<()> {
     let path = conversations_path(&state);
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| AppError::Internal(format!("创建目录失败: {}", e)))?;
+        fs::create_dir_all(parent).context("创建目录失败")?;
     }
     crate::config::atomic_write(&path, &json)?;
     Ok(())
@@ -97,7 +97,7 @@ pub fn load_conversations(state: State<'_, AppState>) -> Result<Option<String>> 
     if !path.exists() {
         return Ok(None);
     }
-    let json = fs::read_to_string(&path).map_err(|e| AppError::Internal(format!("读取对话记录失败: {}", e)))?;
+    let json = fs::read_to_string(&path).context("读取对话记录失败")?;
     Ok(Some(json))
 }
 
@@ -108,7 +108,7 @@ pub fn load_conversations(state: State<'_, AppState>) -> Result<Option<String>> 
 pub fn save_ui_preferences(state: State<'_, AppState>, json: String) -> Result<()> {
     let path = ui_preferences_path(&state);
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| AppError::Internal(format!("创建目录失败: {}", e)))?;
+        fs::create_dir_all(parent).context("创建目录失败")?;
     }
     crate::config::atomic_write(&path, &json)?;
     Ok(())
@@ -121,7 +121,7 @@ pub fn load_ui_preferences(state: State<'_, AppState>) -> Result<Option<String>>
     if !path.exists() {
         return Ok(None);
     }
-    let json = fs::read_to_string(&path).map_err(|e| AppError::Internal(format!("读取UI偏好失败: {}", e)))?;
+    let json = fs::read_to_string(&path).context("读取UI偏好失败")?;
     Ok(Some(json))
 }
 
@@ -140,7 +140,7 @@ pub fn get_data_root_path(state: State<'_, AppState>) -> Result<String> {
 pub fn change_data_root(state: State<'_, AppState>, newPath: String) -> Result<()> {
     let new_root = PathBuf::from(&newPath);
     if !new_root.exists() {
-        fs::create_dir_all(&new_root).map_err(|e| AppError::Internal(format!("创建目录失败: {}", e)))?;
+        fs::create_dir_all(&new_root).context("创建目录失败")?;
     }
     state.set_data_root(new_root)?;
     Ok(())
@@ -159,7 +159,7 @@ pub fn migrate_data_to_new_root(state: State<'_, AppState>, newPath: String) -> 
     }
 
     // 创建新目录
-    fs::create_dir_all(&new_root).map_err(|e| AppError::Internal(format!("创建新数据目录失败: {}", e)))?;
+    fs::create_dir_all(&new_root).context("创建新数据目录失败")?;
 
     // 递归复制所有内容
     let count = copy_dir_recursive(&old_root, &new_root)?;
@@ -173,20 +173,20 @@ pub fn migrate_data_to_new_root(state: State<'_, AppState>, newPath: String) -> 
 /// 递归复制目录内容
 fn copy_dir_recursive(src: &PathBuf, dst: &PathBuf) -> Result<usize> {
     let mut count = 0usize;
-    let entries = fs::read_dir(src).map_err(|e| AppError::Internal(format!("读取源目录失败: {}", e)))?;
+    let entries = fs::read_dir(src).context("读取源目录失败")?;
 
     for entry in entries {
-        let entry = entry.map_err(|e| AppError::Internal(format!("读取目录项失败: {}", e)))?;
+        let entry = entry.context("读取目录项失败")?;
         let src_path = entry.path();
         let file_name = entry.file_name();
         let dst_path = dst.join(&file_name);
 
         if src_path.is_dir() {
-            fs::create_dir_all(&dst_path).map_err(|e| AppError::Internal(format!("创建目录失败: {}", e)))?;
+            fs::create_dir_all(&dst_path).context("创建目录失败")?;
             count += copy_dir_recursive(&src_path, &dst_path)?;
         } else {
             fs::copy(&src_path, &dst_path)
-                .map_err(|e| AppError::Internal(format!("复制文件失败 {:?}: {}", file_name, e)))?;
+                .context_with(|| format!("复制文件失败 {:?}", file_name))?;
             count += 1;
         }
     }

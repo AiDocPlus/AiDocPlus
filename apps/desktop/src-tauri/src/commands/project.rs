@@ -38,12 +38,12 @@ pub fn create_project(
 
     // Create project directory
     let project_dir = state.config().projects_dir.join(&id);
-    fs::create_dir_all(&project_dir).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
-    fs::create_dir_all(project_dir.join("documents")).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
-    fs::create_dir_all(project_dir.join("versions")).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    fs::create_dir_all(&project_dir)?;
+    fs::create_dir_all(project_dir.join("documents"))?;
+    fs::create_dir_all(project_dir.join("versions"))?;
 
     // Save project metadata
-    let project_json = serde_json::to_string_pretty(&project).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    let project_json = serde_json::to_string_pretty(&project)?;
     crate::config::atomic_write(&project.path, &project_json)?;
 
     Ok(project)
@@ -58,8 +58,8 @@ pub fn open_project(state: State<'_, AppState>, project_id: String) -> Result<Pr
         return Err(AppError::ProjectNotFound(format!("项目未找到: {}", project_id)));
     }
 
-    let json = fs::read_to_string(&project_path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
-    let project: Project = serde_json::from_str(&json).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    let json = fs::read_to_string(&project_path)?;
+    let project: Project = serde_json::from_str(&json)?;
 
     Ok(project)
 }
@@ -70,7 +70,7 @@ pub fn save_project(state: State<'_, AppState>, mut project: Project) -> Result<
     project.updated_at = chrono::Utc::now().timestamp();
     project.path = state.get_project_path(&project.id);
 
-    let project_json = serde_json::to_string_pretty(&project).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    let project_json = serde_json::to_string_pretty(&project)?;
     crate::config::atomic_write(&project.path, &project_json)?;
 
     Ok(project)
@@ -86,13 +86,13 @@ pub fn rename_project(state: State<'_, AppState>, project_id: String, new_name: 
         return Err(AppError::ProjectNotFound(format!("项目未找到: {}", project_id)));
     }
 
-    let json = fs::read_to_string(&project_path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
-    let mut project: Project = serde_json::from_str(&json).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    let json = fs::read_to_string(&project_path)?;
+    let mut project: Project = serde_json::from_str(&json)?;
 
     project.name = new_name;
     project.updated_at = chrono::Utc::now().timestamp();
 
-    let project_json = serde_json::to_string_pretty(&project).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    let project_json = serde_json::to_string_pretty(&project)?;
     crate::config::atomic_write(&project_path, &project_json)?;
 
     Ok(project)
@@ -106,12 +106,12 @@ pub fn delete_project(state: State<'_, AppState>, project_id: String) -> Result<
 
     // Remove project metadata file
     if project_path.exists() {
-        fs::remove_file(&project_path).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+        fs::remove_file(&project_path)?;
     }
 
     // Remove project directory
     if project_dir.exists() {
-        fs::remove_dir_all(&project_dir).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+        fs::remove_dir_all(&project_dir)?;
     }
 
     Ok(())
@@ -121,10 +121,10 @@ pub fn delete_project(state: State<'_, AppState>, project_id: String) -> Result<
 pub fn list_projects(state: State<'_, AppState>) -> Result<Vec<Project>> {
     let mut projects = Vec::new();
 
-    let entries = fs::read_dir(&state.config().projects_dir).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    let entries = fs::read_dir(&state.config().projects_dir)?;
 
     for entry in entries {
-        let entry = entry.map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+        let entry = entry?;
         let path = entry.path();
 
         // Only process .json files (project metadata)
@@ -178,9 +178,9 @@ pub fn export_project_zip(
     // 写入所有文档
     let docs_dir = project_dir.join("documents");
     if docs_dir.exists() {
-        let entries = fs::read_dir(&docs_dir).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+        let entries = fs::read_dir(&docs_dir)?;
         for entry in entries {
-            let entry = entry.map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+            let entry = entry?;
             let path = entry.path();
             if path.extension().and_then(|s| s.to_str()) == Some("json") {
                 let file_name = path.file_name().unwrap().to_string_lossy().to_string();
@@ -205,9 +205,9 @@ pub fn export_project_zip(
             prefix: &str,
             options: zip::write::SimpleFileOptions,
         ) -> crate::error::Result<()> {
-            let entries = fs::read_dir(dir).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+            let entries = fs::read_dir(dir)?;
             for entry in entries {
-                let entry = entry.map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+                let entry = entry?;
                 let path = entry.path();
                 let name = path.file_name().unwrap().to_string_lossy().to_string();
                 let zip_path = format!("{}/{}", prefix, name);
@@ -288,16 +288,16 @@ pub fn import_project_zip(
 
     // 创建项目目录
     let project_dir = state.config().projects_dir.join(&new_id);
-    fs::create_dir_all(project_dir.join("documents")).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
-    fs::create_dir_all(project_dir.join("versions")).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    fs::create_dir_all(project_dir.join("documents"))?;
+    fs::create_dir_all(project_dir.join("versions"))?;
 
     // 保存项目元数据
-    let project_json = serde_json::to_string_pretty(&project).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+    let project_json = serde_json::to_string_pretty(&project)?;
     crate::config::atomic_write(&project.path, &project_json)?;
 
     // 解压文档和版本文件
     for i in 0..archive.len() {
-        let mut file = archive.by_index(i).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+        let mut file = archive.by_index(i).map_err(|e| AppError::ImportFailed(format!("读取 ZIP 条目失败: {}", e)))?;
         let name = file.name().to_string();
 
         if name == "project.json" {
@@ -327,7 +327,7 @@ pub fn import_project_zip(
 
         // 确保父目录存在
         if let Some(parent) = target_path.parent() {
-            fs::create_dir_all(parent).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+            fs::create_dir_all(parent)?;
         }
 
         let mut content = String::new();
@@ -347,7 +347,7 @@ pub fn import_project_zip(
             );
         }
 
-        fs::write(&target_path, content).map_err(|e| crate::error::AppError::Internal(e.to_string()))?;
+        fs::write(&target_path, content)?;
     }
 
     Ok(project)

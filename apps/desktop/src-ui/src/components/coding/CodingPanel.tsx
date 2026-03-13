@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { save, open } from '@tauri-apps/plugin-dialog';
+import { open } from '@tauri-apps/plugin-dialog';
 import { useTranslation } from 'react-i18next';
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
@@ -9,8 +9,6 @@ import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dn
 import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useCodingStore, nextTabId, detectLangFromExt } from '@/stores/useCodingStore';
 import { formatBackendError } from '@/lib/backendError';
@@ -19,109 +17,26 @@ import { CodingAssistantPanel } from './CodingAssistantPanel';
 import { getApiServerPort, isApiServerReady } from '@/api/ApiBridge';
 import { ResizableHandle } from '@/components/ui/resizable-handle';
 import { CodingFileTree } from './CodingFileTree';
-import { MarkdownPreview } from '@/components/editor/MarkdownPreview';
+import { useCodingEditorExtensions } from './useCodingEditorExtensions';
+import { CodingOutput } from './CodingOutput';
+import { CodingSettingsPopover } from './CodingSettingsPopover';
+import { useCodingScriptRunner } from './useCodingScriptRunner';
+// CodingDialogs 组件在内联实现，保留引用备用
+// import { GotoLineDialog, CommandPalette, ShortcutsDialog, TabContextMenu } from './CodingDialogs';
+import { DEFAULT_TEMPLATES, NEW_FILE_TYPES, SUPPORTED_EXTENSIONS } from './CodingPanel.constants';
+import type { PythonInterpreter } from './CodingPanel.constants';
 import {
   Play, FilePlus, FolderOpen, Save,
-  Star, StarOff, Trash2, Settings, ChevronDown, ChevronRight,
+  Star, StarOff, ChevronDown, ChevronRight,
   Loader2, CheckCircle, XCircle, Clock, GripHorizontal, X,
-  Copy, Check, MessageSquare, PanelRightOpen, PanelRightClose, Pencil,
+  MessageSquare, PanelRightOpen, PanelRightClose,
   Eye, FileCode, Maximize2, Minimize2,
-  Undo2, Redo2, WrapText, Keyboard, Hash, Search, ArrowUp, ArrowDown,
+  Undo2, Redo2, WrapText, Keyboard, Hash,
   PanelLeftOpen, PanelLeftClose, History,
+  Copy, Pencil,
 } from 'lucide-react';
 
 const CodeMirror = lazy(() => import('@uiw/react-codemirror'));
-
-// ── ANSI 颜色解析 ──
-const ANSI_COLORS: Record<number, string> = {
-  30: 'text-gray-900 dark:text-gray-300', 31: 'text-red-600 dark:text-red-400',
-  32: 'text-green-600 dark:text-green-400', 33: 'text-yellow-600 dark:text-yellow-400',
-  34: 'text-blue-600 dark:text-blue-400', 35: 'text-purple-600 dark:text-purple-400',
-  36: 'text-cyan-600 dark:text-cyan-400', 37: 'text-gray-200 dark:text-gray-100',
-  90: 'text-gray-500', 91: 'text-red-400', 92: 'text-green-400',
-  93: 'text-yellow-300', 94: 'text-blue-400', 95: 'text-purple-400',
-  96: 'text-cyan-400', 97: 'text-white',
-};
-
-function parseAnsiLine(text: string): Array<{ text: string; className: string }> {
-  const parts: Array<{ text: string; className: string }> = [];
-  const regex = /\x1b\[([0-9;]*)m/g;
-  let lastIndex = 0;
-  let currentClass = '';
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push({ text: text.slice(lastIndex, match.index), className: currentClass });
-    }
-    const codes = match[1].split(';').map(Number);
-    for (const code of codes) {
-      if (code === 0) currentClass = '';
-      else if (code === 1) currentClass += ' font-bold';
-      else if (code === 2) currentClass += ' opacity-60';
-      else if (code === 4) currentClass += ' underline';
-      else if (ANSI_COLORS[code]) currentClass = ANSI_COLORS[code] + (currentClass.includes('font-bold') ? ' font-bold' : '');
-    }
-    lastIndex = regex.lastIndex;
-  }
-  if (lastIndex < text.length) parts.push({ text: text.slice(lastIndex), className: currentClass });
-  if (parts.length === 0) parts.push({ text, className: '' });
-  return parts;
-}
-
-// ── 类型 ──
-
-interface ScriptRunResult {
-  stdout: string;
-  stderr: string;
-  exitCode: number | null;
-  timedOut: boolean;
-  durationMs: number;
-}
-
-interface PythonInterpreter {
-  path: string;
-  version: string;
-  label: string;
-}
-
-
-const DEFAULT_CODE = `# Python 脚本
-# 可通过环境变量获取文档内容：
-#   import os
-#   input_file = os.environ.get('AIDOCPLUS_INPUT_FILE')
-#   if input_file:
-#       with open(input_file, 'r', encoding='utf-8') as f:
-#           content = f.read()
-
-print("Hello from Python!")
-`;
-
-/** 各语言的默认代码模板 */
-const DEFAULT_TEMPLATES: Record<string, string> = {
-  python: DEFAULT_CODE,
-  html: `<!DOCTYPE html>\n<html lang="zh">\n<head>\n    <meta charset="UTF-8">\n    <title>文档</title>\n</head>\n<body>\n    <h1>Hello</h1>\n</body>\n</html>\n`,
-  javascript: `// JavaScript\nconsole.log("Hello!");\n`,
-  typescript: `// TypeScript\nconsole.log("Hello!");\n`,
-  json: `{\n    \n}\n`,
-  markdown: `# 标题\n\n正文内容\n`,
-  css: `/* CSS */\nbody {\n    margin: 0;\n    padding: 0;\n}\n`,
-  text: '',
-};
-
-/** 新建文件类型选项 */
-const NEW_FILE_TYPES = [
-  { ext: 'py', label: 'Python', lang: 'python' },
-  { ext: 'html', label: 'HTML', lang: 'html' },
-  { ext: 'js', label: 'JavaScript', lang: 'javascript' },
-  { ext: 'ts', label: 'TypeScript', lang: 'typescript' },
-  { ext: 'json', label: 'JSON', lang: 'json' },
-  { ext: 'md', label: 'Markdown', lang: 'markdown' },
-  { ext: 'css', label: 'CSS', lang: 'css' },
-  { ext: 'txt', label: '纯文本', lang: 'text' },
-];
-
-/** 支持打开的文件扩展名 */
-const SUPPORTED_EXTENSIONS = ['py','html','htm','js','jsx','ts','tsx','json','md','css','txt','xml','yaml','yml','toml','sh','sql'];
 
 // ── SortableTab 子组件 ──
 
@@ -174,29 +89,20 @@ export function CodingPanel() {
   const {
     tabs, activeTabId, favorites, settings, scriptsDir, initialized, runHistory, recentFiles,
     addTab, removeTab, setActiveTab, updateTab, saveFile, toggleFavorite, updateSettings, reorderTabs,
-    addRunHistory, clearRunHistory, addRecentFile, clearRecentFiles,
+    clearRunHistory, addRecentFile, clearRecentFiles,
   } = store;
 
   const activeTab = useMemo(() => tabs.find(t => t.id === activeTabId) || tabs[0], [tabs, activeTabId]);
 
-  // ── Python 环境（从 Store 缓存读取） ──
-  const pythonInfo = store.pythonInfo;
-  const detecting = store.pythonDetecting;
+  // ── Python 解释器选择器状态 ──
   const [pythonList, setPythonList] = useState<PythonInterpreter[]>([]);
   const [pythonListLoaded, setPythonListLoaded] = useState(false);
   const [pythonPopoverOpen, setPythonPopoverOpen] = useState(false);
 
-  // ── Node.js 环境（从 Store 缓存读取） ──
-  const nodeInfo = store.nodeInfo;
-  const nodeDetecting = store.nodeDetecting;
-
-  // ── 运行状态 ──
-  const [running, setRunning] = useState(false);
-
   // ── 编辑器 ──
   const [outputHeight, setOutputHeight] = useState(settings.outputHeight || 200);
   const [cursorInfo, setCursorInfo] = useState({ line: 1, col: 1 });
-  const [outputPreview, setOutputPreview] = useState(false); // 输出区预览模式
+  const [outputPreview, setOutputPreview] = useState(false);
   const [maximized, setMaximized] = useState<'none' | 'editor' | 'output'>('none');
   const draggingRef = useRef(false);
   const dragStartYRef = useRef(0);
@@ -219,10 +125,8 @@ export function CodingPanel() {
   // ── 收藏面板 ──
   const [favOpen, setFavOpen] = useState(false);
 
-  // ── 输出复制 ──
-  const [outputCopied, setOutputCopied] = useState(false);
+  // ── 输出区 ref（供 CodeMirror 快捷键滚动） ──
   const outputRef = useRef<HTMLPreElement | null>(null);
-  const autoScrollRef = useRef(true);
 
   // ── 编辑器增强 ──
   const editorViewRef = useRef<any>(null);
@@ -234,10 +138,6 @@ export function CodingPanel() {
   const [tabCtxMenu, setTabCtxMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
   const [cmdPaletteOpen, setCmdPaletteOpen] = useState(false);
   const [cmdPaletteQuery, setCmdPaletteQuery] = useState('');
-  const [outputSearchOpen, setOutputSearchOpen] = useState(false);
-  const [outputSearchQuery, setOutputSearchQuery] = useState('');
-  const [outputSearchIdx, setOutputSearchIdx] = useState(0);
-  const outputSearchRef = useRef<HTMLInputElement>(null);
 
   // ── DnD sensors ──
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -245,12 +145,17 @@ export function CodingPanel() {
   // ── 状态栏 ──
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [statusIsError, setStatusIsError] = useState(false);
-  const [lastResult, setLastResult] = useState<ScriptRunResult | null>(null);
 
   const showStatus = useCallback((msg: string, isError = false) => {
     setStatusMsg(msg); setStatusIsError(isError);
     setTimeout(() => setStatusMsg(null), 4000);
   }, []);
+
+  // ── 脚本运行（委托给 hook） ──
+  const {
+    running, lastResult, setLastResult, canRun, handleRun, handleKillScript,
+    pythonInfo, detecting, nodeInfo, nodeDetecting,
+  } = useCodingScriptRunner({ activeTab, showStatus });
 
   // ── API Server 状态 ──
   const [apiReady, setApiReady] = useState(isApiServerReady());
@@ -285,129 +190,24 @@ export function CodingPanel() {
     }
   }, [settings.customNodePath]);
 
+  // ── 运行/保存/跳转行 Refs（供 CodeMirror 快捷键使用） ──
+  const handleRunRef = useRef<(() => void) | null>(null);
+  const handleSaveRef = useRef<(() => void) | null>(null);
+  const gotoLineRef = useRef<(() => void) | null>(null);
+
   // ── CodeMirror 扩展（动态语言加载） ──
-  const [cmLangExts, setCmLangExts] = useState<any[]>([]);
-  const [cmKeymapExts, setCmKeymapExts] = useState<any[]>([]);
-  const [cmTheme, setCmTheme] = useState<any>(undefined);
-
-  // 主题加载函数
-  const loadEditorTheme = useCallback(async (themeId: string) => {
-    if (themeId === 'light') {
-      setCmTheme(undefined);
-    } else if (themeId === 'oneDark') {
-      const m = await import('@codemirror/theme-one-dark');
-      setCmTheme(m.oneDark);
-    } else {
-      // auto: 跟随系统
-      const isDark = document.documentElement.classList.contains('dark');
-      if (isDark) {
-        const m = await import('@codemirror/theme-one-dark');
-        setCmTheme(m.oneDark);
-      } else {
-        setCmTheme(undefined);
-      }
-    }
-  }, []);
-
-  // 加载快捷键（只加载一次）
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const keyMod = await import('@codemirror/view');
-        if (cancelled) return;
-        const runKeymap = keyMod.keymap.of([
-          { key: 'Mod-Enter', run: () => { handleRunRef.current?.(); return true; } },
-          { key: 'Mod-Shift-Enter', run: () => { handleRunRef.current?.(); setTimeout(() => outputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200); return true; } },
-          { key: 'Mod-s', run: () => { handleSaveRef.current?.(); return true; } },
-          { key: 'Mod-g', run: () => { gotoLineRef.current?.(); return true; } },
-        ]);
-        setCmKeymapExts([runKeymap]);
-      } catch (err) {
-        console.warn('加载 CodeMirror 快捷键失败:', err);
-      }
-      try {
-        await loadEditorTheme(settings.editorTheme);
-      } catch { /* ignore */ }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  // 按 activeTab.language 动态加载语言扩展
   const activeLang = activeTab?.language || 'text';
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const langMod = await import('@codemirror/language');
-        const langDataMod = await import('@codemirror/language-data');
-        const { LanguageDescription } = await import('@codemirror/language');
-        if (cancelled) return;
-
-        // 映射语言名 → CodeMirror language-data 名称
-        const cmLangMap: Record<string, string> = {
-          python: 'Python', html: 'HTML', javascript: 'JavaScript', typescript: 'TypeScript',
-          json: 'JSON', markdown: 'Markdown', css: 'CSS', xml: 'XML',
-          yaml: 'YAML', toml: 'TOML', shell: 'Shell', sql: 'SQL',
-        };
-        const cmName = cmLangMap[activeLang];
-        const exts: any[] = [];
-
-        if (cmName) {
-          const desc = LanguageDescription.matchLanguageName(langDataMod.languages, cmName, true);
-          if (desc) {
-            const langSupport = await desc.load();
-            exts.push(langSupport);
-          }
-        }
-
-        // Python 用 4 空格缩进
-        if (activeLang === 'python') {
-          exts.push(langMod.indentUnit.of('    '));
-        } else {
-          exts.push(langMod.indentUnit.of('  '));
-        }
-
-        if (!cancelled) setCmLangExts(exts);
-      } catch (err) {
-        console.warn('加载语言扩展失败:', err);
-        if (!cancelled) setCmLangExts([]);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [activeLang]);
-
-  // word wrap 扩展
-  const [cmWrapExt, setCmWrapExt] = useState<any[]>([]);
-  useEffect(() => {
-    if (wordWrap) {
-      import('@codemirror/view').then(m => setCmWrapExt([m.EditorView.lineWrapping]));
-    } else {
-      setCmWrapExt([]);
-    }
-  }, [wordWrap]);
-
-  // 合并扩展
-  const cmExts = useMemo(() => [...cmLangExts, ...cmKeymapExts, ...cmWrapExt], [cmLangExts, cmKeymapExts, cmWrapExt]);
-
-  // 监听系统主题变化（仅 auto 模式生效）
-  useEffect(() => {
-    const observer = new MutationObserver(() => {
-      if (settings.editorTheme === 'auto') {
-        loadEditorTheme('auto');
-      }
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, [settings.editorTheme, loadEditorTheme]);
-
-  // 响应 editorTheme 设置变化
-  useEffect(() => {
-    loadEditorTheme(settings.editorTheme);
-  }, [settings.editorTheme, loadEditorTheme]);
+  const { cmExts, cmTheme } = useCodingEditorExtensions({
+    activeLang,
+    wordWrap,
+    editorTheme: settings.editorTheme,
+    handleRunRef,
+    handleSaveRef,
+    gotoLineRef,
+    outputRef,
+  });
 
   // ── 编辑器操作 ──
-  const gotoLineRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     gotoLineRef.current = () => { setGotoLineOpen(true); setGotoLineValue(''); };
   }, []);
@@ -451,122 +251,6 @@ export function CodingPanel() {
     if (tab) navigator.clipboard.writeText(tab.filePath);
     setTabCtxMenu(null);
   }, [tabs]);
-
-  // ── 运行脚本 ──
-  const handleRunRef = useRef<(() => void) | null>(null);
-  const handleSaveRef = useRef<(() => void) | null>(null);
-
-  /** 判断当前语言是否支持运行 */
-  const canRun = useMemo(() => {
-    if (activeLang === 'python') return pythonInfo?.available && !detecting;
-    if (activeLang === 'javascript' || activeLang === 'typescript') return nodeInfo?.available && !nodeDetecting;
-    return false;
-  }, [activeLang, pythonInfo, detecting, nodeInfo, nodeDetecting]);
-
-  // 用于存储流式输出行的 ref（避免闭包捕获旧值）
-  const streamLinesRef = useRef<Array<{ text: string; type: 'stdout' | 'stderr' | 'info' }>>([]);
-
-  const handleRun = useCallback(async () => {
-    if (running || !activeTab) return;
-
-    const lang = activeTab.language || 'python';
-    const isPython = lang === 'python';
-    const isNode = lang === 'javascript' || lang === 'typescript';
-
-    if (isPython && !pythonInfo?.available) { showStatus(t('coding.pythonNotFound', { defaultValue: '未找到 Python' }), true); return; }
-    if (isNode && !nodeInfo?.available) { showStatus('未找到 Node.js', true); return; }
-    if (!isPython && !isNode) return;
-
-    setRunning(true);
-    setLastResult(null);
-    const cmdLabel = isPython ? 'python' : 'node';
-    const headerLine = { text: `$ ${cmdLabel} ${activeTab.title}`, type: 'info' as const };
-    streamLinesRef.current = [headerLine];
-    updateTab(activeTab.id, { outputLines: [headerLine], lastExitCode: null });
-
-    // 先保存文件再运行
-    try {
-      await invoke('save_coding_script', { filePath: activeTab.filePath, content: activeTab.code });
-      updateTab(activeTab.id, { dirty: false });
-    } catch { /* ignore save error, still try to run */ }
-
-    const argsArr = settings.extraArgs.trim() ? settings.extraArgs.trim().split(/\s+/) : undefined;
-    const isAbsolute = activeTab.filePath.startsWith('/') || /^[a-zA-Z]:/.test(activeTab.filePath);
-    const scriptFullPath = isAbsolute ? activeTab.filePath : `${scriptsDir}/${activeTab.filePath}`;
-
-    const interpreter = isPython
-      ? (settings.customPythonPath || pythonInfo?.path || 'python3')
-      : (settings.customNodePath || nodeInfo?.path || 'node');
-
-    const tabId = activeTab.id;
-
-    // 监听实时输出
-    const unlistenChunk = await listen<{ stream: string; text: string }>('coding:output:chunk', (event) => {
-      const { stream, text } = event.payload;
-      const line = { text, type: (stream === 'stderr' ? 'stderr' : 'stdout') as 'stdout' | 'stderr' };
-      streamLinesRef.current = [...streamLinesRef.current, line];
-      updateTab(tabId, { outputLines: [...streamLinesRef.current] });
-    });
-
-    // 监听完成事件
-    const unlistenDone = await listen<{ exitCode: number | null; timedOut: boolean; killed: boolean; durationMs: number }>('coding:output:done', (event) => {
-      const { exitCode, timedOut, killed, durationMs } = event.payload;
-
-      if (timedOut) {
-        streamLinesRef.current = [...streamLinesRef.current, { text: `⏱ ${t('coding.timedOut', { defaultValue: '执行超时' })} (${settings.timeout}s)`, type: 'info' }];
-        showStatus(t('coding.timedOut', { defaultValue: '执行超时' }), true);
-      } else if (killed) {
-        streamLinesRef.current = [...streamLinesRef.current, { text: `⚠ ${t('coding.killed', { defaultValue: '已终止' })}`, type: 'info' }];
-        showStatus(t('coding.killed', { defaultValue: '已终止' }), true);
-      } else if (exitCode === 0) {
-        showStatus(`✅ ${(durationMs / 1000).toFixed(2)}s`);
-      } else {
-        showStatus(`❌ ${t('coding.exitCode', { defaultValue: '退出码' })}: ${exitCode}`, true);
-      }
-
-      setLastResult({ stdout: '', stderr: '', exitCode, timedOut, durationMs } as ScriptRunResult);
-      updateTab(tabId, { outputLines: [...streamLinesRef.current], lastExitCode: exitCode });
-      addRunHistory({
-        id: `run_${Date.now()}`,
-        fileName: activeTab.title,
-        language: lang,
-        exitCode,
-        durationMs,
-        timestamp: Date.now(),
-      });
-      setRunning(false);
-      unlistenChunk();
-      unlistenDone();
-    });
-
-    // 发起流式运行
-    try {
-      const envVars: Record<string, string> = { ...(settings.envVars || {}) };
-      if (settings.specifyOutput && settings.outputPath) envVars['AIDOCPLUS_OUTPUT_FILE'] = settings.outputPath;
-      await invoke('run_script_stream', {
-        interpreter,
-        scriptPath: scriptFullPath,
-        args: argsArr || null,
-        envVars: Object.keys(envVars).length > 0 ? envVars : null,
-        timeoutSecs: settings.timeout,
-        cwd: null,
-      });
-    } catch (err) {
-      unlistenChunk();
-      unlistenDone();
-      updateTab(tabId, {
-        outputLines: [headerLine, { text: formatBackendError(err), type: 'stderr' }],
-      });
-      showStatus(formatBackendError(err), true);
-      setRunning(false);
-    }
-  }, [running, activeTab, pythonInfo, nodeInfo, settings, scriptsDir, showStatus, t, updateTab]);
-
-  const handleKillScript = useCallback(async () => {
-    try {
-      await invoke('kill_running_script');
-    } catch { /* ignore */ }
-  }, []);
 
   useEffect(() => { handleRunRef.current = handleRun; }, [handleRun]);
 
@@ -865,21 +549,6 @@ export function CodingPanel() {
     reorderTabs(String(active.id), String(over.id));
   }, [tabs, reorderTabs]);
 
-  // ── 输出智能自动滚动 ──
-  useEffect(() => {
-    const el = outputRef.current;
-    if (el && autoScrollRef.current) {
-      requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
-    }
-  }, [activeTab?.outputLines.length]);
-
-  const handleOutputScroll = useCallback(() => {
-    const el = outputRef.current;
-    if (!el) return;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 30;
-    autoScrollRef.current = atBottom;
-  }, []);
-
   // ── Python 状态指示（可点击切换解释器） ──
   const pythonStatusEl = useMemo(() => {
     if (detecting) return <span className="text-sm text-muted-foreground flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />{t('coding.detecting', { defaultValue: '检测中...' })}</span>;
@@ -934,32 +603,6 @@ export function CodingPanel() {
     if (lastResult.exitCode === 0) return <span className="flex items-center gap-1 text-green-600 dark:text-green-400"><CheckCircle className="h-3 w-3" />{(lastResult.durationMs / 1000).toFixed(2)}s</span>;
     return <span className="flex items-center gap-1 text-destructive"><XCircle className="h-3 w-3" />{t('coding.exitCode', { defaultValue: '退出码' })}: {lastResult.exitCode} ({(lastResult.durationMs / 1000).toFixed(2)}s)</span>;
   }, [running, lastResult, t]);
-
-  // ── 输出区搜索匹配 ──
-  const outputSearchMatches = useMemo(() => {
-    if (!outputSearchQuery || !activeTab) return [];
-    const q = outputSearchQuery.toLowerCase();
-    const matches: number[] = [];
-    activeTab.outputLines.forEach((line, i) => {
-      if (line.text.toLowerCase().includes(q)) matches.push(i);
-    });
-    return matches;
-  }, [outputSearchQuery, activeTab?.outputLines]);
-
-  const handleOutputSearchNav = useCallback((dir: 1 | -1) => {
-    if (outputSearchMatches.length === 0) return;
-    const next = (outputSearchIdx + dir + outputSearchMatches.length) % outputSearchMatches.length;
-    setOutputSearchIdx(next);
-    // 滚动到匹配行
-    const el = outputRef.current;
-    if (el) {
-      const lineEls = el.querySelectorAll('[data-output-line]');
-      const targetLine = outputSearchMatches[next];
-      if (lineEls[targetLine]) {
-        lineEls[targetLine].scrollIntoView({ block: 'center', behavior: 'smooth' });
-      }
-    }
-  }, [outputSearchMatches, outputSearchIdx]);
 
   // 文件名
   const fileName = useMemo(() => {
@@ -1125,142 +768,14 @@ export function CodingPanel() {
           <Keyboard className="h-3 w-3" />
         </Button>
         {/* 设置 Popover */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 text-base px-2" title={t('coding.settings', { defaultValue: '设置' })}>
-              <Settings className="h-3 w-3" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent side="bottom" align="end" className="w-72 p-3 space-y-2.5">
-            <p className="text-base font-semibold">{t('coding.settings', { defaultValue: '设置' })}</p>
-            {/* Python 专属设置 */}
-            {activeLang === 'python' && (
-              <div className="space-y-0.5">
-                <Label className="text-sm">{t('coding.pythonPath', { defaultValue: 'Python 路径' })}</Label>
-                <Input value={settings.customPythonPath} onChange={e => updateSettings({ customPythonPath: e.target.value })}
-                  placeholder={t('coding.pythonPathPlaceholder', { defaultValue: '留空自动检测' })} className="h-8 text-base" />
-              </div>
-            )}
-            {/* Node.js 专属设置 */}
-            {(activeLang === 'javascript' || activeLang === 'typescript') && (
-              <div className="space-y-0.5">
-                <Label className="text-sm">Node.js 路径</Label>
-                <Input value={settings.customNodePath} onChange={e => updateSettings({ customNodePath: e.target.value })}
-                  placeholder="留空自动检测" className="h-8 text-base" />
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              <Label className="text-sm flex-1">{t('coding.timeout', { defaultValue: '超时(秒)' })}</Label>
-              <Input type="number" value={settings.timeout} min={5} max={300}
-                onChange={e => updateSettings({ timeout: Number(e.target.value) })}
-                className="h-8 text-base w-20" />
-            </div>
-            <div className="space-y-0.5">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm">{t('coding.fontSize', { defaultValue: '字号' })}</Label>
-                <span className="text-sm font-mono text-muted-foreground">{settings.fontSize}px</span>
-              </div>
-              <input type="range" min={10} max={20} step={1} value={settings.fontSize}
-                onChange={e => updateSettings({ fontSize: Number(e.target.value) })}
-                className="w-full h-1.5 accent-primary" />
-            </div>
-            <div className="space-y-0.5">
-              <Label className="text-sm">{t('coding.editorTheme', { defaultValue: '编辑器主题' })}</Label>
-              <div className="flex gap-1">
-                {[
-                  { id: 'auto', label: t('coding.themeAuto', { defaultValue: '自动' }) },
-                  { id: 'light', label: t('coding.themeLight', { defaultValue: '浅色' }) },
-                  { id: 'oneDark', label: 'One Dark' },
-                ].map(th => (
-                  <Button key={th.id} variant={settings.editorTheme === th.id ? 'default' : 'outline'}
-                    size="sm" className="h-6 text-xs flex-1"
-                    onClick={() => updateSettings({ editorTheme: th.id })}>
-                    {th.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <Label className="text-sm">{t('coding.passDocContent', { defaultValue: '传入文档内容' })}</Label>
-              <Switch checked={settings.passDocContent} onCheckedChange={v => updateSettings({ passDocContent: v })} />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label className="text-sm">{t('coding.specifyOutput', { defaultValue: '指定输出路径' })}</Label>
-              <Switch checked={settings.specifyOutput} onCheckedChange={v => updateSettings({ specifyOutput: v })} />
-            </div>
-            {settings.specifyOutput && (
-              <div className="flex items-center gap-1.5">
-                <Input value={settings.outputPath} onChange={e => updateSettings({ outputPath: e.target.value })}
-                  placeholder={t('coding.outputPath', { defaultValue: '输出文件路径' })} className="h-8 text-base flex-1" />
-                <Button variant="outline" size="sm" className="h-8 text-base"
-                  onClick={async () => { const p = await save({ defaultPath: 'output.txt' }); if (p) updateSettings({ outputPath: p }); }}>
-                  {t('coding.selectOutputPath', { defaultValue: '选择' })}
-                </Button>
-              </div>
-            )}
-            <div className="space-y-0.5">
-              <Label className="text-sm">{t('coding.extraArgs', { defaultValue: '额外参数' })}</Label>
-              <Input value={settings.extraArgs} onChange={e => updateSettings({ extraArgs: e.target.value })}
-                placeholder={t('coding.extraArgsPlaceholder', { defaultValue: '传递给脚本的额外参数' })} className="h-8 text-base" />
-            </div>
-            {/* 环境变量编辑器 */}
-            <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm">{t('coding.envVars', { defaultValue: '环境变量' })}</Label>
-                <Button variant="ghost" size="sm" className="h-5 px-1 text-[10px]"
-                  onClick={() => {
-                    const vars = { ...settings.envVars };
-                    const key = `VAR_${Object.keys(vars).length + 1}`;
-                    vars[key] = '';
-                    updateSettings({ envVars: vars });
-                  }}>+ {t('coding.addEnvVar', { defaultValue: '添加' })}</Button>
-              </div>
-              {Object.entries(settings.envVars || {}).map(([k, v]) => (
-                <div key={k} className="flex items-center gap-1">
-                  <Input value={k} className="h-6 text-xs flex-1 font-mono" title={t('coding.envKey', { defaultValue: '变量名' })}
-                    onChange={e => {
-                      const vars = { ...settings.envVars };
-                      const val = vars[k]; delete vars[k]; vars[e.target.value] = val;
-                      updateSettings({ envVars: vars });
-                    }} />
-                  <span className="text-muted-foreground">=</span>
-                  <Input value={v} className="h-6 text-xs flex-1 font-mono" title={t('coding.envValue', { defaultValue: '值' })}
-                    onChange={e => updateSettings({ envVars: { ...settings.envVars, [k]: e.target.value } })} />
-                  <button className="p-0.5 hover:bg-muted rounded" title={t('common.delete', { defaultValue: '删除' })}
-                    onClick={() => { const vars = { ...settings.envVars }; delete vars[k]; updateSettings({ envVars: vars }); }}>
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-            {/* 运行历史 */}
-            {runHistory.length > 0 && (
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm">{t('coding.runHistory', { defaultValue: '运行历史' })}</Label>
-                  <Button variant="ghost" size="sm" className="h-5 px-1 text-[10px]"
-                    onClick={clearRunHistory}>{t('coding.clearHistory', { defaultValue: '清除' })}</Button>
-                </div>
-                <div className="max-h-28 overflow-y-auto space-y-0.5">
-                  {runHistory.slice(0, 10).map(h => (
-                    <div key={h.id} className="flex items-center gap-1.5 text-[10px] font-mono">
-                      {h.exitCode === 0
-                        ? <CheckCircle className="h-2.5 w-2.5 text-green-500 flex-shrink-0" />
-                        : <XCircle className="h-2.5 w-2.5 text-red-500 flex-shrink-0" />}
-                      <span className="truncate flex-1">{h.fileName}</span>
-                      <span className="text-muted-foreground">{(h.durationMs / 1000).toFixed(1)}s</span>
-                      <span className="text-muted-foreground">{new Date(h.timestamp).toLocaleTimeString()}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div className="space-y-0.5">
-              <Label className="text-sm">{t('coding.scriptsDir', { defaultValue: '脚本目录' })}</Label>
-              <div className="text-sm text-muted-foreground font-mono bg-muted/30 px-2 py-1 rounded break-all">{scriptsDir}</div>
-            </div>
-          </PopoverContent>
-        </Popover>
+        <CodingSettingsPopover
+          activeLang={activeLang}
+          settings={settings}
+          updateSettings={updateSettings}
+          runHistory={runHistory}
+          clearRunHistory={clearRunHistory}
+          scriptsDir={scriptsDir}
+        />
         <div className="w-px h-5 bg-border" />
         <Button
           variant={assistantOpen ? 'default' : 'outline'}
@@ -1479,154 +994,18 @@ export function CodingPanel() {
       )}
 
       {/* ═══ 输出区（固定高度 + 拖拽调整） ═══ */}
-      <div className={`flex-shrink-0 flex flex-col ${maximized === 'editor' ? 'hidden' : maximized === 'output' ? 'flex-1' : ''}`}
-        style={maximized === 'output' ? { minHeight: 0 } : { height: outputHeight, minHeight: 80 }}>
-        {/* 输出标题栏 */}
-        <div className="flex-shrink-0 flex items-center gap-2 px-3 py-1 border-b bg-muted/20">
-          <span className="text-xs font-medium">{t('coding.output', { defaultValue: '输出' })}</span>
-          {outputStatusEl && <span className="text-[11px]">{outputStatusEl}</span>}
-          <div className="flex-1" />
-          {activeTab && activeTab.outputLines.length > 0 && (
-            <>
-              {/* 预览/原始切换 */}
-              <Button variant={outputPreview ? 'default' : 'ghost'} size="sm" className="h-5 px-1.5 text-[10px] gap-0.5"
-                onClick={() => setOutputPreview(v => !v)}
-                title={outputPreview ? '原始输出' : '预览'}>
-                <Eye className="h-2.5 w-2.5" />
-                {outputPreview ? '原始' : '预览'}
-              </Button>
-              <Button variant="ghost" size="sm" className="h-5 px-1.5 text-[10px] gap-0.5"
-                onClick={() => {
-                  const text = activeTab.outputLines.map(l => l.text).join('\n');
-                  navigator.clipboard.writeText(text).then(() => {
-                    setOutputCopied(true);
-                    setTimeout(() => setOutputCopied(false), 2000);
-                  });
-                }}
-                title={t('coding.copyOutput', { defaultValue: '复制输出' })}>
-                {outputCopied ? <Check className="h-2.5 w-2.5 text-green-500" /> : <Copy className="h-2.5 w-2.5" />}
-                {outputCopied ? t('coding.copied', { defaultValue: '已复制' }) : t('coding.copy', { defaultValue: '复制' })}
-              </Button>
-              <Button variant="ghost" size="sm" className="h-5 px-1.5 text-[10px] gap-0.5"
-                onClick={() => { setOutputSearchOpen(v => !v); setTimeout(() => outputSearchRef.current?.focus(), 50); }}
-                title={t('coding.searchOutput', { defaultValue: '搜索输出' })}>
-                <Search className="h-2.5 w-2.5" />
-              </Button>
-              <Button variant="ghost" size="sm" className="h-5 px-1.5 text-[10px] gap-0.5"
-                onClick={() => { updateTab(activeTab.id, { outputLines: [], lastExitCode: null }); setLastResult(null); setOutputPreview(false); setOutputSearchOpen(false); setOutputSearchQuery(''); }}>
-                <Trash2 className="h-2.5 w-2.5" />{t('coding.clearOutput', { defaultValue: '清除' })}
-              </Button>
-            </>
-          )}
-          <button
-            onClick={() => setMaximized(v => v === 'output' ? 'none' : 'output')}
-            className="p-0.5 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-            title={maximized === 'output' ? '还原' : '最大化输出区'}>
-            {maximized === 'output' ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
-          </button>
-        </div>
-
-        {/* 输出搜索条 */}
-        {outputSearchOpen && (
-          <div className="flex-shrink-0 flex items-center gap-1 px-2 py-1 border-b bg-muted/30">
-            <Search className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-            <input
-              ref={outputSearchRef}
-              className="flex-1 bg-transparent border-none outline-none text-xs h-5 placeholder:text-muted-foreground/50"
-              placeholder={t('coding.searchOutput', { defaultValue: '搜索输出...' })}
-              title={t('coding.searchOutput', { defaultValue: '搜索输出' })}
-              value={outputSearchQuery}
-              onChange={e => { setOutputSearchQuery(e.target.value); setOutputSearchIdx(0); }}
-              onKeyDown={e => {
-                if (e.key === 'Enter') { handleOutputSearchNav(e.shiftKey ? -1 : 1); }
-                if (e.key === 'Escape') { setOutputSearchOpen(false); setOutputSearchQuery(''); }
-              }}
-            />
-            <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-              {outputSearchQuery ? `${outputSearchMatches.length > 0 ? outputSearchIdx + 1 : 0}/${outputSearchMatches.length}` : ''}
-            </span>
-            <button onClick={() => handleOutputSearchNav(-1)} className="p-0.5 hover:bg-muted rounded" title={t('coding.prevMatch', { defaultValue: '上一个' })}>
-              <ArrowUp className="h-3 w-3" />
-            </button>
-            <button onClick={() => handleOutputSearchNav(1)} className="p-0.5 hover:bg-muted rounded" title={t('coding.nextMatch', { defaultValue: '下一个' })}>
-              <ArrowDown className="h-3 w-3" />
-            </button>
-            <button onClick={() => { setOutputSearchOpen(false); setOutputSearchQuery(''); }} className="p-0.5 hover:bg-muted rounded" title={t('common.close', { defaultValue: '关闭' })}>
-              <X className="h-3 w-3" />
-            </button>
-          </div>
-        )}
-
-        {/* 输出内容 — 支持原始/预览两种模式 */}
-        <div className="flex-1 min-h-0 overflow-hidden relative">
-          {activeTab && activeTab.outputLines.length > 0 ? (
-            outputPreview ? (
-              // 预览模式
-              <div className="h-full overflow-auto px-3 py-2">
-                {(() => {
-                  const outputText = activeTab.outputLines.filter(l => l.type === 'stdout').map(l => l.text).join('\n');
-                  const isHtml = activeLang === 'html' || /^\s*<!DOCTYPE|^\s*<html/i.test(outputText);
-                  if (isHtml) {
-                    return <iframe srcDoc={outputText} sandbox="allow-scripts allow-same-origin" className="w-full h-full border rounded bg-white" title="HTML 预览" />;
-                  }
-                  return <MarkdownPreview content={outputText} theme={document.documentElement.classList.contains('dark') ? 'dark' : 'light'} fontSize={settings.fontSize} />;
-                })()}
-              </div>
-            ) : (
-              // 原始模式
-              <pre
-                ref={outputRef}
-                onScroll={handleOutputScroll}
-                className="h-full overflow-auto px-3 py-2 text-[12px] leading-relaxed font-mono whitespace-pre-wrap break-words select-text"
-                style={{ fontSize: `${Math.max(settings.fontSize - 1, 11)}px` }}
-              >
-                {activeTab.outputLines.map((line, i) => {
-                  const baseClass = line.type === 'stderr' ? 'text-red-500 dark:text-red-400' :
-                    line.type === 'info' ? 'text-blue-500 dark:text-blue-400 opacity-70' : 'text-foreground';
-                  const isMatch = outputSearchQuery && outputSearchMatches.includes(i);
-                  const isCurrent = isMatch && outputSearchMatches[outputSearchIdx] === i;
-                  const highlightClass = isCurrent ? 'bg-yellow-300 dark:bg-yellow-700' : isMatch ? 'bg-yellow-100 dark:bg-yellow-900/40' : '';
-                  const hasAnsi = line.type === 'stdout' && /\x1b\[/.test(line.text);
-                  if (hasAnsi) {
-                    const parts = parseAnsiLine(line.text);
-                    return <span key={i} data-output-line={i} className={`block ${highlightClass}`}>{parts.map((p, j) =>
-                      p.className ? <span key={j} className={p.className}>{p.text}</span> : p.text
-                    )}</span>;
-                  }
-                  // 图片路径检测：绝对路径 + 图片扩展名
-                  const trimmed = line.text.trim();
-                  const imgMatch = /^(\/[^\s]+\.(png|jpg|jpeg|gif|bmp|svg|webp))$/i.test(trimmed)
-                    || /^([A-Z]:\\[^\s]+\.(png|jpg|jpeg|gif|bmp|svg|webp))$/i.test(trimmed);
-                  if (imgMatch && line.type === 'stdout') {
-                    const imgPath = trimmed;
-                    return (
-                      <span key={i} data-output-line={i} className={`block ${highlightClass}`}>
-                        <span className="text-xs text-muted-foreground">{imgPath}</span>
-                        <img
-                          src={`https://asset.localhost/${encodeURIComponent(imgPath)}`}
-                          alt={imgPath.replace(/^.*[\\/]/, '')}
-                          className="max-w-full max-h-[300px] rounded border mt-1 mb-1"
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        />
-                      </span>
-                    );
-                  }
-                  return <span key={i} data-output-line={i} className={`block ${baseClass} ${highlightClass}`}>{line.text}</span>;
-                })}
-              </pre>
-            )
-          ) : (
-            <div className="h-full flex items-center justify-center text-muted-foreground/40 text-sm">
-              {(activeLang === 'python' || activeLang === 'javascript' || activeLang === 'typescript')
-                ? `${navigator.platform?.includes('Mac') ? '⌘' : 'Ctrl'}+Shift+Enter ${t('coding.run', { defaultValue: '运行' })}`
-                : (activeLang === 'html' || activeLang === 'markdown')
-                  ? t('coding.clickPreview', { defaultValue: '点击"预览"按钮查看效果' })
-                  : t('coding.editMode', { defaultValue: '编辑模式' })
-              }
-            </div>
-          )}
-        </div>
-      </div>
+      <CodingOutput
+        outputLines={activeTab?.outputLines || []}
+        activeLang={activeLang}
+        fontSize={settings.fontSize}
+        maximized={maximized}
+        outputHeight={outputHeight}
+        outputStatusEl={outputStatusEl}
+        outputPreview={outputPreview}
+        onOutputPreviewChange={setOutputPreview}
+        onClear={() => { if (activeTab) { updateTab(activeTab.id, { outputLines: [], lastExitCode: null }); setLastResult(null); } }}
+        onMaximize={() => setMaximized(v => v === 'output' ? 'none' : 'output')}
+      />
 
       {/* ═══ 折叠面板：收藏脚本 ═══ */}
       {favorites.length > 0 && (

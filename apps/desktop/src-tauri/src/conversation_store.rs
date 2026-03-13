@@ -1,7 +1,7 @@
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use crate::database::Database;
-use crate::error::{AppError, Result};
+use crate::error::{AppError, Result, ResultExt};
 
 /// 对话记录（不含消息）
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,7 +51,7 @@ pub fn list_conversations(db: &Database) -> Result<Vec<ConversationRecord>> {
     let mut stmt = conn.prepare(
         "SELECT id, document_id, title, created_at, updated_at, is_pinned
          FROM conversations ORDER BY is_pinned DESC, updated_at DESC"
-    ).map_err(|e| AppError::Internal(format!("查询对话列表失败: {}", e)))?;
+    ).context("查询对话列表失败")?;
 
     let records = stmt.query_map([], |row| {
         Ok(ConversationRecord {
@@ -62,7 +62,7 @@ pub fn list_conversations(db: &Database) -> Result<Vec<ConversationRecord>> {
             updated_at: row.get(4)?,
             is_pinned: row.get::<_, i32>(5)? != 0,
         })
-    }).map_err(|e| AppError::Internal(format!("查询对话列表失败: {}", e)))?
+    }).context("查询对话列表失败")?
     .filter_map(|r| r.ok())
     .collect();
 
@@ -70,6 +70,7 @@ pub fn list_conversations(db: &Database) -> Result<Vec<ConversationRecord>> {
 }
 
 /// 获取完整对话（含消息）
+#[allow(dead_code)]
 pub fn get_conversation(db: &Database, conversation_id: &str) -> Result<FullConversation> {
     let conn = db.conversations();
 
@@ -131,7 +132,7 @@ pub fn create_conversation(db: &Database, id: &str, document_id: &str, title: &s
         "INSERT INTO conversations (id, document_id, title, created_at, updated_at, is_pinned)
          VALUES (?1, ?2, ?3, ?4, ?4, 0)",
         params![id, document_id, title, created_at],
-    ).map_err(|e| AppError::Internal(format!("创建对话失败: {}", e)))?;
+    ).context("创建对话失败")?;
 
     Ok(())
 }
@@ -151,13 +152,13 @@ pub fn add_message(db: &Database, conversation_id: &str, msg: &MessageRecord) ->
             now,
             msg.context_mode,
         ],
-    ).map_err(|e| AppError::Internal(format!("添加消息失败: {}", e)))?;
+    ).context("添加消息失败")?;
 
     // 更新对话的 updatedAt
     conn.execute(
         "UPDATE conversations SET updated_at = ?1 WHERE id = ?2",
         params![now, conversation_id],
-    ).map_err(|e| AppError::Internal(format!("更新对话时间失败: {}", e)))?;
+    ).context("更新对话时间失败")?;
 
     Ok(())
 }
@@ -168,7 +169,7 @@ pub fn rename_conversation(db: &Database, conversation_id: &str, title: &str) ->
     conn.execute(
         "UPDATE conversations SET title = ?1 WHERE id = ?2",
         params![title, conversation_id],
-    ).map_err(|e| AppError::Internal(format!("重命名对话失败: {}", e)))?;
+    ).context("重命名对话失败")?;
 
     Ok(())
 }
@@ -179,7 +180,7 @@ pub fn pin_conversation(db: &Database, conversation_id: &str, pinned: bool) -> R
     conn.execute(
         "UPDATE conversations SET is_pinned = ?1 WHERE id = ?2",
         params![pinned as i32, conversation_id],
-    ).map_err(|e| AppError::Internal(format!("切换置顶失败: {}", e)))?;
+    ).context("切换置顶失败")?;
 
     Ok(())
 }
@@ -191,7 +192,7 @@ pub fn delete_conversation(db: &Database, conversation_id: &str) -> Result<()> {
     conn.execute(
         "DELETE FROM conversations WHERE id = ?1",
         params![conversation_id],
-    ).map_err(|e| AppError::Internal(format!("删除对话失败: {}", e)))?;
+    ).context("删除对话失败")?;
 
     Ok(())
 }
@@ -204,7 +205,7 @@ pub fn update_last_message(db: &Database, conversation_id: &str, content: &str) 
             SELECT rowid FROM messages WHERE conversation_id = ?2 ORDER BY timestamp DESC LIMIT 1
         )",
         params![content, conversation_id],
-    ).map_err(|e| AppError::Internal(format!("更新消息失败: {}", e)))?;
+    ).context("更新消息失败")?;
 
     Ok(())
 }
@@ -215,7 +216,7 @@ pub fn bulk_import_conversations(db: &Database, conversations: &[FullConversatio
     let mut count = 0usize;
 
     conn.execute_batch("BEGIN TRANSACTION")
-        .map_err(|e| AppError::Internal(format!("开启事务失败: {}", e)))?;
+        .context("开启事务失败")?;
 
     for conv in conversations {
         let result = conn.execute(
@@ -251,7 +252,7 @@ pub fn bulk_import_conversations(db: &Database, conversations: &[FullConversatio
     }
 
     conn.execute_batch("COMMIT")
-        .map_err(|e| AppError::Internal(format!("提交事务失败: {}", e)))?;
+        .context("提交事务失败")?;
 
     Ok(count)
 }
@@ -263,7 +264,7 @@ pub fn is_empty(db: &Database) -> Result<bool> {
         "SELECT COUNT(*) FROM conversations",
         [],
         |row| row.get(0),
-    ).map_err(|e| AppError::Internal(format!("查询对话数失败: {}", e)))?;
+    ).context("查询对话数失败")?;
 
     Ok(count == 0)
 }
@@ -274,7 +275,7 @@ fn get_messages(conn: &rusqlite::Connection, conversation_id: &str) -> Result<Ve
     let mut stmt = conn.prepare(
         "SELECT role, content, timestamp, context_mode
          FROM messages WHERE conversation_id = ?1 ORDER BY timestamp ASC"
-    ).map_err(|e| AppError::Internal(format!("查询消息失败: {}", e)))?;
+    ).context("查询消息失败")?;
 
     let messages = stmt.query_map(params![conversation_id], |row| {
         Ok(MessageRecord {
@@ -283,7 +284,7 @@ fn get_messages(conn: &rusqlite::Connection, conversation_id: &str) -> Result<Ve
             timestamp: row.get(2)?,
             context_mode: row.get(3)?,
         })
-    }).map_err(|e| AppError::Internal(format!("查询消息失败: {}", e)))?
+    }).context("查询消息失败")?
     .filter_map(|r| r.ok())
     .collect();
 

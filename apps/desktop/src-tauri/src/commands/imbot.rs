@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 /// IM Bot 子进程全局状态
 pub struct ImBotState {
@@ -21,17 +21,23 @@ pub struct ImBotStatus {
     pub running: bool,
 }
 
-/// 定位 im-bot 项目目录
-/// 开发模式：从源码目录向上查找 apps/im-bot
-/// 生产模式：~/.aidocplus/im-bot（需用户部署）
-fn find_imbot_dir() -> Option<std::path::PathBuf> {
-    // 开发模式：从当前工作目录向上查找 apps/im-bot
+/// IM Bot 运行模式
+enum ImBotMode {
+    /// 开发模式：npx tsx src/index.ts，工作目录为 im-bot 源码目录
+    Dev { imbot_dir: std::path::PathBuf },
+    /// 生产模式：node imbot-bundle.mjs，bundle 文件在 bundled-resources 中
+    Bundle { bundle_path: std::path::PathBuf },
+}
+
+/// 定位 IM Bot 并确定运行模式
+fn find_imbot(app: &AppHandle) -> Option<ImBotMode> {
+    // 1. 开发模式：从当前工作目录向上查找 apps/im-bot
     if let Ok(cwd) = std::env::current_dir() {
         let mut dir = cwd.as_path();
         loop {
             let candidate = dir.join("apps").join("im-bot");
             if candidate.join("src").join("index.ts").exists() {
-                return Some(candidate);
+                return Some(ImBotMode::Dev { imbot_dir: candidate });
             }
             match dir.parent() {
                 Some(p) => dir = p,
@@ -40,36 +46,41 @@ fn find_imbot_dir() -> Option<std::path::PathBuf> {
         }
     }
 
-    // 生产模式：~/.aidocplus/im-bot
+    // 2. 生产模式：bundled resources 中的 imbot-bundle.mjs
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        let bundle_path = resource_dir.join("bundled-resources").join("imbot-bundle.mjs");
+        if bundle_path.exists() {
+            return Some(ImBotMode::Bundle { bundle_path });
+        }
+    }
+
+    // 3. 备用：~/.aidocplus/im-bot 源码目录
     if let Some(home) = dirs::home_dir() {
         let candidate = home.join(".aidocplus").join("im-bot");
         if candidate.join("src").join("index.ts").exists() {
-            return Some(candidate);
+            return Some(ImBotMode::Dev { imbot_dir: candidate });
         }
     }
 
     None
 }
 
-/// 查找 npx 可执行文件路径
-fn find_npx() -> String {
+/// 查找可执行文件路径（node 或 npx）
+fn find_executable(name: &str) -> String {
     // macOS / Linux：常见路径
-    for path in &[
-        "/usr/local/bin/npx",
-        "/opt/homebrew/bin/npx",
-        "/usr/bin/npx",
-    ] {
-        if std::path::Path::new(path).exists() {
-            return path.to_string();
+    for prefix in &["/usr/local/bin", "/opt/homebrew/bin", "/usr/bin"] {
+        let p = format!("{}/{}", prefix, name);
+        if std::path::Path::new(&p).exists() {
+            return p;
         }
     }
 
     // 尝试从 PATH 环境变量查找
     if let Ok(path_var) = std::env::var("PATH") {
         for dir in path_var.split(':') {
-            let npx_path = std::path::Path::new(dir).join("npx");
-            if npx_path.exists() {
-                return npx_path.to_string_lossy().to_string();
+            let full = std::path::Path::new(dir).join(name);
+            if full.exists() {
+                return full.to_string_lossy().to_string();
             }
         }
     }
@@ -77,27 +88,26 @@ fn find_npx() -> String {
     // Windows
     #[cfg(target_os = "windows")]
     {
-        for path in &[
-            "C:\\Program Files\\nodejs\\npx.cmd",
-            "C:\\Program Files (x86)\\nodejs\\npx.cmd",
-        ] {
-            if std::path::Path::new(path).exists() {
-                return path.to_string();
+        let win_name = if name == "node" { "node.exe" } else { &format!("{}.cmd", name) };
+        for prefix in &["C:\\Program Files\\nodejs", "C:\\Program Files (x86)\\nodejs"] {
+            let p = format!("{}\\{}", prefix, win_name);
+            if std::path::Path::new(&p).exists() {
+                return p;
             }
         }
     }
 
     // 回退：依赖 PATH
-    "npx".to_string()
+    name.to_string()
 }
 
 /// 启动 IM Bot 子进程
 #[tauri::command]
 pub async fn start_imbot(
-    _app: AppHandle,
+    app: AppHandle,
     state: tauri::State<'_, ImBotState>,
 ) -> crate::error::Result<ImBotStatus> {
-    use crate::error::AppError;
+    use crate::error::{AppError, ResultExt};
     // 检查是否已在运行
     {
         let guard = state.child.lock().await;
@@ -110,18 +120,28 @@ pub async fn start_imbot(
         }
     }
 
-    let imbot_dir = find_imbot_dir()
-        .ok_or_else(|| AppError::Internal("找不到 IM Bot 目录。请确认 apps/im-bot 目录存在。".to_string()))?;
+    let mode = find_imbot(&app)
+        .ok_or_else(|| AppError::Internal("找不到 IM Bot。请确认 apps/im-bot 目录存在或应用已正确安装。".to_string()))?;
 
-    let npx = find_npx();
-
-    println!("[IM Bot] 启动 IM Bot: {} tsx src/index.ts", npx);
-    println!("[IM Bot] 工作目录: {:?}", imbot_dir);
-
-    let mut cmd = tokio::process::Command::new(&npx);
-    cmd.arg("tsx");
-    cmd.arg("src/index.ts");
-    cmd.current_dir(&imbot_dir);
+    let mut cmd = match &mode {
+        ImBotMode::Dev { imbot_dir } => {
+            let npx = find_executable("npx");
+            println!("[IM Bot] 开发模式: {} tsx src/index.ts", npx);
+            println!("[IM Bot] 工作目录: {:?}", imbot_dir);
+            let mut c = tokio::process::Command::new(&npx);
+            c.arg("tsx");
+            c.arg("src/index.ts");
+            c.current_dir(imbot_dir);
+            c
+        }
+        ImBotMode::Bundle { bundle_path } => {
+            let node = find_executable("node");
+            println!("[IM Bot] 生产模式: {} {:?}", node, bundle_path);
+            let mut c = tokio::process::Command::new(&node);
+            c.arg(bundle_path);
+            c
+        }
+    };
 
     // 注入 API 连接信息
     if let Some((port, token)) = crate::api_server::get_api_connection_info() {
@@ -146,9 +166,9 @@ pub async fn start_imbot(
     let _ = std::fs::create_dir_all(&log_dir);
     let log_path = log_dir.join("imbot.log");
     let stdout_file = std::fs::File::create(&log_path)
-        .map_err(|e| AppError::Internal(format!("创建 IM Bot 日志文件失败: {}", e)))?;
+        .context("创建 IM Bot 日志文件失败")?;
     let stderr_file = stdout_file.try_clone()
-        .map_err(|e| AppError::Internal(format!("克隆日志文件句柄失败: {}", e)))?;
+        .context("克隆日志文件句柄失败")?;
     cmd.stdout(std::process::Stdio::from(stdout_file));
     cmd.stderr(std::process::Stdio::from(stderr_file));
     println!("[IM Bot] 日志文件: {:?}", log_path);
