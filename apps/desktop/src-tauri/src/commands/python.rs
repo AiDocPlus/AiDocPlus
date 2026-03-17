@@ -217,7 +217,7 @@ fn discover_pythons_sync() -> Vec<PythonInterpreter> {
                 "/Library/Frameworks/Python.framework/Versions/Current/bin/python3",
             ]
         }
-        #[cfg(target_os = "windows")]
+        #[cfg(not(target_os = "macos"))]
         { vec![] }
     };
 

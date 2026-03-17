@@ -289,5 +289,10 @@ pub fn show_in_folder(path: String) -> Result<()> {
             .context("打开资源管理器失败")?;
     }
 
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        let _ = &target;
+    }
+
     Ok(())
 }
