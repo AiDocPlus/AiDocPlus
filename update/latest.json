@@ -1,19 +1,19 @@
 {
-  "version": "0.3.7",
-  "notes": "AiDocPlus v0.3.7: 重构编辑器工具栏、优化AI侧边栏布局、编程区修复、多项改进",
-  "pub_date": "2026-03-13T14:07:46.159Z",
+  "version": "0.3.8",
+  "notes": "AiDocPlus v0.3.8",
+  "pub_date": "2026-03-17T13:32:37Z",
   "platforms": {
     "darwin-aarch64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRXFJZVBONFpQWlc0dHZGazM3aE1ObVd3QlhOSlFQOWlaZ1JmeFB0VDVJTEFsZkNmenFzOFRjTlJXSkRmakJCR05DM1ozUFZVNGl6SGd1cHlpUitsQmdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczNDA5OTk5CWZpbGU6QWlEb2NQbHVzLmFwcC50YXIuZ3oKWWtQK0xWV0xsVTByeE9vTVVCMUs1T3ZRUkg0ZFh4S1VtM3N0L3BGZXM0VWcwMkVSZWdaZDR1OTZXSnA3UW5qbUhaT2lKKzZLa0pmN3VSR1I2YXc1Q3c9PQo=",
-      "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.7/AiDocPlus.app.tar.gz"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRWs0Z0dBUm16c09KaGVjaDI5a0RabWVIa2xncHhaRWtTWjFhZCtGUi90Ukh4NWNDeXI2NjBHTk5xMVcyQStldmFRc21aZ0JCeXZ6OTUzeWdUdTFYSkFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczNzUzNDAxCWZpbGU6QWlEb2NQbHVzLmFwcC50YXIuZ3oKQTFSdnVtM1pCRVBvejZFZTQ5SWRzNDFmaTJsdVpnTUxMb0FUK3RrZ0NaSDUzUXU1a2JFaFk4TzA2KzhVQURUcXdQNU5kRnNXNFBFS1NYcGZDei9sQVE9PQo=",
+      "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.8/AiDocPlus.app.tar.gz"
     },
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRWdrN3BCejhPeU1RYURkenp0WVZ3NGV1cUZkSHRnbjhPWjVsZ1I4b0JLcGNUSWRTSTNSV2c2QzdpempoNTZDZGZUcVNCQUNra0s3UlZFYUJBeEJJWGdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczNDEwODY0CWZpbGU6QWlEb2NQbHVzXzAuMy43X3g2NC1zZXR1cC5leGUKaEhYMFFiL095YVBHb3BzWGpEbk9WUjZ0UURjTFpjM0ZXSlZuREp5dHV4NWpYSm15blVEVlFKMlVzZjJ2bmU5N1RacVFzaDVvZjBNMGtiN1ZqbjJLQ1E9PQo=",
-      "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.7/AiDocPlus_0.3.7_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRWhpNHZzaWZLY3d4L0FZNSszdGR5MjFzdHd6YVZZUGNTSjhGK0dEb1A3Q0dYcjJvOXFRcWczREd6M2hPMWo5ZkFkSDBXNWNKMVk3Um5CV1JxL0JGMXdNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczNzU0MDUzCWZpbGU6QWlEb2NQbHVzXzAuMy44X3g2NC1zZXR1cC5leGUKcTVnNVBmU0h3OVNmb1VTUGR0RHo2bkh0eU8wL09YT3RjTlIzZ3RjQ1EwMXVCRFN3NmxMOENUR3dxdTlBT1ArcXpaTkg4N1AybEdrSTlHdUY0VFZJQWc9PQo=",
+      "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.8/AiDocPlus_0.3.8_x64-setup.exe"
     },
     "windows-x86_64-nsis": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRWdrN3BCejhPeU1RYURkenp0WVZ3NGV1cUZkSHRnbjhPWjVsZ1I4b0JLcGNUSWRTSTNSV2c2QzdpempoNTZDZGZUcVNCQUNra0s3UlZFYUJBeEJJWGdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczNDEwODY0CWZpbGU6QWlEb2NQbHVzXzAuMy43X3g2NC1zZXR1cC5leGUKaEhYMFFiL095YVBHb3BzWGpEbk9WUjZ0UURjTFpjM0ZXSlZuREp5dHV4NWpYSm15blVEVlFKMlVzZjJ2bmU5N1RacVFzaDVvZjBNMGtiN1ZqbjJLQ1E9PQo=",
-      "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.7/AiDocPlus_0.3.7_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRWhpNHZzaWZLY3d4L0FZNSszdGR5MjFzdHd6YVZZUGNTSjhGK0dEb1A3Q0dYcjJvOXFRcWczREd6M2hPMWo5ZkFkSDBXNWNKMVk3Um5CV1JxL0JGMXdNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczNzU0MDUzCWZpbGU6QWlEb2NQbHVzXzAuMy44X3g2NC1zZXR1cC5leGUKcTVnNVBmU0h3OVNmb1VTUGR0RHo2bkh0eU8wL09YT3RjTlIzZ3RjQ1EwMXVCRFN3NmxMOENUR3dxdTlBT1ArcXpaTkg4N1AybEdrSTlHdUY0VFZJQWc9PQo=",
+      "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.8/AiDocPlus_0.3.8_x64-setup.exe"
     }
   }
 }
