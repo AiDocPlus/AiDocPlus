@@ -183,7 +183,7 @@ pub fn export_project_zip(
             let entry = entry?;
             let path = entry.path();
             if path.extension().and_then(|s| s.to_str()) == Some("json") {
-                let file_name = path.file_name().unwrap().to_string_lossy().to_string();
+                let file_name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
                 let content = fs::read_to_string(&path)
                     .map_err(|e| AppError::ExportFailed(format!("读取文档失败: {}", e)))?;
                 zip_writer
@@ -209,7 +209,7 @@ pub fn export_project_zip(
             for entry in entries {
                 let entry = entry?;
                 let path = entry.path();
-                let name = path.file_name().unwrap().to_string_lossy().to_string();
+                let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
                 let zip_path = format!("{}/{}", prefix, name);
                 if path.is_dir() {
                     add_dir_to_zip(zip_writer, &path, &zip_path, options)?;

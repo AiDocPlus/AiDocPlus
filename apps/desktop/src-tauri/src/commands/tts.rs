@@ -32,12 +32,22 @@ fn ensure_tts(state: &TtsState) -> crate::error::Result<()> {
     Ok(())
 }
 
+const TTS_NOT_INIT: &str = "TTS 引擎未初始化";
+
+fn get_tts_ref<'a>(guard: &'a std::sync::MutexGuard<'_, Option<Tts>>) -> crate::error::Result<&'a Tts> {
+    guard.as_ref().ok_or_else(|| crate::error::AppError::ExternalToolError(TTS_NOT_INIT.into()))
+}
+
+fn get_tts_mut<'a>(guard: &'a mut std::sync::MutexGuard<'_, Option<Tts>>) -> crate::error::Result<&'a mut Tts> {
+    guard.as_mut().ok_or_else(|| crate::error::AppError::ExternalToolError(TTS_NOT_INIT.into()))
+}
+
 /// 获取系统 TTS 能力
 #[tauri::command]
 pub fn tts_capabilities(state: State<'_, TtsState>) -> crate::error::Result<TtsCapabilities> {
     ensure_tts(&state)?;
     let guard = state.0.lock()?;
-    let tts = guard.as_ref().unwrap();
+    let tts = get_tts_ref(&guard)?;
     let features = tts.supported_features();
     Ok(TtsCapabilities {
         rate: features.rate,
@@ -53,7 +63,7 @@ pub fn tts_speak(state: State<'_, TtsState>, text: String, interrupt: bool) -> c
     use crate::error::AppError;
     ensure_tts(&state)?;
     let mut guard = state.0.lock()?;
-    let tts = guard.as_mut().unwrap();
+    let tts = get_tts_mut(&mut guard)?;
     tts.speak(text, interrupt)
         .map_err(|e| AppError::ExternalToolError(format!("TTS 播放失败: {}", e)))?;
     Ok(())
@@ -65,7 +75,7 @@ pub fn tts_stop(state: State<'_, TtsState>) -> crate::error::Result<()> {
     use crate::error::AppError;
     ensure_tts(&state)?;
     let mut guard = state.0.lock()?;
-    let tts = guard.as_mut().unwrap();
+    let tts = get_tts_mut(&mut guard)?;
     tts.stop().map_err(|e| AppError::ExternalToolError(format!("TTS 停止失败: {}", e)))?;
     Ok(())
 }
@@ -75,8 +85,8 @@ pub fn tts_stop(state: State<'_, TtsState>) -> crate::error::Result<()> {
 pub fn tts_is_speaking(state: State<'_, TtsState>) -> crate::error::Result<bool> {
     ensure_tts(&state)?;
     let guard = state.0.lock()?;
-    let tts = guard.as_ref().unwrap();
-    tts.is_speaking().map_err(|e| crate::error::AppError::ExternalToolError(e.to_string()))
+    let tts = get_tts_ref(&guard)?;
+    tts.is_speaking().map_err(|e: tts::Error| crate::error::AppError::ExternalToolError(e.to_string()))
 }
 
 /// 设置语速
@@ -85,7 +95,7 @@ pub fn tts_set_rate(state: State<'_, TtsState>, rate: f32) -> crate::error::Resu
     use crate::error::AppError;
     ensure_tts(&state)?;
     let mut guard = state.0.lock()?;
-    let tts = guard.as_mut().unwrap();
+    let tts = get_tts_mut(&mut guard)?;
     tts.set_rate(rate).map_err(|e| AppError::ExternalToolError(format!("设置语速失败: {}", e)))?;
     Ok(())
 }
@@ -96,7 +106,7 @@ pub fn tts_set_pitch(state: State<'_, TtsState>, pitch: f32) -> crate::error::Re
     use crate::error::AppError;
     ensure_tts(&state)?;
     let mut guard = state.0.lock()?;
-    let tts = guard.as_mut().unwrap();
+    let tts = get_tts_mut(&mut guard)?;
     tts.set_pitch(pitch).map_err(|e| AppError::ExternalToolError(format!("设置音调失败: {}", e)))?;
     Ok(())
 }
@@ -107,7 +117,7 @@ pub fn tts_set_volume(state: State<'_, TtsState>, volume: f32) -> crate::error::
     use crate::error::AppError;
     ensure_tts(&state)?;
     let mut guard = state.0.lock()?;
-    let tts = guard.as_mut().unwrap();
+    let tts = get_tts_mut(&mut guard)?;
     tts.set_volume(volume).map_err(|e| AppError::ExternalToolError(format!("设置音量失败: {}", e)))?;
     Ok(())
 }
@@ -117,7 +127,7 @@ pub fn tts_set_volume(state: State<'_, TtsState>, volume: f32) -> crate::error::
 pub fn tts_get_params(state: State<'_, TtsState>) -> crate::error::Result<(f32, f32, f32)> {
     ensure_tts(&state)?;
     let guard = state.0.lock()?;
-    let tts = guard.as_ref().unwrap();
+    let tts = get_tts_ref(&guard)?;
     let rate = tts.get_rate().unwrap_or(tts.normal_rate());
     let pitch = tts.get_pitch().unwrap_or(tts.normal_pitch());
     let volume = tts.get_volume().unwrap_or(tts.normal_volume());
@@ -129,7 +139,7 @@ pub fn tts_get_params(state: State<'_, TtsState>) -> crate::error::Result<(f32, 
 pub fn tts_get_param_ranges(state: State<'_, TtsState>) -> crate::error::Result<serde_json::Value> {
     ensure_tts(&state)?;
     let guard = state.0.lock()?;
-    let tts = guard.as_ref().unwrap();
+    let tts = get_tts_ref(&guard)?;
     Ok(serde_json::json!({
         "rate": { "min": tts.min_rate(), "max": tts.max_rate(), "normal": tts.normal_rate() },
         "pitch": { "min": tts.min_pitch(), "max": tts.max_pitch(), "normal": tts.normal_pitch() },
@@ -143,7 +153,7 @@ pub fn tts_list_voices(state: State<'_, TtsState>) -> crate::error::Result<Vec<V
     use crate::error::AppError;
     ensure_tts(&state)?;
     let guard = state.0.lock()?;
-    let tts = guard.as_ref().unwrap();
+    let tts = get_tts_ref(&guard)?;
     let voices = tts.voices().map_err(|e| AppError::ExternalToolError(format!("获取语音列表失败: {}", e)))?;
     Ok(voices
         .into_iter()
@@ -161,7 +171,7 @@ pub fn tts_set_voice(state: State<'_, TtsState>, voice_id: String) -> crate::err
     use crate::error::AppError;
     ensure_tts(&state)?;
     let mut guard = state.0.lock()?;
-    let tts = guard.as_mut().unwrap();
+    let tts = get_tts_mut(&mut guard)?;
     let voices = tts.voices().map_err(|e| AppError::ExternalToolError(e.to_string()))?;
     let voice = voices
         .iter()

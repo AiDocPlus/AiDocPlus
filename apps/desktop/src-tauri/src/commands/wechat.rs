@@ -50,7 +50,8 @@ pub async fn wechat_http_request(
     }
 
     if is_multipart {
-        let fp = file_path.as_deref().unwrap();
+        let fp = file_path.as_deref()
+            .ok_or_else(|| AppError::ValidationError("multipart 请求需要 file_path".into()))?;
         let path = PathBuf::from(fp);
         if !path.exists() {
             return Err(AppError::ValidationError(format!("文件不存在: {}", fp)));
