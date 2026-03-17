@@ -107,6 +107,7 @@ RESPONSE=$(curl -s -X POST "https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITE
   -d "{
     \"access_token\": \"${GITEE_TOKEN}\",
     \"tag_name\": \"${TAG}\",
+    \"target_commitish\": \"main\",
     \"name\": \"AiDocPlus ${TAG}\",
     \"body\": \"${RELEASE_BODY}\",
     \"prerelease\": false
