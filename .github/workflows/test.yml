@@ -39,9 +39,7 @@ jobs:
             ${{ runner.os }}-pnpm-
 
       - name: Build resources
-        run: |
-          python3 resources/prompt-templates/scripts/build.py 2>/dev/null || true
-          python3 resources/doc-templates/scripts/build.py 2>/dev/null || true
+        run: bash scripts/build-resources.sh
 
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
@@ -93,9 +91,7 @@ jobs:
           cache-on-failure: true
 
       - name: Build resources
-        run: |
-          python3 resources/prompt-templates/scripts/build.py 2>/dev/null || true
-          python3 resources/doc-templates/scripts/build.py 2>/dev/null || true
+        run: bash scripts/build-resources.sh
 
       - name: Install frontend dependencies
         run: pnpm install --no-frozen-lockfile
