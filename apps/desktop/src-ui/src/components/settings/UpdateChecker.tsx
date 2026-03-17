@@ -108,9 +108,17 @@ export function UpdateChecker() {
 
   if (!showBanner) return null;
 
+  const bannerStyle: React.CSSProperties = {
+    opacity: 1,
+    backgroundColor: 'hsl(var(--card, 0 0% 100%))',
+    color: 'hsl(var(--card-foreground, 222.2 84% 4.9%))',
+    backdropFilter: 'none',
+    WebkitBackdropFilter: 'none',
+  };
+
   return (
     <div className="fixed bottom-4 right-4 z-50 max-w-sm">
-      <div className="update-banner border border-border rounded-lg shadow-lg p-4 space-y-3">
+      <div className="border border-border rounded-lg shadow-lg p-4 space-y-3" style={bannerStyle}>
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
             {status === 'checking' && <RefreshCw className="w-5 h-5 text-primary shrink-0 animate-spin" />}
