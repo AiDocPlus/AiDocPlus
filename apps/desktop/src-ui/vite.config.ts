@@ -48,9 +48,29 @@ export default defineConfig({
           ) {
             return 'vendor-markdown';
           }
+          // Mermaid 图表引擎（约 2-3 MB）
+          if (id.includes('mermaid') || id.includes('dagre-') || id.includes('d3') || id.includes('elkjs') || id.includes('@mermaid-js/')) {
+            return 'vendor-mermaid';
+          }
+          // TipTap 编辑器核心 + 扩展
+          if (id.includes('@tiptap/') || id.includes('prosemirror-') || id.includes('tippy.js')) {
+            return 'vendor-tiptap';
+          }
+          // Radix UI 组件库
+          if (id.includes('@radix-ui/')) {
+            return 'vendor-radix';
+          }
           // 图标库
           if (id.includes('lucide-react')) {
             return 'vendor-icons';
+          }
+          // PDF.js
+          if (id.includes('pdfjs-dist')) {
+            return 'vendor-pdfjs';
+          }
+          // i18next
+          if (id.includes('i18next') || id.includes('react-i18next')) {
+            return 'vendor-i18n';
           }
           // React 核心
           if (
