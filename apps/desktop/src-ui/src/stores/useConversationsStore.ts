@@ -242,7 +242,7 @@ export const useConversationsStore = create<ConversationsState>()(
       ];
 
       result.sort((a, b) => {
-        return groupOrder.indexOf(a.label as any) - groupOrder.indexOf(b.label as any);
+        return groupOrder.indexOf(a.label as typeof groupOrder[number]) - groupOrder.indexOf(b.label as typeof groupOrder[number]);
       });
 
       return result;
