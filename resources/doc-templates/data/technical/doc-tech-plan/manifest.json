@@ -9,10 +9,6 @@
   "majorCategory": "technical",
   "subCategory": "general",
   "tags": [],
-  "roles": [
-    "programmer",
-    "product-manager"
-  ],
   "order": 2,
   "enabled": true,
   "source": "builtin",

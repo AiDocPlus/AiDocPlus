@@ -9,10 +9,6 @@
   "majorCategory": "report",
   "subCategory": "general",
   "tags": [],
-  "roles": [
-    "product-manager",
-    "civil-servant"
-  ],
   "order": 1,
   "enabled": true,
   "source": "builtin",

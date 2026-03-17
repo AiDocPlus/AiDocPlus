@@ -24,13 +24,6 @@ cd apps/desktop/src-tauri/binaries
 ln -sf /opt/homebrew/bin/pandoc pandoc-aarch64-apple-darwin
 ```
 
-### Linux (开发)
-
-```bash
-cd apps/desktop/src-tauri/binaries
-ln -sf /usr/local/bin/pandoc pandoc-x86_64-unknown-linux-gnu
-```
-
 ## 生产环境部署
 
 ### 下载 Pandoc 二进制文件
@@ -67,25 +60,12 @@ rm -rf pandoc-3.1.11-x86_64-macOS
 2. 解压并重命名为 `pandoc-x86_64-pc-windows-msvc.exe`
 3. 放入 `src-tauri/binaries/` 目录
 
-#### Linux x64
-
-```bash
-cd apps/desktop/src-tauri/binaries
-curl -L -o pandoc-linux.tar.gz https://github.com/jgm/pandoc/releases/download/3.1.11/pandoc-3.1.11-linux-amd64.tar.gz
-tar -xzf pandoc-linux.tar.gz
-mv pandoc-3.1.11-linux-amd64/bin/pandoc pandoc-x86_64-unknown-linux-gnu
-chmod +x pandoc-x86_64-unknown-linux-gnu
-rm pandoc-linux.tar.gz
-rm -rf pandoc-3.1.11-linux-amd64
-```
-
 ## 文件大小影响
 
 | 平台 | 大小范围 |
 |------|---------|
 | macOS (单一架构) | ~30-40 MB |
 | Windows (x64) | ~50-70 MB |
-| Linux (x64) | ~40-60 MB |
 
 ## 中文支持
 

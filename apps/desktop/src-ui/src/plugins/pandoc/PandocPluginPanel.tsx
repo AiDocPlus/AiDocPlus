@@ -255,7 +255,6 @@ export function PandocPluginPanel({
               <p>{t('installGuideDesc')}</p>
               <code className="block bg-muted/50 px-2 py-1 rounded text-xs">{t('installMac')}</code>
               <code className="block bg-muted/50 px-2 py-1 rounded text-xs">{t('installWin')}</code>
-              <code className="block bg-muted/50 px-2 py-1 rounded text-xs">{t('installLinux')}</code>
               <a
                 href="https://pandoc.org/installing.html"
                 target="_blank"

@@ -9,9 +9,6 @@
   "majorCategory": "general",
   "subCategory": "general",
   "tags": [],
-  "roles": [
-    "general"
-  ],
   "order": 0,
   "enabled": true,
   "source": "builtin",

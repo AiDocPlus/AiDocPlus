@@ -18,7 +18,7 @@ export default defineConfig({
   // Env prefix for Tauri
   envPrefix: ['VITE_', 'TAURI_'],
   build: {
-    // Tauri uses Chromium on Windows and WebKit on macOS and Linux
+    // Tauri uses Chromium on Windows and WebKit on macOS
     target: process.env.TAURI_PLATFORM == 'windows' ? 'chrome105' : 'safari13',
     // Don't minify for debug builds
     minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
@@ -28,6 +28,7 @@ export default defineConfig({
       input: {
         main: path.resolve(__dirname, 'index.html'),
         manager: path.resolve(__dirname, 'manager.html'),
+        help: path.resolve(__dirname, 'help.html'),
       },
       output: {
         manualChunks(id) {

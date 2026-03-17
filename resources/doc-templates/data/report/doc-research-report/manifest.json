@@ -9,10 +9,6 @@
   "majorCategory": "report",
   "subCategory": "general",
   "tags": [],
-  "roles": [
-    "researcher",
-    "product-manager"
-  ],
   "order": 2,
   "enabled": true,
   "source": "builtin",

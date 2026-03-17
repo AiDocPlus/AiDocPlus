@@ -9,10 +9,6 @@
   "majorCategory": "article",
   "subCategory": "general",
   "tags": [],
-  "roles": [
-    "marketing",
-    "content-creator"
-  ],
   "order": 3,
   "enabled": true,
   "source": "builtin",

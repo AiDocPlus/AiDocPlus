@@ -9,9 +9,6 @@
   "majorCategory": "article",
   "subCategory": "general",
   "tags": [],
-  "roles": [
-    "programmer"
-  ],
   "order": 1,
   "enabled": true,
   "source": "builtin",

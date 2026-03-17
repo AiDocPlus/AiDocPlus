@@ -9,11 +9,6 @@
   "majorCategory": "general",
   "subCategory": "general",
   "tags": [],
-  "roles": [
-    "general",
-    "student",
-    "researcher"
-  ],
   "order": 1,
   "enabled": true,
   "source": "builtin",

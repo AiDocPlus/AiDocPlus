@@ -43,8 +43,6 @@ def find_doc_templates(data_dir: str):
 def generate_doc_templates_ts(templates):
     entries = []
     for t in templates:
-        roles = t.get('roles', [])
-        roles_ts = '[' + ', '.join(ts_string(r) for r in roles) + ']'
         tags = t.get('tags', [])
         tags_ts = '[' + ', '.join(ts_string(tag) for tag in tags) + ']'
         entries.append(
@@ -53,7 +51,7 @@ def generate_doc_templates_ts(templates):
             f'icon: {ts_string(t.get("icon", ""))}, '
             f'majorCategory: {ts_string(t.get("majorCategory", ""))}, '
             f'subCategory: {ts_string(t.get("subCategory", ""))}, '
-            f'tags: {tags_ts}, roles: {roles_ts}, '
+            f'tags: {tags_ts}, '
             f'order: {t.get("order", 0)}, source: "builtin" }},'
         )
     return f"""/**
@@ -69,7 +67,6 @@ export interface BuiltinDocTemplate {{
   majorCategory: string;
   subCategory: string;
   tags: string[];
-  roles: string[];
   order: number;
   source: string;
 }}

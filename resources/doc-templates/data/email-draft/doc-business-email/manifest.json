@@ -9,11 +9,6 @@
   "majorCategory": "email-draft",
   "subCategory": "general",
   "tags": [],
-  "roles": [
-    "product-manager",
-    "civil-servant",
-    "marketing"
-  ],
   "order": 0,
   "enabled": true,
   "source": "builtin",

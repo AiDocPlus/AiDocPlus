@@ -9,10 +9,6 @@
   "majorCategory": "meeting",
   "subCategory": "general",
   "tags": [],
-  "roles": [
-    "product-manager",
-    "programmer"
-  ],
   "order": 1,
   "enabled": true,
   "source": "builtin",

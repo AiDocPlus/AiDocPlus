@@ -47,6 +47,7 @@ use commands::{
     coding::*,
     script_runner::*,
     imbot::*,
+    help::*,
 };
 use commands::tts::TtsState;
 use commands::script_runner::RunningScriptState;
@@ -207,12 +208,20 @@ fn main() {
 
             app.set_menu(menu)?;
 
-            // 监听菜单事件，转发到前端
+            // 监听菜单事件，转发到前端（部分事件由 Rust 直接处理）
             app.on_menu_event(move |app_handle, event| {
                 let id = event.id().0.as_str();
-                // 将菜单事件作为自定义事件发送到前端
-                if let Some(window) = app_handle.get_webview_window("main") {
-                    let _ = window.emit("menu-event", id);
+                match id {
+                    // 「使用文档」直接打开帮助中心窗口
+                    "help_docs" => {
+                        let _ = commands::help::open_help_center(app_handle.clone());
+                    }
+                    // 其他事件转发到前端
+                    _ => {
+                        if let Some(window) = app_handle.get_webview_window("main") {
+                            let _ = window.emit("menu-event", id);
+                        }
+                    }
                 }
             });
 
@@ -480,6 +489,9 @@ fn main() {
             start_imbot,
             stop_imbot,
             get_imbot_status,
+
+            // 帮助中心
+            open_help_center,
 
         ])
         .run(tauri::generate_context!())

@@ -9,9 +9,6 @@
   "majorCategory": "email-draft",
   "subCategory": "general",
   "tags": [],
-  "roles": [
-    "lawyer"
-  ],
   "order": 1,
   "enabled": true,
   "source": "builtin",

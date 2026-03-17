@@ -9,10 +9,6 @@
   "majorCategory": "email-draft",
   "subCategory": "general",
   "tags": [],
-  "roles": [
-    "lawyer",
-    "civil-servant"
-  ],
   "order": 2,
   "enabled": true,
   "source": "builtin",

@@ -9,10 +9,6 @@
   "majorCategory": "report",
   "subCategory": "general",
   "tags": [],
-  "roles": [
-    "researcher",
-    "student"
-  ],
   "order": 3,
   "enabled": true,
   "source": "builtin",

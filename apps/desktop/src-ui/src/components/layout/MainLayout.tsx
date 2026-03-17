@@ -16,6 +16,7 @@ const AboutDialog = lazy(() => import('../dialogs/AboutDialog').then(m => ({ def
 const FirstRunGuideDialog = lazy(() => import('../dialogs/FirstRunGuideDialog').then(m => ({ default: m.FirstRunGuideDialog })));
 const TemplatePickerDialog = lazy(() => import('../templates/TemplatePickerDialog').then(m => ({ default: m.TemplatePickerDialog })));
 const SaveAsTemplateDialog = lazy(() => import('../templates/SaveAsTemplateDialog').then(m => ({ default: m.SaveAsTemplateDialog })));
+const LockScreen = lazy(() => import('../settings/LockScreen').then(m => ({ default: m.LockScreen })));
 import { cn } from '@/lib/utils';
 import { logRender } from '@/lib/perfLog';
 import { Menu, X } from 'lucide-react';
@@ -38,6 +39,13 @@ export function MainLayout() {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [saveAsTemplateOpen, setSaveAsTemplateOpen] = useState(false);
+
+  // 启动密码锁屏
+  const securitySettings = useSettingsStore(s => s.security);
+  const [isLocked, setIsLocked] = useState(() => {
+    const sec = useSettingsStore.getState().security;
+    return sec.passwordEnabled && !!sec.passwordHash;
+  });
 
   // 首次启动引导对话框状态
   const [showFirstRunGuide, setShowFirstRunGuide] = useState(false);
@@ -110,6 +118,23 @@ export function MainLayout() {
     const newWidth = Math.min(480, Math.max(180, sidebarWidth + delta));
     setSidebarWidth(newWidth);
   }, [sidebarWidth, setSidebarWidth]);
+
+  // 锁屏状态：显示全屏密码验证
+  if (isLocked) {
+    return (
+      <div className={cn(
+        "h-screen w-full",
+        theme === 'dark' && 'dark'
+      )}>
+        <Suspense fallback={null}>
+          <LockScreen
+            passwordHash={securitySettings.passwordHash}
+            onUnlock={() => setIsLocked(false)}
+          />
+        </Suspense>
+      </div>
+    );
+  }
 
   return (
     <div className={cn(

@@ -114,12 +114,25 @@ const DEFAULT_IMBOT_SETTINGS: ImBotSettings = {
   autoStart: true,
 };
 
+export interface SecuritySettings {
+  /** 是否启用启动密码 */
+  passwordEnabled: boolean;
+  /** 密码的 SHA-256 哈希值（不存储明文） */
+  passwordHash: string;
+}
+
+const DEFAULT_SECURITY_SETTINGS: SecuritySettings = {
+  passwordEnabled: false,
+  passwordHash: '',
+};
+
 interface SettingsState extends AppSettings {
   // Settings state
   isLoading: boolean;
   error: string | null;
   plugins: PluginsSettings;
   imBot: ImBotSettings;
+  security: SecuritySettings;
 
   // Actions
   updateSettings: (settings: Partial<AppSettings>) => void;
@@ -140,6 +153,7 @@ interface SettingsState extends AppSettings {
   updateAISettings: (settings: Partial<typeof DEFAULT_AI_SETTINGS>) => void;
   updateEmailSettings: (settings: Partial<typeof DEFAULT_EMAIL_SETTINGS>) => void;
   updateImBotSettings: (settings: Partial<ImBotSettings>) => void;
+  updateSecuritySettings: (settings: Partial<SecuritySettings>) => void;
   updateShortcut: (key: string, value: string) => void;
   resetSettings: () => void;
   resetCategory: (category: 'editor' | 'ui' | 'file' | 'ai') => void;
@@ -159,6 +173,7 @@ export const useSettingsStore = create<SettingsState>()(
       shortcuts: { ...DEFAULT_SETTINGS.shortcuts },
       plugins: { ...DEFAULT_PLUGINS_SETTINGS },
       imBot: { ...DEFAULT_IMBOT_SETTINGS },
+      security: { ...DEFAULT_SECURITY_SETTINGS },
       isLoading: false,
       error: null,
 
@@ -213,6 +228,13 @@ export const useSettingsStore = create<SettingsState>()(
       updateImBotSettings: (settings) => {
         set((state) => ({
           imBot: { ...state.imBot, ...settings }
+        }));
+      },
+
+      // Update security settings
+      updateSecuritySettings: (settings) => {
+        set((state) => ({
+          security: { ...state.security, ...settings }
         }));
       },
 
@@ -427,6 +449,7 @@ export const useSettingsStore = create<SettingsState>()(
           shortcuts: { ...DEFAULT_SETTINGS.shortcuts },
           plugins: { ...DEFAULT_PLUGINS_SETTINGS },
           imBot: { ...DEFAULT_IMBOT_SETTINGS },
+          security: { ...DEFAULT_SECURITY_SETTINGS },
           error: null
         });
       },
@@ -483,6 +506,7 @@ export const useSettingsStore = create<SettingsState>()(
         shortcuts: state.shortcuts,
         plugins: state.plugins,
         imBot: state.imBot,
+        security: state.security,
       }),
       // 用深度合并替代版本迁移：缺失字段自动用默认值填充，无需 version + migrate()
       merge: (persisted, current) => {
@@ -502,6 +526,7 @@ export const useSettingsStore = create<SettingsState>()(
             pluginOrder: saved.plugins?.pluginOrder,
           },
           imBot: deepMergeDefaults(DEFAULT_IMBOT_SETTINGS, saved.imBot || {}),
+          security: deepMergeDefaults(DEFAULT_SECURITY_SETTINGS, saved.security || {}),
         };
       },
     }

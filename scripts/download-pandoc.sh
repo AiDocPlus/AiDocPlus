@@ -29,18 +29,6 @@ case "$OS" in
         chmod +x "${BINARIES_DIR}/${OUTPUT_FILE}"
         rm /tmp/pandoc.zip
         ;;
-    Linux)
-        PANDOC_FILE="pandoc-${PANDOC_VERSION}-linux-amd64.tar.gz"
-        OUTPUT_FILE="pandoc-x86_64-unknown-linux-gnu"
-
-        echo "Downloading $PANDOC_FILE..."
-        curl -L "https://github.com/jgm/pandoc/releases/download/${PANDOC_VERSION}/${PANDOC_FILE}" -o /tmp/pandoc.tar.gz
-
-        echo "Extracting to $BINARIES_DIR/$OUTPUT_FILE..."
-        tar -xzf /tmp/pandoc.tar.gz -O "pandoc-${PANDOC_VERSION}/bin/pandoc" > "${BINARIES_DIR}/${OUTPUT_FILE}"
-        chmod +x "${BINARIES_DIR}/${OUTPUT_FILE}"
-        rm /tmp/pandoc.tar.gz
-        ;;
     MINGW*|MSYS*|CYGWIN*)
         PANDOC_FILE="pandoc-${PANDOC_VERSION}-windows-x86_64.zip"
         OUTPUT_FILE="pandoc-x86_64-pc-windows-msvc.exe"

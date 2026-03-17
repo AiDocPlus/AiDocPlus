@@ -1,0 +1,270 @@
+@import "tailwindcss";
+
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 222.2 47.4% 11.2%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 222.2 84% 4.9%;
+  --radius: 0.5rem;
+  --sidebar-bg: 210 40% 98%;
+}
+
+.dark {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 210 40% 98%;
+  --primary-foreground: 222.2 47.4% 11.2%;
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --ring: 212.7 26.8% 83.9%;
+  --sidebar-bg: 222.2 84% 6%;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  border-color: hsl(var(--border));
+}
+
+body {
+  font-family: "Songti SC", "SimSun", "STSong", serif;
+  font-size: 16px;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* 窗口标题栏拖拽区域 */
+.help-titlebar {
+  -webkit-app-region: drag;
+  app-region: drag;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.help-titlebar button,
+.help-titlebar input {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+/* 侧边栏 */
+.help-sidebar {
+  background-color: hsl(var(--sidebar-bg));
+}
+
+/* 自定义滚动条 */
+.help-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.help-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.help-scroll::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground) / 0.25);
+  border-radius: 3px;
+}
+.help-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--muted-foreground) / 0.4);
+}
+
+/* Markdown 渲染样式 */
+.help-markdown h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 1.5rem 0 1rem;
+  line-height: 1.3;
+  color: hsl(var(--foreground));
+}
+.help-markdown h2 {
+  font-size: 1.35rem;
+  font-weight: 600;
+  margin: 1.5rem 0 0.75rem;
+  line-height: 1.3;
+  border-bottom: 1px solid hsl(var(--border));
+  padding-bottom: 0.5rem;
+  color: hsl(var(--foreground));
+}
+.help-markdown h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 1.25rem 0 0.5rem;
+  line-height: 1.4;
+  color: hsl(var(--foreground));
+}
+.help-markdown h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0.75rem 0 0.5rem;
+}
+.help-markdown p {
+  margin: 0.5rem 0;
+  line-height: 1.75;
+}
+.help-markdown ul, .help-markdown ol {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+.help-markdown li {
+  margin: 0.3rem 0;
+  line-height: 1.7;
+}
+.help-markdown code {
+  background-color: hsl(var(--muted));
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.25rem;
+  font-size: 0.85em;
+  font-family: "JetBrains Mono", "Fira Code", "Consolas", monospace;
+}
+.help-markdown pre {
+  background-color: hsl(var(--muted));
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin: 0.75rem 0;
+  border: 1px solid hsl(var(--border));
+}
+.help-markdown pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.85em;
+}
+.help-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+  font-size: 0.9rem;
+}
+.help-markdown th, .help-markdown td {
+  border: 1px solid hsl(var(--border));
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+.help-markdown th {
+  background-color: hsl(var(--muted));
+  font-weight: 600;
+}
+.help-markdown blockquote {
+  border-left: 3px solid hsl(var(--ring));
+  padding: 0.5rem 1rem;
+  margin: 0.75rem 0;
+  background-color: hsl(var(--muted) / 0.5);
+  color: hsl(var(--muted-foreground));
+  border-radius: 0 0.375rem 0.375rem 0;
+}
+.help-markdown strong { font-weight: 600; }
+.help-markdown a {
+  color: hsl(220 80% 50%);
+  text-decoration: none;
+  border-bottom: 1px solid hsl(220 80% 50% / 0.3);
+}
+.help-markdown a:hover {
+  border-bottom-color: hsl(220 80% 50%);
+}
+.dark .help-markdown a {
+  color: hsl(210 80% 65%);
+  border-bottom-color: hsl(210 80% 65% / 0.3);
+}
+.dark .help-markdown a:hover {
+  border-bottom-color: hsl(210 80% 65%);
+}
+.help-markdown hr {
+  border: none;
+  border-top: 1px solid hsl(var(--border));
+  margin: 1.25rem 0;
+}
+
+/* AI 聊天消息样式 */
+.help-ai-msg-user {
+  background-color: hsl(220 80% 50%);
+  color: #fff;
+  border-radius: 1rem 1rem 0.25rem 1rem;
+  padding: 0.625rem 0.875rem;
+  max-width: 85%;
+  align-self: flex-end;
+  box-shadow: 0 1px 2px hsl(220 80% 50% / 0.15);
+}
+.help-ai-msg-assistant {
+  background-color: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  border-radius: 1rem 1rem 1rem 0.25rem;
+  padding: 0.625rem 0.875rem;
+  max-width: 85%;
+  align-self: flex-start;
+  box-shadow: 0 1px 2px hsl(0 0% 0% / 0.05);
+}
+
+/* AI 气泡内 Markdown 紧凑样式 */
+.help-ai-msg-assistant .help-markdown p {
+  margin: 0.25rem 0;
+}
+.help-ai-msg-assistant .help-markdown p:first-child {
+  margin-top: 0;
+}
+.help-ai-msg-assistant .help-markdown p:last-child {
+  margin-bottom: 0;
+}
+.help-ai-msg-assistant .help-markdown h1,
+.help-ai-msg-assistant .help-markdown h2,
+.help-ai-msg-assistant .help-markdown h3,
+.help-ai-msg-assistant .help-markdown h4 {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 0.9em;
+}
+.help-ai-msg-assistant .help-markdown ul,
+.help-ai-msg-assistant .help-markdown ol {
+  margin: 0.25rem 0;
+  padding-left: 1.25rem;
+}
+.help-ai-msg-assistant .help-markdown li {
+  margin: 0.125rem 0;
+}
+.help-ai-msg-assistant .help-markdown pre {
+  margin: 0.375rem 0;
+  padding: 0.5rem;
+  font-size: 0.8em;
+}
+.help-ai-msg-assistant .help-markdown code {
+  font-size: 0.85em;
+}
+.help-ai-msg-assistant .help-markdown blockquote {
+  margin: 0.375rem 0;
+  padding: 0.25rem 0.5rem;
+}
+
+/* 思考过程折叠区域 */
+.help-ai-thinking button {
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0.125rem 0;
+  font-family: inherit;
+}

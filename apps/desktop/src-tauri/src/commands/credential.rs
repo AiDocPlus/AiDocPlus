@@ -1,6 +1,6 @@
 /// AI API Key 凭证管理模块
 /// 使用 OS 级密钥链安全存储 AI 服务的 API Key
-/// macOS: Keychain, Windows: Credential Manager, Linux: Secret Service
+/// macOS: Keychain, Windows: Credential Manager
 
 /// keyring 服务名常量（AI 凭证专用，与邮件凭证分离）
 const AI_KEYRING_SERVICE: &str = "com.aidocplus.ai";

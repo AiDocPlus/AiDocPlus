@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Monitor, Type, Globe, Zap, Download, Upload, RotateCcw, Loader2, Puzzle, Mail, Search, ChevronDown, ChevronRight, LayoutTemplate, Bot, Play, Square, Circle, FolderOpen } from 'lucide-react';
+import { X, Monitor, Type, Globe, Zap, Download, Upload, RotateCcw, Loader2, Puzzle, Mail, Search, ChevronDown, ChevronRight, LayoutTemplate, Bot, Play, Square, Circle, FolderOpen, Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { invoke } from '@tauri-apps/api/core';
@@ -55,6 +55,8 @@ export function SettingsPanel({ open, onClose, defaultTab }: SettingsPanelProps)
     importSettings,
     imBot,
     updateImBotSettings,
+    security,
+    updateSecuritySettings,
     error
   } = useSettingsStore();
 
@@ -94,6 +96,83 @@ export function SettingsPanel({ open, onClose, defaultTab }: SettingsPanelProps)
       await pollImBotStatus();
     } catch (e) { console.error('停止 IM Bot 失败:', e); }
     finally { setImBotLoading(false); }
+  };
+
+  // 密码设置状态
+  const [pwdAction, setPwdAction] = useState<'none' | 'set' | 'change' | 'remove'>('none');
+  const [pwdCurrent, setPwdCurrent] = useState('');
+  const [pwdNew, setPwdNew] = useState('');
+  const [pwdConfirm, setPwdConfirm] = useState('');
+  const [pwdShowCurrent, setPwdShowCurrent] = useState(false);
+  const [pwdShowNew, setPwdShowNew] = useState(false);
+  const [pwdError, setPwdError] = useState('');
+  const [pwdSuccess, setPwdSuccess] = useState('');
+
+  const resetPwdForm = () => {
+    setPwdAction('none');
+    setPwdCurrent('');
+    setPwdNew('');
+    setPwdConfirm('');
+    setPwdShowCurrent(false);
+    setPwdShowNew(false);
+    setPwdError('');
+    setPwdSuccess('');
+  };
+
+  /** SHA-256 哈希 */
+  const sha256 = async (text: string): Promise<string> => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(text);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  };
+
+  const handlePasswordSubmit = async () => {
+    setPwdError('');
+    setPwdSuccess('');
+
+    if (pwdAction === 'set') {
+      if (pwdNew.length < 4) {
+        setPwdError(t('settings.security.pwdTooShort', { defaultValue: '密码长度不能少于 4 位' }));
+        return;
+      }
+      if (pwdNew !== pwdConfirm) {
+        setPwdError(t('settings.security.pwdNotMatch', { defaultValue: '两次输入的密码不一致' }));
+        return;
+      }
+      const hash = await sha256(pwdNew);
+      updateSecuritySettings({ passwordEnabled: true, passwordHash: hash });
+      setPwdSuccess(t('settings.security.pwdSetSuccess', { defaultValue: '启动密码已设置' }));
+      setTimeout(resetPwdForm, 1500);
+    } else if (pwdAction === 'change') {
+      const currentHash = await sha256(pwdCurrent);
+      if (currentHash !== security.passwordHash) {
+        setPwdError(t('settings.security.wrongCurrentPwd', { defaultValue: '当前密码不正确' }));
+        return;
+      }
+      if (pwdNew.length < 4) {
+        setPwdError(t('settings.security.pwdTooShort', { defaultValue: '密码长度不能少于 4 位' }));
+        return;
+      }
+      if (pwdNew !== pwdConfirm) {
+        setPwdError(t('settings.security.pwdNotMatch', { defaultValue: '两次输入的密码不一致' }));
+        return;
+      }
+      const hash = await sha256(pwdNew);
+      updateSecuritySettings({ passwordHash: hash });
+      setPwdSuccess(t('settings.security.pwdChangeSuccess', { defaultValue: '密码已修改' }));
+      setTimeout(resetPwdForm, 1500);
+    } else if (pwdAction === 'remove') {
+      const currentHash = await sha256(pwdCurrent);
+      if (currentHash !== security.passwordHash) {
+        setPwdError(t('settings.security.wrongCurrentPwd', { defaultValue: '当前密码不正确' }));
+        return;
+      }
+      updateSecuritySettings({ passwordEnabled: false, passwordHash: '' });
+      setPwdSuccess(t('settings.security.pwdRemoveSuccess', { defaultValue: '启动密码已移除' }));
+      setTimeout(resetPwdForm, 1500);
+    }
   };
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -850,6 +929,136 @@ export function SettingsPanel({ open, onClose, defaultTab }: SettingsPanelProps)
                       onCheckedChange={(checked) => updateImBotSettings({ autoStart: checked })}
                     />
                   </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* 启动密码 */}
+              <div>
+                <h3 className="text-lg font-semibold mb-4">
+                  <ShieldCheck className="w-5 h-5 inline-block mr-2" />
+                  {t('settings.security.title', { defaultValue: '安全设置' })}
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {t('settings.security.description', { defaultValue: '设置启动密码后，每次打开应用时需要输入密码才能使用。' })}
+                </p>
+
+                <div className="space-y-4">
+                  {/* 当前状态 */}
+                  <div className="flex items-center justify-between p-3 rounded-lg border bg-background">
+                    <div className="flex items-center gap-3">
+                      <Lock className={`w-4 h-4 ${security.passwordEnabled ? 'text-green-500' : 'text-muted-foreground'}`} />
+                      <span className="text-sm font-medium">
+                        {security.passwordEnabled
+                          ? t('settings.security.enabled', { defaultValue: '启动密码已启用' })
+                          : t('settings.security.disabled', { defaultValue: '启动密码未启用' })}
+                      </span>
+                    </div>
+                    {!security.passwordEnabled ? (
+                      <Button variant="outline" size="sm" onClick={() => { resetPwdForm(); setPwdAction('set'); }}>
+                        {t('settings.security.setPassword', { defaultValue: '设置密码' })}
+                      </Button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => { resetPwdForm(); setPwdAction('change'); }}>
+                          {t('settings.security.changePassword', { defaultValue: '修改密码' })}
+                        </Button>
+                        <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" onClick={() => { resetPwdForm(); setPwdAction('remove'); }}>
+                          {t('settings.security.removePassword', { defaultValue: '移除密码' })}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 密码表单 */}
+                  {pwdAction !== 'none' && (
+                    <div className="p-4 rounded-lg border bg-muted/30 space-y-3">
+                      <h4 className="text-sm font-medium">
+                        {pwdAction === 'set' && t('settings.security.setPassword', { defaultValue: '设置密码' })}
+                        {pwdAction === 'change' && t('settings.security.changePassword', { defaultValue: '修改密码' })}
+                        {pwdAction === 'remove' && t('settings.security.removePassword', { defaultValue: '移除密码' })}
+                      </h4>
+
+                      {/* 当前密码（修改/移除时需要） */}
+                      {(pwdAction === 'change' || pwdAction === 'remove') && (
+                        <div className="space-y-1">
+                          <Label>{t('settings.security.currentPassword', { defaultValue: '当前密码' })}</Label>
+                          <div className="relative">
+                            <Input
+                              type={pwdShowCurrent ? 'text' : 'password'}
+                              value={pwdCurrent}
+                              onChange={e => setPwdCurrent(e.target.value)}
+                              placeholder={t('settings.security.enterCurrentPwd', { defaultValue: '输入当前密码' })}
+                              autoComplete="off"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setPwdShowCurrent(v => !v)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                              tabIndex={-1}
+                            >
+                              {pwdShowCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 新密码（设置/修改时需要） */}
+                      {(pwdAction === 'set' || pwdAction === 'change') && (
+                        <>
+                          <div className="space-y-1">
+                            <Label>{t('settings.security.newPassword', { defaultValue: '新密码' })}</Label>
+                            <div className="relative">
+                              <Input
+                                type={pwdShowNew ? 'text' : 'password'}
+                                value={pwdNew}
+                                onChange={e => setPwdNew(e.target.value)}
+                                placeholder={t('settings.security.enterNewPwd', { defaultValue: '输入新密码（至少 4 位）' })}
+                                autoComplete="off"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setPwdShowNew(v => !v)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                tabIndex={-1}
+                              >
+                                {pwdShowNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <Label>{t('settings.security.confirmPassword', { defaultValue: '确认密码' })}</Label>
+                            <Input
+                              type="password"
+                              value={pwdConfirm}
+                              onChange={e => setPwdConfirm(e.target.value)}
+                              placeholder={t('settings.security.reenterPwd', { defaultValue: '再次输入密码' })}
+                              autoComplete="off"
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {/* 错误/成功提示 */}
+                      {pwdError && (
+                        <p className="text-sm text-destructive">{pwdError}</p>
+                      )}
+                      {pwdSuccess && (
+                        <p className="text-sm text-green-600">{pwdSuccess}</p>
+                      )}
+
+                      {/* 操作按钮 */}
+                      <div className="flex gap-2 pt-1">
+                        <Button size="sm" onClick={handlePasswordSubmit}>
+                          {t('common.confirm', { defaultValue: '确认' })}
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={resetPwdForm}>
+                          {t('common.cancel', { defaultValue: '取消' })}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

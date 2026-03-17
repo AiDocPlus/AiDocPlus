@@ -13,7 +13,6 @@
   "installGuideDesc": "pandoc.org からダウンロードするか、パッケージマネージャーでインストール：",
   "installMac": "macOS: brew install pandoc",
   "installWin": "Windows: winget install pandoc",
-  "installLinux": "Linux: sudo apt install pandoc",
   "contentSource": "エクスポート内容",
   "sourceAiContent": "AI 生成コンテンツ",
   "sourceOriginal": "元の素材",

@@ -1228,7 +1228,7 @@ env:
 
 ### 代码跨平台规范
 
-所有 Rust 后端和 TypeScript 前端代码必须遵守以下规范，确保在 macOS、Windows、Linux 上正确运行：
+所有 Rust 后端和 TypeScript 前端代码必须遵守以下规范，确保在 macOS、Windows 上正确运行：
 
 #### Rust 路径处理
 1. **必须使用 `PathBuf::join()`**：禁止用 `format!("{}/{}", dir, name)` 拼接文件路径，`join()` 会自动使用平台正确的分隔符

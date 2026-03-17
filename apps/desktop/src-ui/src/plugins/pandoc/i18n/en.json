@@ -13,7 +13,6 @@
   "installGuideDesc": "Visit pandoc.org to download Pandoc, or install via package manager:",
   "installMac": "macOS: brew install pandoc",
   "installWin": "Windows: winget install pandoc",
-  "installLinux": "Linux: sudo apt install pandoc",
   "contentSource": "Content Source",
   "sourceAiContent": "AI Generated Content",
   "sourceOriginal": "Original Material",

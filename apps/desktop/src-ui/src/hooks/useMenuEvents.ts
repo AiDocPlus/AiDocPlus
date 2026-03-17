@@ -149,7 +149,7 @@ export function useMenuEvents(onSettingsOpen: () => void) {
           invoke('open_file_with_app', { path: 'https://AiDocPlus.com', appName: null }).catch(() => {});
           break;
         case 'help_docs':
-          invoke('open_file_with_app', { path: 'https://AiDocPlus.com/docs', appName: null }).catch(() => {});
+          invoke('open_help_center').catch(() => {});
           break;
         case 'help_feedback':
           invoke('open_file_with_app', { path: 'https://github.com/AiDocPlus/AiDocPlus/issues', appName: null }).catch(() => {});

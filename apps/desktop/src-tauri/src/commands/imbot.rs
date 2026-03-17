@@ -67,7 +67,7 @@ fn find_imbot(app: &AppHandle) -> Option<ImBotMode> {
 
 /// 查找可执行文件路径（node 或 npx）
 fn find_executable(name: &str) -> String {
-    // macOS / Linux：常见路径
+    // macOS：常见路径
     for prefix in &["/usr/local/bin", "/opt/homebrew/bin", "/usr/bin"] {
         let p = format!("{}/{}", prefix, name);
         if std::path::Path::new(&p).exists() {

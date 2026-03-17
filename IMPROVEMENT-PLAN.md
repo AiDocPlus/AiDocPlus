@@ -703,18 +703,18 @@
 
 ### 16.1 当前平台支持矩阵
 
-| 维度                 | macOS (Apple Silicon) | Windows x64             | Windows ARM64         | macOS Intel         | Linux                            |
-| -------------------- | --------------------- | ----------------------- | --------------------- | ------------------- | -------------------------------- |
-| **代码分支**   | ✅ 完整               | ✅ 完整                 | ✅ 完整               | ✅ 同 macOS         | ✅`#[cfg]` 已有                |
-| **CI 构建**    | ✅`macos-latest`    | ✅`windows-latest`    | ❌ 无 CI runner       | ❌ 未配置           | ❌ 无                            |
-| **本地构建**   | ✅ 主力开发环境       | ✅ Parallels ARM64 脚本 | ✅ 同左               | —                  | ❌ 未测试                        |
-| **安装包格式** | `.dmg`              | NSIS `.exe`           | NSIS `.exe`（本地） | —                  | ❌ 无（缺 `deb`/`AppImage`） |
-| **WebView**    | WebKit (WKWebView)    | WebView2 (Chromium)     | WebView2              | WebKit              | WebKitGTK（需安装）              |
-| **TTS**        | AVSpeechSynthesizer   | SAPI 5                  | SAPI 5                | AVSpeechSynthesizer | speech-dispatcher（需安装）      |
-| **自动更新**   | ❌                    | ❌                      | ❌                    | ❌                  | ❌                               |
-| **发布状态**   | ✅ 已发布             | ✅ 已发布               | 仅本地构建            | ❌                  | ❌                               |
+| 维度                 | macOS (Apple Silicon) | Windows x64             | Windows ARM64         | macOS Intel         |
+| -------------------- | --------------------- | ----------------------- | --------------------- | ------------------- |
+| **代码分支**   | ✅ 完整               | ✅ 完整                 | ✅ 完整               | ✅ 同 macOS         |
+| **CI 构建**    | ✅`macos-latest`    | ✅`windows-latest`    | ❌ 无 CI runner       | ❌ 未配置           |
+| **本地构建**   | ✅ 主力开发环境       | ✅ Parallels ARM64 脚本 | ✅ 同左               | —                  |
+| **安装包格式** | `.dmg`              | NSIS `.exe`           | NSIS `.exe`（本地） | —                  |
+| **WebView**    | WebKit (WKWebView)    | WebView2 (Chromium)     | WebView2              | WebKit              |
+| **TTS**        | AVSpeechSynthesizer   | SAPI 5                  | SAPI 5                | AVSpeechSynthesizer |
+| **自动更新**   | ❌                    | ❌                      | ❌                    | ❌                  |
+| **发布状态**   | ✅ 已发布             | ✅ 已发布               | 仅本地构建            | ❌                  |
 
-**总结**：macOS Apple Silicon 和 Windows x64 是已验证的双平台。Linux 有代码基础但零构建零测试。macOS Intel 和 Windows ARM64 有潜在能力但未纳入 CI。
+**总结**：macOS Apple Silicon 和 Windows x64 是已验证的双平台。macOS Intel 和 Windows ARM64 有潜在能力但未纳入 CI。
 
 ### 16.2 已有跨平台基础设施盘点
 
@@ -722,9 +722,9 @@
 
 | 文件            | 平台分支内容                                                                                                          |
 | --------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `resource.rs` | 资源管理器启动：macOS `.app` + `open -a` / Windows `.exe` + `CREATE_NEW_PROCESS_GROUP` / Linux 二进制直接启动 |
+| `resource.rs` | 资源管理器启动：macOS `.app` + `open -a` / Windows `.exe` + `CREATE_NEW_PROCESS_GROUP` |
 | `export.rs`   | 文件打开：`open` / `cmd /c start` / `xdg-open`；应用候选列表（WPS、Word、Chrome 等）                            |
-| `python.rs`   | Python 发现：候选命令名（Windows:`py`）、常见路径（macOS: homebrew、Linux: `/usr/bin`）、pyenv/conda              |
+| `python.rs`   | Python 发现：候选命令名（Windows:`py`）、常见路径（macOS: homebrew）、pyenv/conda              |
 | `nodejs.rs`   | Node.js 路径查找：`where`（Windows） / `which`（Unix）                                                            |
 | `pandoc.rs`   | Pandoc 路径查找：同上                                                                                                 |
 | `pdf.rs`      | 浏览器打开：同 `export.rs`                                                                                          |
@@ -744,42 +744,9 @@
 - **`scripts/build-resources.sh`**：资源构建脚本（替代原 assemble.sh + 各 deploy.sh）
 - **CLAUDE.md**：已有完整的代码跨平台规范和脚本兼容规范
 
-### 16.3 短期目标：完善桌面三平台（P1）
+### 16.3 短期目标：完善桌面双平台（P1）
 
-#### 16.3.1 Linux 支持
-
-**当前状态**：Rust 后端所有平台分支已包含 `#[cfg(target_os = "linux")]`，但从未构建或测试。
-
-**实施步骤**：
-
-1. **`tauri.conf.json`** 添加 bundle targets：
-
-   ```json
-   "targets": ["dmg", "nsis", "deb", "appimage"]
-   ```
-
-   Tauri 会根据构建平台自动选择适用的 target。
-2. **CI 矩阵扩展**：`build.yml` 添加 `ubuntu-22.04` 平台
-
-   ```yaml
-   - platform: ubuntu-22.04
-     args: --target x86_64-unknown-linux-gnu
-     target: x86_64-unknown-linux-gnu
-     artifact: deb
-   ```
-3. **Linux 系统依赖**文档化（Tauri 2 在 Linux 需要）：
-
-   - 构建依赖：`libwebkit2gtk-4.1-dev`, `libappindicator3-dev`, `librsvg2-dev`, `patchelf`
-   - 运行依赖：`libwebkit2gtk-4.1-0`, `libayatana-appindicator3-1`
-   - TTS：`speech-dispatcher`（`tts` crate 在 Linux 使用此后端）
-4. **测试 Linux TTS**：`tts` crate v0.26 支持 speech-dispatcher，但中文语音质量可能差异大，需标注为"实验性"
-5. **资源管理器**：已合并到主程序，Linux 构建时自动包含
-
-- **开发成本**：约 3~5 天
-- **预期用户**：开发者、教育机构（Linux 桌面用户）
-- ⭐⭐ | 🔧🔧 | **P1**
-
-#### 16.3.2 macOS Universal Binary
+#### 16.3.1 macOS Universal Binary
 
 **当前状态**：仅构建 `aarch64-apple-darwin`（Apple Silicon），Intel Mac 用户无法使用。
 
@@ -820,7 +787,6 @@
 **待优化**（P2）：
 
 - 更新通道（`stable` / `beta`）
-- Linux `AppImage` 更新支持（`deb` 不支持 updater）
 - ~~⭐⭐⭐ | 🔧🔧 | **P0**~~ → **已完成**
 
 #### 16.4.2 平台包管理器上架
@@ -829,11 +795,8 @@
 | ------- | ------------------------ | ---------------------- | ------ |
 | macOS   | **Homebrew Cask**  | 🔧（提交 formula PR）  | P1     |
 | Windows | **winget**         | 🔧（提交 manifest PR） | P1     |
-| Linux   | **Flatpak** / Snap | 🔧🔧（需打包配置）     | P2     |
-| Linux   | **AUR** (Arch)     | 🔧（社区可维护）       | P3     |
 
 - 提交到 Homebrew/winget 仓库只需写 manifest 文件指向 GitHub Release 下载链接
-- Flatpak 需编写 `.flatpak.yml` manifest，处理沙箱权限
 
 ### 16.5 长期目标：移动端与 Web（P3）
 
@@ -884,16 +847,11 @@
 
 | #  | 问题                                                         | 严重度                                     | 当前状态                                    |
 | -- | ------------------------------------------------------------ | ------------------------------------------ | ------------------------------------------- |
-| 1  | `tauri.conf.json` bundle targets 缺少 `deb`/`appimage` | 中                                         | 仅 `["dmg", "nsis"]`                      |
-| 2  | CI 无 Linux / macOS 构建矩阵                                 | 中                                         | `build.yml` 仅 Windows x64                |
-| 3  | 无 macOS Intel 构建                                          | 中                                         | 仅 `aarch64-apple-darwin`                 |
-| 4  | ~~无代码签名（macOS）~~                                     | ~~高~~                                    | ✅ 已解决：Apple Developer ID 签名 + 公证   |
-| 5  | Windows 无代码签名                                           | 高                                         | SmartScreen 警告，用户可能放弃安装          |
-| 6  | Linux TTS（speech-dispatcher）中文语音未验证                 | 低                                         | `tts` crate 理论支持                      |
-| 7  | Linux WebKitGTK 渲染差异未测试                               | 中                                         | WebKitGTK 版本可能落后于 Safari             |
-| 8  | `index.css` 全局字体栈未包含 Linux 中文字体                | 低                                         | 缺少 `"Noto Sans SC"` 等                  |
-| 9  | `discover_pythons` 中 conda/pyenv 路径检测无 Windows 版    | 低                                         | Windows 使用 `where` 但未检查 conda/pyenv |
-| 10 | ✅ 已解决：菜单文本硬编码中文（`main.rs`）                 | ✅ 已解决：`menu_i18n.rs` 动态中英文菜单 |                                             |
+| 1  | 无 macOS Intel 构建                                          | 中                                         | 仅 `aarch64-apple-darwin`                 |
+| 2  | ~~无代码签名（macOS）~~                                     | ~~高~~                                    | ✅ 已解决：Apple Developer ID 签名 + 公证   |
+| 3  | Windows 无代码签名                                           | 高                                         | SmartScreen 警告，用户可能放弃安装          |
+| 4  | `discover_pythons` 中 conda/pyenv 路径检测无 Windows 版    | 低                                         | Windows 使用 `where` 但未检查 conda/pyenv |
+| 5  | ✅ 已解决：菜单文本硬编码中文（`main.rs`）                 | ✅ 已解决：`menu_i18n.rs` 动态中英文菜单 |                                             |
 
 ### 16.7 代码签名战略 🟡 macOS 已完成
 
@@ -1045,8 +1003,7 @@
 | 10.1    | 错误处理体系化（后端+前端）                     | ⭐⭐   | 🔧🔧   | ✅ 已完成                     |
 | 10.2    | 日志与遥测                                      | ⭐⭐   | 🔧🔧   |                               |
 | 10.4    | 测试体系建设                                    | ⭐⭐   | 🔧🔧   |                               |
-| 16.3.1  | Linux 支持（deb + AppImage + CI 矩阵）          | ⭐⭐   | 🔧🔧   |                               |
-| 16.3.2  | macOS Universal Binary（Intel + Apple Silicon） | ⭐⭐   | 🔧     |                               |
+| 16.3.1  | macOS Universal Binary（Intel + Apple Silicon） | ⭐⭐   | 🔧     |                               |
 | 16.4.2a | Homebrew Cask + winget 上架                     | ⭐⭐   | 🔧     |                               |
 
 ### P2 — 中期实施（4~8 个月）
@@ -1067,7 +1024,6 @@
 | 9.4     | 引导与帮助系统                           | ⭐     | 🔧🔧   |      |
 | 18.2    | CLI/Deep Link 完善                       | ⭐     | 🔧     | 新增 |
 | 16.3.3  | Windows ARM64 CI 交叉编译                | ⭐     | 🔧🔧   |      |
-| 16.4.2b | Flatpak / Snap 上架                      | ⭐     | 🔧🔧   |      |
 
 ### P3 — 远期规划（8+ 个月）
 

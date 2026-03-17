@@ -2,31 +2,12 @@ import type { EditorPanelProps } from '@aidocplus/manager-shared';
 
 export function PromptTemplateEditor({ resource, onChange }: EditorPanelProps) {
   const content = resource.contentFiles['content.md'] || '';
-  const roles: string[] = (resource.manifest.roles as string[]) || [];
 
   return (
     <div className="space-y-5 p-5 border rounded-lg">
       <h3 className="text-sm font-semibold text-muted-foreground">
         提示词模板特有字段
       </h3>
-
-      {/* 关联角色 */}
-      <div className="space-y-2">
-        <label className="font-medium">关联角色（逗号分隔）</label>
-        <input
-          type="text"
-          value={roles.join(', ')}
-          onChange={(e) => {
-            const next = e.target.value
-              .split(',')
-              .map((s) => s.trim())
-              .filter(Boolean);
-            onChange({ manifest: { roles: next } });
-          }}
-          className="w-full h-10 rounded-md border border-input bg-white px-3 outline-none focus:ring-1 focus:ring-ring"
-          placeholder="default, programmer, ..."
-        />
-      </div>
 
       {/* 提示词内容 */}
       <div className="space-y-2">
