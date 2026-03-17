@@ -124,6 +124,10 @@ fn open_with_default(file_path: &str) -> crate::error::Result<()> {
             .spawn()
             .map(|_| ())?;
     }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        let _ = file_path;
+    }
     Ok(())
 }
 
@@ -177,6 +181,11 @@ fn open_with_app(file_path: &str, app: &str) -> crate::error::Result<()> {
                 Err(AppError::ExternalToolError(format!("尝试了 {:?} 和 start 命令，均未成功: {}", exe_paths, last_err)))
             }
         }
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        let _ = (file_path, app);
+        Ok(())
     }
 }
 
