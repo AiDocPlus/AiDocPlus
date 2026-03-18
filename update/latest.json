@@ -1,10 +1,10 @@
 {
   "version": "0.3.8",
   "notes": "AiDocPlus v0.3.8",
-  "pub_date": "2026-03-17T13:32:37Z",
+  "pub_date": "2026-03-18T04:03:16Z",
   "platforms": {
     "darwin-aarch64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRWs0Z0dBUm16c09KaGVjaDI5a0RabWVIa2xncHhaRWtTWjFhZCtGUi90Ukh4NWNDeXI2NjBHTk5xMVcyQStldmFRc21aZ0JCeXZ6OTUzeWdUdTFYSkFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczNzUzNDAxCWZpbGU6QWlEb2NQbHVzLmFwcC50YXIuZ3oKQTFSdnVtM1pCRVBvejZFZTQ5SWRzNDFmaTJsdVpnTUxMb0FUK3RrZ0NaSDUzUXU1a2JFaFk4TzA2KzhVQURUcXdQNU5kRnNXNFBFS1NYcGZDei9sQVE9PQo=",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRWo4VEdSU3R4K2p1UENJNktuNjQxb2R5SkN4ZzFpYkNrdTY5bVJiWkU5TnFRR1BwV0NLRVVJR3dZNFY2TE5ZT2tSeU5Nc04wMFNTbEVOWGdFdjUrSWdvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczODA2MDY3CWZpbGU6QWlEb2NQbHVzLmFwcC50YXIuZ3oKM2YwQVgwU2h0NG45cVF5M25QaUtoU2lud0JVTnd4YitZKzZma3Mwa25makZPWE9xNi9MS3dYSTEzUnhadHNyenFRb1FXcHk2Q0hhWERMZ0tBOGlBRFE9PQo=",
       "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.8/AiDocPlus.app.tar.gz"
     },
     "windows-x86_64": {
