@@ -19,12 +19,7 @@ pub fn open_help_center(app_handle: tauri::AppHandle) -> crate::error::Result<()
     let url = if cfg!(debug_assertions) {
         WebviewUrl::External("http://localhost:1420/help.html".parse().context("URL 解析失败")?)
     } else {
-        let full_url = if cfg!(target_os = "windows") {
-            "https://tauri.localhost/help.html".to_string()
-        } else {
-            "tauri://localhost/help.html".to_string()
-        };
-        WebviewUrl::CustomProtocol(full_url.parse().context("URL 解析失败")?)
+        WebviewUrl::App("help.html".into())
     };
 
     WebviewWindowBuilder::new(&app_handle, window_label, url)
