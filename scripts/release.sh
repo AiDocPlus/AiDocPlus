@@ -126,6 +126,8 @@ while [ $WAITED -lt $MAX_WAIT ]; do
     ASSETS=$(gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name' 2>/dev/null)
     if echo "$ASSETS" | grep -q "\.exe\.sig$"; then
         ok "CI Windows 构建已完成"
+        info "额外等待 60s 确保 latest.json 上传完毕..."
+        sleep 60
         break
     fi
     
@@ -153,9 +155,17 @@ gh release download "$TAG" --repo "$REPO" --pattern "latest.json" --output "$LAT
 MAC_SIG=$(cat "$UPDATER_SIG")
 MAC_URL="https://github.com/${REPO}/releases/download/${TAG}/AiDocPlus.app.tar.gz"
 
-# 用 python3 合并 latest.json
+# 下载 Windows 签名
+WIN_SIG_FILE="/tmp/win_exe.sig"
+gh release download "$TAG" --repo "$REPO" --pattern "*_x64-setup.exe.sig" --output "$WIN_SIG_FILE" --clobber 2>/dev/null || {
+    warn "Windows .exe.sig 下载失败"
+}
+WIN_EXE_NAME="AiDocPlus_${VERSION}_x64-setup.exe"
+WIN_URL="https://github.com/${REPO}/releases/download/${TAG}/${WIN_EXE_NAME}"
+
+# 用 python3 合并 latest.json（同时写入 macOS 和 Windows）
 python3 -c "
-import json, sys
+import json, sys, os
 
 with open('$LATEST_JSON', 'r') as f:
     data = json.load(f)
@@ -164,16 +174,34 @@ data['version'] = '$VERSION'
 if 'platforms' not in data:
     data['platforms'] = {}
 
+# macOS
 data['platforms']['darwin-aarch64'] = {
     'url': '$MAC_URL',
     'signature': '''$MAC_SIG'''
 }
+
+# Windows（从下载的 .sig 文件读取签名）
+win_sig_path = '$WIN_SIG_FILE'
+if os.path.isfile(win_sig_path):
+    with open(win_sig_path, 'r') as f:
+        win_sig = f.read().strip()
+    if win_sig:
+        data['platforms']['windows-x86_64'] = {
+            'url': '$WIN_URL',
+            'signature': win_sig
+        }
+        print('[完成] Windows updater 条目已添加')
+    else:
+        print('[警告] Windows 签名文件为空')
+else:
+    print('[警告] Windows 签名文件不存在，跳过')
 
 with open('$LATEST_JSON', 'w') as f:
     json.dump(data, f, indent=2)
 
 print('[完成] latest.json 已合并，平台:', ', '.join(data['platforms'].keys()))
 "
+rm -f "$WIN_SIG_FILE"
 
 # 上传合并后的 latest.json
 gh release upload "$TAG" "$LATEST_JSON" --repo "$REPO" --clobber
