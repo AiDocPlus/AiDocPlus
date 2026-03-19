@@ -1,19 +1,15 @@
 {
-  "version": "0.3.8",
-  "notes": "AiDocPlus v0.3.8",
-  "pub_date": "2026-03-18T04:03:16Z",
+  "version": "0.3.9",
+  "notes": "v0.3.9: 长篇小说专业化增强 + Markdown编辑器全面升级 + 文本处理工具库",
+  "pub_date": "2026-03-19T14:30:55Z",
   "platforms": {
     "darwin-aarch64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRWo4VEdSU3R4K2p1UENJNktuNjQxb2R5SkN4ZzFpYkNrdTY5bVJiWkU5TnFRR1BwV0NLRVVJR3dZNFY2TE5ZT2tSeU5Nc04wMFNTbEVOWGdFdjUrSWdvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczODA2MDY3CWZpbGU6QWlEb2NQbHVzLmFwcC50YXIuZ3oKM2YwQVgwU2h0NG45cVF5M25QaUtoU2lud0JVTnd4YitZKzZma3Mwa25makZPWE9xNi9MS3dYSTEzUnhadHNyenFRb1FXcHk2Q0hhWERMZ0tBOGlBRFE9PQo=",
-      "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.8/AiDocPlus.app.tar.gz"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRWp4RWdGdWNKMjMrdGk3dGZsSklwTEpDRDllM0prZVZhZW94cFFOVWVGZWdxNUVjQ1JNUWd1UUtKMzdhaG5rUkw4c3RYT0k4K09FZm5zOVpsRXU5MndRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczOTMwNTYwCWZpbGU6QWlEb2NQbHVzLmFwcC50YXIuZ3oKWVo2YmJCdlhqOFBwOXZiODJsSEVBKzVDekl6Sy9mMDZyd1JBcHVsNlNlak44cU91a2g0R3hJbm1XdlVPTzR3L0NKZGdTM3BVSi9hSmhFZ0s4UngzQlE9PQo=",
+      "url": "https://github.com/AiDocPlus/AiDocPlus/releases/download/v0.3.9/AiDocPlus.app.tar.gz"
     },
-    "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRWhpNHZzaWZLY3d4L0FZNSszdGR5MjFzdHd6YVZZUGNTSjhGK0dEb1A3Q0dYcjJvOXFRcWczREd6M2hPMWo5ZkFkSDBXNWNKMVk3Um5CV1JxL0JGMXdNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczNzU0MDUzCWZpbGU6QWlEb2NQbHVzXzAuMy44X3g2NC1zZXR1cC5leGUKcTVnNVBmU0h3OVNmb1VTUGR0RHo2bkh0eU8wL09YT3RjTlIzZ3RjQ1EwMXVCRFN3NmxMOENUR3dxdTlBT1ArcXpaTkg4N1AybEdrSTlHdUY0VFZJQWc9PQo=",
-      "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.8/AiDocPlus_0.3.8_x64-setup.exe"
-    },
-    "windows-x86_64-nsis": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRWhpNHZzaWZLY3d4L0FZNSszdGR5MjFzdHd6YVZZUGNTSjhGK0dEb1A3Q0dYcjJvOXFRcWczREd6M2hPMWo5ZkFkSDBXNWNKMVk3Um5CV1JxL0JGMXdNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczNzU0MDUzCWZpbGU6QWlEb2NQbHVzXzAuMy44X3g2NC1zZXR1cC5leGUKcTVnNVBmU0h3OVNmb1VTUGR0RHo2bkh0eU8wL09YT3RjTlIzZ3RjQ1EwMXVCRFN3NmxMOENUR3dxdTlBT1ArcXpaTkg4N1AybEdrSTlHdUY0VFZJQWc9PQo=",
-      "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.8/AiDocPlus_0.3.8_x64-setup.exe"
+    "darwin-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRWp4RWdGdWNKMjMrdGk3dGZsSklwTEpDRDllM0prZVZhZW94cFFOVWVGZWdxNUVjQ1JNUWd1UUtKMzdhaG5rUkw4c3RYT0k4K09FZm5zOVpsRXU5MndRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczOTMwNTYwCWZpbGU6QWlEb2NQbHVzLmFwcC50YXIuZ3oKWVo2YmJCdlhqOFBwOXZiODJsSEVBKzVDekl6Sy9mMDZyd1JBcHVsNlNlak44cU91a2g0R3hJbm1XdlVPTzR3L0NKZGdTM3BVSi9hSmhFZ0s4UngzQlE9PQo=",
+      "url": "https://github.com/AiDocPlus/AiDocPlus/releases/download/v0.3.9/AiDocPlus.app.tar.gz"
     }
   }
 }
