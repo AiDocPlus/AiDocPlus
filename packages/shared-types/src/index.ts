@@ -53,6 +53,13 @@ export interface Document {
   composedContent?: string;  // 合并内容（Markdown），汇集正文+插件片段+外部导入
   aiServiceId?: string;  // 文档级 AI 服务绑定（为空时使用全局 activeServiceId）
   _contentLoaded?: boolean;  // 前端标志：内容是否已加载（区分元数据模式 vs 内容确实为空）
+  // ── 小说写作扩展字段（仅小说项目使用，所有字段可选） ──
+  parentId?: string;         // 父文档 ID（卷→章层级）
+  sortOrder?: number;        // 同级排序（拖拽排序用）
+  documentType?: NovelDocumentType; // 文档类型
+  chapterOutline?: string;   // 本章大纲
+  chapterSummary?: string;   // AI 自动摘要（用于四层记忆 Layer 2）
+  chapterStatus?: ChapterStatus; // 章节状态
 }
 
 // ============================================================
@@ -461,6 +468,23 @@ export interface ToolbarButtons {
   goToBottom: boolean;     // 滚动到底部
 }
 
+export interface SelectionToolbarAction {
+  id: string;
+  label: string;
+  prompt: string;
+  icon?: string;
+  enabled: boolean;
+  sortOrder: number;
+  builtin?: boolean;
+}
+
+export interface SelectionToolbarSettings {
+  enabled: boolean;
+  triggerMode: 'auto' | 'manual';
+  position: 'above' | 'below';
+  actions: SelectionToolbarAction[];
+}
+
 export interface EditorSettings {
   fontSize: number; // in pixels
   fontFamily: string; // font family for editor
@@ -483,6 +507,7 @@ export interface EditorSettings {
   markdownLint: boolean; // Markdown 语法检查
   defaultViewMode: 'edit' | 'preview' | 'split'; // 默认视图模式
   toolbarButtons: ToolbarButtons; // 工具栏按钮可见性
+  selectionToolbar: SelectionToolbarSettings; // 浮动AI工具条设置
 }
 
 export interface UISettings {
@@ -646,6 +671,19 @@ export const DEFAULT_EDITOR_SETTINGS: EditorSettings = {
   indentOnInput: true,
   markdownLint: true,
   defaultViewMode: 'edit',
+  selectionToolbar: {
+    enabled: true,
+    triggerMode: 'auto',
+    position: 'above',
+    actions: [
+      { id: 'rewrite', label: '改写', prompt: '请改写以下文本，保持原意但用不同表达方式：\n\n', icon: 'RefreshCw', enabled: true, sortOrder: 0, builtin: true },
+      { id: 'expand', label: '扩写', prompt: '请对以下文本进行扩写，增加细节描写：\n\n', icon: 'Maximize2', enabled: true, sortOrder: 1, builtin: true },
+      { id: 'simplify', label: '精简', prompt: '请精简以下文本，去除冗余描写，保留核心信息：\n\n', icon: 'Minimize2', enabled: true, sortOrder: 2, builtin: true },
+      { id: 'polish', label: '润色', prompt: '请对以下文本进行语言润色，提升文学性和表现力：\n\n', icon: 'PenLine', enabled: true, sortOrder: 3, builtin: true },
+      { id: 'translate', label: '翻译', prompt: '请将以下文本翻译为英文：\n\n', icon: 'Languages', enabled: true, sortOrder: 4, builtin: true },
+      { id: 'continue', label: '续写', prompt: '请续写以下文本，保持文风和节奏一致：\n\n', icon: 'Sparkles', enabled: true, sortOrder: 5, builtin: true },
+    ],
+  },
   toolbarButtons: {
     undo: true,
     redo: true,
@@ -931,4 +969,172 @@ export interface WorkspaceState {
     windowY?: number;
   };
   lastSavedAt: number;
+}
+
+// ============================================================
+// Novel Writing Types
+// ============================================================
+
+/** 章节状态 */
+export type ChapterStatus = 'draft' | 'revised' | 'done';
+
+/** 小说文档类型 */
+export type NovelDocumentType = 'volume' | 'chapter' | 'appendix' | 'normal';
+
+/** 小说人物角色类型 */
+export type NovelCharacterRole = 'protagonist' | 'antagonist' | 'supporting' | 'minor';
+
+/** 伏笔状态 */
+export type NovelForeshadowingStatus = 'open' | 'resolved' | 'abandoned';
+
+/** 小说设定集（存储为 novel-settings.json） */
+export interface NovelSettings {
+  genre: string;              // 题材（如「武侠」「科幻」「奇幻」）
+  era: string;                // 时代背景
+  style: string;              // 文风描述
+  synopsis: string;           // 故事梗概
+  worldView: string;          // 世界观设定（Markdown）
+  outlineGlobal: string;      // 全书大纲（Markdown）
+  characters: NovelCharacter[];
+  locations: NovelLocation[];
+  factions: NovelFaction[];
+  customEntries: NovelCustomEntry[];
+  timeline: NovelTimelineEvent[];
+  foreshadowing: NovelForeshadowing[];
+  styleCorpusIds?: string[];  // 关联的风格素材库 ID
+  styleCorpusWeights?: Record<string, number>; // 风格库权重（corpusId → 0~1）
+  dailyGoal?: number;         // 每日写作字数目标
+  totalGoal?: number;         // 全书字数目标
+  dailyWordStats?: DailyWordStat[]; // 每日写作字数统计
+}
+
+/** 每日写作字数统计 */
+export interface DailyWordStat {
+  date: string;               // YYYY-MM-DD
+  words: number;              // 当天新增字数
+}
+
+/** 小说人物卡 */
+export interface NovelCharacter {
+  id: string;
+  name: string;
+  aliases: string[];          // 别名/绰号
+  role: NovelCharacterRole;
+  description: string;        // 人物描述（Markdown）
+  relationships: NovelCharacterRelationship[];
+  tags: string[];
+  avatar?: string;            // 头像文件名（存在 novel-assets/ 下）
+  dialogueStyle?: string;     // 对话风格描述（用于 AI 一致性检查）
+  sortOrder: number;
+}
+
+/** 人物关系 */
+export interface NovelCharacterRelationship {
+  targetCharacterId: string;
+  relation: string;           // 关系描述（如「师徒」「情敌」「父子」）
+}
+
+/** 小说地点 */
+export interface NovelLocation {
+  id: string;
+  name: string;
+  description: string;
+  parentId?: string;          // 父地点 ID（层级，如「国家→城市→街道」）
+  tags: string[];
+  sortOrder: number;
+}
+
+/** 小说势力/组织 */
+export interface NovelFaction {
+  id: string;
+  name: string;
+  description: string;
+  memberIds: string[];        // 关联人物 ID
+  tags: string[];
+  sortOrder: number;
+}
+
+/** 自定义条目（用户自定义分类，如「魔法体系」「武器图鉴」） */
+export interface NovelCustomEntry {
+  id: string;
+  category: string;           // 自定义分类名
+  title: string;
+  content: string;            // Markdown
+  tags: string[];
+  sortOrder: number;
+}
+
+/** 时间线事件 */
+export interface NovelTimelineEvent {
+  id: string;
+  time: string;               // 故事内时间（自由格式，如「第三年春」「公元 2185 年」）
+  sortOrder: number;
+  title: string;
+  description: string;
+  characterIds: string[];     // 相关人物
+  chapterIds: string[];       // 相关章节文档 ID
+}
+
+/** 伏笔/悬念 */
+export interface NovelForeshadowing {
+  id: string;
+  content: string;            // 伏笔内容
+  chapterId: string;          // 埋设章节
+  position: number;           // 文本位置（字符偏移）
+  status: NovelForeshadowingStatus;
+  resolvedChapterId?: string; // 回收章节
+  note?: string;              // 作者备注
+}
+
+/** 风格素材库 */
+export interface StyleCorpus {
+  id: string;
+  name: string;               // 如「古龙全集」
+  authorName: string;         // 原作者名
+  files: StyleCorpusFile[];
+  totalWords: number;
+  totalChunks: number;
+  indexedAt?: number;         // 向量化完成时间
+  styleProfile?: StyleProfile;
+}
+
+/** 素材文件 */
+export interface StyleCorpusFile {
+  id: string;
+  fileName: string;
+  filePath: string;
+  wordCount: number;
+  importedAt: number;
+}
+
+/** 风格画像（AI 自动分析生成） */
+export interface StyleProfile {
+  summary: string;            // 风格总述（~200 字）
+  sentenceStyle: string;      // 句式特征
+  rhythm: string;             // 叙事节奏
+  vocabulary: string;         // 用词特征
+  dialogue: string;           // 对话风格
+  narrative: string;          // 叙事手法
+  atmosphere: string;         // 氛围营造
+  signature: string;          // 标志性手法
+  rawAnalysis: string;        // AI 原始分析全文（Markdown）
+  analyzedAt: number;
+}
+
+/** 创建空的小说设定集 */
+export function createEmptyNovelSettings(): NovelSettings {
+  return {
+    genre: '',
+    era: '',
+    style: '',
+    synopsis: '',
+    worldView: '',
+    outlineGlobal: '',
+    characters: [],
+    locations: [],
+    factions: [],
+    customEntries: [],
+    timeline: [],
+    foreshadowing: [],
+  };
 }

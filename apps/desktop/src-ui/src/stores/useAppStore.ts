@@ -332,7 +332,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ isLoading: true, error: null });
       const project = await invoke<Project>('create_project', {
         name,
-        description
+        description,
       });
       set((state) => ({ projects: [...state.projects, project] }));
       return project;
@@ -461,6 +461,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           enabledPlugins: document.enabledPlugins || undefined,
           composedContent: document.composedContent || undefined,
           aiServiceId: document.aiServiceId || undefined,
+          documentType: document.documentType || undefined,
         },
       });
       updated._contentLoaded = true;

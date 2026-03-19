@@ -28,6 +28,63 @@ function simpleHash(str: string): string {
 
 // 模块级常量：避免每次渲染创建新数组引用
 const REMARK_PLUGINS = [remarkGfm, remarkMath] as const;
+
+/**
+ * 预处理 Markdown：将普通段落间的单换行转为双换行，
+ * 使每行文本生成独立的 <p> 标签（首行缩进正常生效）。
+ * 保留代码块、列表、标题、引用、表格、空行等特殊结构不被干扰。
+ */
+function preprocessMarkdown(text: string): string {
+  const lines = text.split('\n');
+  const result: string[] = [];
+  let inCodeBlock = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trimStart();
+
+    // 代码块围栏切换
+    if (trimmed.startsWith('```')) {
+      inCodeBlock = !inCodeBlock;
+      result.push(line);
+      continue;
+    }
+
+    // 代码块内部：原样保留
+    if (inCodeBlock) {
+      result.push(line);
+      continue;
+    }
+
+    result.push(line);
+
+    // 判断是否需要在当前行后插入空行
+    // 条件：当前行是普通文本行（非空、非特殊标记），下一行也是普通文本行
+    if (i < lines.length - 1) {
+      const nextLine = lines[i + 1];
+      const nextTrimmed = nextLine.trimStart();
+      const isCurrentEmpty = trimmed === '';
+      const isNextEmpty = nextTrimmed === '';
+      const isSpecial = (l: string) =>
+        l === '' ||
+        /^#{1,6}\s/.test(l) ||      // 标题
+        /^[-*+]\s/.test(l) ||        // 无序列表
+        /^\d+\.\s/.test(l) ||       // 有序列表
+        /^>/.test(l) ||              // 引用
+        /^\|/.test(l) ||             // 表格
+        /^---/.test(l) ||            // 分隔线
+        /^```/.test(l) ||            // 代码块
+        /^\s{4,}/.test(l);           // 缩进代码
+
+      // 两行都是普通文本（非空、非特殊），且中间没有空行 → 插入空行
+      if (!isCurrentEmpty && !isNextEmpty && !isSpecial(trimmed) && !isSpecial(nextTrimmed)) {
+        result.push('');
+      }
+    }
+  }
+
+  return result.join('\n');
+}
 const REHYPE_PLUGINS = [
   rehypeRaw,
   [rehypeKatex, { throwOnError: false, strict: false }],
@@ -143,9 +200,11 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = React.memo(({
         remarkPlugins={REMARK_PLUGINS as any}
         rehypePlugins={REHYPE_PLUGINS as any}
       >
-        {content.length > PREVIEW_TRUNCATE_THRESHOLD
-          ? content.slice(0, PREVIEW_TRUNCATE_THRESHOLD)
-          : content}
+        {preprocessMarkdown(
+          content.length > PREVIEW_TRUNCATE_THRESHOLD
+            ? content.slice(0, PREVIEW_TRUNCATE_THRESHOLD)
+            : content
+        )}
       </ReactMarkdown>
       {content.length > PREVIEW_TRUNCATE_THRESHOLD && (
         <div className="text-center py-4 text-muted-foreground text-sm border-t mt-4">

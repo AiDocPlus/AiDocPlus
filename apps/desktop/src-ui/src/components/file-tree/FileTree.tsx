@@ -32,6 +32,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { loadUIPreferences, saveProjectOrder, saveDocOrders } from '@/lib/uiPreferences';
 import { useTranslation } from '@/i18n';
 import { FileTreeContextMenu, type FileTreeContextMenuProps } from './FileTreeContextMenu';
+import { getDocType } from '@/doctype-sdk/registry';
 
 interface FileTreeProps {
   sidebarOpen?: boolean;
@@ -247,10 +248,15 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
     }
   };
 
-  const handleSelectDocument = async (_projectId: string, documentId: string) => {
+  const handleSelectDocument = async (projectId: string, documentId: string) => {
     setFocusedDocId(null);
     const doc = documents.find(d => d.id === documentId);
     if (doc) {
+      // 确保先切换到文档所属项目，以便 MainLayout 正确路由
+      const cp = useAppStore.getState().currentProject;
+      if (!cp || cp.id !== projectId) {
+        await openProject(projectId);
+      }
       await openTab(documentId);
     }
   };
@@ -488,6 +494,36 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
     }
   }, [currentProject, documents, createDocument, loadDocuments, t]);
 
+  // ── 新建指定类型的文档 ──
+  const handleNewDocType = useCallback(async (projectId: string, docType: string) => {
+    try {
+      const { getDocTypeOrDefault } = await import('@/doctype-sdk/registry');
+      const typeDef = getDocTypeOrDefault(docType);
+      const title = t('fileTree.newDocument', { defaultValue: '未命名文档' });
+      const newDoc = await createDocument(projectId, title);
+      if (newDoc) {
+        // 设置文档类型和初始内容
+        const initialContent = typeDef.createEmptyContent();
+        const { invoke } = await import('@tauri-apps/api/core');
+        await invoke('save_document', {
+          payload: {
+            documentId: newDoc.id,
+            projectId,
+            title: newDoc.title,
+            content: initialContent,
+            authorNotes: '',
+            aiGeneratedContent: '',
+            documentType: docType,
+          },
+        });
+        await loadDocuments(projectId);
+        await openTab(newDoc.id);
+      }
+    } catch (err) {
+      console.error('[FileTree] 创建文档类型失败:', err);
+    }
+  }, [createDocument, loadDocuments, openTab, t]);
+
   // ── 右键菜单回调 ──
   const handleProjectContextMenu = useCallback((e: React.MouseEvent, projectId: string, projectName: string) => {
     e.preventDefault();
@@ -514,10 +550,11 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
         }
         window.dispatchEvent(new CustomEvent('menu-new-from-template'));
       },
+      onNewDocType: handleNewDocType,
       onRenameProject: handleStartRenameProject,
       onDeleteProject: handleDeleteProject,
     });
-  }, [expandedProjects, openProject, handleStartRenameProject, handleDeleteProject]);
+  }, [projects, expandedProjects, openProject, handleNewDocType, handleStartRenameProject, handleDeleteProject]);
 
   const handleDocContextMenu = useCallback((e: React.MouseEvent, projectId: string, doc: typeof documents[0]) => {
     e.preventDefault();
@@ -648,7 +685,7 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setIsCreating(true)}
+            onClick={() => window.dispatchEvent(new CustomEvent('create-project-dialog'))}
             className="h-6 w-6"
             title={t('fileTree.createProject', { defaultValue: '新建项目' })}
           >
@@ -732,10 +769,8 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
                 onClick={() => {
                   if (renamingProjectId !== project.id) {
                     if (isActive) {
-                      // 已选中，展开/收缩
                       toggleProject(project.id);
                     } else {
-                      // 未选中，先选中项目
                       openProject(project.id);
                     }
                   }
@@ -813,9 +848,11 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
                           >
                             {isStarred ? (
                               <Star className="h-3 w-3 text-yellow-500 fill-yellow-500 ml-1 flex-shrink-0" />
-                            ) : (
-                              <File className="h-3 w-3 text-muted-foreground ml-1 flex-shrink-0" />
-                            )}
+                            ) : (() => {
+                              const typeDef = doc.documentType ? getDocType(doc.documentType) : undefined;
+                              const Icon = typeDef?.icon || File;
+                              return <Icon className="h-3 w-3 text-muted-foreground ml-1 flex-shrink-0" />;
+                            })()}
 
                             {isRenaming ? (
                               <div className="flex-1 flex items-center gap-1">

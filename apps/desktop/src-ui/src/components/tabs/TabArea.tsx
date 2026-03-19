@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { TabBar } from './TabBar';
-import { EditorWorkspace } from './EditorWorkspace';
+import { DocumentWorkspace } from './DocumentWorkspace';
 import { useAppStore } from '@/stores/useAppStore';
 import { logRender } from '@/lib/perfLog';
 import { FileText, FolderOpen, Keyboard } from 'lucide-react';
@@ -93,7 +93,7 @@ export function TabArea({ onSettingsOpen }: TabAreaProps) {
           key={tab.id}
           className={`flex-1 min-h-0 ${tab.id === activeTabId ? '' : 'hidden'}`}
         >
-          <EditorWorkspace tab={tab} />
+          <DocumentWorkspace tab={tab} />
         </div>
       ))}
     </div>

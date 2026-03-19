@@ -14,11 +14,12 @@ import {
   bracketMatching, indentOnInput, HighlightStyle,
 } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
-import { highlightSelectionMatches, searchKeymap } from '@codemirror/search';
+import { highlightSelectionMatches, searchKeymap, openSearchPanel } from '@codemirror/search';
 import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';
 import { closeBrackets, closeBracketsKeymap, autocompletion } from '@codemirror/autocomplete';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { cn } from '@/lib/utils';
+import * as TU from '@/lib/textUtils';
 import { useEditorSettings } from '@/stores/useSettingsStore';
 import { EditorToolbar } from './EditorToolbar';
 import { EditorStatusBar } from './EditorStatusBar';
@@ -30,6 +31,8 @@ import { markdownLinterExtension } from './extensions/markdownLinter';
 import { lintKeymap } from '@codemirror/lint';
 import type { Document } from '@aidocplus/shared-types';
 import { DocumentOutline, parseHeadings, getBreadcrumb } from './DocumentOutline';
+import EditorSelectionToolbar from './EditorSelectionToolbar';
+import EditorContextMenu from './EditorContextMenu';
 
 // 大文档阈值（字符数），超过此值启用性能降级模式
 const LARGE_DOC_THRESHOLD = 100_000;
@@ -89,6 +92,8 @@ interface MarkdownEditorProps {
   exportCallbacks?: import('./EditorToolbar').ExportCallbacks;
   initialViewMode?: 'edit' | 'preview' | 'split';
   showStatusBar?: boolean;
+  editorRef?: React.MutableRefObject<EditorView | null>;
+  enableSelectionToolbar?: boolean;
 }
 
 // 创建一组 Compartment 实例（每个编辑器实例独立）
@@ -128,10 +133,14 @@ export function MarkdownEditor({
   exportCallbacks,
   initialViewMode,
   showStatusBar = true,
+  editorRef,
+  enableSelectionToolbar = true,
 }: MarkdownEditorProps) {
   const editorDivRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const cmViewRef = useRef<EditorView | null>(null);
+  // Phase 2: Expose EditorView to parent via editorRef prop
+  // (synced after view creation and on destroy)
   const scrollSyncLock = useRef(false);
   const compRef = useRef(createCompartments());
   const onChangeRef = useRef(onChange);
@@ -148,6 +157,10 @@ export function MarkdownEditor({
   const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode || editorSettings.defaultViewMode || 'edit');
   const [docContent, setDocContent] = useState(value);
   const [outlineOpen, setOutlineOpen] = useState(false);
+  const [selToolbar, setSelToolbar] = useState<{ visible: boolean; x: number; y: number; text: string; from: number; to: number }>({ visible: false, x: 0, y: 0, text: '', from: 0, to: 0 });
+  const [ctxMenu, setCtxMenu] = useState<{ visible: boolean; x: number; y: number }>({ visible: false, x: 0, y: 0 });
+  // 持久保存选中状态，供系统菜单使用（菜单点击时编辑器会失焦导致 selection 被清除）
+  const lastSelectionRef = useRef<{ from: number; to: number; text: string; hasSelection: boolean }>({ from: 0, to: 0, text: '', hasSelection: false });
 
   // 大文档检测：超过阈值启用性能降级模式
   const isLargeDoc = docContent.length > LARGE_DOC_THRESHOLD;
@@ -238,6 +251,63 @@ export function MarkdownEditor({
         return true;
       },
     },
+    // ── 新增快捷键（对标 Sublime Text） ──
+    { key: 'Alt-ArrowUp', run: (view) => {
+      const { from } = view.state.selection.main;
+      const line = view.state.doc.lineAt(from);
+      if (line.number <= 1) return true;
+      const prev = view.state.doc.line(line.number - 1);
+      view.dispatch({ changes: [
+        { from: prev.from, to: line.to, insert: line.text + '\n' + prev.text },
+      ], selection: { anchor: prev.from + (from - line.from) } });
+      return true;
+    } },
+    { key: 'Alt-ArrowDown', run: (view) => {
+      const { from } = view.state.selection.main;
+      const line = view.state.doc.lineAt(from);
+      if (line.number >= view.state.doc.lines) return true;
+      const next = view.state.doc.line(line.number + 1);
+      view.dispatch({ changes: [
+        { from: line.from, to: next.to, insert: next.text + '\n' + line.text },
+      ], selection: { anchor: line.from + next.text.length + 1 + (from - line.from) } });
+      return true;
+    } },
+    { key: 'Mod-Shift-d', run: (view) => {
+      const { from } = view.state.selection.main;
+      const line = view.state.doc.lineAt(from);
+      view.dispatch({ changes: { from: line.to, to: line.to, insert: '\n' + line.text } });
+      return true;
+    } },
+    { key: 'Ctrl-Shift-k', run: (view) => {
+      const { from } = view.state.selection.main;
+      const line = view.state.doc.lineAt(from);
+      const df = line.from === 0 ? 0 : line.from - 1;
+      const dt = line.to === view.state.doc.length ? line.to : line.to + 1;
+      view.dispatch({ changes: { from: df, to: dt, insert: '' } });
+      return true;
+    } },
+    { key: 'Mod-j', run: (view) => {
+      const { from, to } = view.state.selection.main;
+      const startLine = view.state.doc.lineAt(from);
+      const endLine = view.state.doc.lineAt(to);
+      if (startLine.number === endLine.number && endLine.number < view.state.doc.lines) {
+        const nextLine = view.state.doc.line(endLine.number + 1);
+        view.dispatch({ changes: { from: startLine.to, to: nextLine.to, insert: ' ' + nextLine.text.trimStart() } });
+      } else if (startLine.number < endLine.number) {
+        const lines: string[] = [];
+        for (let i = startLine.number; i <= endLine.number; i++) lines.push(view.state.doc.line(i).text);
+        view.dispatch({ changes: { from: startLine.from, to: endLine.to, insert: lines.join(' ') } });
+      }
+      return true;
+    } },
+    { key: 'Mod-l', run: (view) => {
+      const { from } = view.state.selection.main;
+      const line = view.state.doc.lineAt(from);
+      view.dispatch({ selection: { anchor: line.from, head: line.to + 1 } });
+      return true;
+    } },
+    { key: 'Mod-h', run: (view) => { openSearchPanel(view); return true; } },
+    { key: 'Mod-=', run: (view) => { wrapSelection(view, '==', '==', '高亮文本'); return true; } },
   ]), [editorSettings.tabSize]);
 
   // 创建 EditorView（组件挂载时执行一次，通过 key prop 在文档切换时重新挂载）
@@ -271,6 +341,8 @@ export function MarkdownEditor({
             if (prev.line === newLine && prev.col === newCol && prev.selChars === newSelChars && prev.from === from) return prev;
             return { line: newLine, col: newCol, selChars: newSelChars, from };
           });
+          // 持久保存选中状态（供系统菜单使用，菜单点击会导致编辑器失焦清除 selection）
+          lastSelectionRef.current = { from, to, text: update.state.sliceDoc(from, to), hasSelection: to > from };
           onCursorLineChangeRef.current?.(newLine);
         } catch { /* view may be destroyed */ }
       });
@@ -381,6 +453,7 @@ export function MarkdownEditor({
 
     const view = new EditorView({ state, parent });
     cmViewRef.current = view;
+    if (editorRef) editorRef.current = view;
 
     // 初始化时跳转到指定行
     if (initialLine && initialLine > 1) {
@@ -396,6 +469,7 @@ export function MarkdownEditor({
     return () => {
       view.destroy();
       cmViewRef.current = null;
+      if (editorRef) editorRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // 空依赖：只在挂载时创建一次，文档切换通过 key prop 重新挂载
@@ -537,6 +611,215 @@ export function MarkdownEditor({
     return () => scroller.removeEventListener('scroll', handleEditorScroll);
   }, [viewMode, handleEditorScroll]);
 
+  // 选中文本检测：mouseup 时弹出浮动AI工具条
+  const toolbarEnabled = enableSelectionToolbar && editorSettings.selectionToolbar?.enabled !== false;
+  const toolbarTriggerAuto = editorSettings.selectionToolbar?.triggerMode !== 'manual';
+  useEffect(() => {
+    if (!toolbarEnabled || !toolbarTriggerAuto) return;
+    const handleMouseUp = () => {
+      const view = cmViewRef.current;
+      if (!view) return;
+      setTimeout(() => {
+        try {
+          const { from, to } = view.state.selection.main;
+          if (to - from > 2) {
+            const text = view.state.sliceDoc(from, to);
+            const coords = view.coordsAtPos(from);
+            if (coords) {
+              setSelToolbar({ visible: true, x: coords.left, y: coords.top, text, from, to });
+            }
+          } else {
+            setSelToolbar(prev => prev.visible ? { ...prev, visible: false } : prev);
+          }
+        } catch { /* view destroyed */ }
+      }, 50);
+    };
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => document.removeEventListener('mouseup', handleMouseUp);
+  }, [toolbarEnabled, toolbarTriggerAuto]);
+
+  // ── 系统菜单事件监听（通过 useMenuEvents 转发的 CustomEvent） ──
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const view = cmViewRef.current;
+      if (!view) return;
+      const id = (e as CustomEvent<string>).detail;
+      if (!id) return;
+      try {
+        // 使用持久保存的选中状态（系统菜单点击会导致编辑器失焦，实时 selection 已被清除）
+        const { from, to, text: sel, hasSelection } = lastSelectionRef.current;
+
+        // 文本转换类：对选中文本或全文执行转换
+        const transformMap: Record<string, (t: string) => string> = {
+          to_uppercase: TU.toUpperCase, to_lowercase: TU.toLowerCase,
+          swap_case: TU.swapCase, title_case: TU.titleCase,
+          to_simplified: TU.toSimplified, to_traditional: TU.toTraditional,
+          to_fullwidth: TU.toFullWidth, to_halfwidth: TU.toHalfWidth,
+          to_cn_punct: TU.toChinesePunctuation, to_en_punct: TU.toEnglishPunctuation,
+          remove_empty_lines: TU.removeEmptyLines, trim_lines: TU.trimLines,
+          collapse_spaces: TU.collapseSpaces,
+          url_encode: TU.urlEncode, url_decode: TU.urlDecode,
+          base64_encode: TU.base64Encode, base64_decode: TU.base64Decode,
+          line_sort_asc: TU.sortLinesAsc, line_sort_desc: TU.sortLinesDesc,
+          line_deduplicate: TU.deduplicateLines, line_reverse: TU.reverseLines,
+          line_shuffle: TU.shuffleLines,
+        };
+        const transformFn = transformMap[id];
+        if (transformFn) {
+          const target = hasSelection ? sel : view.state.doc.toString();
+          const result = transformFn(target);
+          const rFrom = hasSelection ? from : 0;
+          const rTo = hasSelection ? to : view.state.doc.length;
+          view.dispatch({ changes: { from: rFrom, to: rTo, insert: result } });
+          view.focus();
+          return;
+        }
+
+        // 行操作类
+        if (id === 'line_move_up') {
+          const line = view.state.doc.lineAt(from);
+          if (line.number <= 1) return;
+          const prevLine = view.state.doc.line(line.number - 1);
+          view.dispatch({ changes: [
+            { from: prevLine.from, to: prevLine.to + 1, insert: '' },
+            { from: line.to, to: line.to, insert: '\n' + prevLine.text },
+          ] });
+          view.focus(); return;
+        }
+        if (id === 'line_move_down') {
+          const line = view.state.doc.lineAt(from);
+          if (line.number >= view.state.doc.lines) return;
+          const nextLine = view.state.doc.line(line.number + 1);
+          view.dispatch({ changes: [
+            { from: nextLine.from - 1, to: nextLine.to, insert: '' },
+            { from: line.from, to: line.from, insert: nextLine.text + '\n' },
+          ] });
+          view.focus(); return;
+        }
+        if (id === 'line_duplicate') {
+          const line = view.state.doc.lineAt(from);
+          view.dispatch({ changes: { from: line.to, to: line.to, insert: '\n' + line.text } });
+          view.focus(); return;
+        }
+        if (id === 'line_delete') {
+          const line = view.state.doc.lineAt(from);
+          const delFrom = line.from === 0 ? 0 : line.from - 1;
+          const delTo = line.to === view.state.doc.length ? line.to : line.to + 1;
+          view.dispatch({ changes: { from: delFrom, to: delTo, insert: '' } });
+          view.focus(); return;
+        }
+        if (id === 'line_join') {
+          if (!hasSelection) return;
+          const startLine = view.state.doc.lineAt(from);
+          const endLine = view.state.doc.lineAt(to);
+          if (startLine.number === endLine.number) return;
+          const lines: string[] = [];
+          for (let i = startLine.number; i <= endLine.number; i++) lines.push(view.state.doc.line(i).text);
+          view.dispatch({ changes: { from: startLine.from, to: endLine.to, insert: lines.join(' ') } });
+          view.focus(); return;
+        }
+
+        // 选择类
+        if (id === 'select_line') {
+          const line = view.state.doc.lineAt(from);
+          view.dispatch({ selection: { anchor: line.from, head: line.to } });
+          view.focus(); return;
+        }
+        if (id === 'select_word') {
+          const wordAt = view.state.wordAt(from);
+          if (wordAt) view.dispatch({ selection: { anchor: wordAt.from, head: wordAt.to } });
+          view.focus(); return;
+        }
+        if (id === 'select_paragraph') {
+          let pFrom = from, pTo = from;
+          while (pFrom > 0 && view.state.doc.sliceString(pFrom - 1, pFrom) !== '\n') pFrom--;
+          while (pTo < view.state.doc.length && view.state.doc.sliceString(pTo, pTo + 1) !== '\n') pTo++;
+          view.dispatch({ selection: { anchor: pFrom, head: pTo } });
+          view.focus(); return;
+        }
+
+        // 文本格式类
+        const wrapMap: Record<string, [string, string, string]> = {
+          fmt_bold: ['**', '**', '粗体文本'],
+          fmt_italic: ['*', '*', '斜体文本'],
+          fmt_strikethrough: ['~~', '~~', '删除线文本'],
+          fmt_inline_code: ['`', '`', '代码'],
+          fmt_highlight: ['==', '==', '高亮文本'],
+          fmt_superscript: ['^', '^', '上标'],
+          fmt_subscript: ['~', '~', '下标'],
+        };
+        const wrap = wrapMap[id];
+        if (wrap) {
+          const [prefix, suffix, ph] = wrap;
+          const text = sel || ph;
+          view.dispatch({
+            changes: { from, to, insert: prefix + text + suffix },
+            selection: { anchor: from + prefix.length, head: from + prefix.length + text.length },
+          });
+          view.focus(); return;
+        }
+
+        // 插入类
+        if (id === 'insert_date') { const ins = TU.currentDate(); view.dispatch({ changes: { from, to: from, insert: ins } }); view.focus(); return; }
+        if (id === 'insert_time') { const ins = TU.currentTime(); view.dispatch({ changes: { from, to: from, insert: ins } }); view.focus(); return; }
+        if (id === 'insert_datetime') { const ins = TU.currentDateTime(); view.dispatch({ changes: { from, to: from, insert: ins } }); view.focus(); return; }
+        if (id === 'insert_hr') { view.dispatch({ changes: { from, to: from, insert: '\n---\n' } }); view.focus(); return; }
+
+        // 粘贴（从 useMenuEvents 转发的 CodeMirror 粘贴）
+        if (id === 'paste' || id === 'paste_plain') {
+          navigator.clipboard.readText().then(text => {
+            if (text) {
+              view.dispatch({ changes: { from, to: hasSelection ? to : from, insert: text } });
+              view.focus();
+            }
+          }).catch(() => {});
+          return;
+        }
+
+        // 插入链接
+        if (id === 'insert_link') {
+          const linkText = sel || '链接文本';
+          const ins = `[${linkText}](url)`;
+          view.dispatch({ changes: { from, to, insert: ins }, selection: { anchor: from + linkText.length + 3, head: from + linkText.length + 6 } });
+          view.focus(); return;
+        }
+        // 插入图片
+        if (id === 'insert_image') {
+          const ins = '![图片描述](url)';
+          view.dispatch({ changes: { from, to: from, insert: ins }, selection: { anchor: from + 2, head: from + 6 } });
+          view.focus(); return;
+        }
+
+        // 查找替换
+        if (id === 'find_replace') { openSearchPanel(view); return; }
+
+      } catch { /* view destroyed */ }
+    };
+    window.addEventListener('editor-menu-action', handler);
+    return () => { window.removeEventListener('editor-menu-action', handler); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSelReplace = useCallback((text: string) => {
+    const view = cmViewRef.current;
+    if (!view) return;
+    view.dispatch({
+      changes: { from: selToolbar.from, to: selToolbar.to, insert: text },
+      selection: { anchor: selToolbar.from + text.length },
+    });
+    view.focus();
+  }, [selToolbar.from, selToolbar.to]);
+
+  const handleSelInsertAfter = useCallback((text: string) => {
+    const view = cmViewRef.current;
+    if (!view) return;
+    const insertPos = selToolbar.to;
+    view.dispatch({
+      changes: { from: insertPos, to: insertPos, insert: '\n\n' + text },
+      selection: { anchor: insertPos + text.length + 2 },
+    });
+    view.focus();
+  }, [selToolbar.to]);
+
   return (
     <div className="flex flex-col h-full bg-background rounded-md border overflow-hidden">
       {/* 工具栏 */}
@@ -576,6 +859,7 @@ export function MarkdownEditor({
             'hidden': viewMode === 'preview',
           })}
           style={editorFontStyle}
+          onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ visible: true, x: e.clientX, y: e.clientY }); }}
         />
 
         {/* 预览区 */}
@@ -605,6 +889,26 @@ export function MarkdownEditor({
           onBreadcrumbClick={handleBreadcrumbClick}
         />
       )}
+
+      {/* 浮动AI工具条 */}
+      {toolbarEnabled && (
+        <EditorSelectionToolbar
+          visible={selToolbar.visible}
+          position={{ x: selToolbar.x, y: selToolbar.y }}
+          selectedText={selToolbar.text}
+          onClose={() => setSelToolbar(prev => ({ ...prev, visible: false }))}
+          onReplace={handleSelReplace}
+          onInsertAfter={handleSelInsertAfter}
+        />
+      )}
+
+      {/* 右键菜单 */}
+      <EditorContextMenu
+        cmViewRef={cmViewRef}
+        visible={ctxMenu.visible}
+        position={{ x: ctxMenu.x, y: ctxMenu.y }}
+        onClose={() => setCtxMenu({ visible: false, x: 0, y: 0 })}
+      />
     </div>
   );
 }

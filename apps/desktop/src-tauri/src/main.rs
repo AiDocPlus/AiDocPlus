@@ -48,6 +48,7 @@ use commands::{
     script_runner::*,
     imbot::*,
     help::*,
+    novel::*,
 };
 use commands::tts::TtsState;
 use commands::script_runner::RunningScriptState;
@@ -124,6 +125,7 @@ fn main() {
                 // ── 新建 ──
                 .item(&MenuItem::with_id(handle, "new_project", t.new_project, true, Some("CmdOrCtrl+Shift+N"))?)
                 .item(&MenuItem::with_id(handle, "new_document", t.new_document, true, Some("CmdOrCtrl+N"))?)
+                .item(&MenuItem::with_id(handle, "new_document_dialog", t.new_document_dialog, true, Some("CmdOrCtrl+Alt+N"))?)
                 .item(&MenuItem::with_id(handle, "new_from_template", t.new_from_template, true, Some("CmdOrCtrl+Shift+T"))?)
                 .separator()
                 // ── 保存 ──
@@ -156,17 +158,100 @@ fn main() {
                 .item(&MenuItem::with_id(handle, "close_tab", t.close_tab, true, Some("CmdOrCtrl+W"))?)
                 .build()?;
 
-            // 编辑菜单（使用内置 PredefinedMenuItem 以确保剪贴板操作在所有输入框中正常工作）
-            let edit_menu = SubmenuBuilder::new(handle, t.edit)
-                .undo()
-                .redo()
+            // 编辑菜单（全面中文化，不使用英文 PredefinedMenuItem）
+            let selection_sub = SubmenuBuilder::new(handle, t.selection)
+                .item(&MenuItem::with_id(handle, "select_line", t.select_line, true, Some("CmdOrCtrl+L"))?)
+                .item(&MenuItem::with_id(handle, "select_word", t.select_word, true, Some("CmdOrCtrl+D"))?)
+                .item(&MenuItem::with_id(handle, "select_paragraph", t.select_paragraph, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "select_all_same", t.select_all_same, true, None::<&str>)?)
+                .build()?;
+
+            let line_ops_sub = SubmenuBuilder::new(handle, t.line_ops)
+                .item(&MenuItem::with_id(handle, "line_move_up", t.line_move_up, true, Some("Alt+Up"))?)
+                .item(&MenuItem::with_id(handle, "line_move_down", t.line_move_down, true, Some("Alt+Down"))?)
+                .item(&MenuItem::with_id(handle, "line_duplicate", t.line_duplicate, true, Some("CmdOrCtrl+Shift+D"))?)
+                .item(&MenuItem::with_id(handle, "line_delete", t.line_delete, true, Some("CmdOrCtrl+Shift+K"))?)
+                .item(&MenuItem::with_id(handle, "line_join", t.line_join, true, Some("CmdOrCtrl+J"))?)
                 .separator()
-                .cut()
-                .copy()
-                .paste()
-                .select_all()
+                .item(&MenuItem::with_id(handle, "line_sort_asc", t.line_sort_asc, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "line_sort_desc", t.line_sort_desc, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "line_deduplicate", t.line_deduplicate, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "line_reverse", t.line_reverse, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "line_shuffle", t.line_shuffle, true, None::<&str>)?)
+                .build()?;
+
+            let text_convert_sub = SubmenuBuilder::new(handle, t.text_convert)
+                .item(&MenuItem::with_id(handle, "to_uppercase", t.to_uppercase, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "to_lowercase", t.to_lowercase, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "swap_case", t.swap_case, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "title_case", t.title_case, true, None::<&str>)?)
+                .separator()
+                .item(&MenuItem::with_id(handle, "to_simplified", t.to_simplified, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "to_traditional", t.to_traditional, true, None::<&str>)?)
+                .separator()
+                .item(&MenuItem::with_id(handle, "to_fullwidth", t.to_fullwidth, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "to_halfwidth", t.to_halfwidth, true, None::<&str>)?)
+                .separator()
+                .item(&MenuItem::with_id(handle, "to_cn_punct", t.to_cn_punct, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "to_en_punct", t.to_en_punct, true, None::<&str>)?)
+                .build()?;
+
+            let text_process_sub = SubmenuBuilder::new(handle, t.text_process)
+                .item(&MenuItem::with_id(handle, "remove_empty_lines", t.remove_empty_lines, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "trim_lines", t.trim_lines, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "collapse_spaces", t.collapse_spaces, true, None::<&str>)?)
+                .separator()
+                .item(&MenuItem::with_id(handle, "url_encode", t.url_encode, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "url_decode", t.url_decode, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "base64_encode", t.base64_encode, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "base64_decode", t.base64_decode, true, None::<&str>)?)
+                .build()?;
+
+            let text_format_sub = SubmenuBuilder::new(handle, t.text_format)
+                .item(&MenuItem::with_id(handle, "fmt_bold", t.fmt_bold, true, Some("CmdOrCtrl+B"))?)
+                .item(&MenuItem::with_id(handle, "fmt_italic", t.fmt_italic, true, Some("CmdOrCtrl+I"))?)
+                .item(&MenuItem::with_id(handle, "fmt_strikethrough", t.fmt_strikethrough, true, Some("CmdOrCtrl+Shift+X"))?)
+                .item(&MenuItem::with_id(handle, "fmt_inline_code", t.fmt_inline_code, true, Some("CmdOrCtrl+E"))?)
+                .separator()
+                .item(&MenuItem::with_id(handle, "fmt_highlight", t.fmt_highlight, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "fmt_superscript", t.fmt_superscript, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "fmt_subscript", t.fmt_subscript, true, None::<&str>)?)
+                .build()?;
+
+            let insert_sub = SubmenuBuilder::new(handle, t.insert)
+                .item(&MenuItem::with_id(handle, "insert_date", t.insert_date, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "insert_time", t.insert_time, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "insert_datetime", t.insert_datetime, true, None::<&str>)?)
+                .separator()
+                .item(&MenuItem::with_id(handle, "insert_hr", t.insert_hr, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "insert_link", t.insert_link, true, Some("CmdOrCtrl+K"))?)
+                .item(&MenuItem::with_id(handle, "insert_image", t.insert_image, true, None::<&str>)?)
+                .build()?;
+
+            let edit_menu = SubmenuBuilder::new(handle, t.edit)
+                .item(&MenuItem::with_id(handle, "undo", t.undo, true, Some("CmdOrCtrl+Z"))?)
+                .item(&MenuItem::with_id(handle, "redo", t.redo, true, Some("CmdOrCtrl+Shift+Z"))?)
+                .separator()
+                .item(&MenuItem::with_id(handle, "cut", t.cut, true, Some("CmdOrCtrl+X"))?)
+                .item(&MenuItem::with_id(handle, "copy", t.copy, true, Some("CmdOrCtrl+C"))?)
+                .item(&MenuItem::with_id(handle, "paste", t.paste, true, Some("CmdOrCtrl+V"))?)
+                .item(&MenuItem::with_id(handle, "paste_plain", t.paste_plain, true, Some("CmdOrCtrl+Shift+V"))?)
+                .item(&MenuItem::with_id(handle, "select_all", t.select_all, true, Some("CmdOrCtrl+A"))?)
                 .separator()
                 .item(&MenuItem::with_id(handle, "find", t.find, true, Some("CmdOrCtrl+F"))?)
+                .item(&MenuItem::with_id(handle, "find_replace", t.find_replace, true, Some("CmdOrCtrl+H"))?)
+                .separator()
+                .item(&selection_sub)
+                .separator()
+                .item(&line_ops_sub)
+                .separator()
+                .item(&text_convert_sub)
+                .separator()
+                .item(&text_process_sub)
+                .separator()
+                .item(&text_format_sub)
+                .separator()
+                .item(&insert_sub)
                 .build()?;
 
             // 视图菜单
@@ -492,6 +577,16 @@ fn main() {
 
             // 帮助中心
             open_help_center,
+
+            // 小说写作
+            load_novel_settings,
+            save_novel_settings,
+            delete_novel_settings,
+            load_style_corpus_list,
+            save_style_corpus_list,
+            save_style_corpus_file,
+            read_style_corpus_file,
+            delete_style_corpus,
 
         ])
         .run(tauri::generate_context!())

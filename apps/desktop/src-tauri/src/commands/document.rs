@@ -22,6 +22,12 @@ pub struct SaveDocumentPayload {
     pub enabledPlugins: Option<Vec<String>>,
     pub composedContent: Option<String>,
     pub aiServiceId: Option<String>,
+    // 小说扩展字段
+    pub parentId: Option<String>,
+    pub sortOrder: Option<i32>,
+    pub documentType: Option<String>,
+    pub chapterOutline: Option<String>,
+    pub chapterSummary: Option<String>,
 }
 
 #[tauri::command]
@@ -55,6 +61,7 @@ pub fn save_document(
         documentId, projectId, title, content, authorNotes,
         aiGeneratedContent, attachments, pluginData,
         enabledPlugins, composedContent, aiServiceId,
+        parentId, sortOrder, documentType, chapterOutline, chapterSummary,
     } = payload;
 
     security::validate_id(&projectId, "projectId")?;
@@ -87,6 +94,12 @@ pub fn save_document(
         document.composed_content = Some(cc);
     }
     document.ai_service_id = aiServiceId;
+    // 小说扩展字段（仅在传入时更新，避免普通保存覆盖）
+    if parentId.is_some() { document.parent_id = parentId; }
+    if sortOrder.is_some() { document.sort_order = sortOrder; }
+    if documentType.is_some() { document.document_type = documentType; }
+    if chapterOutline.is_some() { document.chapter_outline = chapterOutline; }
+    if chapterSummary.is_some() { document.chapter_summary = chapterSummary; }
 
     // Update metadata
     document.metadata.updated_at = chrono::Utc::now().timestamp();

@@ -1,10 +1,10 @@
 /**
- * 文件树右键菜单组件 — 对标 VSCode Explorer 右键菜单
+ * 文件树右键菜单组件 — 支持子菜单
  */
-import { useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   FilePlus, LayoutTemplate, Edit2, Trash2, Star, Copy,
-  ArrowRightLeft, FolderOpen,
+  ArrowRightLeft, FolderOpen, ChevronRight,
 } from 'lucide-react';
 import { useTranslation } from '@/i18n';
 import { cn } from '@/lib/utils';
@@ -24,6 +24,7 @@ export interface ProjectContextMenuProps {
   onClose: () => void;
   onNewDocument: (projectId: string) => void;
   onNewFromTemplate: (projectId: string) => void;
+  onNewDocType: (projectId: string, docType: string) => void;
   onRenameProject: (projectId: string, name: string) => void;
   onDeleteProject: (projectId: string, name: string) => void;
 }
@@ -51,8 +52,10 @@ export type FileTreeContextMenuProps = ProjectContextMenuProps | DocumentContext
 interface MenuItem {
   icon: React.ReactNode;
   label: string;
-  onClick: () => void;
+  onClick?: () => void;
   danger?: boolean;
+  /** 子菜单项 */
+  children?: MenuItem[];
 }
 
 // ── 组件 ──
@@ -60,10 +63,10 @@ interface MenuItem {
 export function FileTreeContextMenu(props: FileTreeContextMenuProps) {
   const { t } = useTranslation();
   const menuRef = useRef<HTMLDivElement>(null);
+  const [openSubmenu, setOpenSubmenu] = useState<number | null>(null);
 
   const close = props.onClose;
 
-  // 点击外部或 Escape 关闭
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -81,7 +84,6 @@ export function FileTreeContextMenu(props: FileTreeContextMenuProps) {
     };
   }, [close]);
 
-  // 限制菜单不超出视口
   useEffect(() => {
     if (!menuRef.current) return;
     const rect = menuRef.current.getBoundingClientRect();
@@ -99,11 +101,21 @@ export function FileTreeContextMenu(props: FileTreeContextMenuProps) {
   const buildItems = useCallback((): (MenuItem | 'separator')[] => {
     if (props.type === 'project') {
       const p = props;
+
       return [
         {
           icon: <FilePlus className="h-3.5 w-3.5" />,
-          label: t('fileTree.newDocument', { defaultValue: '新建文档' }),
+          label: t('fileTree.newDocument', { defaultValue: '新建通用文档' }),
           onClick: () => { p.onNewDocument(p.projectId); close(); },
+        },
+        {
+          icon: <FilePlus className="h-3.5 w-3.5" />,
+          label: t('fileTree.newDocumentDialog', { defaultValue: '新建文档...' }),
+          onClick: () => {
+            // 派发事件让 MainLayout 打开新建文档对话框
+            window.dispatchEvent(new CustomEvent('create-document-dialog', { detail: { projectId: p.projectId } }));
+            close();
+          },
         },
         {
           icon: <LayoutTemplate className="h-3.5 w-3.5" />,
@@ -173,6 +185,8 @@ export function FileTreeContextMenu(props: FileTreeContextMenuProps) {
 
   const items = buildItems();
 
+  const menuItemClass = "flex items-center gap-2 w-full rounded-sm px-2 py-1 text-left text-[13px] hover:bg-blue-500/15 hover:text-blue-700 dark:hover:text-blue-300 focus:bg-blue-500/15 outline-none cursor-pointer";
+
   return (
     <div
       ref={menuRef}
@@ -189,11 +203,44 @@ export function FileTreeContextMenu(props: FileTreeContextMenuProps) {
       {items.map((item, i) =>
         item === 'separator' ? (
           <div key={`sep-${i}`} className="h-px bg-border my-1" />
+        ) : item.children ? (
+          // 带子菜单的项
+          <div
+            key={i}
+            className="relative"
+            onMouseEnter={() => setOpenSubmenu(i)}
+            onMouseLeave={() => setOpenSubmenu(null)}
+          >
+            <button className={cn(menuItemClass, "justify-between")}>
+              <span className="flex items-center gap-2">
+                {item.icon}
+                <span>{item.label}</span>
+              </span>
+              <ChevronRight className="h-3 w-3 opacity-50" />
+            </button>
+            {openSubmenu === i && (
+              <div
+                className="absolute left-full top-0 ml-0.5 min-w-[140px] rounded-md border p-1 shadow-lg"
+                style={{ backgroundColor: 'hsl(var(--popover))' }}
+              >
+                {item.children.map((child, ci) => (
+                  <button
+                    key={ci}
+                    className={menuItemClass}
+                    onClick={child.onClick}
+                  >
+                    {child.icon}
+                    <span>{child.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         ) : (
           <button
             key={i}
             className={cn(
-              "flex items-center gap-2 w-full rounded-sm px-2 py-1 text-left text-[13px] hover:bg-blue-500/15 hover:text-blue-700 dark:hover:text-blue-300 focus:bg-blue-500/15 outline-none cursor-pointer",
+              menuItemClass,
               item.danger && "text-destructive hover:text-destructive"
             )}
             onClick={item.onClick}

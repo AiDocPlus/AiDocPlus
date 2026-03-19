@@ -44,6 +44,17 @@ pub struct Document {
     pub composed_content: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "aiServiceId")]
     pub ai_service_id: Option<String>,
+    // ── 小说扩展字段 ──
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "parentId")]
+    pub parent_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "sortOrder")]
+    pub sort_order: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "documentType")]
+    pub document_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "chapterOutline")]
+    pub chapter_outline: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "chapterSummary")]
+    pub chapter_summary: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -112,6 +123,11 @@ impl Document {
             enabled_plugins: None,
             composed_content: None,
             ai_service_id: None,
+            parent_id: None,
+            sort_order: None,
+            document_type: None,
+            chapter_outline: None,
+            chapter_summary: None,
         }
     }
 
@@ -130,6 +146,8 @@ impl Document {
         self.ai_generated_content = String::new();
         self.versions = Vec::new();
         self.composed_content = None;
+        self.chapter_outline = None;
+        self.chapter_summary = None;
         self
     }
 

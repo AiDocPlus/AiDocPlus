@@ -17,6 +17,8 @@ import {
   migrateAiKeysToKeyring,
 } from './App.helpers';
 import { loadConversationsFromDB } from './stores/useConversationsStore';
+import { registerBuiltinDocTypes } from './document-types/register';
+import { registerBuiltinSkills } from './ai-engine/register-skills';
 
 
 function AppContent() {
@@ -36,6 +38,10 @@ function AppContent() {
       const t0 = performance.now();
 
       try {
+        // 注册内置文档类型和 AI Skills（同步，无 IO）
+        registerBuiltinDocTypes();
+        registerBuiltinSkills();
+
         // 启动时静默清理旧临时文件（不阻塞）
         invoke('cleanup_temp_files').catch(() => {});
 

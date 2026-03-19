@@ -315,6 +315,22 @@ div[role="dialog"] {
   -webkit-backdrop-filter: none !important;
 }
 
+/* Radix UI Select/Listbox Content - force solid background */
+div[role="listbox"] {
+  opacity: 1 !important;
+  background-color: hsl(var(--card)) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Radix UI Tooltip Content - force solid background */
+div[data-radix-tooltip-content] {
+  opacity: 1 !important;
+  background-color: hsl(var(--popover)) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
 /* Fix prose min-height issue - allow editors to shrink properly */
 .prose {
   min-height: 0 !important;
@@ -382,4 +398,26 @@ div[role="dialog"] {
 }
 .animate-shake {
   animation: shake 0.5s ease-in-out;
+}
+
+/* ═══ 小说写作工作台专用样式 ═══ */
+
+/* 打字机模式：编辑区内容垂直居中，光标行始终在视口中央 */
+.novel-typewriter-mode .cm-editor .cm-scroller {
+  padding-top: 45vh;
+  padding-bottom: 45vh;
+}
+.novel-typewriter-mode .cm-editor .cm-line:has(.cm-cursor) {
+  scroll-margin-top: 45vh;
+  scroll-margin-bottom: 45vh;
+}
+
+/* 专注模式：当前段落正常，其余淡化 */
+.novel-focus-dim .cm-editor .cm-content .cm-line {
+  opacity: 0.35;
+  transition: opacity 0.2s ease;
+}
+.novel-focus-dim .cm-editor .cm-content .cm-line.cm-activeLine,
+.novel-focus-dim .cm-editor .cm-content .cm-line:focus-within {
+  opacity: 1;
 }

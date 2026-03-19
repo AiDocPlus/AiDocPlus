@@ -126,10 +126,65 @@ AiDocPlus/
 - **插件系统**：27 个插件，自注册 + 自动发现 + manifest 驱动
 - **资源数据**：提示词模板、AI 提供商、文档模板等资源数据在 `resources/` 目录，通过 `build-resources.sh` 生成 TypeScript 文件和 bundled-resources
 - **文档标签与收藏**：文档可添加自定义标签，支持收藏（星标），文件树按标签筛选/按收藏筛选，编辑器工具栏内联标签编辑器（TagEditor）
+- **长篇小说写作**（规划中）：设定集系统（世界观/人物/地点/势力/时间线）、章节层级（卷→章 + 拖拽排序）、大纲系统、AI 四层记忆写作引擎、作家风格学习（导入作品→风格分析→RAG 检索→写作注入）、伏笔追踪、写作仪表盘、全书导出 + EPUB
 - **编程区**：独立的多语言代码编辑与执行环境（Python/JavaScript/TypeScript/HTML 等），集成文件树、AI 助手、自动化运行、pip 包管理
 - **功能区**：功能类插件工作区（格式转换、OCR、代码工具等），独立于内容生成类插件
 - **开放 API**：HTTP API Server + JSON-RPC 网关（11 个命名空间 30+ 操作），MCP Server（23 个工具），Python / JS SDK
 - **脚本自动化**：编程区运行脚本时自动注入 API 连接参数，零配置调用 AiDocPlus 全部功能
+- **文档类型系统**：10 种内置文档类型，每种类型有专属编辑器和 AI 侧栏，基于 DocType SDK 统一架构
+
+## 文档类型系统
+
+### 架构概述
+
+文档类型系统通过 `DocType SDK` 实现，每种文档类型声明自己的编辑器组件、AI 侧栏、系统提示词和快捷操作。
+
+- **SDK 入口**：`src-ui/src/doctype-sdk/`（types.ts, registry.ts, host.ts, hooks.ts）
+- **类型实现**：`src-ui/src/document-types/{type-id}/`
+- **共享基础组件**：`src-ui/src/document-types/_shared/`
+
+### 10 种内置文档类型
+
+| 类型 ID | 名称 | 布局模式 | 编辑器 | AI 侧栏 |
+|---------|------|---------|--------|---------|
+| `normal` | 通用文档 | standard | EditorPanel（主程序） | ChatPanel（主程序） |
+| `study-notes` | 学习体会 | standard | DocTypeEditorBase 包装 | StudyNotesAISidebar |
+| `novel` | 长篇小说 | full | NovelDocWorkspace（三栏） | NovelAISidebar |
+| `translation` | 中英翻译 | standard | TranslationWorkspace（双栏） | TranslationAISidebar |
+| `official-doc` | 公文写作 | standard | OfficialDocEditor | OfficialDocAISidebar |
+| `wechat-article` | 公众号文章 | standard | WechatArticleEditor | WechatArticleAISidebar |
+| `business-plan` | 商业计划书 | standard | BusinessPlanEditor | BusinessPlanAISidebar |
+| `meeting-minutes` | 会议纪要 | standard | MeetingMinutesEditor | MeetingMinutesAISidebar |
+| `academic-paper` | 学术论文 | standard | AcademicPaperEditor | AcademicPaperAISidebar |
+| `screenplay` | 电影剧本 | standard | ScreenplayEditor | ScreenplayAISidebar |
+
+### 共享基础组件
+
+- **`DocTypeAIChatBase`**：统一 AI 聊天框架（Markdown 渲染、流式输出、联网/深度思考开关、消息操作）
+- **`DocTypeChatMessage`**：统一消息渲染（MarkdownPreview + think 标签解析 + 复制按钮）
+- **`DocTypeEditorBase`**：统一编辑器包装（MarkdownEditor + 自动保存 + 内容同步 + AI 插入监听）
+- **`styles.ts`**：Design Tokens 常量（消息气泡、快捷按钮、工具栏、状态栏等统一样式）
+
+### Design Tokens（UI 规范）
+
+| Token | 值 | 用途 |
+|-------|-----|------|
+| 快捷按钮 | `h-7 text-xs px-2 gap-1` | 所有文档类型快捷操作 |
+| 消息气泡 | `rounded-lg p-3 text-sm` | AI 侧栏消息 |
+| 用户消息 | `bg-primary/10 ml-8` | 用户消息偏右 |
+| AI 消息 | `bg-muted mr-2` + MarkdownPreview | AI 回复偏左 |
+| 状态栏 | `px-3 py-1 border-t text-xs text-muted-foreground bg-card` | 编辑器底部 |
+| 工具栏 | `px-3 py-1.5 border-b bg-card` | 编辑器顶部 |
+| 输入框 | `text-sm px-3 py-2 border rounded-md` | AI 侧栏输入 |
+
+### 新建文档类型的标准流程
+
+1. 在 `document-types/{type-id}/` 创建 `definition.ts`（实现 `DocTypeDefinition` 接口）
+2. 创建 `{TypeName}Editor.tsx`（基于 `DocTypeEditorBase` 或自定义 full 布局）
+3. 创建 `{TypeName}AISidebar.tsx`（基于 `DocTypeAIChatBase` + 专属快捷操作）
+4. 在 `register.ts` 中注册
+5. 添加 i18n 键到 `zh/en` 翻译文件
+6. Design Tokens 从 `_shared/styles.ts` 导入
 
 ### 运行命令
 
@@ -313,6 +368,53 @@ AiDocPlus/
 - 前端使用 `streamSessionId`（模块级变量）+ `streamAborted` 标志双重保护
 - `stopAiStreaming()` 同时：递增 sessionId、移除事件监听、通知后端中断 HTTP 流
 - 聊天和内容生成共用同一套流式机制和停止逻辑
+
+### 长篇小说写作系统架构（规划中）
+
+> **最高优先级突破口**。详见 `IMPROVEMENT-PLAN.md` §19~§21。
+
+#### 数据模型扩展
+
+- `Project.isNovel?: boolean` — 小说项目标记
+- `Document` 新增可选字段：`parentId`（卷→章层级）、`sortOrder`（拖拽排序）、`documentType`（volume/chapter/appendix/normal）、`chapterOutline`（章节大纲）
+- 设定集独立存储：`~/AiDocPlus/Projects/{projectId}/novel-settings.json`
+- 风格素材库独立存储：`~/AiDocPlus/StyleCorpus/{corpusId}/`
+
+#### 核心类型（`packages/shared-types/src/index.ts` 新增）
+
+- **NovelSettings**：genre / era / style / synopsis / worldView / outlineGlobal + characters[] / locations[] / factions[] / customEntries[] / timeline[]
+- **NovelCharacter**：name / aliases / role / description / relationships / tags / avatar
+- **StyleCorpus**：name / authorName / files[] / totalWords / totalChunks / indexedAt / styleProfile
+- **StyleProfile**：summary / sentenceStyle / rhythm / vocabulary / dialogue / narrative / atmosphere / signature / rawAnalysis / analyzedAt
+- **NovelForeshadowing**：content / chapterId / position / status / resolvedChapterId / note
+
+#### 四层记忆架构（AI 续写时注入 System Prompt）
+
+```
+Layer 0: 风格画像 + 风格示例（~800-1500 token，若已配置风格学习）
+Layer 1: 设定集摘要（~1000-2000 token）
+Layer 2: 近章摘要（~1500 token，滑动窗口 3-5 章）
+Layer 3: 当前章节上下文（~2000-4000 token）
+总计 ~5800-9500 token
+```
+
+#### 关键新文件
+
+| 文件 | 作用 |
+|------|------|
+| `src-ui/src/components/novel/` | 小说写作 UI 组件目录 |
+| `src-ui/src/stores/useNovelStore.ts` | 小说设定 + 写作统计状态管理 |
+| `src-ui/src/components/novel/novelContext.ts` | 小说上下文引擎（buildNovelWritingContext / generateChapterSummary） |
+| `src-ui/src/components/novel/StyleLearningPanel.tsx` | 风格学习面板（素材导入 + 分析 + 画像展示） |
+| `src-tauri/src/commands/novel.rs` | Rust 后端（设定集 CRUD / 章节排序 / 摘要生成） |
+| `src-tauri/src/commands/style.rs` | Rust 后端（风格素材导入 / 分块 / 向量化 / 检索） |
+| `src-tauri/src/knowledge.rs` | RAG 知识库核心（向量存储 / Embedding / 检索） |
+
+#### 风格学习系统
+
+- **风格分析**：导入作品 → 文本分块（~500 token/块）→ 向量化（Embedding API + SQLite + sqlite-vss）→ 抽样分析（20-30 段）→ AI 生成 StyleProfile
+- **写作注入（双管齐下）**：长期记忆（风格画像注入 System Prompt）+ 短期参考（RAG 检索风格相似片段作为 few-shot 示例）
+- **场景匹配**：检测当前写作场景（对话/描写/打斗/心理），检索同类型段落作为示例
 
 ### 提示词模板架构（JSON 文件模式）
 

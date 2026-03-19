@@ -255,7 +255,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
     setInput('');
     setPendingImages([]);
     try {
-      const ctxInfo = effectiveContextMode !== 'none'
+      let ctxInfo = effectiveContextMode !== 'none'
         ? { mode: effectiveContextMode, content: getContextContent() }
         : undefined;
       await sendChatMessage({
@@ -1025,7 +1025,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
         />
         {/* AI 模式切换按钮 */}
         {!simpleMode && (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-wrap">
           <Button variant="ghost" size="sm"
             className={`h-7 px-2 text-xs gap-1 ${enableThinking && supportsThinking ? 'text-purple-600 dark:text-purple-400' : 'text-muted-foreground'}`}
             disabled={!supportsThinking}

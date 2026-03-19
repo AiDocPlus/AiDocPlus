@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { X, ChevronLeft, ChevronRight, Settings } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Settings, Menu } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
   DropdownMenu,
@@ -12,6 +12,7 @@ import { useAppStore } from '@/stores/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/i18n';
+import { getDocType } from '@/doctype-sdk/registry';
 import { confirm } from '@tauri-apps/plugin-dialog';
 
 interface TabBarProps {
@@ -32,12 +33,14 @@ const TAB_COLORS = [
 
 export function TabBar({ onSettingsOpen }: TabBarProps) {
   const { t } = useTranslation();
-  const { tabs, switchTab, closeTab, closeOtherTabs, closeAllTabs } = useAppStore(useShallow(s => ({
+  const { tabs, switchTab, closeTab, closeOtherTabs, closeAllTabs, sidebarOpen, toggleSidebar } = useAppStore(useShallow(s => ({
     tabs: s.tabs,
     switchTab: s.switchTab,
     closeTab: s.closeTab,
     closeOtherTabs: s.closeOtherTabs,
     closeAllTabs: s.closeAllTabs,
+    sidebarOpen: s.sidebarOpen,
+    toggleSidebar: s.toggleSidebar,
   })));
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftScroll, setShowLeftScroll] = useState(false);
@@ -167,6 +170,18 @@ export function TabBar({ onSettingsOpen }: TabBarProps) {
   return (
     <>
     <div className="h-6 border-b bg-background flex items-center relative flex-shrink-0">
+      {/* 侧栏切换按钮（仅侧栏关闭时显示） */}
+      {!sidebarOpen && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleSidebar}
+          className="h-6 w-6 flex-shrink-0 ml-0.5"
+          title={t('shortcuts.toggleSidebar', { defaultValue: '切换侧边栏' })}
+        >
+          <Menu className="h-3.5 w-3.5" />
+        </Button>
+      )}
       {/* 左滚动按钮 */}
       {showLeftScroll && (
         <Button
@@ -216,7 +231,13 @@ export function TabBar({ onSettingsOpen }: TabBarProps) {
                 <span className="w-1.5 h-1.5 bg-orange-500 rounded-full flex-shrink-0" />
               )}
 
-              {/* 标题 */}
+              {/* 文档类型图标 + 标题 */}
+              {(() => {
+                const doc = useAppStore.getState().documents.find(d => d.id === tab.documentId);
+                const typeDef = doc?.documentType ? getDocType(doc.documentType) : undefined;
+                const Icon = typeDef?.icon;
+                return Icon ? <Icon className="h-3 w-3 flex-shrink-0 opacity-50" /> : null;
+              })()}
               <span
                 className={cn(
                   'text-sm truncate flex-1',

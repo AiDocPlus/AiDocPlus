@@ -19,7 +19,10 @@ const SaveAsTemplateDialog = lazy(() => import('../templates/SaveAsTemplateDialo
 const LockScreen = lazy(() => import('../settings/LockScreen').then(m => ({ default: m.LockScreen })));
 import { cn } from '@/lib/utils';
 import { logRender } from '@/lib/perfLog';
-import { Menu, X } from 'lucide-react';
+import { X } from 'lucide-react';
+import { CreateProjectDialog } from '../dialogs/CreateProjectDialog';
+import { CreateDocumentDialog } from '../dialogs/CreateDocumentDialog';
+import { WelcomePage } from './WelcomePage';
 import { Button } from '../ui/button';
 import { ResizableHandle } from '../ui/resizable-handle';
 
@@ -39,6 +42,12 @@ export function MainLayout() {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [saveAsTemplateOpen, setSaveAsTemplateOpen] = useState(false);
+  const [createProjectOpen, setCreateProjectOpen] = useState(false);
+  const [createDocOpen, setCreateDocOpen] = useState(false);
+  const [createDocProjectId, setCreateDocProjectId] = useState('');
+  const tabs = useAppStore(s => s.tabs);
+  const createProject = useAppStore(s => s.createProject);
+  const openProject = useAppStore(s => s.openProject);
 
   // 启动密码锁屏
   const securitySettings = useSettingsStore(s => s.security);
@@ -94,6 +103,15 @@ export function MainLayout() {
       });
     };
     const onFirstRunGuide = () => setShowFirstRunGuide(true);
+    const onCreateProjectDialog = () => setCreateProjectOpen(true);
+    const onOpenSettings = () => setSettingsOpen(true);
+    const onCreateDocumentDialog = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.projectId) {
+        setCreateDocProjectId(detail.projectId);
+        setCreateDocOpen(true);
+      }
+    };
     window.addEventListener('menu-doc-move-to', onMoveTo);
     window.addEventListener('menu-doc-copy-to', onCopyTo);
     window.addEventListener('menu-shortcuts-ref', onShortcuts);
@@ -102,6 +120,9 @@ export function MainLayout() {
     window.addEventListener('menu-save-as-template', onSaveAsTemplate);
     window.addEventListener('menu-manage-templates', onManageTemplates);
     window.addEventListener('menu-first-run-guide', onFirstRunGuide);
+    window.addEventListener('create-project-dialog', onCreateProjectDialog);
+    window.addEventListener('menu-open-settings', onOpenSettings);
+    window.addEventListener('create-document-dialog', onCreateDocumentDialog);
     return () => {
       window.removeEventListener('menu-doc-move-to', onMoveTo);
       window.removeEventListener('menu-doc-copy-to', onCopyTo);
@@ -111,6 +132,9 @@ export function MainLayout() {
       window.removeEventListener('menu-save-as-template', onSaveAsTemplate);
       window.removeEventListener('menu-manage-templates', onManageTemplates);
       window.removeEventListener('menu-first-run-guide', onFirstRunGuide);
+      window.removeEventListener('create-project-dialog', onCreateProjectDialog);
+      window.removeEventListener('menu-open-settings', onOpenSettings);
+      window.removeEventListener('create-document-dialog', onCreateDocumentDialog);
     };
   }, []);
 
@@ -177,24 +201,15 @@ export function MainLayout() {
 
       {/* Main Content - Tab Area */}
       <main className="flex-1 flex flex-col min-w-0 min-h-0">
-        {/* Menu button for when sidebar is closed */}
-        {!sidebarOpen && (
-          <div className="flex items-center h-9 px-2 border-b bg-background flex-shrink-0">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleSidebar}
-              className="h-7 w-7"
-              title={t('shortcuts.toggleSidebar')}
-            >
-              <Menu className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-
-        {/* Tab Content Area */}
+        {/* Tab Content Area — 统一使用 TabArea，文档类型由 DocumentWorkspace 路由 */}
         <div className="flex-1 min-h-0 flex flex-col">
-          <TabArea onSettingsOpen={() => setSettingsOpen(true)} />
+          {tabs.length > 0 ? (
+            <TabArea onSettingsOpen={() => setSettingsOpen(true)} />
+          ) : (
+            <WelcomePage onCreateProject={() => {
+              setCreateProjectOpen(true);
+            }} />
+          )}
         </div>
       </main>
 
@@ -269,6 +284,67 @@ export function MainLayout() {
           />
         </Suspense>
       )}
+
+      {/* 创建项目弹窗 */}
+      <CreateProjectDialog
+        open={createProjectOpen}
+        onClose={() => setCreateProjectOpen(false)}
+        onCreate={async (name, description, firstDocType) => {
+          try {
+            const project = await createProject(name, description);
+            await openProject(project.id);
+            // 如果选择了文档类型，自动创建第一个文档
+            if (firstDocType) {
+              const { getDocTypeOrDefault } = await import('@/doctype-sdk/registry');
+              const typeDef = getDocTypeOrDefault(firstDocType);
+              const { createDocument, openTab } = useAppStore.getState();
+              const newDoc = await createDocument(project.id, name);
+              if (newDoc && firstDocType !== 'normal') {
+                await invoke('save_document', {
+                  payload: {
+                    documentId: newDoc.id, projectId: project.id,
+                    title: newDoc.title, content: typeDef.createEmptyContent(),
+                    authorNotes: '', aiGeneratedContent: '', documentType: firstDocType,
+                  },
+                });
+                const { loadDocuments } = useAppStore.getState();
+                await loadDocuments(project.id);
+              }
+              await openTab(newDoc.id);
+            }
+          } catch (err) {
+            console.error('Failed to create project:', err);
+          }
+        }}
+      />
+
+      {/* 新建文档对话框 */}
+      <CreateDocumentDialog
+        open={createDocOpen}
+        projectId={createDocProjectId}
+        onClose={() => setCreateDocOpen(false)}
+        onCreate={async (projectId, title, docType) => {
+          try {
+            const { getDocTypeOrDefault } = await import('@/doctype-sdk/registry');
+            const typeDef = getDocTypeOrDefault(docType);
+            const { createDocument, openTab, loadDocuments } = useAppStore.getState();
+            const newDoc = await createDocument(projectId, title);
+            if (newDoc && docType !== 'normal') {
+              await invoke('save_document', {
+                payload: {
+                  documentId: newDoc.id, projectId,
+                  title: newDoc.title, content: typeDef.createEmptyContent(),
+                  authorNotes: '', aiGeneratedContent: '', documentType: docType,
+                },
+              });
+              await loadDocuments(projectId);
+            }
+            await openTab(newDoc.id);
+          } catch (err) {
+            console.error('Failed to create document:', err);
+          }
+        }}
+      />
 
       {/* 存为模板（lazy） */}
       {saveAsTemplateOpen && (() => {

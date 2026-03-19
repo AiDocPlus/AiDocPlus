@@ -22,6 +22,15 @@ export function useMenuEvents(onSettingsOpen: () => void) {
         case 'new_document':
           window.dispatchEvent(new CustomEvent('editor-new-document'));
           break;
+        case 'new_document_dialog': {
+          // 获取当前项目 ID，弹出新建文档对话框
+          const { useAppStore } = await import('@/stores/useAppStore');
+          const projectId = useAppStore.getState().currentProject?.id;
+          if (projectId) {
+            window.dispatchEvent(new CustomEvent('create-document-dialog', { detail: { projectId } }));
+          }
+          break;
+        }
         case 'save':
           window.dispatchEvent(new CustomEvent('save-active-tab'));
           break;
@@ -59,9 +68,54 @@ export function useMenuEvents(onSettingsOpen: () => void) {
           onSettingsOpen();
           break;
 
-        // ── 编辑菜单（剪切/复制/粘贴/撤销/重做/全选由 Tauri PredefinedMenuItem 原生处理）──
+        // ── 编辑菜单：基础操作（原 PredefinedMenuItem 改为自定义菜单项后需前端处理） ──
+        case 'undo':
+          document.execCommand('undo');
+          break;
+        case 'redo':
+          document.execCommand('redo');
+          break;
+        case 'cut':
+          document.execCommand('cut');
+          break;
+        case 'copy':
+          document.execCommand('copy');
+          break;
+        case 'paste':
+          navigator.clipboard.readText().then(text => {
+            const el = document.activeElement;
+            if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+              const start = el.selectionStart ?? 0;
+              const end = el.selectionEnd ?? 0;
+              el.setRangeText(text, start, end, 'end');
+              el.dispatchEvent(new Event('input', { bubbles: true }));
+            } else {
+              // CodeMirror 或其他：转发给编辑器处理
+              window.dispatchEvent(new CustomEvent('editor-menu-action', { detail: 'paste' }));
+            }
+          }).catch(() => {});
+          break;
+        case 'paste_plain':
+          navigator.clipboard.readText().then(text => {
+            const el = document.activeElement;
+            if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+              const start = el.selectionStart ?? 0;
+              const end = el.selectionEnd ?? 0;
+              el.setRangeText(text, start, end, 'end');
+              el.dispatchEvent(new Event('input', { bubbles: true }));
+            } else {
+              window.dispatchEvent(new CustomEvent('editor-menu-action', { detail: 'paste_plain' }));
+            }
+          }).catch(() => {});
+          break;
+        case 'select_all':
+          document.execCommand('selectAll');
+          break;
         case 'find':
           window.dispatchEvent(new CustomEvent('open-search'));
+          break;
+        case 'find_replace':
+          window.dispatchEvent(new CustomEvent('editor-menu-action', { detail: 'find_replace' }));
           break;
 
         // ── 视图菜单 ──
@@ -162,7 +216,9 @@ export function useMenuEvents(onSettingsOpen: () => void) {
           break;
 
         default:
-          console.log('[MenuEvent] 未处理的菜单事件:', menuId);
+          // 编辑类菜单事件（文本转换/行操作/选择/格式/插入等）转发给活动编辑器处理
+          window.dispatchEvent(new CustomEvent('editor-menu-action', { detail: menuId }));
+          break;
       }
     });
 

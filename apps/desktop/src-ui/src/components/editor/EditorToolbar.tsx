@@ -335,6 +335,10 @@ export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMod
             {s('bold') && <DropdownMenuItem onClick={() => doWrap('**', '**', t('editor.toolbar.boldPlaceholder', { defaultValue: '粗体文本' }))}><Bold className="h-4 w-4 mr-2" />{t('editor.toolbar.boldCmd', { defaultValue: '粗体 (Cmd+B)' })}</DropdownMenuItem>}
             {s('italic') && <DropdownMenuItem onClick={() => doWrap('*', '*', t('editor.toolbar.italicPlaceholder', { defaultValue: '斜体文本' }))}><Italic className="h-4 w-4 mr-2" />{t('editor.toolbar.italicCmd', { defaultValue: '斜体 (Cmd+I)' })}</DropdownMenuItem>}
             {s('strikethrough') && <DropdownMenuItem onClick={() => doWrap('~~', '~~', t('editor.toolbar.strikethroughPlaceholder', { defaultValue: '删除线文本' }))}><Strikethrough className="h-4 w-4 mr-2" />{t('editor.toolbar.strikethroughCmd', { defaultValue: '删除线 (Cmd+Shift+X)' })}</DropdownMenuItem>}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => doWrap('==', '==', '高亮文本')}><Minus className="h-4 w-4 mr-2" />{t('editor.toolbar.highlight', { defaultValue: '高亮标记 (⌘=)' })}</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => doWrap('^', '^', '上标')}><Minus className="h-4 w-4 mr-2" />{t('editor.toolbar.superscript', { defaultValue: '上标' })}</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => doWrap('~', '~', '下标')}><Minus className="h-4 w-4 mr-2" />{t('editor.toolbar.subscript', { defaultValue: '下标' })}</DropdownMenuItem>
             {s('clearFormat') && (<><DropdownMenuSeparator /><DropdownMenuItem onClick={() => runAction((v) => cmClearFormat(v))}><RemoveFormatting className="h-4 w-4 mr-2" />{t('editor.toolbar.clearFormat', { defaultValue: '清除格式' })}</DropdownMenuItem></>)}
           </DropdownMenuContent>
         </DropdownMenu>

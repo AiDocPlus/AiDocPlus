@@ -192,7 +192,7 @@ export const EditorWorkspace = memo(function EditorWorkspace({ tab }: EditorWork
         <ResizableHandle direction="horizontal" onResize={handleChatResize} />
       )}
 
-      {/* 右侧面板：插件区显示插件 AI 助手，其他显示 ChatPanel，编程区自带不显示 */}
+      {/* 右侧面板：插件区显示插件 AI 助手，其他显示 ChatPanel / 章节大纲，编程区自带不显示 */}
       {tab.panelState.chatOpen && activeView !== 'coding' && (
         <div
           className="flex-shrink-0 overflow-hidden h-full flex flex-col"
