@@ -25,7 +25,6 @@ import DiarySettingsDialog from './DiarySettingsDialog';
 import DiaryAISidebar from './DiaryAISidebar';
 import DiaryDashboard from './DiaryDashboard';
 import DiaryExportDialog from './DiaryExportDialog';
-import DiaryJournalList from './DiaryJournalList';
 import DiaryOnThisDay from './DiaryOnThisDay';
 import DiaryImportDialog from './DiaryImportDialog';
 import DiaryTemplateDialog from './DiaryTemplateDialog';
@@ -53,7 +52,7 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
   })));
 
   // ── 布局状态 ──
-  const [leftWidth, setLeftWidth] = useState(220);
+  const [leftWidth, setLeftWidth] = useState(260);
   const [rightWidth, setRightWidth] = useState(320);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false); // AI 默认展开
@@ -74,7 +73,6 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
   const [selectedDate, setSelectedDate] = useState(getTodayDateStr());
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
   const [entryContent, setEntryContent] = useState('');
-  const [filterJournalId, setFilterJournalId] = useState<string | null>(null);
   const [editorRevision, setEditorRevision] = useState(0);
 
   // ── 高级筛选状态 ──
@@ -236,30 +234,33 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
       const updated = updateEntryContent(diary, activeEntryId, entryContent);
       saveDiary(updated);
     }
-    const journalId = filterJournalId || diary.settings.defaultJournalId;
+    const journalId = diary.settings.defaultJournalId;
     const updated = createEntry(diary, journalId, selectedDate);
     const newEntry = updated.entries[updated.entries.length - 1];
     saveDiary(updated);
     setActiveEntryId(newEntry.id);
     setEntryContent(newEntry.content);
-  }, [activeEntryId, entryContent, diary, saveDiary, selectedDate, filterJournalId]);
+  }, [activeEntryId, entryContent, diary, saveDiary, selectedDate]);
 
   // ── 内容变化（用 diaryRef 避免 diary 引用变化导致回调重建 → 子组件 effect 循环） ──
+  const dirtyMarkedRef = useRef(false);
   const handleContentChange = useCallback((content: string) => {
     // 内容未变时提前退出，避免 debounce 回调导致不必要的 diary 更新
     const currentEntry = activeEntryId ? diaryRef.current.entries.find(e => e.id === activeEntryId) : null;
     if (currentEntry && currentEntry.content === content) return;
     setEntryContent(content);
     setSaveStatus('unsaved');
+    // 首次变化时立即 markDirty 以显示 Tab 红点（不调用 updateInMemory 避免全局重渲染）
+    if (!dirtyMarkedRef.current) {
+      host.doc.markDirty();
+      dirtyMarkedRef.current = true;
+    }
     if (activeEntryId) {
       let updated = updateEntryContent(diaryRef.current, activeEntryId, content);
       updated = addSnapshot(updated, activeEntryId);
       setDiary(updated);
-      // 注意：不在每次按键时调用 host.doc.updateInMemory / markDirty
-      // 这会导致 store 更新 → 上层 FileTree/DocumentWorkspace 全部重渲染
-      // 改为在自动保存 effect 中延迟同步到 store
     }
-  }, [activeEntryId]);
+  }, [activeEntryId, host.doc]);
 
   // ── 自动保存（延迟同步到 store + 保存到磁盘） ──
   useEffect(() => {
@@ -270,7 +271,9 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
       host.doc.updateInMemory({ content: JSON.stringify(diaryRef.current) });
       host.doc.markDirty();
       setSaveStatus('saving');
-      host.doc.save();
+      host.doc.save().then(() => {
+        dirtyMarkedRef.current = false;
+      });
       saveTimerRef.current = null;
       if (saveStatusTimerRef.current) clearTimeout(saveStatusTimerRef.current);
       saveStatusTimerRef.current = setTimeout(() => setSaveStatus('saved'), 1500);
@@ -426,11 +429,6 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
     }
   }, [focusMode]);
 
-  // ── 标题变更（用 diaryRef 避免 diary 引用变化导致回调重建） ──
-  const handleTitleChange = useCallback((title: string) => {
-    if (!activeEntryId) return;
-    saveDiary(updateEntryMeta(diaryRef.current, activeEntryId, { title }));
-  }, [activeEntryId, saveDiary]);
 
   // ── 键盘快捷键 ──
   useEffect(() => {
@@ -498,7 +496,7 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
               onDateDoubleClick={(dateStr) => {
                 selectDate(dateStr);
                 // 在该日期创建新条目
-                const journalId = filterJournalId || diaryRef.current.settings.defaultJournalId;
+                const journalId = diaryRef.current.settings.defaultJournalId;
                 const updated = createEntry(diaryRef.current, journalId, dateStr);
                 const newEntry = updated.entries[updated.entries.length - 1];
                 saveDiary(updated);
@@ -507,15 +505,6 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
               }}
               weekStartsOn={diary.settings.weekStartsOn}
             />
-
-            {/* 日记本筛选（无高级筛选时显示） */}
-            {!advancedFilter.journalId && (
-              <DiaryJournalList
-                diary={diary}
-                filterJournalId={filterJournalId}
-                onFilterChange={setFilterJournalId}
-              />
-            )}
 
             {/* 高级筛选面板 */}
             <DiaryFilterPanel
@@ -621,6 +610,7 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
             onTagToggle={handleTagToggle}
             onTemplateApply={handleTemplateApply}
             onToggleStarred={handleToggleStarred}
+            onJournalChange={handleMoveToJournal}
             allTags={allTags}
             editorAppearanceSlot={
               <NovelEditorSettings storage={host.storage} appearance={editorAppearance} onAppearanceChange={setEditorAppearance} />
@@ -635,11 +625,9 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
               <div style={getEditorInnerStyle(editorAppearance)}>
                 <DiaryEditor
                   entryId={activeEntry.id}
-                  title={activeEntry.title}
                   content={entryContent}
                   host={host}
                   onChange={handleContentChange}
-                  onTitleChange={handleTitleChange}
                   key={`${activeEntry.id}-${editorRevision}`}
                 />
               </div>
@@ -719,7 +707,7 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
                   host={host}
                   diary={diary}
                   onStartWithPrompt={(content) => {
-                    const journalId = filterJournalId || diary.settings.defaultJournalId;
+                    const journalId = diary.settings.defaultJournalId;
                     const updated = createEntry(diary, journalId, selectedDate, content);
                     const newEntry = updated.entries[updated.entries.length - 1];
                     saveDiary(updated);
@@ -842,7 +830,7 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
         onApply={(content, mode) => {
           if (!activeEntryId) {
             // 无活动条目时，用模板新建
-            const journalId = filterJournalId || diary.settings.defaultJournalId;
+            const journalId = diary.settings.defaultJournalId;
             const updated = createEntry(diary, journalId, selectedDate, content);
             const newEntry = updated.entries[updated.entries.length - 1];
             saveDiary(updated);

@@ -9,7 +9,7 @@ import {
   PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
   ChevronLeft, ChevronRight, CalendarDays, FilePlus, X, XCircle,
   Save, SaveAll, History, BarChart3, FileDown, FileUp, Settings,
-  Maximize2, Star, StarOff, Cloud, Tag, FileText,
+  Maximize2, Star, StarOff, Cloud, Tag, FileText, BookOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -56,12 +56,13 @@ interface DiaryToolbarProps {
   onTagToggle: (tag: string) => void;
   onTemplateApply: (templateId: string) => void;
   onToggleStarred: () => void;
+  onJournalChange: (journalId: string) => void;
   editorAppearanceSlot?: React.ReactNode;
   allTags?: string[];
 }
 
 export default function DiaryToolbar({
-  diary: _diary, activeEntry, selectedDate,
+  diary, activeEntry, selectedDate,
   leftCollapsed, rightCollapsed, focusMode, isSaving,
   onToggleLeft, onToggleRight, onToggleFocus,
   onPrevDay, onNextDay, onToday,
@@ -70,6 +71,7 @@ export default function DiaryToolbar({
   onOpenVersionHistory, onOpenDashboard, onOpenExport, onOpenImport, onOpenSettings,
   onMoodChange, onWeatherChange, onTemperatureChange,
   onTagToggle, onTemplateApply, onToggleStarred,
+  onJournalChange,
   editorAppearanceSlot,
   allTags: allTagsProp,
 }: DiaryToolbarProps) {
@@ -147,6 +149,25 @@ export default function DiaryToolbar({
       {/* 第二行：条目元数据 */}
       {activeEntry && !focusMode && (
         <div className="flex items-center gap-1 px-2 py-0.5 border-t text-xs">
+          {/* 所属日记本 */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="h-5 px-1.5 text-xs gap-0.5">
+                <BookOpen className="h-3 w-3" />
+                <span>{diary.journals.find(j => j.id === activeEntry.journalId)?.icon} {diary.journals.find(j => j.id === activeEntry.journalId)?.name || t('diary.unknownJournal', { defaultValue: '未知' })}</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="bg-card">
+              {diary.journals.map(j => (
+                <DropdownMenuItem key={j.id} className="text-xs gap-1.5" onClick={() => onJournalChange(j.id)}>
+                  <span>{j.icon}</span>
+                  <span>{j.name}</span>
+                  {j.id === activeEntry.journalId && <span className="ml-auto text-primary">✓</span>}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <div className="w-px h-4 bg-border mx-0.5" />
           {/* 心情选择 */}
           <div className="flex items-center gap-0.5">
             {MOOD_VALUES.map(mood => (
@@ -175,7 +196,7 @@ export default function DiaryToolbar({
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
+            <DropdownMenuContent align="start" className="bg-card">
               {WEATHER_TYPES.map(wt => (
                 <DropdownMenuItem key={wt} className="text-xs" onClick={() => onWeatherChange(wt)}>
                   {WEATHER_EMOJI[wt]} {WEATHER_LABEL[wt]}
@@ -218,7 +239,7 @@ export default function DiaryToolbar({
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="max-h-48 overflow-auto">
+            <DropdownMenuContent align="start" className="max-h-48 overflow-auto bg-card">
               {allTags.map(tag => (
                 <DropdownMenuItem key={tag} className="text-xs" onClick={() => onTagToggle(tag)}>
                   {activeEntry.tags.includes(tag) ? '✓ ' : '　'}{tag}
@@ -238,7 +259,7 @@ export default function DiaryToolbar({
                 <span className="text-muted-foreground">{t('diary.template', { defaultValue: '模板' })}</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
+            <DropdownMenuContent align="start" className="bg-card">
               {BUILTIN_TEMPLATES.map(tpl => (
                 <DropdownMenuItem key={tpl.id} className="text-xs" onClick={() => onTemplateApply(tpl.id)}>
                   {tpl.icon} {tpl.name}

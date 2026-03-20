@@ -3,7 +3,6 @@
  *
  * 显示"全部"+ 各日记本，点击切换筛选
  */
-import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/i18n';
 import type { DiaryDocumentContent } from './types';
@@ -19,14 +18,6 @@ export default function DiaryJournalList({
 }: DiaryJournalListProps) {
   const { t } = useTranslation();
 
-  const journalEntryCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const e of diary.entries) {
-      counts[e.journalId] = (counts[e.journalId] || 0) + 1;
-    }
-    return counts;
-  }, [diary.entries]);
-
   return (
     <div className="flex items-center gap-1 px-2 py-1 border-t border-b overflow-x-auto flex-shrink-0">
       <button
@@ -35,7 +26,7 @@ export default function DiaryJournalList({
         )}
         onClick={() => onFilterChange(null)}
       >
-        {t('diary.allJournals', { defaultValue: '全部' })} ({diary.entries.length})
+        {t('diary.allJournals', { defaultValue: '全部' })}
       </button>
       {diary.journals.map(j => (
         <button
@@ -45,7 +36,7 @@ export default function DiaryJournalList({
           )}
           onClick={() => onFilterChange(filterJournalId === j.id ? null : j.id)}
         >
-          {j.icon} {j.name} ({journalEntryCounts[j.id] || 0})
+          {j.icon} {j.name}
         </button>
       ))}
     </div>

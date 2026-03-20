@@ -72,7 +72,7 @@ export default function DiaryEntryList({
         {grouped.map(group => (
           <div key={group.date}>
             {/* 日期分组标题 */}
-            <div className="px-2 py-1.5 text-sm text-muted-foreground font-medium sticky top-0 bg-card/95 backdrop-blur-sm border-b">
+            <div className="px-2 py-1.5 text-sm text-muted-foreground font-medium sticky top-0 bg-card/95 backdrop-blur-sm border-b text-center">
               {formatDateDisplay(group.date)}
             </div>
             {group.entries.map(entry => (

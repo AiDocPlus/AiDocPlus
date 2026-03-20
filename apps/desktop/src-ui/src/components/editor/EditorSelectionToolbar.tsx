@@ -14,9 +14,12 @@ import { Button } from '@/components/ui/button';
 import { MarkdownPreview } from '@/components/editor/MarkdownPreview';
 import { useTranslation } from '@/i18n';
 import { useSettingsStore, getAIInvokeParamsForService } from '@/stores/useSettingsStore';
-import { getActiveService, type SelectionToolbarAction } from '@aidocplus/shared-types';
+import { type SelectionToolbarAction } from '@aidocplus/shared-types';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+import { parseThinkTags } from '@/utils/thinkTagParser';
 import { formatBackendError } from '@/lib/backendError';
+import { useShallow } from 'zustand/react/shallow';
 
 const ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
   RefreshCw, Maximize2, Minimize2, PenLine, Sparkles, Languages,
@@ -41,11 +44,18 @@ export default function EditorSelectionToolbar({
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState('');
   const [error, setError] = useState('');
-  const abortRef = useRef<AbortController | null>(null);
+  const streamingRef = useRef('');
+  const unlistenRef = useRef<(() => void) | null>(null);
 
-  const settingsStore = useSettingsStore();
-  const toolbarSettings = settingsStore.editor.selectionToolbar;
-  const activeService = getActiveService(settingsStore.ai);
+  const { toolbarSettings, aiServices, activeServiceId } = useSettingsStore(useShallow(s => ({
+    toolbarSettings: s.editor.selectionToolbar,
+    aiServices: s.ai.services,
+    activeServiceId: s.ai.activeServiceId,
+  })));
+  const activeService = useMemo(() => {
+    const svc = activeServiceId ? aiServices.find(s => s.id === activeServiceId && s.enabled) : null;
+    return svc || aiServices.find(s => s.enabled) || null;
+  }, [aiServices, activeServiceId]);
   const aiParams = getAIInvokeParamsForService(activeService?.id);
   const aiAvailable = !!(aiParams.provider && aiParams.apiKey && aiParams.model);
 
@@ -64,6 +74,7 @@ export default function EditorSelectionToolbar({
     setLoading(true);
     setResult('');
     setError('');
+    streamingRef.current = '';
 
     const userPrompt = action.prompt + selectedText;
     const messages = [
@@ -71,36 +82,45 @@ export default function EditorSelectionToolbar({
       { role: 'user' as const, content: userPrompt },
     ];
 
-    const abortController = new AbortController();
-    abortRef.current = abortController;
+    const requestId = `sel_${Date.now()}`;
+    let rawAccumulated = '';
 
     try {
-      let fullContent = '';
-      const { provider, apiKey, model, baseUrl } = aiParams;
-      await invoke('ai_chat_stream', {
-        provider, apiKey, model, baseUrl: baseUrl || null,
-        messages, temperature: 0.7, maxTokens: null,
-        enableWebSearch: false, enableThinking: false,
+      const unlisten = await listen<{ request_id: string; content: string }>('ai:stream:chunk', (event) => {
+        if (event.payload.request_id !== requestId) return;
+        rawAccumulated += event.payload.content;
+        const parsed = parseThinkTags(rawAccumulated);
+        streamingRef.current = parsed.content;
+        setResult(parsed.content);
       });
-      // 流式回调通过 Tauri 事件，这里用非流式方式作为 fallback
-      const response = await invoke<string>('ai_chat', {
-        provider, apiKey, model, baseUrl: baseUrl || null,
-        messages, temperature: 0.7, maxTokens: null,
+      unlistenRef.current = unlisten;
+
+      await invoke<string>('chat_stream', {
+        messages,
+        ...aiParams,
+        requestId,
       });
-      fullContent = response;
-      setResult(fullContent);
+
+      unlisten();
+      unlistenRef.current = null;
+      const finalParsed = parseThinkTags(rawAccumulated);
+      setResult(finalParsed.content);
     } catch (err) {
-      if ((err as Error).name !== 'AbortError') {
+      if (unlistenRef.current) { unlistenRef.current(); unlistenRef.current = null; }
+      if (streamingRef.current) {
+        setResult(streamingRef.current);
+      } else {
         setError(formatBackendError(err));
       }
     } finally {
       setLoading(false);
-      abortRef.current = null;
     }
   }, [aiAvailable, loading, selectedText, aiParams]);
 
   const handleStop = useCallback(() => {
-    abortRef.current?.abort();
+    invoke('stop_ai_stream', { requestId: '' }).catch(() => {});
+    if (unlistenRef.current) { unlistenRef.current(); unlistenRef.current = null; }
+    setLoading(false);
   }, []);
 
   if (!visible || !selectedText) return null;

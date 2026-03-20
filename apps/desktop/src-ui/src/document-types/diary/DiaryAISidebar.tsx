@@ -1,19 +1,28 @@
 /**
- * DiaryAISidebar — 日记专属 AI 助手面板
+ * DiaryAISidebar — 日记专属 AI 助手面板（对照 NovelAISidebar 全面增强）
  *
- * 参考 NovelAISidebar 架构：
- * - 会话管理（host.storage 持久化）
- * - 流式输出 + Markdown 渲染
- * - 8 个快捷操作
- * - 上下文模式切换
- * - "插入到日记"按钮
+ * - 多会话管理（新建/切换/删除，host.storage 持久化）
+ * - 流式输出 + think 标签实时折叠 + Markdown 渲染
+ * - 11 个日记快捷操作
+ * - 上下文模式切换（当前/近7天/近30天）
+ * - 消息操作（复制/重新生成/编辑用户消息/插入到日记）
+ * - 系统提示词编辑面板
+ * - 联网默认开启
+ * - 心情预警
+ * - AI 服务切换
  */
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
-  Send, Square, Trash2, Copy, Check, ArrowDownToLine,
-  Globe, Brain,
+  Send, Square, Trash2, Loader2, Copy, Check, ArrowDownToLine,
+  ChevronDown, Globe, Brain, RefreshCw, Pencil, Zap,
+  MessageSquarePlus, X, ScrollText, RotateCcw, BookHeart,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { MarkdownPreview } from '@/components/editor/MarkdownPreview';
 import { useTranslation } from '@/i18n';
 import { useSettingsStore, getAIInvokeParamsForService } from '@/stores/useSettingsStore';
@@ -29,7 +38,10 @@ import {
   type DiaryContextMode,
 } from './diaryContext';
 
-// ── 消息类型 ──
+// ═══════════════════════════════════════════════════════
+// 消息 & 会话类型
+// ═══════════════════════════════════════════════════════
+
 interface DiaryAIMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -42,13 +54,61 @@ function genMsgId(): string {
   return `dmsg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 }
 
-// ── Props ──
+interface DiaryAISession {
+  id: string;
+  title: string;
+  messages: DiaryAIMessage[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+const SESSIONS_KEY = '_diary_ai_sessions';
+const ACTIVE_SESSION_KEY = '_diary_ai_active_session';
+
+function genSessionId(): string {
+  return `dsess_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+}
+
+type StorageLike = { get<T>(key: string): T | null; set(key: string, value: unknown): void };
+
+function loadSessions(storage: StorageLike): DiaryAISession[] {
+  return storage.get<DiaryAISession[]>(SESSIONS_KEY) || [];
+}
+
+function saveSessions(storage: StorageLike, sessions: DiaryAISession[]) {
+  storage.set(SESSIONS_KEY, sessions);
+}
+
+function createSession(): DiaryAISession {
+  const now = Date.now();
+  return { id: genSessionId(), title: '新对话', messages: [], createdAt: now, updatedAt: now };
+}
+
+function getOrCreateActiveSession(storage: StorageLike): DiaryAISession {
+  const sessions = loadSessions(storage);
+  const activeId = storage.get<string>(ACTIVE_SESSION_KEY) || '';
+  const active = sessions.find(s => s.id === activeId);
+  if (active) return active;
+  const newSess = createSession();
+  saveSessions(storage, [...sessions, newSess]);
+  storage.set(ACTIVE_SESSION_KEY, newSess.id);
+  return newSess;
+}
+
+// ═══════════════════════════════════════════════════════
+// Props
+// ═══════════════════════════════════════════════════════
+
 interface DiaryAISidebarProps {
   host: DocTypeHostAPI;
   diary: DiaryDocumentContent;
   activeEntry: DiaryEntry | null;
   onInsertToDoc: (text: string) => void;
 }
+
+// ═══════════════════════════════════════════════════════
+// 组件
+// ═══════════════════════════════════════════════════════
 
 export default function DiaryAISidebar({
   host, diary, activeEntry, onInsertToDoc,
@@ -61,63 +121,124 @@ export default function DiaryAISidebar({
     activeServiceId: s.ai.activeServiceId,
   })));
   const enabledServices = useMemo(() => services.filter(sv => sv.enabled), [services]);
-  const [selectedServiceId, setSelectedServiceId] = useState('');
+  const [selectedServiceId, setSelectedServiceId] = useState<string>(() =>
+    host.storage.get<string>('_diary_ai_service_id') || ''
+  );
   const effectiveServiceId = selectedServiceId || undefined;
   const aiParams = getAIInvokeParamsForService(effectiveServiceId);
   const aiAvailable = !!(aiParams.provider && aiParams.apiKey && aiParams.model);
-  const providerCaps = (() => {
+  const providerCaps = useMemo(() => {
     if (!aiParams.provider) return { webSearch: false, thinking: false };
     const cfg = getProviderConfig(aiParams.provider);
     return cfg?.capabilities || { webSearch: false, thinking: false };
-  })();
+  }, [aiParams.provider]);
 
-  // ── 对话状态（持久化） ──
-  const STORAGE_KEY = '_diary_ai_messages';
-  const [messages, setMessages] = useState<DiaryAIMessage[]>(() => {
-    const saved = host.storage.get<DiaryAIMessage[]>(STORAGE_KEY);
-    return Array.isArray(saved) ? saved.slice(-30) : []; // 最多恢30条
-  });
-  const moodAlert = useMemo(() => detectMoodAlert(diary), [diary]);
+  // ── 会话管理 ──
+  const [sessions, setSessions] = useState<DiaryAISession[]>(() => loadSessions(host.storage));
+  const [activeSessionId, setActiveSessionId] = useState<string>(() => getOrCreateActiveSession(host.storage).id);
+  const activeSession = useMemo(() =>
+    sessions.find(s => s.id === activeSessionId) || (sessions.length > 0 ? sessions[0] : null),
+  [sessions, activeSessionId]);
+  const messages = activeSession?.messages || [];
+  const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
+
+  // ── 对话状态 ──
   const [inputValue, setInputValue] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const abortRef = useRef<AbortController | null>(null);
   const streamingContentRef = useRef('');
+  const sendMessageRef = useRef<(text: string) => void>(() => {});
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [enableWebSearch, setEnableWebSearch] = useState(false);
+  const [enableWebSearch, setEnableWebSearch] = useState(true); // 联网默认开启
   const [enableThinking, setEnableThinking] = useState(false);
   const [contextMode, setContextMode] = useState<DiaryContextMode>('current');
 
-  // 消息持久化
-  useEffect(() => {
-    if (messages.length > 0) {
-      host.storage.set(STORAGE_KEY, messages.slice(-30));
-    }
-  }, [messages, host.storage]);
+  // ── 消息编辑 ──
+  const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState('');
 
-  // 自动滚动
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages, streamingContent]);
+  // ── 系统提示词编辑 ──
+  const [promptOpen, setPromptOpen] = useState(false);
+  const defaultPrompt = useMemo(() => buildDiarySystemPrompt(diary, activeEntry, contextMode), [diary, activeEntry, contextMode]);
+  const [customPrompt, setCustomPrompt] = useState<string>(() =>
+    host.storage.get<string>('_diary_ai_prompt') || ''
+  );
+  const [promptDraft, setPromptDraft] = useState(customPrompt || defaultPrompt);
+
+  // ── 心情预警 ──
+  const moodAlert = useMemo(() => detectMoodAlert(diary), [diary]);
+  const contextSummary = useMemo(() => getContextSummary(diary, contextMode), [diary, contextMode]);
+
+  // ── 持久化 ──
+  const persistSessions = useCallback((updated: DiaryAISession[]) => {
+    setSessions(updated);
+    saveSessions(host.storage, updated);
+  }, [host.storage]);
+
+  const updateActiveSession = useCallback((updater: (s: DiaryAISession) => DiaryAISession) => {
+    setSessions(prev => {
+      const updated = prev.map(s => s.id === activeSessionId ? updater(s) : s);
+      saveSessions(host.storage, updated);
+      return updated;
+    });
+  }, [activeSessionId, host.storage]);
+
+  // ── 新建/切换/删除会话 ──
+  const handleNewSession = useCallback(() => {
+    const newSess = createSession();
+    persistSessions([...sessions, newSess]);
+    setActiveSessionId(newSess.id);
+    host.storage.set(ACTIVE_SESSION_KEY, newSess.id);
+    setSessionMenuOpen(false);
+  }, [sessions, persistSessions, host.storage]);
+
+  const handleSwitchSession = useCallback((id: string) => {
+    setActiveSessionId(id);
+    host.storage.set(ACTIVE_SESSION_KEY, id);
+    setSessionMenuOpen(false);
+  }, [host.storage]);
+
+  const handleDeleteSession = useCallback((id: string) => {
+    const updated = sessions.filter(s => s.id !== id);
+    if (updated.length === 0) {
+      const newSess = createSession();
+      persistSessions([newSess]);
+      setActiveSessionId(newSess.id);
+      host.storage.set(ACTIVE_SESSION_KEY, newSess.id);
+    } else {
+      persistSessions(updated);
+      if (id === activeSessionId) {
+        setActiveSessionId(updated[updated.length - 1].id);
+        host.storage.set(ACTIVE_SESSION_KEY, updated[updated.length - 1].id);
+      }
+    }
+  }, [sessions, activeSessionId, persistSessions, host.storage]);
 
   // ── 发送消息 ──
   const sendMessage = useCallback(async (userText: string) => {
     if (!userText.trim() || streaming || !aiAvailable) return;
 
     const userMsg: DiaryAIMessage = { id: genMsgId(), role: 'user', content: userText.trim(), timestamp: Date.now() };
-    setMessages(prev => [...prev, userMsg]);
+    updateActiveSession(s => ({
+      ...s,
+      messages: [...s.messages, userMsg],
+      updatedAt: Date.now(),
+      title: s.messages.length === 0 ? userText.trim().slice(0, 30) : s.title,
+    }));
+
     setInputValue('');
     setStreaming(true);
     setStreamingContent('');
+    streamingContentRef.current = '';
 
-    const systemPrompt = buildDiarySystemPrompt(diary, activeEntry, contextMode);
-    const history = messages.slice(-6).map(m => ({ role: m.role, content: m.content }));
-    const chatMessages = [
-      { role: 'system', content: systemPrompt },
-      ...history,
-      { role: 'user', content: userText.trim() },
+    const systemPrompt = customPrompt || buildDiarySystemPrompt(diary, activeEntry, contextMode);
+    const historyMsgs = [...(activeSession?.messages || []), userMsg];
+    const apiMessages = [
+      { role: 'system' as const, content: systemPrompt },
+      ...historyMsgs.slice(-8).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
     ];
 
     const controller = new AbortController();
@@ -125,58 +246,75 @@ export default function DiaryAISidebar({
 
     try {
       let full = '';
-      streamingContentRef.current = '';
-      await host.ai.chatStream(
-        chatMessages,
-        (chunk) => {
-          full += chunk;
-          streamingContentRef.current = full;
-          setStreamingContent(full);
-        },
-        {
-          signal: controller.signal,
-          enableWebSearch,
-          enableThinking,
-          serviceId: selectedServiceId || undefined,
-        },
-      );
+      await host.ai.chatStream(apiMessages, (chunk: string) => {
+        full += chunk;
+        streamingContentRef.current = full;
+        setStreamingContent(full);
+      }, {
+        signal: controller.signal,
+        enableWebSearch: enableWebSearch && providerCaps.webSearch ? true : undefined,
+        enableThinking: enableThinking && providerCaps.thinking ? true : undefined,
+        serviceId: selectedServiceId || undefined,
+      });
 
       const assistantMsg: DiaryAIMessage = { id: genMsgId(), role: 'assistant', content: full, timestamp: Date.now() };
-      setMessages(prev => [...prev, assistantMsg]);
+      updateActiveSession(s => ({ ...s, messages: [...s.messages, assistantMsg], updatedAt: Date.now() }));
     } catch (err: unknown) {
       if ((err as Error)?.name === 'AbortError') {
         const partialContent = streamingContentRef.current;
         if (partialContent) {
-          setMessages(prev => [...prev, { id: genMsgId(), role: 'assistant', content: partialContent, timestamp: Date.now() }]);
+          updateActiveSession(s => ({ ...s, messages: [...s.messages, { id: genMsgId(), role: 'assistant', content: partialContent, timestamp: Date.now() }], updatedAt: Date.now() }));
         }
       } else {
-        const errMsg = formatBackendError(err);
-        setMessages(prev => [...prev, { id: genMsgId(), role: 'assistant', content: errMsg, timestamp: Date.now(), isError: true }]);
+        const errContent = formatBackendError(err);
+        updateActiveSession(s => ({ ...s, messages: [...s.messages, { id: genMsgId(), role: 'assistant', content: `❌ ${errContent}`, timestamp: Date.now(), isError: true }], updatedAt: Date.now() }));
       }
     } finally {
       setStreaming(false);
       setStreamingContent('');
       abortRef.current = null;
     }
-  }, [streaming, aiAvailable, diary, activeEntry, contextMode, messages, host.ai, enableWebSearch, enableThinking, selectedServiceId]);
+  }, [streaming, aiAvailable, customPrompt, diary, activeEntry, contextMode, activeSession, enableWebSearch, enableThinking, providerCaps, host.ai, selectedServiceId, updateActiveSession]);
 
-  const handleStop = useCallback(() => {
-    abortRef.current?.abort();
-  }, []);
+  sendMessageRef.current = sendMessage;
 
+  // ── 停止 / 清空 ──
+  const handleStop = useCallback(() => { abortRef.current?.abort(); }, []);
   const handleClear = useCallback(() => {
-    setMessages([]);
-    host.storage.set(STORAGE_KEY, []);
-  }, [host.storage]);
+    updateActiveSession(s => ({ ...s, messages: [], updatedAt: Date.now() }));
+  }, [updateActiveSession]);
 
-  const handleCopy = useCallback((id: string, content: string) => {
-    host.ui.copyToClipboard(content);
+  // ── 复制 / 重新生成 / 编辑 ──
+  const handleCopyMsg = useCallback(async (id: string, content: string) => {
+    await navigator.clipboard.writeText(content);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
-  }, [host.ui]);
+  }, []);
+
+  const handleRegenerate = useCallback((msgId: string) => {
+    const idx = messages.findIndex(m => m.id === msgId);
+    if (idx < 1) return;
+    const userMsg = messages[idx - 1];
+    if (userMsg.role !== 'user') return;
+    updateActiveSession(s => ({ ...s, messages: s.messages.slice(0, idx - 1), updatedAt: Date.now() }));
+    setTimeout(() => sendMessageRef.current(userMsg.content), 100);
+  }, [messages, updateActiveSession]);
+
+  const handleStartEdit = useCallback((msg: DiaryAIMessage) => {
+    setEditingMsgId(msg.id);
+    setEditingContent(msg.content);
+  }, []);
+
+  const handleConfirmEdit = useCallback(() => {
+    if (!editingMsgId || !editingContent.trim()) return;
+    const idx = messages.findIndex(m => m.id === editingMsgId);
+    if (idx < 0) return;
+    updateActiveSession(s => ({ ...s, messages: s.messages.slice(0, idx), updatedAt: Date.now() }));
+    setEditingMsgId(null);
+    setTimeout(() => sendMessageRef.current(editingContent.trim()), 100);
+  }, [editingMsgId, editingContent, messages, updateActiveSession]);
 
   const handleInsert = useCallback((content: string) => {
-    // 去除 think 标签
     const cleaned = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
     onInsertToDoc(cleaned);
   }, [onInsertToDoc]);
@@ -188,79 +326,133 @@ export default function DiaryAISidebar({
     sendMessage(prompt);
   }, [activeEntry, sendMessage]);
 
-  const contextSummary = useMemo(() => getContextSummary(diary, contextMode), [diary, contextMode]);
+  // ── 自动滚动 ──
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages, streamingContent]);
 
-  // ── 渲染消息 ──
-  const renderMessage = (msg: DiaryAIMessage) => {
-    if (msg.role === 'user') {
-      return (
-        <div key={msg.id} className="bg-primary/10 ml-8 rounded-lg p-3 text-sm">
-          {msg.content}
-        </div>
-      );
+  // ── 推荐快捷操作（基于日记阶段） ──
+  const recommendedActions = useMemo(() => {
+    if (!activeEntry || !activeEntry.content) {
+      return DIARY_QUICK_ACTIONS.filter(a => ['continue', 'prompt', 'gratitude'].includes(a.id)).slice(0, 4);
     }
-
-    const parsed = parseThinkTags(msg.content);
-    return (
-      <div key={msg.id} className={`bg-muted mr-2 rounded-lg p-3 text-sm ${msg.isError ? 'border border-red-300' : ''}`}>
-        {parsed.thinking && (
-          <details className="mb-2">
-            <summary className="text-[11px] text-muted-foreground cursor-pointer">💭 {t('diary.aiThinking', { defaultValue: '思考过程' })}</summary>
-            <div className="mt-1 text-xs text-muted-foreground/80 whitespace-pre-wrap">{parsed.thinking}</div>
-          </details>
-        )}
-        <MarkdownPreview content={parsed.content || msg.content} />
-        {/* 操作按钮 */}
-        <div className="flex gap-2 mt-2 pt-1.5 border-t border-border/50">
-          <button className="text-[11px] text-primary hover:underline flex items-center gap-0.5"
-            onClick={() => handleCopy(msg.id, parsed.content || msg.content)}>
-            {copiedId === msg.id ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-            {copiedId === msg.id ? t('diary.copied', { defaultValue: '已复制' }) : t('diary.copy', { defaultValue: '复制' })}
-          </button>
-          <button className="text-[11px] text-primary hover:underline flex items-center gap-0.5"
-            onClick={() => handleInsert(msg.content)}>
-            <ArrowDownToLine className="h-3 w-3" />
-            {t('diary.insertToDiary', { defaultValue: '插入到日记' })}
-          </button>
-        </div>
-      </div>
-    );
-  };
+    if (activeEntry.content.length < 100) {
+      return DIARY_QUICK_ACTIONS.filter(a => ['continue', 'prompt', 'reflect'].includes(a.id)).slice(0, 4);
+    }
+    return DIARY_QUICK_ACTIONS.filter(a => ['reflect', 'polish', 'style', 'mood-review'].includes(a.id)).slice(0, 4);
+  }, [activeEntry]);
 
   return (
-    <div className="h-full flex flex-col bg-card">
-      {/* 头部：上下文模式 + 快捷操作 */}
-      <div className="px-2 py-1.5 border-b flex-shrink-0 space-y-1">
-        {/* 上下文模式切换 */}
-        <div className="flex items-center gap-1 text-[10px]">
-          <span className="text-muted-foreground">{t('diary.aiContext', { defaultValue: '上下文:' })}</span>
-          {(['current', 'week', 'month'] as DiaryContextMode[]).map(mode => (
-            <button key={mode}
-              className={`px-1.5 py-0.5 rounded transition-colors ${contextMode === mode ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:text-foreground'}`}
-              onClick={() => setContextMode(mode)}>
-              {mode === 'current' ? t('diary.ctxCurrent', { defaultValue: '当前' })
-                : mode === 'week' ? t('diary.ctxWeek', { defaultValue: '近7天' })
-                : t('diary.ctxMonth', { defaultValue: '近30天' })}
-            </button>
-          ))}
-          <span className="text-muted-foreground/50 ml-auto">{contextSummary}</span>
-        </div>
-        {/* 快捷操作 */}
-        <div className="flex flex-wrap gap-1">
-          {DIARY_QUICK_ACTIONS.map(action => (
-            <button key={action.id}
-              className="h-6 text-[11px] px-1.5 rounded border hover:bg-accent transition-colors flex items-center gap-0.5"
-              onClick={() => handleQuickAction(action.promptTemplate)}
-              disabled={streaming}
-              title={action.label}>
-              <span>{action.icon}</span>
-              <span>{action.label}</span>
-            </button>
-          ))}
+    <div className="flex flex-col h-full min-h-0 bg-background">
+      {/* ── 顶栏：会话管理 + 提示词 ── */}
+      <div className="flex-shrink-0 border-b">
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5">
+          <BookHeart className="h-4 w-4 text-blue-500" />
+          <Popover open={sessionMenuOpen} onOpenChange={setSessionMenuOpen}>
+            <PopoverTrigger asChild>
+              <button type="button" className="text-sm font-medium truncate max-w-[140px] hover:text-blue-600 transition-colors flex items-center gap-0.5"
+                title={t('diary.aiSwitchSession', { defaultValue: '切换对话' })}>
+                {activeSession?.title || t('diary.aiTitle', { defaultValue: '日记助手' })}
+                <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 opacity-50" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-2 bg-card" align="start">
+              <div className="space-y-1 max-h-60 overflow-y-auto">
+                {sessions.map(sess => (
+                  <div key={sess.id} className={`flex items-center gap-1 px-2 py-1.5 rounded text-sm cursor-pointer hover:bg-accent ${sess.id === activeSessionId ? 'bg-accent font-medium' : ''}`}>
+                    <button className="flex-1 text-left truncate" onClick={() => handleSwitchSession(sess.id)}>
+                      {sess.title} ({sess.messages.length})
+                    </button>
+                    {sessions.length > 1 && (
+                      <button className="opacity-50 hover:opacity-100 hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteSession(sess.id); }}>
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="border-t mt-1 pt-1">
+                <Button variant="ghost" size="sm" className="w-full justify-start h-8 text-sm gap-1" onClick={handleNewSession}>
+                  <MessageSquarePlus className="h-3.5 w-3.5" />{t('diary.aiNewSession', { defaultValue: '新建对话' })}
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+          <div className="flex-1" />
+          <span className="text-[10px] text-muted-foreground">{contextSummary}</span>
+          <Popover open={promptOpen} onOpenChange={setPromptOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="sm" className={`h-7 w-7 p-0 ${promptOpen ? 'text-blue-500' : ''}`}
+                title={t('diary.aiSystemPrompt', { defaultValue: '系统提示词' })}>
+                <ScrollText className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 bg-card" align="end">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">{t('diary.aiSystemPrompt', { defaultValue: '系统提示词' })}</span>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setPromptDraft(defaultPrompt)}>
+                    <RotateCcw className="h-3 w-3 mr-1" />{t('diary.aiReset', { defaultValue: '重置' })}
+                  </Button>
+                </div>
+                <textarea className="w-full h-32 text-xs border rounded-md p-2 resize-none bg-background"
+                  value={promptDraft} onChange={e => setPromptDraft(e.target.value)}
+                  placeholder={t('diary.aiPromptPlaceholder', { defaultValue: '输入自定义系统提示词...' })} />
+                <div className="flex gap-2 justify-end">
+                  <Button size="sm" className="h-7 text-xs" onClick={() => {
+                    setCustomPrompt(promptDraft);
+                    host.storage.set('_diary_ai_prompt', promptDraft);
+                    setPromptOpen(false);
+                  }}>{t('diary.aiSave', { defaultValue: '保存' })}</Button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleClear}
+            title={t('diary.aiClearChat', { defaultValue: '清除对话' })}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
-      {/* 心情预警 */}
+      {/* ── 快捷操作栏 ── */}
+      <div className="flex items-center gap-1 px-2.5 py-1 border-b bg-muted/20 flex-shrink-0">
+        {/* 上下文模式切换 */}
+        {(['current', 'week', 'month'] as DiaryContextMode[]).map(mode => (
+          <button key={mode}
+            className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors border shrink-0 ${
+              contextMode === mode
+                ? 'bg-blue-500/10 text-blue-600 border-blue-500/30 dark:text-blue-400 dark:border-blue-400/30'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 border-transparent'
+            }`}
+            onClick={() => setContextMode(mode)}>
+            {mode === 'current' ? t('diary.ctxCurrent', { defaultValue: '当前' })
+              : mode === 'week' ? t('diary.ctxWeek', { defaultValue: '近7天' })
+              : t('diary.ctxMonth', { defaultValue: '近30天' })}
+          </button>
+        ))}
+        <div className="w-px h-4 bg-border mx-0.5 shrink-0" />
+        {/* 快捷操作下拉菜单 */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-6 text-[11px] gap-1 shrink-0" disabled={streaming || !aiAvailable}>
+              <Zap className="h-3 w-3" />{t('diary.aiQuickActions', { defaultValue: '快捷操作' })}
+              <ChevronDown className="h-3 w-3 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="max-h-[300px] overflow-auto bg-card">
+            {DIARY_QUICK_ACTIONS.map(action => (
+              <DropdownMenuItem key={action.id} className="text-xs gap-2 cursor-pointer"
+                onClick={() => handleQuickAction(action.promptTemplate)}>
+                <span>{action.icon}</span>
+                <span>{action.label}</span>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* ── 心情预警 ── */}
       {moodAlert && (
         <div className="mx-2 mt-1 px-2.5 py-1.5 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
           <span>💛</span>
@@ -268,40 +460,163 @@ export default function DiaryAISidebar({
         </div>
       )}
 
-      {/* 消息列表 */}
-      <div ref={scrollRef} className="flex-1 overflow-auto p-2 space-y-3">
+      {/* ── 消息列表 ── */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2 space-y-3">
         {messages.length === 0 && !streaming && (
-          <div className="text-center text-xs text-muted-foreground py-8 space-y-2">
-            <span className="text-2xl">📖</span>
-            <p>{t('diary.aiEmptyHint', { defaultValue: '使用上方快捷操作或输入问题' })}</p>
-            <p className="text-muted-foreground/60">{t('diary.aiEmptyDesc', { defaultValue: 'AI 会根据你的日记内容提供个性化帮助' })}</p>
+          <div className="py-4 space-y-4">
+            <div className="text-center">
+              <BookHeart className="h-10 w-10 mx-auto text-muted-foreground/30 mb-2" />
+              <p className="text-sm font-medium text-muted-foreground">{t('diary.aiTitle', { defaultValue: 'AI 日记助手' })}</p>
+              <p className="text-xs text-muted-foreground/60 mt-1">{t('diary.aiEmptyDesc', { defaultValue: 'AI 会根据你的日记内容提供个性化帮助' })}</p>
+            </div>
+            {/* 建议操作 */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground px-1">{t('diary.aiSuggestedActions', { defaultValue: '试试这些操作' })}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {recommendedActions.map(action => (
+                  <Button key={action.id} variant="outline" size="sm" className="h-7 text-xs justify-start gap-1"
+                    onClick={() => handleQuickAction(action.promptTemplate)} disabled={streaming || !aiAvailable}>
+                    <span>{action.icon}</span>
+                    <span className="truncate">{action.label}</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
-        {messages.map(renderMessage)}
-        {/* 流式输出 */}
-        {streaming && streamingContent && (
-          <div className="bg-muted mr-2 rounded-lg p-3 text-sm">
-            <MarkdownPreview content={streamingContent} />
-            <span className="inline-block w-1.5 h-4 bg-primary/60 animate-pulse ml-0.5" />
-          </div>
-        )}
+
+        {messages.map(msg => {
+          const parsed = msg.role === 'assistant' ? parseThinkTags(msg.content) : null;
+          return (
+            <div key={msg.id} className={`group/msg flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
+                msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'
+              } ${msg.isError ? 'border border-red-300' : ''}`}>
+                {editingMsgId === msg.id ? (
+                  <div className="space-y-2">
+                    <textarea className="w-full min-h-[60px] text-sm border rounded p-2 bg-background text-foreground resize-none"
+                      value={editingContent} onChange={e => setEditingContent(e.target.value)}
+                      placeholder={t('diary.aiEditPlaceholder', { defaultValue: '编辑消息内容...' })} />
+                    <div className="flex gap-1 justify-end">
+                      <Button size="sm" className="h-6 text-xs" onClick={handleConfirmEdit}>{t('diary.aiSend', { defaultValue: '发送' })}</Button>
+                      <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setEditingMsgId(null)}>{t('diary.aiCancel', { defaultValue: '取消' })}</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {msg.role === 'assistant' && parsed ? (
+                      <div className="space-y-2">
+                        {parsed.thinking && (
+                          <details className="group/think">
+                            <summary className="flex items-center gap-1 cursor-pointer text-xs text-muted-foreground hover:text-foreground transition-colors select-none">
+                              <Brain className="h-3 w-3" /><span>{t('diary.aiThinking', { defaultValue: '思考过程' })}</span>
+                              <ChevronDown className="h-3 w-3 transition-transform group-open/think:rotate-180" />
+                            </summary>
+                            <div className="mt-1 pl-4 border-l-2 border-muted-foreground/20 text-xs text-muted-foreground">
+                              <MarkdownPreview content={parsed.thinking} className="text-xs opacity-80" />
+                            </div>
+                          </details>
+                        )}
+                        <MarkdownPreview content={parsed.content || msg.content} className="text-sm" />
+                      </div>
+                    ) : msg.role === 'assistant' ? (
+                      <MarkdownPreview content={msg.content} className="text-sm" />
+                    ) : (
+                      <div className="whitespace-pre-wrap">{msg.content}</div>
+                    )}
+                    {/* 消息操作（hover 显示） */}
+                    <div className="hidden group-hover/msg:flex items-center gap-0.5 mt-1">
+                      <button className="p-0.5 rounded hover:bg-accent" onClick={() => handleCopyMsg(msg.id, parsed?.content || msg.content)}
+                        title={t('diary.copy', { defaultValue: '复制' })}>
+                        {copiedId === msg.id ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
+                      </button>
+                      {msg.role === 'user' && (
+                        <button className="p-0.5 rounded hover:bg-accent" onClick={() => handleStartEdit(msg)}
+                          title={t('diary.aiEditResend', { defaultValue: '编辑并重新发送' })}>
+                          <Pencil className="h-3 w-3 text-muted-foreground" />
+                        </button>
+                      )}
+                      {msg.role === 'assistant' && !msg.isError && (
+                        <>
+                          <button className="p-0.5 rounded hover:bg-accent" onClick={() => handleRegenerate(msg.id)}
+                            title={t('diary.aiRegenerate', { defaultValue: '重新生成' })}>
+                            <RefreshCw className="h-3 w-3 text-muted-foreground" />
+                          </button>
+                          <button className="p-0.5 rounded hover:bg-accent" onClick={() => handleInsert(parsed?.content || msg.content)}
+                            title={t('diary.insertToDiary', { defaultValue: '插入到日记' })}>
+                            <ArrowDownToLine className="h-3 w-3 text-muted-foreground" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* 流式输出（含 think 标签实时折叠） */}
+        {streaming && streamingContent && (() => {
+          const streamParsed = parseThinkTags(streamingContent);
+          return (
+            <div className="flex justify-start">
+              <div className="max-w-[85%] rounded-lg px-3 py-2 bg-muted text-sm space-y-2">
+                {streamParsed.thinking && (
+                  <details open className="group">
+                    <summary className="flex items-center gap-1 cursor-pointer text-xs text-muted-foreground">
+                      <Brain className="h-3 w-3 animate-pulse" /><span>{t('diary.aiThinkingStatus', { defaultValue: '思考中...' })}</span>
+                    </summary>
+                    <div className="mt-1 pl-4 border-l-2 border-muted-foreground/20 text-xs text-muted-foreground">
+                      <MarkdownPreview content={streamParsed.thinking} className="text-xs opacity-80" />
+                    </div>
+                  </details>
+                )}
+                {streamParsed.content && <MarkdownPreview content={streamParsed.content} className="text-sm" />}
+              </div>
+            </div>
+          );
+        })()}
+
         {streaming && !streamingContent && (
-          <div className="bg-muted mr-2 rounded-lg p-3 text-sm">
-            <span className="text-muted-foreground animate-pulse">{t('diary.aiThinkingStatus', { defaultValue: '正在思考...' })}</span>
+          <div className="flex justify-start">
+            <div className="rounded-lg px-3 py-2 bg-muted text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" />
+            </div>
           </div>
         )}
       </div>
 
-      {/* 输入区 */}
+      {/* ── 输入区 ── */}
       <div className="flex-shrink-0 border-t p-2 space-y-1.5">
-        {/* AI 选项 */}
-        <div className="flex items-center gap-1">
-          {/* AI 服务选择器（≥2 个启用服务时显示） */}
+        <textarea ref={inputRef} value={inputValue} onChange={e => setInputValue(e.target.value)}
+          placeholder={activeEntry
+            ? t('diary.aiInputWithEntry', { defaultValue: '关于这篇日记问点什么...' })
+            : t('diary.aiInputPlaceholder', { defaultValue: '输入问题或指令...' })}
+          className="w-full resize-none rounded-md border bg-transparent px-2.5 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring overflow-hidden"
+          rows={2} disabled={streaming || !aiAvailable}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (!streaming) sendMessage(inputValue); } }} />
+
+        <div className="flex items-center gap-1.5">
+          {providerCaps.webSearch && (
+            <Button variant="ghost" size="sm" className={`h-7 px-1.5 ${enableWebSearch ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}
+              onClick={() => setEnableWebSearch(v => !v)}
+              title={enableWebSearch ? t('diary.webSearchOn', { defaultValue: '联网搜索：已开启' }) : t('diary.webSearchOff', { defaultValue: '联网搜索：已关闭' })}>
+              <Globe className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          {providerCaps.thinking && (
+            <Button variant="ghost" size="sm" className={`h-7 px-1.5 ${enableThinking ? 'text-purple-600 dark:text-purple-400' : 'text-muted-foreground'}`}
+              onClick={() => setEnableThinking(v => !v)}
+              title={enableThinking ? t('diary.deepThinkOn', { defaultValue: '深度思考：已开启' }) : t('diary.deepThinkOff', { defaultValue: '深度思考：已关闭' })}>
+              <Brain className="h-3.5 w-3.5" />
+            </Button>
+          )}
           {enabledServices.length >= 2 && (
             <select
               className="h-6 text-[11px] px-1 border rounded bg-background max-w-[100px] truncate"
               value={selectedServiceId || activeServiceId || ''}
-              onChange={e => setSelectedServiceId(e.target.value)}
+              onChange={e => { setSelectedServiceId(e.target.value); host.storage.set('_diary_ai_service_id', e.target.value); }}
               title={t('diary.selectAiService', { defaultValue: '选择 AI 服务' })}
             >
               {enabledServices.map(s => (
@@ -309,51 +624,17 @@ export default function DiaryAISidebar({
               ))}
             </select>
           )}
-          {providerCaps.webSearch && (
-            <button className={`h-6 px-1.5 text-[11px] gap-0.5 rounded flex items-center ${enableWebSearch ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}
-              onClick={() => setEnableWebSearch(!enableWebSearch)}>
-              <Globe className="h-3 w-3" />
-              {t('diary.webSearch', { defaultValue: '联网' })}
-            </button>
-          )}
-          {providerCaps.thinking && (
-            <button className={`h-6 px-1.5 text-[11px] gap-0.5 rounded flex items-center ${enableThinking ? 'text-purple-600 dark:text-purple-400' : 'text-muted-foreground'}`}
-              onClick={() => setEnableThinking(!enableThinking)}>
-              <Brain className="h-3 w-3" />
-              {t('diary.deepThink', { defaultValue: '深度思考' })}
-            </button>
-          )}
           <div className="flex-1" />
-          <button className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-0.5"
-            onClick={handleClear} disabled={messages.length === 0}>
-            <Trash2 className="h-3 w-3" />
-          </button>
-        </div>
-        {/* 输入框 */}
-        <div className="flex items-end gap-1">
-          <textarea
-            ref={inputRef}
-            className="flex-1 text-sm px-3 py-2 border rounded-md bg-background resize-none focus:outline-none focus:ring-1 focus:ring-ring"
-            rows={2}
-            value={inputValue}
-            onChange={e => setInputValue(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage(inputValue);
-              }
-            }}
-            placeholder={t('diary.aiInputPlaceholder', { defaultValue: '输入问题或指令...' })}
-            disabled={streaming}
-          />
           {streaming ? (
-            <Button variant="destructive" size="icon" className="h-9 w-9 flex-shrink-0" onClick={handleStop}>
-              <Square className="h-4 w-4" />
+            <Button variant="outline" size="icon" className="h-7 w-7 flex-shrink-0" onClick={handleStop}
+              title={t('diary.aiStop', { defaultValue: '停止生成' })}>
+              <Square className="h-3.5 w-3.5" />
             </Button>
           ) : (
-            <Button variant="default" size="icon" className="h-9 w-9 flex-shrink-0"
-              onClick={() => sendMessage(inputValue)} disabled={!inputValue.trim() || !aiAvailable}>
-              <Send className="h-4 w-4" />
+            <Button variant="default" size="icon" className="h-7 w-7 flex-shrink-0 bg-blue-600 hover:bg-blue-700"
+              onClick={() => sendMessage(inputValue)} disabled={!inputValue.trim() || !aiAvailable}
+              title={t('diary.aiSend', { defaultValue: '发送' })}>
+              <Send className="h-3.5 w-3.5" />
             </Button>
           )}
         </div>

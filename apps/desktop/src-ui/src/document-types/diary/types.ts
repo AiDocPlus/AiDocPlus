@@ -163,26 +163,26 @@ export function parseDiaryContent(raw: string): DiaryDocumentContent | null {
 }
 
 export function createEmptyDiaryContent(): DiaryDocumentContent {
-  const defaultJournal: DiaryJournal = {
-    id: genId('dj'),
-    name: '我的日记',
-    icon: '📖',
-    color: '#3b82f6',
-    sortOrder: 0,
-  };
+  const defaultJournals: DiaryJournal[] = [
+    { id: genId('dj'), name: '我的日记', icon: '📖', color: '#3b82f6', sortOrder: 0 },
+    { id: genId('dj'), name: '工作日志', icon: '�', color: '#8b5cf6', sortOrder: 1 },
+    { id: genId('dj'), name: '生活随笔', icon: '🌱', color: '#22c55e', sortOrder: 2 },
+    { id: genId('dj'), name: '读书笔记', icon: '📚', color: '#f59e0b', sortOrder: 3 },
+    { id: genId('dj'), name: '健康运动', icon: '🏃', color: '#ef4444', sortOrder: 4 },
+  ];
   return {
     version: 1,
     settings: {
-      defaultJournalId: defaultJournal.id,
+      defaultJournalId: defaultJournals[0].id,
       defaultTemplate: 'freewrite',
       weekStartsOn: 1,
       showWeather: true,
       showMood: true,
       showLocation: true,
       dailyPromptEnabled: false,
-      tags: [],
+      tags: ['工作', '生活', '学习', '运动', '阅读', '社交', '心情', '旅行'],
     },
-    journals: [defaultJournal],
+    journals: defaultJournals,
     entries: [],
     metadata: {
       currentStreak: 0,
