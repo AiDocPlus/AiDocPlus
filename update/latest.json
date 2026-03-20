@@ -12,7 +12,7 @@
       "url": "https://github.com/AiDocPlus/AiDocPlus/releases/download/v0.3.10/AiDocPlus.app.tar.gz"
     },
     "windows-x86_64": {
-      "signature": "__PENDING_CI_BUILD__",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRXZpdDhqWWZQc0h1dUpKakRneHBreVZHaXlPdTFZSHQrWEY3NEVsd20yZVZ5SnRmYVZJbjJCSDRncG9GRkxaT1pEa3lYbFF4OVcwSUZFMTBFc0hTUFFRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczOTkxNTc2CWZpbGU6QWlEb2NQbHVzXzAuMy4xMF94NjQtc2V0dXAuZXhlCnN5dHE0c3NUNElKLzJtSkVqc3hFQXRxQ05kRlFIbDhWL1ZUWWVqV1d3Q2tKUzh0aXdMNXlDZk1XSzNQRFF6UklKdVhRbG1SUmRaaXlaeHRjWlQwdUF3PT0K",
       "url": "https://github.com/AiDocPlus/AiDocPlus/releases/download/v0.3.10/AiDocPlus_0.3.10_x64-setup.exe"
     }
   }
