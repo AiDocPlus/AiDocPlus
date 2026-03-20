@@ -61,16 +61,23 @@ export function getAppearanceStyle(appearance: EditorAppearance): React.CSSPrope
   const font = FONT_OPTIONS.find(f => f.value === appearance.fontFamily);
   const bg = BG_PRESETS.find(b => b.value === appearance.bgPreset);
   const fontCss = font?.css || FONT_OPTIONS[0].css;
+  const hasBg = bg && bg.bg !== 'transparent';
   return {
     '--novel-font-family': fontCss,
     '--novel-font-size': `${appearance.fontSize}px`,
     '--novel-line-height': String(appearance.lineHeight),
     '--novel-text-indent': appearance.textIndent ? '2em' : '0',
+    // CodeMirror CSS 变量（穿透到编辑器内部）
+    '--cm-font-size': `${appearance.fontSize}px`,
+    '--cm-font-family': fontCss,
+    '--cm-line-height': String(appearance.lineHeight),
+    '--cm-text-indent': appearance.textIndent ? '2em' : '0',
+    ...(hasBg ? { '--cm-bg-color': bg.bg, '--cm-text-color': bg.text } : {}),
     fontSize: `${appearance.fontSize}px`,
     lineHeight: appearance.lineHeight,
     fontFamily: fontCss,
     ...(appearance.textIndent ? { textIndent: '2em' } : {}),
-    ...(bg && bg.bg !== 'transparent' ? { backgroundColor: bg.bg, color: bg.text } : {}),
+    ...(hasBg ? { backgroundColor: bg.bg, color: bg.text } : {}),
   } as React.CSSProperties;
 }
 

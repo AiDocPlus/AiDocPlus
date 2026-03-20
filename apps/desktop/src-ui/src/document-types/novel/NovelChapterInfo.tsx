@@ -9,6 +9,7 @@ import { ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { NovelChapter, NovelCharacter, NovelSceneType } from './types';
 import { getChapterWordCount } from './types';
+import { STATUS_OPTIONS, COLOR_PRESETS, SCENE_TYPES } from './constants';
 
 type InfoTab = 'outline' | 'summary' | 'notes' | 'status' | 'goal' | 'pov' | 'label';
 
@@ -22,24 +23,6 @@ interface NovelChapterInfoProps {
   onUpdateStatus: (status: NovelChapter['status']) => void;
   onUpdateMeta?: (patch: Partial<Pick<NovelChapter, 'wordGoal' | 'povCharacterId' | 'colorLabel' | 'sceneType'>>) => void;
 }
-
-const STATUS_OPTIONS: { value: NovelChapter['status']; label: string; color: string }[] = [
-  { value: 'draft', label: '草稿', color: 'text-yellow-600' },
-  { value: 'revised', label: '修订', color: 'text-blue-600' },
-  { value: 'done', label: '完成', color: 'text-green-600' },
-];
-
-const COLOR_PRESETS = [
-  '#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#6b7280',
-];
-
-const SCENE_TYPES: { value: NovelSceneType; label: string }[] = [
-  { value: 'action', label: '动作' },
-  { value: 'dialogue', label: '对话' },
-  { value: 'description', label: '描写' },
-  { value: 'transition', label: '过渡' },
-  { value: 'flashback', label: '闪回' },
-];
 
 export default function NovelChapterInfo({
   chapter,
@@ -185,14 +168,14 @@ export default function NovelChapterInfo({
           {activeTab === 'label' && (
             <div className="flex items-center gap-2 py-2">
               <span className="text-xs text-muted-foreground">颜色标签：</span>
-              {COLOR_PRESETS.map(color => (
-                <button key={color}
+              {COLOR_PRESETS.map(cp => (
+                <button key={cp.color}
                   className={cn('w-5 h-5 rounded-full border-2 transition-transform hover:scale-110',
-                    chapter.colorLabel === color ? 'border-foreground scale-110' : 'border-transparent'
+                    chapter.colorLabel === cp.color ? 'border-foreground scale-110' : 'border-transparent'
                   )}
-                  style={{ backgroundColor: color }}
-                  onClick={() => onUpdateMeta?.({ colorLabel: chapter.colorLabel === color ? undefined : color })}
-                  title={chapter.colorLabel === color ? '清除' : color}
+                  style={{ backgroundColor: cp.color }}
+                  onClick={() => onUpdateMeta?.({ colorLabel: chapter.colorLabel === cp.color ? undefined : cp.color })}
+                  title={chapter.colorLabel === cp.color ? '清除' : cp.label}
                 />
               ))}
               {chapter.colorLabel && (

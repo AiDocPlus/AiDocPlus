@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import type { DocTypeHostAPI } from '@/doctype-sdk/types';
 import type { NovelDocumentContent } from './types';
+import { addPlotline, deletePlotline } from './types';
 import SynopsisPanel from './settings/SynopsisPanel';
 import OutlinePanel from './settings/OutlinePanel';
 import CharacterPanel from './settings/CharacterPanel';
@@ -29,8 +30,7 @@ import MaterialPanel from './settings/MaterialPanel';
 import GoalPanel from './settings/GoalPanel';
 import SettingsAIPanel from './settings/SettingsAIPanel';
 import { checkConsistency } from './novelAnalysis';
-
-const DIALOG_STYLE = { fontFamily: "'宋体', 'SimSun', serif", fontSize: '16px' };
+import { DIALOG_STYLE } from './constants';
 
 type SettingsTab = 'synopsis' | 'outline' | 'characters' | 'relations' | 'locations' | 'factions' | 'foreshadowing' | 'timeline' | 'worldview' | 'materials' | 'goals' | 'check' | 'plotlines';
 
@@ -152,7 +152,6 @@ export default function NovelSettingsDialog({
                   <p className="text-xs font-medium text-muted-foreground">情节线管理</p>
                   <Button variant="outline" size="sm" className="h-6 text-xs gap-1"
                     onClick={() => {
-                      const { addPlotline } = require('./types');
                       const colors = ['#3b82f6','#ec4899','#8b5cf6','#22c55e','#f97316','#ef4444'];
                       const color = colors[novel.settings.plotlines.length % colors.length];
                       onNovelChange(addPlotline(novel, '新情节线', color));
@@ -169,7 +168,6 @@ export default function NovelSettingsDialog({
                     <span className="flex-1 text-sm font-medium">{pl.title}</span>
                     {pl.description && <span className="text-xs text-muted-foreground truncate max-w-[200px]">{pl.description}</span>}
                     <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => {
-                      const { deletePlotline } = require('./types');
                       onNovelChange(deletePlotline(novel, pl.id));
                     }}><Trash2 className="h-3 w-3" /></Button>
                   </div>

@@ -12,12 +12,9 @@ export interface ChapterSnapshot {
   label?: string;
 }
 
-const MAX_SNAPSHOTS = 100;
+import type { StorageLike } from './constants';
 
-interface StorageLike {
-  get<T>(key: string): T | null | undefined;
-  set(key: string, value: unknown): void;
-}
+const MAX_SNAPSHOTS = 100;
 
 function storageKey(chapterId: string): string {
   return `_novel_snapshots_${chapterId}`;

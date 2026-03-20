@@ -5,24 +5,27 @@
  * 右侧：导出内容预览（前500行）
  */
 import { useState, useMemo, useCallback } from 'react';
-import { FileDown, FileText, ListTree, BookOpen, Settings } from 'lucide-react';
+import { FileDown, FileText, ListTree, BookOpen, Settings, Globe, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/i18n';
+import { invoke } from '@tauri-apps/api/core';
+import { save } from '@tauri-apps/plugin-dialog';
 import type { NovelDocumentContent } from './types';
 import { exportToMarkdown, exportToPlainText, exportOutline, exportSettings, type ExportOptions } from './novelExport';
+import { DIALOG_STYLE } from './constants';
 
-const DIALOG_STYLE = { fontFamily: "'宋体', 'SimSun', serif", fontSize: '16px' };
-
-type ExportFormat = 'markdown' | 'plaintext' | 'outline' | 'settings';
+type ExportFormat = 'markdown' | 'plaintext' | 'outline' | 'settings' | 'docx' | 'pdf' | 'html';
 
 interface NovelExportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   novel: NovelDocumentContent;
+  documentId: string;
+  projectId: string;
 }
 
-export default function NovelExportDialog({ open, onOpenChange, novel }: NovelExportDialogProps) {
+export default function NovelExportDialog({ open, onOpenChange, novel, documentId, projectId }: NovelExportDialogProps) {
   const { t } = useTranslation();
   const [format, setFormat] = useState<ExportFormat>('markdown');
   const [options, setOptions] = useState<ExportOptions>({
@@ -32,6 +35,7 @@ export default function NovelExportDialog({ open, onOpenChange, novel }: NovelEx
     includeForeshadowing: false,
     includeWordCount: true,
   });
+  const [exporting, setExporting] = useState(false);
 
   const exportContent = useMemo(() => {
     switch (format) {
@@ -39,6 +43,8 @@ export default function NovelExportDialog({ open, onOpenChange, novel }: NovelEx
       case 'plaintext': return exportToPlainText(novel);
       case 'outline': return exportOutline(novel);
       case 'settings': return exportSettings(novel);
+      case 'docx': case 'pdf': case 'html':
+        return exportToMarkdown(novel, options) + '\n\n(预览为 Markdown 源文本，实际导出为 ' + format.toUpperCase() + ' 格式)';
       default: return '';
     }
   }, [format, novel, options]);
@@ -47,27 +53,63 @@ export default function NovelExportDialog({ open, onOpenChange, novel }: NovelEx
     return exportContent.split('\n').slice(0, 500).join('\n');
   }, [exportContent]);
 
-  const handleExport = useCallback(() => {
-    const extMap: Record<ExportFormat, string> = { markdown: 'md', plaintext: 'txt', outline: 'md', settings: 'md' };
-    const ext = extMap[format];
-    const defaultName = `novel-${format}.${ext}`;
-    const blob = new Blob([exportContent], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = defaultName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    onOpenChange(false);
-  }, [format, exportContent, onOpenChange]);
+  const handleExport = useCallback(async () => {
+    setExporting(true);
+    try {
+      if (format === 'docx' || format === 'pdf' || format === 'html') {
+        const md = exportToMarkdown(novel, options);
+        const defaultFileName = `novel-export.${format}`;
+        const filePath = await save({
+          defaultPath: defaultFileName,
+          filters: [{ name: format.toUpperCase(), extensions: [format] }],
+        });
+        if (!filePath) { setExporting(false); return; }
+
+        const result = await invoke<string>('export_document_native', {
+          documentId,
+          projectId,
+          format,
+          outputPath: filePath,
+          contentOverride: md,
+        });
+
+        if (format === 'pdf') {
+          await invoke('open_pdf_preview', {
+            htmlPath: result,
+            title: `PDF 预览 - 小说导出`,
+          });
+        }
+        onOpenChange(false);
+      } else {
+        const extMap: Record<string, string> = { markdown: 'md', plaintext: 'txt', outline: 'md', settings: 'md' };
+        const ext = extMap[format] || 'txt';
+        const defaultName = `novel-${format}.${ext}`;
+        const blob = new Blob([exportContent], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = defaultName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        onOpenChange(false);
+      }
+    } catch (err) {
+      console.error('Novel export error:', err);
+    } finally {
+      setExporting(false);
+    }
+  }, [format, exportContent, novel, options, documentId, projectId, onOpenChange]);
 
   const FORMATS: { key: ExportFormat; icon: typeof FileText; label: string; desc: string }[] = [
     { key: 'markdown', icon: FileText, label: t('novel.exportMarkdown', { defaultValue: 'Markdown' }), desc: t('novel.exportMarkdownDesc', { defaultValue: '完整正文 + 目录' }) },
     { key: 'plaintext', icon: FileDown, label: t('novel.exportPlainText', { defaultValue: '纯文本' }), desc: t('novel.exportPlainTextDesc', { defaultValue: '去除格式标记' }) },
     { key: 'outline', icon: ListTree, label: t('novel.exportOutline', { defaultValue: '大纲' }), desc: t('novel.exportOutlineDesc', { defaultValue: '标题 + 大纲 + 摘要' }) },
     { key: 'settings', icon: Settings, label: t('novel.exportSettings', { defaultValue: '设定集' }), desc: t('novel.exportSettingsDesc', { defaultValue: '角色/地点/世界观/伏笔' }) },
+    { key: 'docx', icon: FileText, label: 'Word (.docx)', desc: t('novel.exportDocxDesc', { defaultValue: '公文排版 DOCX' }) },
+    { key: 'pdf', icon: FileDown, label: 'PDF', desc: t('novel.exportPdfDesc', { defaultValue: '可打印 PDF' }) },
+    { key: 'html', icon: Globe, label: 'HTML', desc: t('novel.exportHtmlDesc', { defaultValue: '单页网页' }) },
   ];
 
   return (
@@ -82,8 +124,9 @@ export default function NovelExportDialog({ open, onOpenChange, novel }: NovelEx
           <BookOpen className="h-4 w-4 text-amber-500" />
           <span className="text-sm font-medium">{t('novel.exportNovel', { defaultValue: '导出全书' })}</span>
           <div className="flex-1" />
-          <Button variant="default" size="sm" className="h-7 text-xs gap-1" onClick={handleExport}>
-            <FileDown className="h-3 w-3" />{t('novel.exportSave', { defaultValue: '保存文件' })}
+          <Button variant="default" size="sm" className="h-7 text-xs gap-1" onClick={handleExport} disabled={exporting}>
+            {exporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileDown className="h-3 w-3" />}
+            {exporting ? t('novel.exporting', { defaultValue: '导出中...' }) : t('novel.exportSave', { defaultValue: '保存文件' })}
           </Button>
         </div>
 
@@ -108,7 +151,7 @@ export default function NovelExportDialog({ open, onOpenChange, novel }: NovelEx
               })}
             </div>
 
-            {format === 'markdown' && (
+            {(format === 'markdown' || format === 'docx' || format === 'pdf' || format === 'html') && (
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">{t('novel.exportOptions', { defaultValue: '可选内容' })}</label>
                 {[

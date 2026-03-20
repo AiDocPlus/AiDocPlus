@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from '@/i18n';
 import type { NovelDocumentContent, NovelChapter } from './types';
+import { COLOR_PRESETS, SCENE_TYPES, DIALOG_STYLE } from './constants';
 
 export interface ContextMenuTarget {
   type: 'volume' | 'chapter' | 'scene';
@@ -52,20 +53,7 @@ interface NovelChapterContextMenuProps {
   onMergeScenesToChapter?: (chapterId: string) => void;
 }
 
-const COLOR_PRESETS = [
-  { color: '#ef4444', label: '红' }, { color: '#f97316', label: '橙' },
-  { color: '#eab308', label: '黄' }, { color: '#22c55e', label: '绿' },
-  { color: '#3b82f6', label: '蓝' }, { color: '#8b5cf6', label: '紫' },
-  { color: '#ec4899', label: '粉' }, { color: '#6b7280', label: '灰' },
-];
-
-const SCENE_TYPES = [
-  { value: 'action', label: '动作' }, { value: 'dialogue', label: '对话' },
-  { value: 'description', label: '描写' }, { value: 'transition', label: '过渡' },
-  { value: 'flashback', label: '闪回' },
-];
-
-const MENU_STYLE = { fontFamily: "'宋体', 'SimSun', serif", fontSize: '14px' };
+const MENU_STYLE = DIALOG_STYLE;
 
 export default function NovelChapterContextMenu({
   novel,

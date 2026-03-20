@@ -7,7 +7,7 @@
  */
 
 import type { NovelDocumentContent } from './types';
-import { detectNovelPhase, type NovelPhase, type NovelContextMode } from './novelContext';
+import { detectNovelPhase, type NovelPhase } from './novelContext';
 
 // ── 建议芯片 ──
 
@@ -92,14 +92,3 @@ export function getNovelInputPlaceholder(
   return map[phase] || map.blank;
 }
 
-// ── 自动上下文模式 ──
-
-export function autoNovelContextMode(phase: NovelPhase): NovelContextMode {
-  switch (phase) {
-    case 'blank': return 'settings';
-    case 'drafting': return 'chapter';
-    case 'revising': return 'volume';
-    case 'polishing': return 'chapter';
-    default: return 'chapter';
-  }
-}

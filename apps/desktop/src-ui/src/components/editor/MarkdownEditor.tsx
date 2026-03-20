@@ -33,6 +33,9 @@ import type { Document } from '@aidocplus/shared-types';
 import { DocumentOutline, parseHeadings, getBreadcrumb } from './DocumentOutline';
 import EditorSelectionToolbar from './EditorSelectionToolbar';
 import EditorContextMenu from './EditorContextMenu';
+import GotoLineDialog from './GotoLineDialog';
+import { bookmarkExtension, toggleBookmark, nextBookmark, prevBookmark, clearAllBookmarks } from './extensions/bookmarks';
+import { macroRecorderExtension, macroRecorder } from './extensions/macroRecorder';
 
 // 大文档阈值（字符数），超过此值启用性能降级模式
 const LARGE_DOC_THRESHOLD = 100_000;
@@ -433,6 +436,8 @@ export function MarkdownEditor({
       checkboxWidgetExtension,
       linkHoverTooltip,
       cmPlaceholder(placeholder),
+      bookmarkExtension(),
+      macroRecorderExtension,
       mdKeymap,
       keymap.of([
         { key: 'Backspace', run: deleteMarkupBackward },
@@ -442,6 +447,10 @@ export function MarkdownEditor({
         ...historyKeymap,
         ...foldKeymap,
         ...lintKeymap,
+        { key: 'Mod-F2', run: toggleBookmark },
+        { key: 'F2', run: nextBookmark },
+        { key: 'Shift-F2', run: prevBookmark },
+        { key: 'Mod-g', run: () => { window.dispatchEvent(new CustomEvent('editor-menu-action', { detail: 'goto_line' })); return true; } },
       ]),
       updateListener,
     ];
@@ -663,6 +672,30 @@ export function MarkdownEditor({
           line_sort_asc: TU.sortLinesAsc, line_sort_desc: TU.sortLinesDesc,
           line_deduplicate: TU.deduplicateLines, line_reverse: TU.reverseLines,
           line_shuffle: TU.shuffleLines,
+          // 中文排版
+          cn_paragraph_indent: TU.addParagraphIndent,
+          cn_remove_indent: TU.removeParagraphIndent,
+          cn_space_cn_en: TU.addSpaceBetweenCnEn,
+          cn_normalize_quotes: TU.normalizeQuotes,
+          cn_compress_blank: TU.compressBlankLines,
+          cn_reformat_para: TU.reformatParagraphs,
+          cn_remove_trailing: TU.removeTrailingSpaces,
+          // 文本处理扩展
+          tp_remove_trailing: TU.removeTrailingSpaces,
+          tp_add_line_numbers: TU.addLineNumbers,
+          tp_remove_line_numbers: TU.removeLineNumbers,
+          tp_strip_html: TU.stripHtmlTags,
+          tp_strip_markdown: TU.stripMarkdown,
+          tp_wrap_column: TU.wrapAtColumn,
+          // 编码转换
+          enc_unicode_escape: TU.unicodeEscape,
+          enc_unicode_unescape: TU.unicodeUnescape,
+          enc_html_entity_encode: TU.htmlEntityEncode,
+          enc_html_entity_decode: TU.htmlEntityDecode,
+          enc_json_escape: TU.jsonStringEscape,
+          enc_json_unescape: TU.jsonStringUnescape,
+          enc_num_to_chinese: TU.numberToChinese,
+          enc_chinese_to_num: TU.chineseToNumber,
         };
         const transformFn = transformMap[id];
         if (transformFn) {
@@ -793,6 +826,16 @@ export function MarkdownEditor({
         // 查找替换
         if (id === 'find_replace') { openSearchPanel(view); return; }
 
+        // 书签操作
+        if (id === 'bm_toggle') { toggleBookmark(view); return; }
+        if (id === 'bm_next') { nextBookmark(view); return; }
+        if (id === 'bm_prev') { prevBookmark(view); return; }
+        if (id === 'bm_clear') { clearAllBookmarks(view); return; }
+
+        // 宏操作
+        if (id === 'macro_toggle_record') { macroRecorder.toggleRecording(); return; }
+        if (id === 'macro_replay') { macroRecorder.replay(view); return; }
+
       } catch { /* view destroyed */ }
     };
     window.addEventListener('editor-menu-action', handler);
@@ -887,6 +930,7 @@ export function MarkdownEditor({
           isLargeDoc={isLargeDoc}
           breadcrumb={breadcrumb}
           onBreadcrumbClick={handleBreadcrumbClick}
+          content={docContent}
         />
       )}
 
@@ -909,6 +953,9 @@ export function MarkdownEditor({
         position={{ x: ctxMenu.x, y: ctxMenu.y }}
         onClose={() => setCtxMenu({ visible: false, x: 0, y: 0 })}
       />
+
+      {/* 跳转到行对话框 */}
+      <GotoLineDialog cmViewRef={cmViewRef} />
     </div>
   );
 }

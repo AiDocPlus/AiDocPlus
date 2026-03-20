@@ -5,6 +5,7 @@
  * 8 个分类 ~40 个操作项，全面覆盖小说写作场景。
  * 用户可自定义、收藏、查看最近使用。
  */
+import type { StorageLike } from './constants';
 
 // ── 类型定义 ──
 
@@ -244,11 +245,6 @@ const DEFAULT_ITEMS: NovelQuickActionItem[] = [
 ];
 
 // ── 持久化 ──
-
-interface StorageLike {
-  get<T>(key: string): T | null | undefined;
-  set(key: string, value: unknown): void;
-}
 
 export function getDefaultStore(): NovelQuickActionStore {
   return {

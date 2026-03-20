@@ -101,3 +101,335 @@ export function currentTime(): string {
 export function currentDateTime(): string {
   return `${currentDate()} ${currentTime()}`;
 }
+
+// ═══ 中文排版 ═══
+
+/** 段首缩进：每段开头加两个全角空格 */
+export function addParagraphIndent(t: string): string {
+  return t.split('\n').map(line => {
+    // 非空行且不是已缩进的行
+    if (line.trim() === '') return line;
+    if (/^[\u3000\t ]/.test(line)) return line;
+    return '\u3000\u3000' + line;
+  }).join('\n');
+}
+
+/** 去除段首缩进（全角空格和半角空格） */
+export function removeParagraphIndent(t: string): string {
+  return t.split('\n').map(line => line.replace(/^[\u3000 \t]+/, '')).join('\n');
+}
+
+/** 中英文之间加空格（pangu spacing） */
+export function addSpaceBetweenCnEn(t: string): string {
+  // CJK 统一汉字 + 扩展 A/B + 兼容汉字
+  const CJK = '\\u2e80-\\u2eff\\u2f00-\\u2fdf\\u3040-\\u309f\\u30a0-\\u30ff\\u3100-\\u312f\\u3200-\\u32ff\\u3400-\\u4dbf\\u4e00-\\u9fff\\uf900-\\ufaff\\ufe30-\\ufe4f';
+  // 在 CJK 和半角字母/数字之间插入空格
+  let result = t;
+  result = result.replace(new RegExp(`([${CJK}])([A-Za-z0-9])`, 'g'), '$1 $2');
+  result = result.replace(new RegExp(`([A-Za-z0-9])([${CJK}])`, 'g'), '$1 $2');
+  return result;
+}
+
+/** 引号规范化：直引号转中文弯引号 */
+export function normalizeQuotes(t: string): string {
+  let result = t;
+  // 双引号：交替配对
+  let doubleOpen = true;
+  result = result.replace(/"/g, () => {
+    const q = doubleOpen ? '\u201C' : '\u201D';
+    doubleOpen = !doubleOpen;
+    return q;
+  });
+  // 单引号：交替配对
+  let singleOpen = true;
+  result = result.replace(/'/g, () => {
+    const q = singleOpen ? '\u2018' : '\u2019';
+    singleOpen = !singleOpen;
+    return q;
+  });
+  return result;
+}
+
+/** 压缩多余空行（连续 2+ 空行合并为 1 行） */
+export function compressBlankLines(t: string): string {
+  return t.replace(/\n{3,}/g, '\n\n');
+}
+
+/** 段落重排：合并同一段落内的短行（以空行为段落分隔） */
+export function reformatParagraphs(t: string): string {
+  const paragraphs = t.split(/\n\s*\n/);
+  return paragraphs.map(p => {
+    const lines = p.split('\n').map(l => l.trim()).filter(l => l !== '');
+    // 如果只有一行或看起来是列表/标题/代码块，保留原样
+    if (lines.length <= 1) return lines.join('');
+    if (lines.some(l => /^([-*+#>]|```|\d+\.)/.test(l))) return lines.join('\n');
+    return lines.join('');
+  }).join('\n\n');
+}
+
+/** 去除行尾空格 */
+export function removeTrailingSpaces(t: string): string {
+  return t.split('\n').map(l => l.replace(/\s+$/, '')).join('\n');
+}
+
+// ═══ 文本清理 ═══
+
+/** 添加行号前缀 */
+export function addLineNumbers(t: string): string {
+  const lines = t.split('\n');
+  const width = String(lines.length).length;
+  return lines.map((l, i) => `${String(i + 1).padStart(width, ' ')}  ${l}`).join('\n');
+}
+
+/** 去除行首行号（支持 "1. "、"1) "、"1: "、" 1  " 等格式） */
+export function removeLineNumbers(t: string): string {
+  return t.split('\n').map(l => l.replace(/^\s*\d+[.):：\s]\s*/, '')).join('\n');
+}
+
+/** 去除 HTML 标签保留文本 */
+export function stripHtmlTags(t: string): string {
+  return t
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'");
+}
+
+/** 去除 Markdown 格式标记保留纯文本 */
+export function stripMarkdown(t: string): string {
+  let r = t;
+  // 代码块
+  r = r.replace(/```[\s\S]*?```/g, (m) => m.replace(/```\w*\n?/g, '').replace(/```/g, ''));
+  // 图片 → alt
+  r = r.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
+  // 链接 → 文本
+  r = r.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+  // 粗斜体
+  r = r.replace(/\*{3}(.+?)\*{3}/g, '$1');
+  r = r.replace(/\*{2}(.+?)\*{2}/g, '$1');
+  r = r.replace(/\*(.+?)\*/g, '$1');
+  // 删除线
+  r = r.replace(/~~(.+?)~~/g, '$1');
+  // 行内代码
+  r = r.replace(/`([^`]+)`/g, '$1');
+  // 标题/列表/引用/任务列表前缀
+  r = r.replace(/^#{1,6}\s+/gm, '');
+  r = r.replace(/^>\s?/gm, '');
+  r = r.replace(/^[-*+]\s+/gm, '');
+  r = r.replace(/^\d+\.\s+/gm, '');
+  r = r.replace(/^- \[[ x]\]\s+/gm, '');
+  // 高亮/上标/下标
+  r = r.replace(/==(.+?)==/g, '$1');
+  r = r.replace(/\^(.+?)\^/g, '$1');
+  r = r.replace(/~(.+?)~/g, '$1');
+  // 分隔线
+  r = r.replace(/^---+$/gm, '');
+  return r;
+}
+
+/** 按列宽自动硬换行（默认 80 列） */
+export function wrapAtColumn(t: string, col = 80): string {
+  return t.split('\n').map(line => {
+    if (line.length <= col) return line;
+    const parts: string[] = [];
+    let current = '';
+    for (const ch of line) {
+      current += ch;
+      // 每个 CJK 字符算 2 列宽
+      const visualLen = [...current].reduce((sum, c) => sum + (/[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/.test(c) ? 2 : 1), 0);
+      if (visualLen >= col) {
+        parts.push(current);
+        current = '';
+      }
+    }
+    if (current) parts.push(current);
+    return parts.join('\n');
+  }).join('\n');
+}
+
+// ═══ 编码转换（扩展） ═══
+
+/** Unicode 转义 \uXXXX */
+export function unicodeEscape(t: string): string {
+  return [...t].map(c => {
+    const code = c.codePointAt(0)!;
+    if (code > 127) {
+      return code > 0xFFFF
+        ? `\\u{${code.toString(16).toUpperCase()}}`
+        : `\\u${code.toString(16).toUpperCase().padStart(4, '0')}`;
+    }
+    return c;
+  }).join('');
+}
+
+/** 还原 Unicode 转义 */
+export function unicodeUnescape(t: string): string {
+  return t
+    .replace(/\\u\{([0-9a-fA-F]+)\}/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+}
+
+/** HTML 实体编码 */
+export function htmlEntityEncode(t: string): string {
+  return [...t].map(c => {
+    const code = c.codePointAt(0)!;
+    if (code > 127 || c === '&' || c === '<' || c === '>' || c === '"' || c === "'") {
+      return `&#${code};`;
+    }
+    return c;
+  }).join('');
+}
+
+/** HTML 实体解码 */
+export function htmlEntityDecode(t: string): string {
+  return t
+    .replace(/&#(\d+);/g, (_, num) => String.fromCodePoint(parseInt(num, 10)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+}
+
+/** JSON 字符串转义 */
+export function jsonStringEscape(t: string): string {
+  return t
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\t/g, '\\t');
+}
+
+/** JSON 字符串反转义 */
+export function jsonStringUnescape(t: string): string {
+  return t
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\r')
+    .replace(/\\t/g, '\t')
+    .replace(/\\"/g, '"')
+    .replace(/\\\\/g, '\\');
+}
+
+// ═══ 中文数字 ═══
+
+const CN_DIGITS = '零壹贰叁肆伍陆柒捌玖';
+const CN_UNITS = ['', '拾', '佰', '仟'];
+const CN_BIG_UNITS = ['', '万', '亿', '兆'];
+
+/** 阿拉伯数字转中文大写（整数部分，支持到兆） */
+export function numberToChinese(t: string): string {
+  return t.replace(/\d+/g, (match) => {
+    const num = parseInt(match, 10);
+    if (num === 0) return CN_DIGITS[0];
+    if (isNaN(num)) return match;
+
+    const digits = String(num);
+    const groups: string[] = [];
+    // 4 位一组
+    for (let i = digits.length; i > 0; i -= 4) {
+      groups.unshift(digits.slice(Math.max(0, i - 4), i));
+    }
+
+    let result = '';
+    for (let gi = 0; gi < groups.length; gi++) {
+      const group = groups[gi];
+      let groupStr = '';
+      let hasNonZero = false;
+      for (let di = 0; di < group.length; di++) {
+        const d = parseInt(group[di], 10);
+        const unitIdx = group.length - 1 - di;
+        if (d === 0) {
+          if (hasNonZero && di < group.length - 1 && parseInt(group[di + 1], 10) !== 0) {
+            groupStr += CN_DIGITS[0];
+          }
+        } else {
+          groupStr += CN_DIGITS[d] + CN_UNITS[unitIdx];
+          hasNonZero = true;
+        }
+      }
+      if (groupStr) {
+        result += groupStr + CN_BIG_UNITS[groups.length - 1 - gi];
+      } else if (result && gi < groups.length - 1) {
+        result += CN_DIGITS[0];
+      }
+    }
+    return result || CN_DIGITS[0];
+  });
+}
+
+/** 中文大写转阿拉伯数字 */
+export function chineseToNumber(t: string): string {
+  const digitMap: Record<string, number> = {};
+  for (let i = 0; i < 10; i++) digitMap[CN_DIGITS[i]] = i;
+  // 也支持小写
+  const lower = '零一二三四五六七八九';
+  for (let i = 0; i < 10; i++) digitMap[lower[i]] = i;
+  // 额外映射
+  digitMap['两'] = 2;
+
+  const unitMap: Record<string, number> = { '拾': 10, '十': 10, '佰': 100, '百': 100, '仟': 1000, '千': 1000 };
+  const bigUnitMap: Record<string, number> = { '万': 10000, '萬': 10000, '亿': 100000000, '億': 100000000, '兆': 1000000000000 };
+
+  // 匹配连续的中文数字
+  const cnNumPattern = new RegExp(`[${CN_DIGITS}${lower}两拾十佰百仟千万萬亿億兆]+`, 'g');
+
+  return t.replace(cnNumPattern, (match) => {
+    let result = 0;
+    let section = 0; // 万以下的部分
+    let current = 0;
+
+    for (const ch of match) {
+      if (ch in digitMap) {
+        current = digitMap[ch];
+      } else if (ch in unitMap) {
+        section += (current || 1) * unitMap[ch];
+        current = 0;
+      } else if (ch in bigUnitMap) {
+        section += current;
+        result += (section || 1) * bigUnitMap[ch];
+        section = 0;
+        current = 0;
+      }
+    }
+    result += section + current;
+    return String(result);
+  });
+}
+
+// ═══ 文本统计 ═══
+
+export interface TextStats {
+  chars: number;           // 总字符数（含空格）
+  charsNoSpace: number;    // 字符数（不含空格）
+  chineseChars: number;    // 中文字符数（不含标点）
+  englishWords: number;    // 英文单词数
+  words: number;           // 总词数（中文字+英文词）
+  lines: number;           // 总行数
+  nonEmptyLines: number;   // 非空行数
+  paragraphs: number;      // 段落数
+  sentences: number;       // 句子数
+}
+
+/** 计算详细文本统计 */
+export function getTextStats(t: string): TextStats {
+  const chars = t.length;
+  const charsNoSpace = t.replace(/\s/g, '').length;
+  const chineseChars = (t.match(/[\u4e00-\u9fff]/g) || []).length;
+  const englishWords = (t.match(/[a-zA-Z]+/g) || []).length;
+  const words = chineseChars + englishWords;
+  const lines = t === '' ? 0 : t.split('\n').length;
+  const nonEmptyLines = t === '' ? 0 : t.split('\n').filter(l => l.trim() !== '').length;
+  const paragraphs = t === '' ? 0 : t.split(/\n\s*\n/).filter(p => p.trim() !== '').length;
+  const sentences = (t.match(/[。！？.!?]+/g) || []).length || (t.trim() ? 1 : 0);
+  return { chars, charsNoSpace, chineseChars, englishWords, words, lines, nonEmptyLines, paragraphs, sentences };
+}

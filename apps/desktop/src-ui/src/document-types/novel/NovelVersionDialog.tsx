@@ -10,13 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/i18n';
 import { cn } from '@/lib/utils';
 import { loadSnapshots, toggleSnapshotLabel, diffTexts, type DiffLine } from './novelVersions';
-
-const DIALOG_STYLE = { fontFamily: "'宋体', 'SimSun', serif", fontSize: '16px' };
-
-interface StorageLike {
-  get<T>(key: string): T | null | undefined;
-  set(key: string, value: unknown): void;
-}
+import { DIALOG_STYLE, type StorageLike } from './constants';
 
 interface NovelVersionDialogProps {
   open: boolean;
@@ -36,11 +30,12 @@ export default function NovelVersionDialog({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [compareId, setCompareId] = useState<string | null>(null);
   const [mode, setMode] = useState<'view' | 'diff'>('view');
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const snapshots = useMemo(() => {
     if (!chapterId) return [];
     return loadSnapshots(storage, chapterId);
-  }, [chapterId, storage, open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chapterId, storage, open, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selected = snapshots.find(s => s.id === selectedId);
   const compareSnap = snapshots.find(s => s.id === compareId);
@@ -53,8 +48,7 @@ export default function NovelVersionDialog({
   const handleToggleLabel = (snapId: string) => {
     if (!chapterId) return;
     toggleSnapshotLabel(storage, chapterId, snapId);
-    // Force re-render by toggling a dummy state
-    setSelectedId(prev => prev);
+    setRefreshKey(prev => prev + 1);
   };
 
   const handleRestore = () => {

@@ -39,10 +39,12 @@ import {
   getNovelSuggestions, getNovelPhaseIndicator, getNovelInputPlaceholder,
 } from './novelSuggestions';
 import { NovelCommandPalette } from './NovelCommandPalette';
+import type { StorageLike } from './constants';
 
 // ── 消息类型 ──
 
 interface NovelAIMessage {
+
   id: string;
   role: 'user' | 'assistant';
   content: string;
@@ -69,11 +71,6 @@ const ACTIVE_SESSION_KEY = '_novel_assistant_active';
 
 function genSessionId(): string {
   return `nsess_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-}
-
-interface StorageLike {
-  get<T>(key: string): T | null | undefined;
-  set(key: string, value: unknown): void;
 }
 
 function loadSessions(storage: StorageLike): NovelAISession[] {

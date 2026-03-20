@@ -248,6 +248,8 @@
   height: 100%;
   font-size: var(--cm-font-size, 14px);
   font-family: var(--cm-font-family, inherit);
+  background-color: var(--cm-bg-color, transparent);
+  color: var(--cm-text-color, inherit);
 }
 
 .cm-font-override .cm-scroller {
@@ -259,9 +261,27 @@
   line-height: var(--cm-line-height, 1.6);
 }
 
+/* 首行缩进（通过 --cm-text-indent 控制） */
+.cm-font-override .cm-line {
+  text-indent: var(--cm-text-indent, 0);
+}
+
 .cm-font-override .cm-gutters {
   font-size: var(--cm-font-size, 14px);
   font-family: var(--cm-font-family, inherit);
+  background-color: var(--cm-bg-color, transparent);
+  color: var(--cm-text-color, inherit);
+}
+
+/* 自定义背景色时覆盖 CodeMirror 主题的活动行/光标颜色 */
+.cm-font-override[style*="--cm-bg-color"] .cm-activeLine {
+  background-color: color-mix(in srgb, var(--cm-bg-color) 90%, black 10%) !important;
+}
+.cm-font-override[style*="--cm-bg-color"] .cm-activeLineGutter {
+  background-color: color-mix(in srgb, var(--cm-bg-color) 90%, black 10%) !important;
+}
+.cm-font-override[style*="--cm-bg-color"] .cm-cursor {
+  border-left-color: var(--cm-text-color, currentColor) !important;
 }
 
 /* Syntax highlighting for code blocks */

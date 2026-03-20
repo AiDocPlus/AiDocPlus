@@ -24,7 +24,7 @@ import {
   Plus, BookOpen, ChevronDown, ChevronRight, Search,
   Circle, CheckCircle2, PenLine, X, XCircle, Save, SaveAll,
   History, BookMarked, Maximize2, FilePlus,
-  ChevronsUpDown, ChevronLeft, AlignCenter, Clock, BarChart3, FileDown,
+  ChevronsUpDown, ChevronLeft, AlignCenter, BarChart3, FileDown,
   List, LayoutGrid, GitBranch, MessageSquare, Columns,
 } from 'lucide-react';
 import NovelAISidebar from './NovelAISidebar';
@@ -40,6 +40,7 @@ import NovelChapterInfo from './NovelChapterInfo';
 import NovelSettingsDialog from './NovelSettingsDialog';
 import NovelSelectionToolbar from './NovelSelectionToolbar';
 import NovelDashboard from './NovelDashboard';
+import NovelStatusBar from './NovelStatusBar';
 import NovelExportDialog from './NovelExportDialog';
 import NovelVersionDialog from './NovelVersionDialog';
 import NovelInlineAI from './NovelInlineAI';
@@ -58,6 +59,17 @@ import {
   updateSceneContent, getSceneWordCount,
   type NovelDocumentContent, type NovelChapter, type NovelWritingSession,
 } from './types';
+
+const IDLE_TIMEOUT = 5 * 60 * 1000; // 5分钟空闲超时
+
+const CHAPTER_TEMPLATES: { key: string; label: string; outline: string; content: string }[] = [
+  { key: 'blank', label: '空白', outline: '', content: '' },
+  { key: 'opening', label: '开场', outline: '引入主要角色和场景，建立故事基调，设置悬念钩子', content: '# \n\n' },
+  { key: 'dialogue', label: '对话', outline: '通过角色对话推动情节，揭示角色关系和性格', content: '# \n\n「」\n\n「」\n\n' },
+  { key: 'action', label: '战斗', outline: '紧张的动作场景，节奏快速，描写打斗细节和紧张氛围', content: '# \n\n' },
+  { key: 'transition', label: '过渡', outline: '场景过渡，时间推移，角色反思或旅途描写', content: '# \n\n' },
+  { key: 'ending', label: '结尾', outline: '章节结尾，制造悬念或情感高潮，引导读者继续阅读', content: '# \n\n' },
+];
 
 export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTypeEditorProps) {
   const { t } = useTranslation();
@@ -97,7 +109,6 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
 
   // ── 写作会话追踪（Phase 4） ──
   const writingSessionRef = useRef<{ startTime: number; lastActiveTime: number; wordsAtStart: number } | null>(null);
-  const IDLE_TIMEOUT = 5 * 60 * 1000; // 5分钟空闲超时
 
   // ── 番茄钟（Phase 4） ──
   type PomodoroState = 'idle' | 'working' | 'resting';
@@ -146,7 +157,7 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
 
   // ── 设定集弹窗 ──
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
-  const [settingsDialogTab, setSettingsDialogTab] = useState<string | undefined>(undefined);
+  const [settingsDialogTab, setSettingsDialogTab] = useState<'synopsis' | 'outline' | 'characters' | 'relations' | 'locations' | 'factions' | 'foreshadowing' | 'timeline' | 'worldview' | 'materials' | 'goals' | 'check' | 'plotlines' | undefined>(undefined);
 
   // ── Phase 5: 仪表盘弹窗 ──
   const [dashboardOpen, setDashboardOpen] = useState(false);
@@ -194,7 +205,13 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
   }, [host.doc]);
 
   const selectChapter = useCallback((chId: string) => {
-    // 切换前：结束当前写作会话
+    // 切换前：保存旧章节快照（必须在状态变化前）
+    if (activeChapterId && chapterContent) {
+      saveSnapshot(host.storage, activeSceneId || activeChapterId, chapterContent);
+    }
+
+    // 切换前：合并保存（写作会话 + 章节内容，一次 saveNovel 避免数据丢失）
+    let novelToSave = novel;
     if (activeChapterId && writingSessionRef.current) {
       const sess = writingSessionRef.current;
       const wordsNow = chapterContent.replace(/\s/g, '').length;
@@ -206,17 +223,23 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
           endTime: Date.now(),
           wordsWritten,
         };
-        const sessions = [...(novel.metadata.writingSessions || []), session].slice(-200);
-        const patched = { ...novel, metadata: { ...novel.metadata, writingSessions: sessions } };
-        saveNovel(patched);
+        const sessions = [...(novelToSave.metadata.writingSessions || []), session].slice(-200);
+        novelToSave = { ...novelToSave, metadata: { ...novelToSave.metadata, writingSessions: sessions } };
       }
       writingSessionRef.current = null;
     }
     if (activeChapterId && chapterContent !== undefined) {
-      const updated = updateChapterContent(novel, activeChapterId, chapterContent);
-      saveNovel(updated);
+      if (activeSceneId) {
+        novelToSave = updateSceneContent(novelToSave, activeChapterId, activeSceneId, chapterContent);
+      } else {
+        novelToSave = updateChapterContent(novelToSave, activeChapterId, chapterContent);
+      }
     }
-    const ch = getChapterById(novel, chId);
+    if (novelToSave !== novel) {
+      saveNovel(novelToSave);
+    }
+
+    const ch = getChapterById(novelToSave, chId);
     setActiveChapterId(chId);
     // 场景模式：自动选中第一个场景
     if (ch?.scenes && ch.scenes.length > 0) {
@@ -228,10 +251,6 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
       setActiveSceneId(null);
       setChapterContent(ch?.content || '');
     }
-    // Phase 11: 保存当前章节快照（切换前）
-    if (activeChapterId && chapterContent) {
-      saveSnapshot(host.storage, activeSceneId || activeChapterId, chapterContent);
-    }
     // 记录新章节基准字数
     const effectiveContent = ch?.scenes && ch.scenes.length > 0
       ? [...ch.scenes].sort((a, b) => a.sortOrder - b.sortOrder)[0]?.content || ''
@@ -240,7 +259,7 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
     baselineWordCountRef.current = newWc;
     // 开始新写作会话
     writingSessionRef.current = { startTime: Date.now(), lastActiveTime: Date.now(), wordsAtStart: newWc };
-  }, [activeChapterId, activeSceneId, chapterContent, novel, saveNovel]);
+  }, [activeChapterId, activeSceneId, chapterContent, novel, saveNovel, host.storage]);
 
   const selectScene = useCallback((chId: string, sceneId: string) => {
     // 先保存当前编辑内容
@@ -313,7 +332,7 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
         }
       }
     }
-  }, [activeChapterId, novel, host.doc]);
+  }, [activeChapterId, activeSceneId, novel, host.doc]);
 
   useEffect(() => {
     if (!activeChapterId) return;
@@ -338,15 +357,6 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
     setNewTitle('');
   }, [newTitle, novel, saveNovel]);
 
-  // Phase 3.4: 章节模板
-  const CHAPTER_TEMPLATES: { key: string; label: string; outline: string; content: string }[] = [
-    { key: 'blank', label: '空白', outline: '', content: '' },
-    { key: 'opening', label: '开场', outline: '引入主要角色和场景，建立故事基调，设置悬念钩子', content: '# \n\n' },
-    { key: 'dialogue', label: '对话', outline: '通过角色对话推动情节，揭示角色关系和性格', content: '# \n\n「」\n\n「」\n\n' },
-    { key: 'action', label: '战斗', outline: '紧张的动作场景，节奏快速，描写打斗细节和紧张氛围', content: '# \n\n' },
-    { key: 'transition', label: '过渡', outline: '场景过渡，时间推移，角色反思或旅途描写', content: '# \n\n' },
-    { key: 'ending', label: '结尾', outline: '章节结尾，制造悬念或情感高潮，引导读者继续阅读', content: '# \n\n' },
-  ];
   const [selectedTemplate, setSelectedTemplate] = useState('blank');
 
   const handleAddChapter = useCallback(() => {
@@ -370,14 +380,17 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
     setCreatingChapterInVolume(null);
     setNewTitle('');
     setSelectedTemplate('blank');
-  }, [newTitle, novel, creatingChapterInVolume, saveNovel, selectedTemplate, CHAPTER_TEMPLATES]);
+  }, [newTitle, novel, creatingChapterInVolume, saveNovel, selectedTemplate]);
 
   const handleInsertToDoc = useCallback((text: string) => {
     if (!activeChapterId) return;
-    setChapterContent(prev => prev + '\n\n' + text);
-    const updated = updateChapterContent(novel, activeChapterId, chapterContent + '\n\n' + text);
-    saveNovel(updated);
-  }, [activeChapterId, novel, chapterContent, saveNovel]);
+    setChapterContent(prev => {
+      const newContent = prev + '\n\n' + text;
+      const updated = updateChapterContent(novel, activeChapterId, newContent);
+      saveNovel(updated);
+      return newContent;
+    });
+  }, [activeChapterId, novel, saveNovel]);
 
   // ── 工具栏操作 ──
   const handleSave = useCallback(async () => {
@@ -440,6 +453,11 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
 
   const handleDeleteVolume = useCallback((volId: string) => {
     const vol = novel.volumes.find(v => v.id === volId);
+    const chCount = vol?.chapters.length || 0;
+    const msg = chCount > 0
+      ? `确定删除「${vol?.title || ''}」及其 ${chCount} 个章节？此操作不可撤销。`
+      : `确定删除「${vol?.title || ''}」？`;
+    if (!window.confirm(msg)) return;
     if (vol && vol.chapters.some(c => c.id === activeChapterId)) {
       setActiveChapterId(null);
       setChapterContent('');
@@ -448,6 +466,12 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
   }, [novel, activeChapterId, saveNovel]);
 
   const handleDeleteChapter = useCallback((chapterId: string) => {
+    const ch = getChapterById(novel, chapterId);
+    const wc = ch ? getChapterWordCount(ch) : 0;
+    const msg = wc > 0
+      ? `确定删除「${ch?.title || ''}」（${wc}字）？此操作不可撤销。`
+      : `确定删除「${ch?.title || ''}」？`;
+    if (!window.confirm(msg)) return;
     if (chapterId === activeChapterId) {
       setActiveChapterId(null);
       setChapterContent('');
@@ -497,7 +521,7 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
   const maxChapterWc = useMemo(() => {
     let max = 1;
     for (const v of novel.volumes) for (const c of v.chapters) {
-      const wc = c.content.replace(/\s/g, '').length;
+      const wc = getChapterWordCount(c);
       if (wc > max) max = wc;
     }
     return max;
@@ -633,7 +657,7 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
   // ── Phase 2: 选中文本替换/插入回调 ──
   const handleSelReplace = useCallback((text: string) => {
     const view = cmEditorRef.current;
-    if (!view || !selToolbar.from && !selToolbar.to) return;
+    if (!view || (selToolbar.from === selToolbar.to)) return;
     view.dispatch({
       changes: { from: selToolbar.from, to: selToolbar.to, insert: text },
       selection: { anchor: selToolbar.from + text.length },
@@ -658,9 +682,12 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
     if (!view) {
       // fallback: 追加到末尾
       if (activeChapterId) {
-        setChapterContent(prev => prev + '\n\n' + text);
-        const updated = updateChapterContent(novel, activeChapterId, chapterContent + '\n\n' + text);
-        saveNovel(updated);
+        setChapterContent(prev => {
+          const newContent = prev + '\n\n' + text;
+          const updated = updateChapterContent(novel, activeChapterId, newContent);
+          saveNovel(updated);
+          return newContent;
+        });
       }
       return;
     }
@@ -670,7 +697,7 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
       selection: { anchor: pos + text.length },
     });
     view.focus();
-  }, [activeChapterId, novel, chapterContent, saveNovel]);
+  }, [activeChapterId, novel, saveNovel]);
 
   // ── Phase 4: 写作会话空闲检测（5分钟无操作结束会话） ──
   useEffect(() => {
@@ -712,48 +739,41 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
     };
   }, []);
 
-  // ── Phase 4: 番茄钟逻辑 ──
+  // ── Phase 4: 番茄钟逻辑（统一 interval，避免嵌套泄漏） ──
   const handlePomodoroToggle = useCallback(() => {
     if (pomodoroState === 'idle') {
-      // 开始工作 25 分钟
       setPomodoroState('working');
       setPomodoroRemaining(25 * 60);
-      if (pomodoroIntervalRef.current) clearInterval(pomodoroIntervalRef.current);
-      pomodoroIntervalRef.current = setInterval(() => {
-        setPomodoroRemaining(prev => {
-          if (prev <= 1) {
-            // 工作时间到，切换到休息
-            if (pomodoroIntervalRef.current) clearInterval(pomodoroIntervalRef.current);
-            setPomodoroState('resting');
-            setPomodoroRemaining(5 * 60);
-            pomodoroIntervalRef.current = setInterval(() => {
-              setPomodoroRemaining(p => {
-                if (p <= 1) {
-                  if (pomodoroIntervalRef.current) clearInterval(pomodoroIntervalRef.current);
-                  setPomodoroState('idle');
-                  return 0;
-                }
-                return p - 1;
-              });
-            }, 1000);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
     } else {
-      // 重置番茄钟
       if (pomodoroIntervalRef.current) clearInterval(pomodoroIntervalRef.current);
+      pomodoroIntervalRef.current = null;
       setPomodoroState('idle');
       setPomodoroRemaining(0);
     }
   }, [pomodoroState]);
 
-  const formatPomodoro = (sec: number) => {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
+  useEffect(() => {
+    if (pomodoroState === 'idle') {
+      if (pomodoroIntervalRef.current) clearInterval(pomodoroIntervalRef.current);
+      pomodoroIntervalRef.current = null;
+      return;
+    }
+    pomodoroIntervalRef.current = setInterval(() => {
+      setPomodoroRemaining(prev => {
+        if (prev <= 1) {
+          if (pomodoroState === 'working') {
+            setPomodoroState('resting');
+            return 5 * 60;
+          } else {
+            setPomodoroState('idle');
+            return 0;
+          }
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => { if (pomodoroIntervalRef.current) clearInterval(pomodoroIntervalRef.current); };
+  }, [pomodoroState]);
 
   return (
     <div className="flex h-full w-full overflow-hidden">
@@ -1201,7 +1221,7 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
-              {['synopsis', 'outline', 'characters', 'relations', 'locations', 'factions', 'foreshadowing', 'timeline', 'worldview', 'materials'].map(tab => (
+              {(['synopsis', 'outline', 'characters', 'relations', 'locations', 'factions', 'foreshadowing', 'timeline', 'worldview', 'materials'] as const).map(tab => (
                 <DropdownMenuItem key={tab} className="text-xs" onClick={() => { setSettingsDialogTab(tab); setSettingsDialogOpen(true); }}>
                   {{synopsis:'梗概',outline:'大纲',characters:'人物',relations:'关系',locations:'地点',factions:'阵营',foreshadowing:'伏笔',timeline:'时间线',worldview:'世界观',materials:'素材库'}[tab]}
                 </DropdownMenuItem>
@@ -1418,61 +1438,21 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
 
         {/* 状态栏 */}
         {!focusMode && (
-          <div className="flex items-center gap-2 px-3 py-0.5 border-t text-[10px] text-muted-foreground flex-shrink-0 bg-card">
-            {/* 保存状态指示 */}
-            <span className={cn('flex items-center gap-0.5', saveStatus === 'unsaved' ? 'text-amber-500' : saveStatus === 'saving' ? 'text-blue-500' : 'text-green-500')}>
-              {saveStatus === 'saved' ? '✅' : saveStatus === 'saving' ? '⏳' : '⚠️'}
-              {saveStatus === 'saved' ? t('novel.statusSaved', { defaultValue: '已保存' }) : saveStatus === 'saving' ? t('novel.statusSaving', { defaultValue: '保存中...' }) : t('novel.statusUnsaved', { defaultValue: '未保存' })}
-            </span>
-            <span className="w-px h-3 bg-border" />
-            {activeChapter ? (
-              <>
-                <span className="tabular-nums">
-                  {chapterWords}{activeChapter.wordGoal ? `/${activeChapter.wordGoal}` : ''}{t('novel.charUnit', { defaultValue: '字' })}
-                  {activeChapter.wordGoal ? ` (${Math.round(chapterWords / activeChapter.wordGoal * 100)}%)` : ''}
-                  {(() => { const v = cmEditorRef.current; if (!v) return null; try { const { from, to } = v.state.selection.main; const sel = to - from; return sel > 0 ? ` · ${t('novel.selectedChars', { defaultValue: '选中{{count}}', count: sel })}` : null; } catch { return null; } })()}
-                </span>
-                <span className="w-px h-3 bg-border" />
-                <span>{paragraphCount}{t('novel.paragraphUnit', { defaultValue: '段' })}</span>
-                <span className="w-px h-3 bg-border" />
-                <span className="flex items-center gap-0.5"><Clock className="h-2.5 w-2.5" />{t('novel.readingTime', { defaultValue: '约{{min}}分钟', min: readingTimeMin })}</span>
-                <span className="w-px h-3 bg-border" />
-                <span>{activeChapter.status === 'done' ? '✅' : activeChapter.status === 'revised' ? '�' : '🟡'}{activeChapter.status === 'done' ? t('novel.statusDone', { defaultValue: '完成' }) : activeChapter.status === 'revised' ? t('novel.statusRevised', { defaultValue: '修订' }) : t('novel.statusDraft', { defaultValue: '草稿' })}</span>
-                {activeChapter.povCharacterId && (() => {
-                  const pov = novel.settings.characters.find(c => c.id === activeChapter.povCharacterId);
-                  return pov ? <><span className="w-px h-3 bg-border" /><span>POV:{pov.name}</span></> : null;
-                })()}
-                {activeChapter.sceneType && (
-                  <><span className="w-px h-3 bg-border" /><span>{{action:'动作',dialogue:'对话',description:'描写',transition:'过渡',flashback:'闪回'}[activeChapter.sceneType]}</span></>
-                )}
-              </>
-            ) : null}
-            <div className="flex-1" />
-            {/* 番茄钟 */}
-            <button onClick={handlePomodoroToggle} className={cn('flex items-center gap-0.5 px-1 py-0.5 rounded hover:bg-accent transition-colors',
-              pomodoroState === 'working' ? 'text-red-500' : pomodoroState === 'resting' ? 'text-green-500' : 'text-muted-foreground'
-            )} title={pomodoroState === 'idle' ? t('novel.pomodoroStart', { defaultValue: '开始番茄钟 (25分钟)' }) : t('novel.pomodoroReset', { defaultValue: '重置番茄钟' })}>
-              🍅
-              {pomodoroState !== 'idle' && <span className="tabular-nums">{formatPomodoro(pomodoroRemaining)}</span>}
-              {pomodoroState === 'resting' && <span>{t('novel.pomodoroRest', { defaultValue: '休息' })}</span>}
-            </button>
-            <span className="w-px h-3 bg-border" />
-            {/* 每日目标达成提醒 */}
-            {dailyGoalReached && (
-              <span className="text-amber-500 animate-pulse">🎉 {t('novel.dailyGoalReached', { defaultValue: '今日目标达成！' })}</span>
-            )}
-            {/* 10.2 截止日期倒计时 */}
-            {novel.metadata.deadline && (() => {
-              const daysLeft = Math.ceil((new Date(novel.metadata.deadline).getTime() - Date.now()) / 86400000);
-              const remaining = Math.max(0, (novel.metadata.totalGoal || 0) - totalWords);
-              const dailyNeeded = daysLeft > 0 ? Math.ceil(remaining / daysLeft) : 0;
-              return daysLeft > 0 ? (
-                <span className="text-xs">{t('novel.deadlineCountdown', { defaultValue: '截止{{days}}天·日需{{words}}字', days: daysLeft, words: dailyNeeded })}</span>
-              ) : null;
-            })()}
-            <span>{totalWords > 9999 ? `${(totalWords/10000).toFixed(1)}万` : totalWords}{t('novel.charUnit', { defaultValue: '字' })} · {novel.volumes.length}{t('novel.volUnit', { defaultValue: '卷' })}{totalChapters}{t('novel.chapterUnit', { defaultValue: '章' })}</span>
-            <span className="text-green-600 dark:text-green-400">{t('novel.todayWords', { defaultValue: '今日+{{count}}', count: getTodayWordCount(novel) })}</span>
-          </div>
+          <NovelStatusBar
+            saveStatus={saveStatus}
+            activeChapter={activeChapter}
+            chapterWords={chapterWords}
+            paragraphCount={paragraphCount}
+            readingTimeMin={readingTimeMin}
+            novel={novel}
+            totalWords={totalWords}
+            totalChapters={totalChapters}
+            cmEditorRef={cmEditorRef}
+            pomodoroState={pomodoroState}
+            pomodoroRemaining={pomodoroRemaining}
+            onPomodoroToggle={handlePomodoroToggle}
+            dailyGoalReached={dailyGoalReached}
+          />
         )}
       </div>
 
@@ -1541,7 +1521,7 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
       <NovelSettingsDialog
         open={settingsDialogOpen}
         onOpenChange={setSettingsDialogOpen}
-        initialTab={settingsDialogTab as never}
+        initialTab={settingsDialogTab}
         novel={novel}
         activeChapterId={activeChapterId}
         onNovelChange={saveNovel}
@@ -1567,7 +1547,7 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
       <NovelDashboard open={dashboardOpen} onOpenChange={setDashboardOpen} novel={novel} />
 
       {/* ═══ Phase 6: 导出弹窗 ═══ */}
-      <NovelExportDialog open={exportOpen} onOpenChange={setExportOpen} novel={novel} />
+      <NovelExportDialog open={exportOpen} onOpenChange={setExportOpen} novel={novel} documentId={doc.id} projectId={doc.projectId} />
 
       {/* ═══ Phase 11: 版本历史弹窗 ═══ */}
       <NovelVersionDialog

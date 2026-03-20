@@ -10,7 +10,7 @@
 import type {
   NovelDocumentContent, NovelChapter, NovelVolume,
 } from './types';
-import { getChapterById, getTotalWordCount, getVolumeByChapterId, getEffectiveContent } from './types';
+import { getChapterById, getTotalWordCount, getVolumeByChapterId, getEffectiveContent, getChapterWordCount } from './types';
 
 // ═══ 写作阶段 ═══
 
@@ -169,7 +169,7 @@ function buildVolumeContext(
   if (volume) {
     parts.push(`\n\n--- 当前卷：${volume.title}（${volume.chapters.length} 章）---`);
     for (const ch of volume.chapters) {
-      const wc = ch.content.replace(/\s/g, '').length;
+      const wc = getChapterWordCount(ch);
       const statusLabel = ch.status === 'done' ? '✅' : ch.status === 'revised' ? '🔵' : '🟡';
       if (ch.id === currentCh.id) {
         parts.push(`  ▶ ${ch.title} ${statusLabel} ${wc}字（当前）`);
@@ -271,7 +271,7 @@ function buildFullContext(
 
   // 各卷概览
   for (const v of novel.volumes) {
-    const vWords = v.chapters.reduce((s, c) => s + c.content.replace(/\s/g, '').length, 0);
+    const vWords = v.chapters.reduce((s, c) => s + getChapterWordCount(c), 0);
     const isCurrent = v.id === currentVolume?.id;
     parts.push(`${isCurrent ? '▶' : ' '} ${v.title}（${v.chapters.length}章 ${vWords}字）`);
   }

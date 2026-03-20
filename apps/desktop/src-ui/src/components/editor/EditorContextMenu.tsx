@@ -83,9 +83,10 @@ export default function EditorContextMenu({ cmViewRef, visible, position, onClos
     { label: '选择当前行', shortcut: '⌘L', action: (v) => { const l = v.state.doc.lineAt(v.state.selection.main.from); v.dispatch({ selection: { anchor: l.from, head: l.to } }); v.focus(); } },
     { label: '选择当前词', shortcut: '⌘D', action: (v) => { const w = v.state.wordAt(v.state.selection.main.from); if (w) v.dispatch({ selection: { anchor: w.from, head: w.to } }); v.focus(); } },
     'sep',
-    // 查找
+    // 查找 + 跳转
     { label: '查找...', shortcut: '⌘F', action: (v) => openSearchPanel(v) },
     { label: '查找替换...', shortcut: '⌘H', action: (v) => openSearchPanel(v) },
+    { label: '跳转到行...', shortcut: '⌘G', action: () => { window.dispatchEvent(new CustomEvent('editor-menu-action', { detail: 'goto_line' })); } },
     'sep',
     // 文本格式
     { label: '文本格式', children: [
@@ -111,6 +112,18 @@ export default function EditorContextMenu({ cmViewRef, visible, position, onClos
       { label: '反转行序', action: (v) => applyTransform(v, TU.reverseLines) },
       { label: '打乱行序', action: (v) => applyTransform(v, TU.shuffleLines) },
     ] },
+    // 中文排版
+    { label: '中文排版', children: [
+      { label: '段首缩进', action: (v) => applyTransform(v, TU.addParagraphIndent) },
+      { label: '去除段首缩进', action: (v) => applyTransform(v, TU.removeParagraphIndent) },
+      'sep',
+      { label: '中英文间距', action: (v) => applyTransform(v, TU.addSpaceBetweenCnEn) },
+      { label: '引号规范化', action: (v) => applyTransform(v, TU.normalizeQuotes) },
+      'sep',
+      { label: '压缩空行', action: (v) => applyTransform(v, TU.compressBlankLines) },
+      { label: '段落重排', action: (v) => applyTransform(v, TU.reformatParagraphs) },
+      { label: '去除行尾空格', action: (v) => applyTransform(v, TU.removeTrailingSpaces) },
+    ] },
     // 文本转换
     { label: '文本转换', children: [
       { label: '转为大写', action: (v) => applyTransform(v, TU.toUpperCase) },
@@ -126,17 +139,53 @@ export default function EditorContextMenu({ cmViewRef, visible, position, onClos
       'sep',
       { label: '中文标点→英文', action: (v) => applyTransform(v, TU.toEnglishPunctuation) },
       { label: '英文标点→中文', action: (v) => applyTransform(v, TU.toChinesePunctuation) },
+      'sep',
+      { label: '数字→中文大写', action: (v) => applyTransform(v, TU.numberToChinese) },
+      { label: '中文大写→数字', action: (v) => applyTransform(v, TU.chineseToNumber) },
     ] },
     // 文本处理
     { label: '文本处理', children: [
       { label: '去除空行', action: (v) => applyTransform(v, TU.removeEmptyLines) },
       { label: 'Trim 空格', action: (v) => applyTransform(v, TU.trimLines) },
       { label: '合并连续空格', action: (v) => applyTransform(v, TU.collapseSpaces) },
+      { label: '去除行尾空格', action: (v) => applyTransform(v, TU.removeTrailingSpaces) },
       'sep',
+      { label: '添加行号', action: (v) => applyTransform(v, TU.addLineNumbers) },
+      { label: '去除行号', action: (v) => applyTransform(v, TU.removeLineNumbers) },
+      'sep',
+      { label: '去除 HTML 标签', action: (v) => applyTransform(v, TU.stripHtmlTags) },
+      { label: '去除 Markdown 格式', action: (v) => applyTransform(v, TU.stripMarkdown) },
+      { label: '按列宽换行', action: (v) => applyTransform(v, TU.wrapAtColumn) },
+    ] },
+    // 编码转换
+    { label: '编码转换', children: [
       { label: 'URL 编码', action: (v) => applyTransform(v, TU.urlEncode) },
       { label: 'URL 解码', action: (v) => applyTransform(v, TU.urlDecode) },
       { label: 'Base64 编码', action: (v) => applyTransform(v, TU.base64Encode) },
       { label: 'Base64 解码', action: (v) => applyTransform(v, TU.base64Decode) },
+      'sep',
+      { label: 'Unicode 转义', action: (v) => applyTransform(v, TU.unicodeEscape) },
+      { label: 'Unicode 还原', action: (v) => applyTransform(v, TU.unicodeUnescape) },
+      'sep',
+      { label: 'HTML 实体编码', action: (v) => applyTransform(v, TU.htmlEntityEncode) },
+      { label: 'HTML 实体解码', action: (v) => applyTransform(v, TU.htmlEntityDecode) },
+      'sep',
+      { label: 'JSON 字符串转义', action: (v) => applyTransform(v, TU.jsonStringEscape) },
+      { label: 'JSON 字符串反转义', action: (v) => applyTransform(v, TU.jsonStringUnescape) },
+    ] },
+    'sep',
+    // 书签
+    { label: '书签', children: [
+      { label: '切换书签', shortcut: '⌘F2', action: () => { window.dispatchEvent(new CustomEvent('editor-menu-action', { detail: 'bm_toggle' })); } },
+      { label: '下一个书签', shortcut: 'F2', action: () => { window.dispatchEvent(new CustomEvent('editor-menu-action', { detail: 'bm_next' })); } },
+      { label: '上一个书签', shortcut: '⇧F2', action: () => { window.dispatchEvent(new CustomEvent('editor-menu-action', { detail: 'bm_prev' })); } },
+      'sep',
+      { label: '清除所有书签', action: () => { window.dispatchEvent(new CustomEvent('editor-menu-action', { detail: 'bm_clear' })); } },
+    ] },
+    // 宏
+    { label: '宏', children: [
+      { label: '开始/停止录制', shortcut: '⌘⇧R', action: () => { window.dispatchEvent(new CustomEvent('editor-menu-action', { detail: 'macro_toggle_record' })); } },
+      { label: '重放宏', shortcut: '⌘⇧P', action: () => { window.dispatchEvent(new CustomEvent('editor-menu-action', { detail: 'macro_replay' })); } },
     ] },
     'sep',
     // 插入

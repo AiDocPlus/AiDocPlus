@@ -200,6 +200,14 @@ fn main() {
                 .item(&MenuItem::with_id(handle, "remove_empty_lines", t.remove_empty_lines, true, None::<&str>)?)
                 .item(&MenuItem::with_id(handle, "trim_lines", t.trim_lines, true, None::<&str>)?)
                 .item(&MenuItem::with_id(handle, "collapse_spaces", t.collapse_spaces, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "tp_remove_trailing", t.tp_remove_trailing, true, None::<&str>)?)
+                .separator()
+                .item(&MenuItem::with_id(handle, "tp_add_line_numbers", t.tp_add_line_numbers, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "tp_remove_line_numbers", t.tp_remove_line_numbers, true, None::<&str>)?)
+                .separator()
+                .item(&MenuItem::with_id(handle, "tp_strip_html", t.tp_strip_html, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "tp_strip_markdown", t.tp_strip_markdown, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "tp_wrap_column", t.tp_wrap_column, true, None::<&str>)?)
                 .separator()
                 .item(&MenuItem::with_id(handle, "url_encode", t.url_encode, true, None::<&str>)?)
                 .item(&MenuItem::with_id(handle, "url_decode", t.url_decode, true, None::<&str>)?)
@@ -216,6 +224,45 @@ fn main() {
                 .item(&MenuItem::with_id(handle, "fmt_highlight", t.fmt_highlight, true, None::<&str>)?)
                 .item(&MenuItem::with_id(handle, "fmt_superscript", t.fmt_superscript, true, None::<&str>)?)
                 .item(&MenuItem::with_id(handle, "fmt_subscript", t.fmt_subscript, true, None::<&str>)?)
+                .build()?;
+
+            let cn_typeset_sub = SubmenuBuilder::new(handle, t.cn_typeset)
+                .item(&MenuItem::with_id(handle, "cn_paragraph_indent", t.cn_paragraph_indent, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "cn_remove_indent", t.cn_remove_indent, true, None::<&str>)?)
+                .separator()
+                .item(&MenuItem::with_id(handle, "cn_space_cn_en", t.cn_space_cn_en, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "cn_normalize_quotes", t.cn_normalize_quotes, true, None::<&str>)?)
+                .separator()
+                .item(&MenuItem::with_id(handle, "cn_compress_blank", t.cn_compress_blank, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "cn_reformat_para", t.cn_reformat_para, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "cn_remove_trailing", t.cn_remove_trailing, true, None::<&str>)?)
+                .build()?;
+
+            let encoding_sub = SubmenuBuilder::new(handle, t.encoding_convert)
+                .item(&MenuItem::with_id(handle, "enc_unicode_escape", t.enc_unicode_escape, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "enc_unicode_unescape", t.enc_unicode_unescape, true, None::<&str>)?)
+                .separator()
+                .item(&MenuItem::with_id(handle, "enc_html_entity_encode", t.enc_html_entity_encode, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "enc_html_entity_decode", t.enc_html_entity_decode, true, None::<&str>)?)
+                .separator()
+                .item(&MenuItem::with_id(handle, "enc_json_escape", t.enc_json_escape, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "enc_json_unescape", t.enc_json_unescape, true, None::<&str>)?)
+                .separator()
+                .item(&MenuItem::with_id(handle, "enc_num_to_chinese", t.enc_num_to_chinese, true, None::<&str>)?)
+                .item(&MenuItem::with_id(handle, "enc_chinese_to_num", t.enc_chinese_to_num, true, None::<&str>)?)
+                .build()?;
+
+            let bookmarks_sub = SubmenuBuilder::new(handle, t.bookmarks)
+                .item(&MenuItem::with_id(handle, "bm_toggle", t.bm_toggle, true, Some("CmdOrCtrl+F2"))?)
+                .item(&MenuItem::with_id(handle, "bm_next", t.bm_next, true, Some("F2"))?)
+                .item(&MenuItem::with_id(handle, "bm_prev", t.bm_prev, true, Some("Shift+F2"))?)
+                .separator()
+                .item(&MenuItem::with_id(handle, "bm_clear", t.bm_clear, true, None::<&str>)?)
+                .build()?;
+
+            let macros_sub = SubmenuBuilder::new(handle, t.macros)
+                .item(&MenuItem::with_id(handle, "macro_toggle_record", t.macro_toggle_record, true, Some("CmdOrCtrl+Shift+R"))?)
+                .item(&MenuItem::with_id(handle, "macro_replay", t.macro_replay, true, Some("CmdOrCtrl+Shift+P"))?)
                 .build()?;
 
             let insert_sub = SubmenuBuilder::new(handle, t.insert)
@@ -251,7 +298,15 @@ fn main() {
                 .separator()
                 .item(&text_format_sub)
                 .separator()
+                .item(&cn_typeset_sub)
+                .separator()
+                .item(&encoding_sub)
+                .separator()
                 .item(&insert_sub)
+                .separator()
+                .item(&MenuItem::with_id(handle, "goto_line", t.goto_line, true, Some("CmdOrCtrl+G"))?)
+                .item(&bookmarks_sub)
+                .item(&macros_sub)
                 .build()?;
 
             // 视图菜单

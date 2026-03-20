@@ -18,8 +18,7 @@ import { useTranslation } from '@/i18n';
 import { cn } from '@/lib/utils';
 import type { NovelDocumentContent } from './types';
 import { getTotalWordCount, getChapterWordCount, getTodayWordCount } from './types';
-
-const DIALOG_STYLE = { fontFamily: "'宋体', 'SimSun', serif", fontSize: '16px' };
+import { DIALOG_STYLE } from './constants';
 
 interface NovelDashboardProps {
   open: boolean;

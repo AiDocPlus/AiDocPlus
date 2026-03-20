@@ -346,7 +346,7 @@ export function getTotalWordCount(novel: NovelDocumentContent): number {
   let total = 0;
   for (const v of novel.volumes) {
     for (const ch of v.chapters) {
-      total += ch.content.replace(/\s/g, '').length;
+      total += getChapterWordCount(ch);
     }
   }
   return total;

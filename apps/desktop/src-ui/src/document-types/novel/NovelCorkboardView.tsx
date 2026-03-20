@@ -10,8 +10,8 @@ import { cn } from '@/lib/utils';
 import { useTranslation } from '@/i18n';
 import type { NovelDocumentContent, NovelChapter } from './types';
 import { getChapterWordCount, getSceneWordCount } from './types';
+import { DIALOG_STYLE, SCENE_TYPE_LABELS } from './constants';
 
-const DIALOG_STYLE = { fontFamily: "'宋体', 'SimSun', serif", fontSize: '16px' };
 
 interface NovelCorkboardViewProps {
   novel: NovelDocumentContent;
@@ -35,13 +35,11 @@ interface CardItem {
   plotlineColors?: string[];
 }
 
-const SCENE_TYPE_LABELS: Record<string, string> = {
-  action: '动作', dialogue: '对话', description: '描写', transition: '过渡', flashback: '闪回',
-};
 
-export default function NovelCorkboardView({ novel, onSelectChapter, onSelectScene }: NovelCorkboardViewProps) {
+export default function NovelCorkboardView({ novel, onNovelChange, onSelectChapter, onSelectScene }: NovelCorkboardViewProps) {
   const { t } = useTranslation();
   const [dragId, setDragId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
   const cards = useMemo(() => {
     const result: CardItem[] = [];
@@ -117,10 +115,36 @@ export default function NovelCorkboardView({ novel, onSelectChapter, onSelectSce
                 className={cn(
                   'rounded-lg border bg-card shadow-sm cursor-pointer hover:shadow-md transition-shadow overflow-hidden',
                   dragId === card.id && 'opacity-40',
+                  dropTargetId === card.id && dragId && dragId !== card.id && 'ring-2 ring-primary',
                 )}
-                draggable
-                onDragStart={() => setDragId(card.id)}
-                onDragEnd={() => setDragId(null)}
+                draggable={card.type === 'chapter'}
+                onDragStart={() => { if (card.type === 'chapter') setDragId(card.id); }}
+                onDragOver={(e) => { if (dragId && dragId !== card.id && card.type === 'chapter') { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDropTargetId(card.id); } }}
+                onDragLeave={() => setDropTargetId(null)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDropTargetId(null);
+                  if (!dragId || dragId === card.id || card.type !== 'chapter') return;
+                  // 同卷内重排章节
+                  for (const v of novel.volumes) {
+                    const srcIdx = v.chapters.findIndex(c => c.id === dragId);
+                    const tgtIdx = v.chapters.findIndex(c => c.id === card.id);
+                    if (srcIdx >= 0 && tgtIdx >= 0) {
+                      const sorted = [...v.chapters].sort((a, b) => a.sortOrder - b.sortOrder);
+                      const si = sorted.findIndex(c => c.id === dragId);
+                      const ti = sorted.findIndex(c => c.id === card.id);
+                      if (si >= 0 && ti >= 0) {
+                        const [moved] = sorted.splice(si, 1);
+                        sorted.splice(ti, 0, moved);
+                        const reordered = sorted.map((c, i) => ({ ...c, sortOrder: i }));
+                        onNovelChange({ ...novel, volumes: novel.volumes.map(vol => vol.id === v.id ? { ...vol, chapters: reordered } : vol) });
+                      }
+                      break;
+                    }
+                  }
+                  setDragId(null);
+                }}
+                onDragEnd={() => { setDragId(null); setDropTargetId(null); }}
                 onClick={() => handleCardClick(card)}>
                 {/* 颜色标签条 */}
                 <div className="h-[3px]" style={{ backgroundColor: card.colorLabel || 'transparent' }} />

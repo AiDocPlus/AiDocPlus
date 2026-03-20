@@ -13,6 +13,7 @@ import {
   updateChapterMeta, updateChapterSummary, renameChapter, updateChapterStatus,
   getChapterWordCount, getSceneWordCount, renameScene, updateSceneMeta,
 } from './types';
+import { STATUS_OPTIONS, SCENE_TYPES, DIALOG_STYLE } from './constants';
 
 type SortKey = 'title' | 'status' | 'words' | 'pov' | 'sceneType';
 type SortDir = 'asc' | 'desc';
@@ -40,20 +41,6 @@ interface OutlineRow {
   synopsis?: string;
   depth: number;
 }
-
-const STATUS_OPTIONS: { value: NovelChapter['status']; label: string }[] = [
-  { value: 'draft', label: '草稿' },
-  { value: 'revised', label: '修订' },
-  { value: 'done', label: '完成' },
-];
-
-const SCENE_TYPES = [
-  { value: 'action', label: '动作' }, { value: 'dialogue', label: '对话' },
-  { value: 'description', label: '描写' }, { value: 'transition', label: '过渡' },
-  { value: 'flashback', label: '闪回' },
-];
-
-const DIALOG_STYLE = { fontFamily: "'宋体', 'SimSun', serif", fontSize: '16px' };
 
 export default function NovelOutlineView({ novel, onNovelChange, onSelectChapter, onSelectScene, characters }: NovelOutlineViewProps) {
   const { t } = useTranslation();
