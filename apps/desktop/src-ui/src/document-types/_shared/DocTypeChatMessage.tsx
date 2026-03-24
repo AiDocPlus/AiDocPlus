@@ -16,6 +16,7 @@ import {
   MSG_USER_CLASS, MSG_AI_CLASS, MSG_ACTION_BTN, MSG_ACTION_AREA,
   MSG_STREAMING_CURSOR,
 } from './styles';
+import { CollapsibleThinkingBlock } from './CollapsibleThinkingBlock';
 
 export interface DocTypeChatMsg {
   role: 'user' | 'assistant';
@@ -67,18 +68,12 @@ export const DocTypeChatMessage = memo(function DocTypeChatMessage({
 
   return (
     <div className={MSG_AI_CLASS}>
-      {/* 思考过程 */}
       {parsed.thinking && (
-        <div className="mb-2 text-xs text-muted-foreground border-l-2 border-purple-300 dark:border-purple-600 pl-2 py-1">
-          <details open={parsed.isThinking}>
-            <summary className="cursor-pointer font-medium">
-              {parsed.isThinking
-                ? t('docTypeChat.thinking', { defaultValue: '💭 正在思考...' })
-                : t('docTypeChat.thinkingDone', { defaultValue: '💭 思考过程' })}
-            </summary>
-            <div className="mt-1 whitespace-pre-wrap">{parsed.thinking}</div>
-          </details>
-        </div>
+        <CollapsibleThinkingBlock
+          thinking={parsed.thinking}
+          isThinking={parsed.isThinking}
+          theme={theme}
+        />
       )}
 
       {/* 正文内容 — Markdown 渲染 */}

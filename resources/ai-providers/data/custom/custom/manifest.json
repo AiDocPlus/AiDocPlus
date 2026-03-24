@@ -23,7 +23,7 @@
   "capabilities": {
     "webSearch": false,
     "thinking": false,
-    "functionCalling": false,
+    "functionCalling": true,
     "vision": false
   }
 }

@@ -59,9 +59,33 @@ export interface DiaryEntry {
   createdAt: number;
   updatedAt: number;
   starred: boolean;
+  colorLabel?: string;        // 颜色标签 (hex color)
   deletedAt?: number;         // 软删除时间戳（回收站）
   snapshots?: DiaryEntrySnapshot[]; // 版本快照（限20个）
+  /** D3.4: 当日习惯完成记录 */
+  habitRecords?: DiaryHabitRecord[];
 }
+
+// ═══════════════════════════════════════════════════════════
+// 颜色标签
+// ═══════════════════════════════════════════════════════════
+
+export interface ColorLabel {
+  key: string;
+  color: string;
+  labelKey: string;
+}
+
+export const COLOR_LABELS: ColorLabel[] = [
+  { key: 'red', color: '#ef4444', labelKey: 'diary.colorRed' },
+  { key: 'orange', color: '#f97316', labelKey: 'diary.colorOrange' },
+  { key: 'yellow', color: '#eab308', labelKey: 'diary.colorYellow' },
+  { key: 'green', color: '#22c55e', labelKey: 'diary.colorGreen' },
+  { key: 'teal', color: '#14b8a6', labelKey: 'diary.colorTeal' },
+  { key: 'blue', color: '#3b82f6', labelKey: 'diary.colorBlue' },
+  { key: 'purple', color: '#8b5cf6', labelKey: 'diary.colorPurple' },
+  { key: 'pink', color: '#ec4899', labelKey: 'diary.colorPink' },
+];
 
 export type DiaryMood = 'great' | 'good' | 'okay' | 'bad' | 'terrible';
 
@@ -130,6 +154,31 @@ export interface DiaryTemplate {
   description?: string;
 }
 
+/** D3.4: 习惯定义 */
+export interface DiaryHabit {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  /** 目标类型：boolean=打勾, number=数值 */
+  type: 'boolean' | 'number';
+  /** 数值类型的单位（如"分钟""杯""页"） */
+  unit?: string;
+  /** 数值类型的目标值 */
+  target?: number;
+  sortOrder: number;
+  archived?: boolean;
+}
+
+/** D3.4: 单日习惯记录 */
+export interface DiaryHabitRecord {
+  habitId: string;
+  /** boolean 类型的值 */
+  done?: boolean;
+  /** number 类型的值 */
+  value?: number;
+}
+
 export interface DiaryMetadata {
   currentStreak: number;
   longestStreak: number;
@@ -137,6 +186,8 @@ export interface DiaryMetadata {
   totalWords: number;
   dailyWordGoal?: number;
   customTemplates: DiaryTemplate[];
+  /** D3.4: 习惯追踪定义列表 */
+  habits?: DiaryHabit[];
 }
 
 // ═══════════════════════════════════════════════════════
@@ -144,7 +195,9 @@ export interface DiaryMetadata {
 // ═══════════════════════════════════════════════════════
 
 function genId(prefix: string): string {
-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  // 使用 crypto.randomUUID() 生成唯一 ID，避免 Date.now() + Math.random() 的碰撞风险
+  const randomPart = crypto.randomUUID().replace(/-/g, '').slice(2, 8);
+  return `${prefix}_${randomPart}`;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -290,6 +343,7 @@ export function permanentDeleteEntry(diary: DiaryDocumentContent, entryId: strin
 
 /** 清理超过30天的已删除条目 */
 export function cleanupDeletedEntries(diary: DiaryDocumentContent): DiaryDocumentContent {
+  // 避免循环导入，直接使用内联常量
   const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
   return {
     ...diary,
@@ -303,6 +357,9 @@ export function addSnapshot(diary: DiaryDocumentContent, entryId: string): Diary
   if (!entry) return diary;
   const now = Date.now();
   const snaps = entry.snapshots || [];
+  // 检查是否达到快照上限
+  if (snaps.length >= 20) return diary;
+  // 检查时间间隔（60秒）
   if (snaps.length > 0 && now - snaps[snaps.length - 1].timestamp < 60000) return diary;
   const newSnap: DiaryEntrySnapshot = {
     id: `snap_${now}_${Math.random().toString(36).slice(2, 6)}`,
@@ -310,7 +367,7 @@ export function addSnapshot(diary: DiaryDocumentContent, entryId: string): Diary
     title: entry.title,
     timestamp: now,
   };
-  const updated = [...snaps, newSnap].slice(-20);
+  const updated = [...snaps, newSnap];
   return {
     ...diary,
     entries: diary.entries.map(e =>
@@ -637,3 +694,4 @@ export function formatDateDisplay(dateStr: string): string {
   const weekDays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${weekDays[d.getDay()]}`;
 }
+

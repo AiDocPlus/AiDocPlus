@@ -8,6 +8,7 @@
  */
 
 import type { NovelDocumentContent } from './types';
+import { getTotalWordCount, getTodayWordCount } from './types';
 
 export interface AppearanceResult {
   entityId: string;
@@ -154,6 +155,132 @@ export function checkConsistency(novel: NovelDocumentContent): ConsistencyIssue[
     seen.add(key);
     return true;
   });
+}
+
+// ═══════════════════════════════════════════════════════
+// N3.5: 写作目标与进度分析
+// ═══════════════════════════════════════════════════════
+
+export interface WritingSpeedTrend {
+  date: string;
+  words: number;
+}
+
+/** 获取近 N 天的每日写作量 */
+export function getDailyWritingTrend(novel: NovelDocumentContent, days: number = 30): WritingSpeedTrend[] {
+  const stats = novel.metadata.dailyWordStats || [];
+  const today = new Date();
+  const result: WritingSpeedTrend[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().slice(0, 10);
+    const entry = stats.find(s => s.date === dateStr);
+    result.push({ date: dateStr, words: entry?.words || 0 });
+  }
+  return result;
+}
+
+/** 计算日均写作量（近 N 天有写作的天数） */
+export function getAverageDailyWords(novel: NovelDocumentContent, days: number = 30): { avg: number; activeDays: number; totalDays: number } {
+  const trend = getDailyWritingTrend(novel, days);
+  const activeDays = trend.filter(d => d.words > 0).length;
+  const totalWords = trend.reduce((s, d) => s + d.words, 0);
+  return {
+    avg: activeDays > 0 ? Math.round(totalWords / activeDays) : 0,
+    activeDays,
+    totalDays: days,
+  };
+}
+
+export interface GoalPrediction {
+  /** 全书目标字数 */
+  totalGoal: number;
+  /** 当前总字数 */
+  currentWords: number;
+  /** 剩余字数 */
+  remainingWords: number;
+  /** 完成百分比 */
+  completionPercent: number;
+  /** 日均写作量（近30天活跃日） */
+  dailyAvg: number;
+  /** 预计完成日期（按日均速度） */
+  estimatedDate: string | null;
+  /** 预计剩余天数 */
+  estimatedDays: number | null;
+  /** 截止日期 */
+  deadline: string | null;
+  /** 截止日期前是否能完成 */
+  canMeetDeadline: boolean | null;
+  /** 如要在截止日期前完成，每日需写字数 */
+  dailyNeededForDeadline: number | null;
+  /** 今日字数 */
+  todayWords: number;
+  /** 今日目标 */
+  dailyGoal: number;
+  /** 今日目标完成率 */
+  dailyGoalPercent: number;
+}
+
+/** 预测写作目标完成进度 */
+export function predictGoalCompletion(novel: NovelDocumentContent): GoalPrediction {
+  const totalGoal = novel.metadata.totalGoal || 0;
+  const currentWords = getTotalWordCount(novel);
+  const remainingWords = Math.max(0, totalGoal - currentWords);
+  const completionPercent = totalGoal > 0 ? Math.round(currentWords / totalGoal * 100) : 0;
+
+  const { avg: dailyAvg } = getAverageDailyWords(novel, 30);
+
+  // 预测完成日期
+  let estimatedDate: string | null = null;
+  let estimatedDays: number | null = null;
+  if (dailyAvg > 0 && remainingWords > 0) {
+    estimatedDays = Math.ceil(remainingWords / dailyAvg);
+    const d = new Date();
+    d.setDate(d.getDate() + estimatedDays);
+    estimatedDate = d.toISOString().slice(0, 10);
+  } else if (remainingWords <= 0) {
+    estimatedDays = 0;
+    estimatedDate = new Date().toISOString().slice(0, 10);
+  }
+
+  // 截止日期分析
+  const deadline = novel.metadata.deadline || null;
+  let canMeetDeadline: boolean | null = null;
+  let dailyNeededForDeadline: number | null = null;
+  if (deadline && remainingWords > 0) {
+    const deadlineDate = new Date(deadline + 'T23:59:59');
+    const today = new Date();
+    const daysLeft = Math.max(1, Math.ceil((deadlineDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
+    dailyNeededForDeadline = Math.ceil(remainingWords / daysLeft);
+    canMeetDeadline = dailyAvg >= dailyNeededForDeadline;
+  }
+
+  const todayWords = getTodayWordCount(novel);
+  const dailyGoal = novel.metadata.dailyGoal || 0;
+  const dailyGoalPercent = dailyGoal > 0 ? Math.round(todayWords / dailyGoal * 100) : 0;
+
+  return {
+    totalGoal, currentWords, remainingWords, completionPercent,
+    dailyAvg, estimatedDate, estimatedDays,
+    deadline, canMeetDeadline, dailyNeededForDeadline,
+    todayWords, dailyGoal, dailyGoalPercent,
+  };
+}
+
+/** 写作速度趋势（字/小时，基于写作会话） */
+export function getWritingSpeedHistory(novel: NovelDocumentContent, limit: number = 20): { date: string; wordsPerHour: number }[] {
+  const sessions = novel.metadata.writingSessions || [];
+  return sessions
+    .filter(s => s.wordsWritten > 0 && s.endTime > s.startTime)
+    .slice(-limit)
+    .map(s => {
+      const hours = (s.endTime - s.startTime) / (1000 * 60 * 60);
+      return {
+        date: s.date,
+        wordsPerHour: hours > 0 ? Math.round(s.wordsWritten / hours) : 0,
+      };
+    });
 }
 
 /** 简单 Levenshtein 距离 */

@@ -43,8 +43,9 @@ export default function SkillBasedAISidebar({ document: doc, host, onClose: _onC
         ...historyMsgs,
         { role: 'user', content: userPrompt },
       ];
-      const result = await host.ai.chatStream(allMsgs, (chunk) => {
-        setStreamingContent(prev => prev + chunk);
+      // DocTypeHost.chatStream：onChunk 为已累计全文，非增量
+      const result = await host.ai.chatStream(allMsgs, (cumulative: string) => {
+        setStreamingContent(cumulative);
       });
       setMessages(prev => [...prev, { role: 'assistant', content: result }]);
       setStreamingContent('');

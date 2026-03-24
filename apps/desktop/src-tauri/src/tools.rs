@@ -51,9 +51,138 @@ fn tool(name: &str, description: &str, parameters: Value) -> ToolDefinition {
     }
 }
 
+/// 工具作用域：控制哪些工具暴露给 AI
+#[derive(Debug, Clone, PartialEq)]
+pub enum ToolScope {
+    /// 所有工具（文档 + 股票）
+    All,
+    /// 仅股票数据工具（通用精简集）
+    Stock,
+    /// 股票工具：偏财务/基本面
+    StockFinancial,
+    /// 股票工具：偏行情/技术/资金盘面
+    StockTechnical,
+    /// 仅通用文档工具
+    Document,
+}
+
+/// 获取指定 scope 的工具定义
+pub fn get_tool_definitions(scope: ToolScope) -> Vec<ToolDefinition> {
+    match scope {
+        ToolScope::Stock => crate::commands::stock::get_stock_tool_definitions(),
+        ToolScope::StockFinancial => crate::commands::stock::get_stock_tool_definitions_financial(),
+        ToolScope::StockTechnical => crate::commands::stock::get_stock_tool_definitions_technical(),
+        ToolScope::Document => get_document_tool_definitions(),
+        ToolScope::All => get_builtin_tool_definitions(),
+    }
+}
+
+/// 仅获取通用文档工具定义
+pub fn get_document_tool_definitions() -> Vec<ToolDefinition> {
+    vec![
+        tool("search_documents", "搜索项目中的文档，返回匹配的文档标题和摘要", json!({
+            "type": "object",
+            "properties": {
+                "query": { "type": "string", "description": "搜索关键词" }
+            },
+            "required": ["query"]
+        })),
+        tool("read_document", "读取指定文档的完整内容", json!({
+            "type": "object",
+            "properties": {
+                "document_id": { "type": "string", "description": "文档 ID" }
+            },
+            "required": ["document_id"]
+        })),
+        tool("get_document_stats", "获取当前项目的文档统计信息，包括文档数量、总字数等", json!({
+            "type": "object",
+            "properties": {},
+            "required": []
+        })),
+        tool("update_document", "更新指定文档的内容（全量替换）", json!({
+            "type": "object",
+            "properties": {
+                "document_id": { "type": "string", "description": "文档 ID" },
+                "content": { "type": "string", "description": "新的文档内容（Markdown 格式）" }
+            },
+            "required": ["document_id", "content"]
+        })),
+        tool("update_document_title", "修改文档标题", json!({
+            "type": "object",
+            "properties": {
+                "document_id": { "type": "string", "description": "文档 ID" },
+                "title": { "type": "string", "description": "新标题" }
+            },
+            "required": ["document_id", "title"]
+        })),
+        tool("append_to_document", "在文档末尾追加内容", json!({
+            "type": "object",
+            "properties": {
+                "document_id": { "type": "string", "description": "文档 ID" },
+                "content": { "type": "string", "description": "要追加的内容（Markdown 格式）" }
+            },
+            "required": ["document_id", "content"]
+        })),
+        tool("create_document", "在当前项目中创建新文档", json!({
+            "type": "object",
+            "properties": {
+                "title": { "type": "string", "description": "文档标题" },
+                "content": { "type": "string", "description": "文档初始内容（可选）" }
+            },
+            "required": ["title"]
+        })),
+        tool("list_projects", "列出所有可用的项目", json!({
+            "type": "object",
+            "properties": {},
+            "required": []
+        })),
+        tool("list_documents", "列出当前项目中的所有文档", json!({
+            "type": "object",
+            "properties": {},
+            "required": []
+        })),
+        tool("export_document", "将文档导出为指定格式", json!({
+            "type": "object",
+            "properties": {
+                "document_id": { "type": "string", "description": "文档 ID" },
+                "format": { "type": "string", "enum": ["markdown", "html", "txt"], "description": "导出格式" }
+            },
+            "required": ["document_id", "format"]
+        })),
+        tool("list_templates", "列出可用的提示词模板", json!({
+            "type": "object",
+            "properties": {
+                "category": { "type": "string", "description": "模板分类（可选，不填则列出所有分类）" }
+            },
+            "required": []
+        })),
+        tool("get_template_content", "获取指定模板的内容", json!({
+            "type": "object",
+            "properties": {
+                "template_id": { "type": "string", "description": "模板 ID" }
+            },
+            "required": ["template_id"]
+        })),
+        tool("get_document_outline", "获取文档的标题大纲结构", json!({
+            "type": "object",
+            "properties": {
+                "document_id": { "type": "string", "description": "文档 ID" }
+            },
+            "required": ["document_id"]
+        })),
+        tool("count_words", "统计指定文档的字数、段落数、行数", json!({
+            "type": "object",
+            "properties": {
+                "document_id": { "type": "string", "description": "文档 ID" }
+            },
+            "required": ["document_id"]
+        })),
+    ]
+}
+
 /// 获取所有内置工具的定义（OpenAI tools 格式）
 pub fn get_builtin_tool_definitions() -> Vec<ToolDefinition> {
-    vec![
+    let mut tools = vec![
         // ── 文档搜索与读取 ──
         tool("search_documents", "搜索项目中的文档，返回匹配的文档标题和摘要", json!({
             "type": "object",
@@ -162,13 +291,21 @@ pub fn get_builtin_tool_definitions() -> Vec<ToolDefinition> {
             },
             "required": ["document_id"]
         })),
-    ]
+    ];
+
+    // 合并股票数据工具
+    tools.extend(crate::commands::stock::get_stock_tool_definitions_full());
+    tools
 }
 
 /// 执行内置工具调用
-pub fn execute_tool(tool_call: &ToolCall, project_documents: &[Value]) -> ToolResult {
+pub async fn execute_tool(tool_call: &ToolCall, project_documents: &[Value]) -> ToolResult {
     let args = &tool_call.function.arguments;
     let result_content = match tool_call.function.name.as_str() {
+        // 股票数据工具（直接调用 stock 模块）
+        name if name.starts_with("stock_") || name.starts_with("tushare_") => {
+            crate::commands::stock::execute_stock_tool(tool_call).await.content
+        }
         "search_documents" => execute_search_documents(args, project_documents),
         "read_document" => execute_read_document(args, project_documents),
         "get_document_stats" => execute_get_document_stats(project_documents),

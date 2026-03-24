@@ -8,11 +8,12 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { Send, Square, Trash2, Loader2, Bot, Sparkles, AlertCircle, ChevronRight } from 'lucide-react';
+import { Send, Square, Trash2, Loader2, Bot, Sparkles, AlertCircle } from 'lucide-react';
 import type { HelpDoc } from './helpDocs';
 import { generateDocIndex } from './helpDocs';
 import { parseThinkTags } from '@/utils/thinkTagParser';
 import { markdownToHtml } from './HelpContent';
+import { CollapsibleThinkingBlock } from '@/document-types/_shared/CollapsibleThinkingBlock';
 
 interface ChatMessage {
   id: string;
@@ -24,28 +25,21 @@ interface HelpAIChatProps {
   currentDoc: HelpDoc | null;
 }
 
-/** 渲染 AI 消息内容：解析 think 标签折叠显示 + Markdown 渲染 */
+/** 渲染 AI 消息内容：解析 think 标签默认折叠 + Markdown 渲染 */
 function AIMessageContent({ content }: { content: string }) {
-  const { content: mainContent, thinking } = parseThinkTags(content);
-  const [thinkOpen, setThinkOpen] = useState(false);
+  const parsed = parseThinkTags(content);
+  const mainContent = parsed.content;
+  const thinking = parsed.thinking;
 
   return (
     <>
       {thinking && (
-        <div className="help-ai-thinking mb-2">
-          <button
-            onClick={() => setThinkOpen(v => !v)}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ChevronRight className={`w-3 h-3 transition-transform ${thinkOpen ? 'rotate-90' : ''}`} />
-            <span>思考过程</span>
-          </button>
-          {thinkOpen && (
-            <div className="mt-1.5 pl-4 text-xs text-muted-foreground border-l-2 border-muted whitespace-pre-wrap">
-              {thinking}
-            </div>
-          )}
-        </div>
+        <CollapsibleThinkingBlock
+          thinking={thinking}
+          isThinking={parsed.isThinking}
+          theme="light"
+          className="mb-2"
+        />
       )}
       {mainContent && (
         <div
@@ -177,6 +171,7 @@ export function HelpAIChat({ currentDoc }: HelpAIChatProps) {
           proxyUrl: aiConfig.proxyUrl || undefined,
           connectTimeoutSecs: aiConfig.connectTimeoutSecs || undefined,
           requestTimeoutSecs: aiConfig.requestTimeoutSecs || undefined,
+          maxTokens: typeof aiConfig.maxTokens === 'number' ? aiConfig.maxTokens : 4096,
         });
 
         // 流式完成

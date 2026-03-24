@@ -63,13 +63,13 @@ export default function DiaryDailyPrompt({ host, diary, onStartWithPrompt }: Dia
     try {
       const systemPrompt = buildDiarySystemPrompt(diary, null, 'week');
       const userPrompt = buildDailyPromptRequest(diary);
-      let full = '';
-      await host.ai.chatStream(
+      // onChunk 为累计全文，非 delta；解析以返回值为准
+      const full = await host.ai.chatStream(
         [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        (chunk) => { full += chunk; },
+        () => {},
         {},
       );
       // 解析 AI 回复为提示列表（按数字编号或换行分割）

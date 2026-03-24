@@ -11,7 +11,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { usePluginHost, useThinkingContent } from '../_framework/PluginHostAPI';
 import { formatBackendError } from '@/lib/backendError';
 import { useSettingsStore, getAIInvokeParamsForService } from '@/stores/useSettingsStore';
-import { getProviderConfig, getActiveService } from '@aidocplus/shared-types';
+import { getProviderConfig, getActiveService, type AIProvider } from '@aidocplus/shared-types';
 import type { PluginAssistantPanelProps } from '../types';
 import {
   type AssistantMessage,
@@ -45,6 +45,8 @@ import type { QuickActionStore, QuickActionItem } from './quickActionDefs';
 import { QuickActionManagerDialog } from './dialogs/QuickActionManagerDialog';
 import { QuickActionCommandPalette } from './QuickActionCommandPalette';
 import { parseThinkTags } from '@/utils/thinkTagParser';
+import { resolveTheme } from '@/components/chat/ChatMessage';
+import { CollapsibleThinkingBlock } from '@/document-types/_shared/CollapsibleThinkingBlock';
 import { getInputSuggestions, getPhaseIndicator, getInputPlaceholder, autoContextMode } from './assistantSuggestions';
 
 // ── 会话管理 ──
@@ -135,7 +137,7 @@ export function MindMapAssistantPanel({
   const aiAvailable = !!(aiParams.provider && aiParams.apiKey && aiParams.model);
   const providerCaps = (() => {
     if (!aiParams.provider) return { webSearch: false, thinking: false };
-    const cfg = getProviderConfig(aiParams.provider);
+    const cfg = getProviderConfig(aiParams.provider as AIProvider);
     return cfg?.capabilities || { webSearch: false, thinking: false };
   })();
 
@@ -806,16 +808,11 @@ export function MindMapAssistantPanel({
                   {msg.role === 'assistant' && parsed ? (
                     <div className="space-y-2">
                       {parsed.thinking && (
-                        <details className="group/think">
-                          <summary className="flex items-center gap-1 cursor-pointer text-xs text-muted-foreground hover:text-foreground transition-colors select-none">
-                            <Brain className="h-3 w-3" />
-                            <span>深度思考</span>
-                            <ChevronDown className="h-3 w-3 transition-transform group-open/think:rotate-180" />
-                          </summary>
-                          <div className="mt-1 pl-4 border-l-2 border-muted-foreground/20 text-xs text-muted-foreground">
-                            <MarkdownPreview content={parsed.thinking} className="text-xs opacity-80" />
-                          </div>
-                        </details>
+                        <CollapsibleThinkingBlock
+                          thinking={parsed.thinking}
+                          isThinking={false}
+                          theme={resolveTheme()}
+                        />
                       )}
                       <MarkdownPreview content={parsed.content || msg.content} className="text-sm" />
                     </div>
@@ -862,16 +859,11 @@ export function MindMapAssistantPanel({
           <div className="flex justify-start">
             <div className="max-w-[85%] rounded-lg px-3 py-2 bg-muted text-sm space-y-2">
               {streamParsed.thinking && (
-                <details open className="group">
-                  <summary className="flex items-center gap-1 cursor-pointer text-xs text-muted-foreground hover:text-foreground transition-colors select-none">
-                    <Brain className="h-3 w-3 animate-pulse" />
-                    <span>思考中...</span>
-                    <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" />
-                  </summary>
-                  <div className="mt-1 pl-4 border-l-2 border-muted-foreground/20 text-xs text-muted-foreground">
-                    <MarkdownPreview content={streamParsed.thinking} className="text-xs opacity-80" />
-                  </div>
-                </details>
+                <CollapsibleThinkingBlock
+                  thinking={streamParsed.thinking}
+                  isThinking={streamParsed.isThinking}
+                  theme={resolveTheme()}
+                />
               )}
               {streamParsed.content && (
                 <MarkdownPreview content={streamParsed.content} className="text-sm" />

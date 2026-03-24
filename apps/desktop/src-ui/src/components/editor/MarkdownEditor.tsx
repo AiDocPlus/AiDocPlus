@@ -36,6 +36,7 @@ import EditorContextMenu from './EditorContextMenu';
 import GotoLineDialog from './GotoLineDialog';
 import { bookmarkExtension, toggleBookmark, nextBookmark, prevBookmark, clearAllBookmarks } from './extensions/bookmarks';
 import { macroRecorderExtension, macroRecorder } from './extensions/macroRecorder';
+import { textIndentPlugin } from './textIndentPlugin';
 
 // 大文档阈值（字符数），超过此值启用性能降级模式
 const LARGE_DOC_THRESHOLD = 100_000;
@@ -97,6 +98,7 @@ interface MarkdownEditorProps {
   showStatusBar?: boolean;
   editorRef?: React.MutableRefObject<EditorView | null>;
   enableSelectionToolbar?: boolean;
+  textIndent?: boolean;
 }
 
 // 创建一组 Compartment 实例（每个编辑器实例独立）
@@ -118,6 +120,7 @@ function createCompartments() {
     scrollPastEnd: new Compartment(),
     indentOnInput: new Compartment(),
     markdownLint: new Compartment(),
+    textIndent: new Compartment(),
   };
 }
 
@@ -138,6 +141,7 @@ export function MarkdownEditor({
   showStatusBar = true,
   editorRef,
   enableSelectionToolbar = true,
+  textIndent = false,
 }: MarkdownEditorProps) {
   const editorDivRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -399,6 +403,7 @@ export function MarkdownEditor({
       compRef.current.markdownLint.of(
         editorSettings.markdownLint !== false ? markdownLinterExtension : []
       ),
+      compRef.current.textIndent.of(textIndent ? textIndentPlugin('2em') : []),
       // --- DOM 事件处理 ---
       EditorView.domEventHandlers({
         // 修复：编辑器无焦点时点击会导致错误选区扩展
@@ -544,6 +549,7 @@ export function MarkdownEditor({
       c.markdownLint.reconfigure(
         editorSettings.markdownLint !== false && !isLargeDoc ? markdownLinterExtension : []
       ),
+      c.textIndent.reconfigure(textIndent ? textIndentPlugin('2em') : []),
     ];
     view.dispatch({ effects });
   }, [
@@ -552,7 +558,7 @@ export function MarkdownEditor({
     editorSettings.bracketMatching, editorSettings.closeBrackets, editorSettings.codeFolding,
     editorSettings.highlightSelectionMatches, editorSettings.autocompletion,
     editorSettings.multiCursor, editorSettings.scrollPastEnd, editorSettings.indentOnInput,
-    editorSettings.markdownLint, isLargeDoc,
+    editorSettings.markdownLint, isLargeDoc, textIndent,
   ]);
 
   // 编辑器字体样式

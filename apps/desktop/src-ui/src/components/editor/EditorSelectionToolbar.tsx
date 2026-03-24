@@ -99,6 +99,7 @@ export default function EditorSelectionToolbar({
         messages,
         ...aiParams,
         requestId,
+        maxTokens: useSettingsStore.getState().ai.maxTokens ?? 4096,
       });
 
       unlisten();

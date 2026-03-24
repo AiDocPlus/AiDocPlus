@@ -7,6 +7,7 @@ import type { ChatContextMode } from '@aidocplus/shared-types';
 import { useTranslation } from '@/i18n';
 import { parseThinkTags } from '@/utils/thinkTagParser';
 import { MarkdownPreview } from '../editor/MarkdownPreview';
+import { CollapsibleThinkingBlock } from '@/document-types/_shared/CollapsibleThinkingBlock';
 
 export function resolveTheme(): 'light' | 'dark' {
   const t = useSettingsStore.getState().ui?.theme;
@@ -143,7 +144,7 @@ export interface ChatMessageProps {
 }
 
 export const ChatMessage = memo(function ChatMessage({
-  message, turnNumber, totalMessages, enableThinking, onApplyToDocument,
+  message, turnNumber, totalMessages, enableThinking: _enableThinking, onApplyToDocument,
 }: ChatMessageProps) {
   const { t } = useTranslation();
   const isUserTurn = message.role === 'user';
@@ -156,16 +157,12 @@ export const ChatMessage = memo(function ChatMessage({
         {parsed.thinking && (
           <div className="max-w-[80%] rounded-lg px-4 py-2 bg-muted">
             <div className="text-xs font-medium opacity-70 mb-1">{t('chat.ai', { defaultValue: 'AI' })}</div>
-            <div className="text-sm [&_.markdown-preview]:p-0 [&_.markdown-preview]:text-inherit">
-              <MarkdownPreview
-                content={enableThinking
-                  ? `> 💭 **思考过程：**\n>\n> ${parsed.thinking.replace(/\n/g, '\n> ')}`
-                  : `<details>\n<summary>${t('chat.thinkingCollapsed', { defaultValue: '💭 查看 AI 思考过程' })}</summary>\n\n${parsed.thinking}\n\n</details>`}
-                theme={resolveTheme()}
-                className="!p-0"
-                fontSize={13}
-              />
-            </div>
+            <CollapsibleThinkingBlock
+              thinking={parsed.thinking}
+              isThinking={false}
+              theme={resolveTheme()}
+              className="border-l-purple-400/60 dark:border-l-purple-500/50"
+            />
           </div>
         )}
         <ContextReplyBox
@@ -214,15 +211,24 @@ export const ChatMessage = memo(function ChatMessage({
               )}
             </div>
           ) : (
-            <div className="text-sm [&_.markdown-preview]:p-0 [&_.markdown-preview]:text-inherit">
-              <MarkdownPreview content={(() => {
+            <div className="text-sm [&_.markdown-preview]:p-0 [&_.markdown-preview]:text-inherit space-y-2">
+              {(() => {
                 const parsed = parseThinkTags(message.content);
-                if (!parsed.thinking) return parsed.content;
-                if (enableThinking) {
-                  return `> 💭 **思考过程：**\n>\n> ${parsed.thinking.replace(/\n/g, '\n> ')}\n\n${parsed.content}`;
-                }
-                return `<details>\n<summary>${t('chat.thinkingCollapsed', { defaultValue: '💭 查看 AI 思考过程' })}</summary>\n\n${parsed.thinking}\n\n</details>\n\n${parsed.content}`;
-              })()} theme={resolveTheme()} className="!p-0" fontSize={13} />
+                return (
+                  <>
+                    {parsed.thinking && (
+                      <CollapsibleThinkingBlock
+                        thinking={parsed.thinking}
+                        isThinking={false}
+                        theme={resolveTheme()}
+                      />
+                    )}
+                    {parsed.content ? (
+                      <MarkdownPreview content={parsed.content} theme={resolveTheme()} className="!p-0" fontSize={13} />
+                    ) : null}
+                  </>
+                );
+              })()}
             </div>
           )}
         </div>

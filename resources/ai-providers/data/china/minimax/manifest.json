@@ -17,8 +17,16 @@
   "createdAt": "2026-02-18T00:00:00Z",
   "updatedAt": "2026-02-18T00:00:00Z",
   "baseUrl": "https://api.minimaxi.com/v1",
-  "defaultModel": "MiniMax-M2.5",
+  "defaultModel": "MiniMax-M2.7",
   "models": [
+    {
+      "id": "MiniMax-M2.7",
+      "name": "MiniMax M2.7"
+    },
+    {
+      "id": "MiniMax-M2.7-highspeed",
+      "name": "MiniMax M2.7 高速版"
+    },
     {
       "id": "MiniMax-M2.5",
       "name": "MiniMax M2.5"

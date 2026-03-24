@@ -1,4 +1,5 @@
 import type { AIMessage, ChatContextMode, Document, EditorTab } from '@aidocplus/shared-types';
+import type { DocTypeToolScope } from '@/doctype-sdk/types';
 import { getAIInvokeParamsForService } from './useSettingsStore';
 
 export interface ChatContextInfo {
@@ -13,6 +14,8 @@ export interface ChatMessageOptions {
   enableWebSearch?: boolean;
   contextInfo?: ChatContextInfo;
   enableTools?: boolean;
+  /** 工具作用域，默认 'all' */
+  toolScope?: DocTypeToolScope;
   enableThinking?: boolean;
   planMode?: boolean;
   images?: import('@aidocplus/shared-types').ChatImage[];

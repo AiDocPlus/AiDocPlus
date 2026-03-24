@@ -76,18 +76,25 @@ export default function DiaryEntryList({
               {formatDateDisplay(group.date)}
             </div>
             {group.entries.map(entry => (
-              <div
-                key={entry.id}
-                className={cn(
-                  'flex items-start gap-1.5 px-2 py-1.5 cursor-pointer transition-colors text-sm border-b border-border/30',
-                  selectedEntryId === entry.id
-                    ? 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
-                    : 'hover:bg-accent',
-                )}
-                onClick={() => onSelectEntry(entry.id)}
-                onContextMenu={onContextMenu ? (e) => onContextMenu(e, entry) : undefined}
-              >
-                <div className="flex-1 min-w-0">
+                <div
+                  key={entry.id}
+                  className={cn(
+                    'flex items-start gap-1.5 px-2 py-1.5 cursor-pointer transition-colors text-sm border-b border-border/30',
+                    selectedEntryId === entry.id
+                      ? 'bg-blue-500/15 text-blue-700 dark:text-blue-300'
+                      : 'hover:bg-accent',
+                  )}
+                  onClick={() => onSelectEntry(entry.id)}
+                  onContextMenu={onContextMenu ? (e) => onContextMenu(e, entry) : undefined}
+                >
+                  {/* 颜色标签指示条 */}
+                  {entry.colorLabel && (
+                    <div
+                      className="w-1 h-full min-h-[2rem] rounded-full flex-shrink-0 self-stretch"
+                      style={{ backgroundColor: entry.colorLabel }}
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
                   {/* 标题行 */}
                   <div className="flex items-center gap-1.5">
                     {entry.mood && <span className="text-sm flex-shrink-0">{MOOD_EMOJI[entry.mood]}</span>}

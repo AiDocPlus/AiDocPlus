@@ -23,3 +23,4 @@ pub mod script_runner;
 pub mod imbot;
 pub mod help;
 pub mod novel;
+pub mod stock;

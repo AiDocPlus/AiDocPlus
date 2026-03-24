@@ -128,3 +128,272 @@ export function getLongestEntries(diary: DiaryDocumentContent, limit: number = 1
     .sort((a, b) => b.words - a.words)
     .slice(0, limit);
 }
+
+// ═══════════════════════════════════════════════════════
+// D1.2: 情绪洞察引擎
+// ═══════════════════════════════════════════════════════
+
+/** 心情与天气关联分析 */
+export interface MoodWeatherCorrelation {
+  weather: string;
+  avgScore: number;
+  count: number;
+}
+
+export function getMoodWeatherCorrelation(diary: DiaryDocumentContent): MoodWeatherCorrelation[] {
+  const map = new Map<string, { total: number; count: number }>();
+  for (const e of diary.entries) {
+    if (e.mood && e.weather) {
+      const key = e.weather.type;
+      const existing = map.get(key);
+      if (existing) {
+        existing.total += MOOD_SCORE[e.mood];
+        existing.count++;
+      } else {
+        map.set(key, { total: MOOD_SCORE[e.mood], count: 1 });
+      }
+    }
+  }
+  return Array.from(map.entries())
+    .map(([weather, { total, count }]) => ({ weather, avgScore: Math.round(total / count * 10) / 10, count }))
+    .sort((a, b) => b.avgScore - a.avgScore);
+}
+
+/** 心情与星期关联分析 */
+export interface MoodWeekdayCorrelation {
+  weekday: number; // 0=周日, 1=周一, ..., 6=周六
+  weekdayLabel: string;
+  avgScore: number;
+  count: number;
+}
+
+const WEEKDAY_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+export function getMoodWeekdayCorrelation(diary: DiaryDocumentContent): MoodWeekdayCorrelation[] {
+  const buckets: { total: number; count: number }[] = Array.from({ length: 7 }, () => ({ total: 0, count: 0 }));
+  for (const e of diary.entries) {
+    if (e.mood) {
+      const d = new Date(e.date + 'T00:00:00');
+      const weekday = d.getDay();
+      buckets[weekday].total += MOOD_SCORE[e.mood];
+      buckets[weekday].count++;
+    }
+  }
+  return buckets.map((b, i) => ({
+    weekday: i,
+    weekdayLabel: WEEKDAY_LABELS[i],
+    avgScore: b.count > 0 ? Math.round(b.total / b.count * 10) / 10 : 0,
+    count: b.count,
+  }));
+}
+
+/** 心情与标签关联分析 */
+export interface MoodTagCorrelation {
+  tag: string;
+  avgScore: number;
+  count: number;
+  /** 相对全局平均心情的偏差 */
+  deviation: number;
+}
+
+export function getMoodTagCorrelation(diary: DiaryDocumentContent): MoodTagCorrelation[] {
+  // 全局平均
+  const allMoods = diary.entries.filter(e => e.mood).map(e => MOOD_SCORE[e.mood!]);
+  const globalAvg = allMoods.length > 0 ? allMoods.reduce((s, v) => s + v, 0) / allMoods.length : 3;
+
+  const map = new Map<string, { total: number; count: number }>();
+  for (const e of diary.entries) {
+    if (e.mood && e.tags.length > 0) {
+      for (const tag of e.tags) {
+        const existing = map.get(tag);
+        if (existing) {
+          existing.total += MOOD_SCORE[e.mood];
+          existing.count++;
+        } else {
+          map.set(tag, { total: MOOD_SCORE[e.mood], count: 1 });
+        }
+      }
+    }
+  }
+  return Array.from(map.entries())
+    .filter(([, { count }]) => count >= 2)
+    .map(([tag, { total, count }]) => {
+      const avg = total / count;
+      return { tag, avgScore: Math.round(avg * 10) / 10, count, deviation: Math.round((avg - globalAvg) * 10) / 10 };
+    })
+    .sort((a, b) => Math.abs(b.deviation) - Math.abs(a.deviation));
+}
+
+/** 情绪热力图：星期 × 时段（4 个时段） */
+export interface MoodHeatmapCell {
+  weekday: number;
+  period: number; // 0=凌晨(0-6), 1=上午(6-12), 2=下午(12-18), 3=晚上(18-24)
+  avgScore: number;
+  count: number;
+}
+
+const PERIOD_LABELS = ['凌晨', '上午', '下午', '晚上'];
+
+export function getMoodHeatmap(diary: DiaryDocumentContent): { cells: MoodHeatmapCell[]; periodLabels: string[]; weekdayLabels: string[] } {
+  const grid: { total: number; count: number }[][] = Array.from({ length: 7 }, () =>
+    Array.from({ length: 4 }, () => ({ total: 0, count: 0 })),
+  );
+
+  for (const e of diary.entries) {
+    if (e.mood && e.time) {
+      const d = new Date(e.date + 'T00:00:00');
+      const weekday = d.getDay();
+      const hour = parseInt(e.time.split(':')[0], 10);
+      const period = hour < 6 ? 0 : hour < 12 ? 1 : hour < 18 ? 2 : 3;
+      grid[weekday][period].total += MOOD_SCORE[e.mood];
+      grid[weekday][period].count++;
+    }
+  }
+
+  const cells: MoodHeatmapCell[] = [];
+  for (let w = 0; w < 7; w++) {
+    for (let p = 0; p < 4; p++) {
+      const { total, count } = grid[w][p];
+      cells.push({
+        weekday: w,
+        period: p,
+        avgScore: count > 0 ? Math.round(total / count * 10) / 10 : 0,
+        count,
+      });
+    }
+  }
+
+  return { cells, periodLabels: PERIOD_LABELS, weekdayLabels: WEEKDAY_LABELS };
+}
+
+/** 周期性模式检测（哪些日子心情规律性高/低） */
+export interface PeriodicPattern {
+  type: 'weekday_low' | 'weekday_high' | 'time_low' | 'time_high';
+  label: string;
+  detail: string;
+  significance: number; // 偏离程度（0-1）
+}
+
+export function detectPeriodicPatterns(diary: DiaryDocumentContent): PeriodicPattern[] {
+  const patterns: PeriodicPattern[] = [];
+
+  // 星期模式
+  const weekdayData = getMoodWeekdayCorrelation(diary);
+  const validWeekdays = weekdayData.filter(w => w.count >= 3);
+  if (validWeekdays.length >= 5) {
+    const allAvg = validWeekdays.reduce((s, w) => s + w.avgScore * w.count, 0) / validWeekdays.reduce((s, w) => s + w.count, 0);
+    for (const w of validWeekdays) {
+      const diff = w.avgScore - allAvg;
+      if (diff < -0.5 && w.count >= 3) {
+        patterns.push({
+          type: 'weekday_low',
+          label: `${w.weekdayLabel}心情偏低`,
+          detail: `${w.weekdayLabel}平均心情 ${w.avgScore}/5（低于均值 ${Math.abs(diff).toFixed(1)}），共 ${w.count} 次记录`,
+          significance: Math.min(1, Math.abs(diff) / 2),
+        });
+      } else if (diff > 0.5 && w.count >= 3) {
+        patterns.push({
+          type: 'weekday_high',
+          label: `${w.weekdayLabel}心情偏高`,
+          detail: `${w.weekdayLabel}平均心情 ${w.avgScore}/5（高于均值 ${diff.toFixed(1)}），共 ${w.count} 次记录`,
+          significance: Math.min(1, diff / 2),
+        });
+      }
+    }
+  }
+
+  // 时段模式
+  const heatmap = getMoodHeatmap(diary);
+  const periodTotals = [0, 0, 0, 0];
+  const periodCounts = [0, 0, 0, 0];
+  for (const cell of heatmap.cells) {
+    periodTotals[cell.period] += cell.avgScore * cell.count;
+    periodCounts[cell.period] += cell.count;
+  }
+  const periodAvgs = periodTotals.map((t, i) => periodCounts[i] > 0 ? t / periodCounts[i] : 0);
+  const validPeriods = periodAvgs.filter(a => a > 0);
+  if (validPeriods.length >= 2) {
+    const allPeriodAvg = validPeriods.reduce((s, v) => s + v, 0) / validPeriods.length;
+    for (let p = 0; p < 4; p++) {
+      if (periodCounts[p] < 3) continue;
+      const diff = periodAvgs[p] - allPeriodAvg;
+      if (diff < -0.5) {
+        patterns.push({
+          type: 'time_low',
+          label: `${PERIOD_LABELS[p]}心情偏低`,
+          detail: `${PERIOD_LABELS[p]}写日记时平均心情 ${periodAvgs[p].toFixed(1)}/5，低于其他时段`,
+          significance: Math.min(1, Math.abs(diff) / 2),
+        });
+      } else if (diff > 0.5) {
+        patterns.push({
+          type: 'time_high',
+          label: `${PERIOD_LABELS[p]}心情偏高`,
+          detail: `${PERIOD_LABELS[p]}写日记时平均心情 ${periodAvgs[p].toFixed(1)}/5，高于其他时段`,
+          significance: Math.min(1, diff / 2),
+        });
+      }
+    }
+  }
+
+  return patterns.sort((a, b) => b.significance - a.significance);
+}
+
+/** 构建情绪洞察 AI 提示词（用于 DiaryAISidebar） */
+export function buildEmotionInsightPrompt(diary: DiaryDocumentContent): string {
+  const parts: string[] = [];
+  parts.push('请基于以下日记数据，为我提供深度情绪洞察分析：\n');
+
+  // 心情分布
+  const dist = getMoodDistribution(diary);
+  if (dist.length > 0) {
+    parts.push('【心情分布】');
+    for (const d of dist) {
+      parts.push(`  ${d.mood}: ${d.count}次`);
+    }
+  }
+
+  // 心情与天气
+  const weatherCorr = getMoodWeatherCorrelation(diary);
+  if (weatherCorr.length > 0) {
+    parts.push('\n【心情与天气关联】');
+    for (const w of weatherCorr.slice(0, 5)) {
+      parts.push(`  ${w.weather}: 平均心情 ${w.avgScore}/5（${w.count}次）`);
+    }
+  }
+
+  // 心情与星期
+  const weekdayCorr = getMoodWeekdayCorrelation(diary);
+  const validWd = weekdayCorr.filter(w => w.count > 0);
+  if (validWd.length > 0) {
+    parts.push('\n【心情与星期关联】');
+    for (const w of validWd) {
+      parts.push(`  ${w.weekdayLabel}: 平均 ${w.avgScore}/5（${w.count}次）`);
+    }
+  }
+
+  // 心情与标签
+  const tagCorr = getMoodTagCorrelation(diary);
+  if (tagCorr.length > 0) {
+    parts.push('\n【心情与标签关联（偏差最大的）】');
+    for (const t of tagCorr.slice(0, 8)) {
+      const sign = t.deviation > 0 ? '+' : '';
+      parts.push(`  #${t.tag}: 平均 ${t.avgScore}/5（${sign}${t.deviation}，${t.count}次）`);
+    }
+  }
+
+  // 周期性模式
+  const patterns = detectPeriodicPatterns(diary);
+  if (patterns.length > 0) {
+    parts.push('\n【检测到的周期性模式】');
+    for (const p of patterns) {
+      parts.push(`  ${p.label}: ${p.detail}`);
+    }
+  }
+
+  parts.push('\n请分析以上数据，给出：');
+  parts.push('1. 情绪触发器：哪些因素（天气/活动/日期）与好/坏心情关联最强？');
+  parts.push('2. 周期性规律：是否存在固定的情绪周期？原因推测？');
+  parts.push('3. 个性化建议：基于分析结果，给出3-5条具体的情绪调节建议。');
+
+  return parts.join('\n');
+}

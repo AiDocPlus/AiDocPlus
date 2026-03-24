@@ -112,7 +112,8 @@ export interface AIAPI {
   /**
    * 流式 AI 对话，自动过滤 <think> 标签
    * @param messages 消息列表
-   * @param onChunk 每次收到正文内容块时的回调（不含 think 内容）
+   * @param onChunk 每次收到**正文增量**（相对上一段的新字符；不含 think）。实现里用 `accumulated += text` 正确。
+   *   注意：文档类型 `createDocTypeHost().ai.chatStream` 的回调参数是**累计全文**，二者契约不同。
    * @param options 选项（支持 signal 用于取消）
    * @returns 完整的累积正文内容（不含 think 内容）
    */
@@ -489,7 +490,7 @@ export function createPluginHostAPI(opts: CreatePluginHostAPIOptions): PluginHos
         await invoke<string>('chat_stream', {
           messages,
           ...aiParams,
-          maxTokens: options?.maxTokens ?? 4096,
+          maxTokens: options?.maxTokens ?? useSettingsStore.getState().ai.maxTokens ?? 4096,
           enableWebSearch: options?.enableWebSearch || undefined,
           enableThinking: options?.enableThinking || undefined,
           requestId,

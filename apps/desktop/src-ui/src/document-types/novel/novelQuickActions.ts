@@ -57,6 +57,7 @@ const DEFAULT_CATEGORIES: NovelQuickActionCategory[] = [
   { id: 'analyze',   label: '分析',   icon: 'BarChart3',     order: 6, builtin: true },
   { id: 'export',    label: '导出',   icon: 'FileOutput',    order: 7, builtin: true },
   { id: 'settings',  label: '设定集', icon: 'BookMarked',    order: 8, builtin: true },
+  { id: 'structure', label: '结构',   icon: 'Layers',        order: 9, builtin: true },
 ];
 
 // ── 默认操作项 ──
@@ -242,6 +243,32 @@ const DEFAULT_ITEMS: NovelQuickActionItem[] = [
   { id: 'ai_rhythm_heatmap',  categoryId: 'analyze', label: '节奏热力图',     icon: 'BarChart3',   order: 10, builtin: true, contextMode: 'full',
     keywords: ['节奏', '热力图', 'rhythm', 'heatmap'],
     prompt: '请分析全书每个章节/场景的叙事节奏紧张度（1-10分），并输出热力图数据：\n\n格式（JSON数组）：\n```json\n[{"chapter": "章节名", "scene": "场景名", "tension": 7, "reason": "动作场景，节奏紧凑"}]\n```\n\n同时分析全书节奏曲线是否合理：是否有足够的高潮低谷交替，紧张度是否逐步升级到最终高潮。' },
+  { id: 'ai_style_analysis',  categoryId: 'analyze', label: '语言风格分析',   icon: 'Feather',     order: 11, builtin: true, contextMode: 'full',
+    keywords: ['风格', '语言', 'style', 'language'],
+    prompt: '{{styleAnalysis}}' },
+  { id: 'ai_redundancy_check', categoryId: 'analyze', label: '冗余用词检查',   icon: 'Eraser',      order: 12, builtin: true, contextMode: 'chapter',
+    keywords: ['冗余', '用词', 'redundancy'],
+    prompt: '请检查当前章节的用词习惯，找出以下问题：\n1. 过度使用的副词（突然、缓缓、微微、默默、淡淡等）\n2. 重复的连接词（然后、接着、于是）\n3. 空洞的形容词（漂亮、厉害、好看）\n4. 可以精简的冗余表达\n\n对每个问题给出原文位置和具体替换建议。\n\n{{chapterTail}}' },
+
+  // ━━ 结构 (structure) —— N1.1 Beat Sheet 大纲驱动写作 ━━
+  { id: 'struct_beat_detect', categoryId: 'structure', label: '检测当前拍点', icon: 'Layers', order: 0, builtin: true, contextMode: 'full',
+    keywords: ['拍点', '结构', 'beat', 'structure'],
+    prompt: '请分析我的小说当前进度，对照经典叙事结构（三幕式/英雄之旅/起承转合），判断当前处于哪个拍点（beat），并建议接下来应该推进到哪个拍点。\n\n请输出：\n1. 当前位置判断（百分比+拍点名称+依据）\n2. 下一个拍点（名称+描述+建议）\n3. 到达下一拍点需要的情节事件' },
+  { id: 'struct_beat_write', categoryId: 'structure', label: '按拍点续写', icon: 'Layers', order: 1, builtin: true, contextMode: 'full',
+    keywords: ['拍点', '续写', 'beat', 'write'],
+    prompt: '请根据当前小说的大纲设定和已有正文，按照叙事结构的下一个拍点要求，续写正文。\n\n要求：\n- 自动识别当前处于哪个结构拍点\n- 按照该拍点的功能要求推进情节\n- 保持与前文的风格和节奏一致\n- 直接输出正文，不要说明' },
+  { id: 'struct_outline_expand', categoryId: 'structure', label: '大纲逐层展开', icon: 'ListTree', order: 2, builtin: true, contextMode: 'settings',
+    keywords: ['大纲', '展开', 'outline', 'expand'],
+    prompt: '请将我的全局大纲逐层展开为更详细的章节大纲。\n\n步骤：\n1. 分析当前全局大纲\n2. 将每个大纲节点展开为2-3个更具体的子节点\n3. 每个子节点包含：情节要点、出场角色、关键对话或事件\n\n用 Markdown 嵌套列表格式输出。' },
+  { id: 'struct_three_act', categoryId: 'structure', label: '三幕式分析', icon: 'Layers', order: 3, builtin: true, contextMode: 'full',
+    keywords: ['三幕', '分析', 'three act'],
+    prompt: '请按照好莱坞三幕式结构分析我的小说：\n\n1. 第一幕（建置 0-25%）：开篇钩子、世界建置、激励事件、第一幕转折——是否完整？\n2. 第二幕（对抗 25-75%）：试炼之路、中点逆转、至暗时刻——节奏是否合理？\n3. 第三幕（解决 75-100%）：高潮决战、结局——是否有力？\n\n请具体指出每个拍点对应的章节/场景，标注缺失或薄弱的拍点。' },
+  { id: 'struct_hero_journey', categoryId: 'structure', label: '英雄之旅分析', icon: 'Layers', order: 4, builtin: true, contextMode: 'full',
+    keywords: ['英雄', '之旅', 'hero', 'journey'],
+    prompt: '请按照英雄之旅十二阶段分析我的小说：\n\n平凡世界→冒险召唤→拒绝召唤→遇见导师→跨越门槛→试炼盟敌→接近深渊→严峻考验→获得奖赏→回程之路→复活考验→满载而归\n\n请逐阶段分析：该阶段是否完整？对应哪些章节？有何改进空间？' },
+  { id: 'struct_pacing_plan', categoryId: 'structure', label: '节奏规划', icon: 'Activity', order: 5, builtin: true, contextMode: 'full',
+    keywords: ['节奏', '规划', 'pacing', 'plan'],
+    prompt: '请为我的小说规划整体节奏曲线：\n\n1. 按当前章节数量，标注每章的理想紧张度（1-10）\n2. 确保高潮低谷交替出现\n3. 紧张度总体呈上升趋势\n4. 在 25%/50%/75% 位置安排转折点\n5. 标注当前哪些章节节奏偏离建议\n\n用表格格式输出。' },
 ];
 
 // ── 持久化 ──

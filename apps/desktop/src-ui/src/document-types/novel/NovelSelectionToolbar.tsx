@@ -85,10 +85,8 @@ export default function NovelSelectionToolbar({
     abortRef.current = abortController;
 
     try {
-      let fullContent = '';
-      await host.ai.chatStream(messages, (chunk: string) => {
-        fullContent += chunk;
-        setResult(fullContent);
+      await host.ai.chatStream(messages, (cumulative: string) => {
+        setResult(cumulative);
       }, { signal: abortController.signal });
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {

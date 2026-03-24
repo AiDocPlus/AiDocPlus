@@ -76,7 +76,7 @@ export function getAppearanceStyle(appearance: EditorAppearance): React.CSSPrope
     fontSize: `${appearance.fontSize}px`,
     lineHeight: appearance.lineHeight,
     fontFamily: fontCss,
-    ...(appearance.textIndent ? { textIndent: '2em' } : {}),
+    // textIndent 由 CodeMirror textIndentPlugin (Widget Decoration) 控制，不再使用 CSS text-indent
     ...(hasBg ? { backgroundColor: bg.bg, color: bg.text } : {}),
   } as React.CSSProperties;
 }

@@ -12,6 +12,137 @@ import type {
 } from './types';
 import { getChapterById, getTotalWordCount, getVolumeByChapterId, getEffectiveContent, getChapterWordCount } from './types';
 
+// ═══ Token 预算系统 ═══
+
+export type TokenBudgetLevel = '8k' | '16k' | '32k' | '64k' | '128k';
+
+export const TOKEN_BUDGETS: Record<TokenBudgetLevel, number> = {
+  '8k': 8000,
+  '16k': 16000,
+  '32k': 32000,
+  '64k': 64000,
+  '128k': 128000,
+};
+
+/**
+ * 估算中文文本的 token 数（中文约 1.5 字/token，英文约 4 字符/token）
+ */
+export function estimateTokens(text: string): number {
+  if (!text) return 0;
+  let zhCount = 0;
+  let enCount = 0;
+  for (const ch of text) {
+    if (/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/.test(ch)) {
+      zhCount++;
+    } else if (/[a-zA-Z0-9]/.test(ch)) {
+      enCount++;
+    }
+  }
+  // 中文: ~1.5 字/token, 英文: ~4 字符/token, 标点等按中文算
+  const otherCount = text.length - zhCount - enCount;
+  return Math.ceil(zhCount / 1.5 + enCount / 4 + otherCount / 1.5);
+}
+
+/**
+ * 根据 token 预算智能裁剪文本，保留开头和结尾
+ */
+function trimToTokenBudget(text: string, maxTokens: number): string {
+  const currentTokens = estimateTokens(text);
+  if (currentTokens <= maxTokens) return text;
+
+  // 按比例保留开头和结尾（开头 30%，结尾 70%）
+  const ratio = maxTokens / currentTokens;
+  const totalChars = text.length;
+  const headChars = Math.floor(totalChars * ratio * 0.3);
+  const tailChars = Math.floor(totalChars * ratio * 0.7);
+
+  const head = text.slice(0, headChars);
+  const tail = text.slice(-tailChars);
+  const omitted = totalChars - headChars - tailChars;
+  return `${head}\n\n[…省略约 ${omitted} 字…]\n\n${tail}`;
+}
+
+export interface ContextTokenInfo {
+  systemPromptTokens: number;
+  contextTokens: number;
+  totalTokens: number;
+  budgetTokens: number;
+  usage: number; // 0-1
+  overBudget: boolean;
+}
+
+/**
+ * 获取当前上下文的 token 使用信息（用于 UI 显示）
+ */
+export function getContextTokenInfo(
+  novel: NovelDocumentContent,
+  activeChapterId: string | null,
+  mode: NovelContextMode,
+  budget: TokenBudgetLevel = '16k',
+  customPrompt?: string,
+  activeSceneId?: string | null,
+): ContextTokenInfo {
+  const systemPrompt = customPrompt || buildSmartSystemPrompt(novel, activeChapterId, { activeSceneId });
+  const context = buildContextForMode(novel, activeChapterId, mode);
+  const systemPromptTokens = estimateTokens(systemPrompt);
+  const contextTokens = estimateTokens(context);
+  const totalTokens = systemPromptTokens + contextTokens;
+  const budgetTokens = TOKEN_BUDGETS[budget];
+  // 预留 30% 给对话历史和 AI 回复
+  const effectiveBudget = Math.floor(budgetTokens * 0.7);
+  return {
+    systemPromptTokens,
+    contextTokens,
+    totalTokens,
+    budgetTokens: effectiveBudget,
+    usage: effectiveBudget > 0 ? totalTokens / effectiveBudget : 0,
+    overBudget: totalTokens > effectiveBudget,
+  };
+}
+
+/**
+ * 根据 token 预算构建上下文（自动裁剪以适应预算）
+ * 优先级：系统提示词 > 当前章节正文尾部 > 大纲/摘要 > 设定概览 > 前文回顾
+ */
+export function buildContextWithBudget(
+  novel: NovelDocumentContent,
+  activeChapterId: string | null,
+  mode: NovelContextMode,
+  budget: TokenBudgetLevel = '16k',
+  reserveForHistory: number = 0,
+): string {
+  if (!activeChapterId) return '';
+  const ch = getChapterById(novel, activeChapterId);
+  if (!ch) return '';
+
+  const budgetTokens = TOKEN_BUDGETS[budget];
+  // 预留 30% 给对话历史 + AI 回复 + 额外预留
+  const contextBudget = Math.floor(budgetTokens * 0.7) - reserveForHistory;
+  if (contextBudget <= 0) return '';
+
+  // 先正常构建
+  const fullContext = buildContextForMode(novel, activeChapterId, mode);
+  const fullTokens = estimateTokens(fullContext);
+
+  // 在预算内直接返回
+  if (fullTokens <= contextBudget) return fullContext;
+
+  // 超预算：智能裁剪策略
+  // 策略：降级上下文模式 full → settings → volume → chapter
+  const modeDowngrade: NovelContextMode[] = ['full', 'settings', 'volume', 'chapter'];
+  const modeIdx = modeDowngrade.indexOf(mode);
+
+  for (let i = modeIdx + 1; i < modeDowngrade.length; i++) {
+    const downgraded = buildContextForMode(novel, activeChapterId, modeDowngrade[i]);
+    if (estimateTokens(downgraded) <= contextBudget) {
+      return downgraded;
+    }
+  }
+
+  // 即使 chapter 模式也超预算，对章节内容进行裁剪
+  return trimToTokenBudget(fullContext, contextBudget);
+}
+
 // ═══ 写作阶段 ═══
 
 export type NovelPhase = 'blank' | 'drafting' | 'revising' | 'polishing';
@@ -354,6 +485,24 @@ export function buildSmartSystemPrompt(
       if (povChar.dialogueStyle) parts.push(`对话风格：${povChar.dialogueStyle}`);
       if (povChar.background) parts.push(`背景：${povChar.background.slice(0, 200)}`);
       if (povChar.motivation) parts.push(`动机：${povChar.motivation.slice(0, 150)}`);
+      // N1.2: 注入角色对话样本
+      if (povChar.dialogueSamples && povChar.dialogueSamples.length > 0) {
+        parts.push(`\n对话样本（参考该角色的说话方式）：`);
+        for (const sample of povChar.dialogueSamples.slice(0, 3)) {
+          parts.push(`  「${sample.slice(0, 150)}」`);
+        }
+      }
+      // N1.2: 注入角色当前情感状态
+      if (povChar.emotionArc && povChar.emotionArc.length > 0 && activeChapterId) {
+        const currentEmotion = povChar.emotionArc.find(e => e.chapterId === activeChapterId);
+        const recentEmotions = povChar.emotionArc.slice(-3);
+        if (currentEmotion) {
+          parts.push(`当前情感：${currentEmotion.emotion}（强度 ${currentEmotion.intensity}/10）`);
+        } else if (recentEmotions.length > 0) {
+          const last = recentEmotions[recentEmotions.length - 1];
+          parts.push(`近期情感：${last.emotion}（强度 ${last.intensity}/10）`);
+        }
+      }
       parts.push('请确保续写内容符合该角色的性格和说话方式。');
     }
   }
@@ -436,6 +585,9 @@ export function getContextSummary(
   const wc = ch.content.replace(/\s/g, '').length;
   return `${ch.title} · ${wc}字`;
 }
+
+/** 默认 Token 预算等级 */
+export const DEFAULT_TOKEN_BUDGET: TokenBudgetLevel = '16k';
 
 /**
  * 根据阶段自动选择上下文模式

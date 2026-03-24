@@ -44,6 +44,7 @@ import NovelStatusBar from './NovelStatusBar';
 import NovelExportDialog from './NovelExportDialog';
 import NovelVersionDialog from './NovelVersionDialog';
 import NovelInlineAI from './NovelInlineAI';
+import NovelSearchDialog from './NovelSearchDialog';
 import { saveSnapshot } from './novelVersions';
 import {
   parseNovelContent, addVolume, addChapter, updateChapterContent,
@@ -170,6 +171,9 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
 
   // ── 情节线弹窗 ──
   const [plotlineViewOpen, setPlotlineViewOpen] = useState(false);
+
+  // ── N2.3: 全书搜索弹窗 ──
+  const [searchOpen, setSearchOpen] = useState(false);
 
   // ── 解析小说内容 ──
   const getNovel = useCallback((): NovelDocumentContent => {
@@ -1190,6 +1194,12 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
             title={t('novel.exportNovel', { defaultValue: '导出全书' })}>
             <FileDown className="h-3.5 w-3.5" />
           </Button>
+          {/* N2.3: 全书搜索 */}
+          <Button type="button" variant="outline" size="icon" className="h-5 w-5"
+            onClick={() => setSearchOpen(true)}
+            title={t('novel.searchNovel', { defaultValue: '全书搜索 (⌘F)' })}>
+            <Search className="h-3.5 w-3.5" />
+          </Button>
           {/* 情节线 */}
           <Button type="button" variant="outline" size="icon" className="h-5 w-5"
             onClick={() => setPlotlineViewOpen(true)}
@@ -1351,7 +1361,8 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
                   <div style={getEditorInnerStyle(editorAppearance)}>
                     <MarkdownEditor value={chapterContent} onChange={handleChapterChange}
                       placeholder={t('novel.editorPlaceholder', { defaultValue: '开始书写...' })}
-                      theme="light" editorRef={cmEditorRef} showStatusBar={false} enableSelectionToolbar={false} />
+                      theme="light" editorRef={cmEditorRef} showStatusBar={false} enableSelectionToolbar={false}
+                      textIndent={editorAppearance.textIndent} />
                   </div>
                 </div>
                 <div className="flex-shrink-0 px-2 py-0.5 bg-muted/30 text-[10px] text-muted-foreground border-b">
@@ -1361,7 +1372,8 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
                   <div style={getEditorInnerStyle(editorAppearance)}>
                     <MarkdownEditor value={splitContent} onChange={setSplitContent}
                       placeholder="对照内容..."
-                      theme="light" showStatusBar={false} enableSelectionToolbar={false} />
+                      theme="light" showStatusBar={false} enableSelectionToolbar={false}
+                      textIndent={editorAppearance.textIndent} />
                   </div>
                 </div>
               </>
@@ -1369,7 +1381,8 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
               <div style={getEditorInnerStyle(editorAppearance)}>
                 <MarkdownEditor value={chapterContent} onChange={handleChapterChange}
                   placeholder={t('novel.editorPlaceholder', { defaultValue: '开始书写...' })}
-                  theme="light" editorRef={cmEditorRef} showStatusBar={false} enableSelectionToolbar={false} />
+                  theme="light" editorRef={cmEditorRef} showStatusBar={false} enableSelectionToolbar={false}
+                  textIndent={editorAppearance.textIndent} />
               </div>
             )
           ) : (
@@ -1583,6 +1596,15 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
           if (scId) selectScene(chId, scId);
           else selectChapter(chId);
         }}
+      />
+
+      {/* ═══ N2.3: 全书搜索弹窗 ═══ */}
+      <NovelSearchDialog
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        novel={novel}
+        onNovelChange={saveNovel}
+        onJumpToChapter={selectChapter}
       />
 
       {/* ═══ Phase 2.2/2.3: 内联 AI + 虚影预览 ═══ */}

@@ -61,6 +61,94 @@ export interface DiffLine {
   content: string;
 }
 
+// ═══ N6.1: 自动备份系统 ═══
+
+export interface AutoBackupConfig {
+  enabled: boolean;
+  /** 自动备份间隔（分钟） */
+  intervalMinutes: 5 | 15 | 30 | 60;
+  /** 保留策略：最近 N 个常规备份 */
+  maxRegularBackups: number;
+  /** 保留策略：每日保留 N 天 */
+  dailyRetentionDays: number;
+  /** 保留策略：每周保留 N 周 */
+  weeklyRetentionWeeks: number;
+}
+
+const AUTO_BACKUP_CONFIG_KEY = '_novel_auto_backup_config';
+const DEFAULT_CONFIG: AutoBackupConfig = {
+  enabled: true,
+  intervalMinutes: 15,
+  maxRegularBackups: 50,
+  dailyRetentionDays: 30,
+  weeklyRetentionWeeks: 12,
+};
+
+export function loadAutoBackupConfig(storage: StorageLike): AutoBackupConfig {
+  return storage.get<AutoBackupConfig>(AUTO_BACKUP_CONFIG_KEY) || { ...DEFAULT_CONFIG };
+}
+
+export function saveAutoBackupConfig(storage: StorageLike, config: AutoBackupConfig): void {
+  storage.set(AUTO_BACKUP_CONFIG_KEY, config);
+}
+
+/** 应用备份保留策略：保留重要版本 + 最新 N 个 + 每日/每周各一个 */
+export function applyRetentionPolicy(snapshots: ChapterSnapshot[], config: AutoBackupConfig): ChapterSnapshot[] {
+  const important = snapshots.filter(s => s.label);
+  const regular = snapshots.filter(s => !s.label);
+
+  // 最新 N 个
+  const recent = regular.slice(-config.maxRegularBackups);
+
+  // 每日保留（取每天最后一个）
+  const dailyCutoff = Date.now() - config.dailyRetentionDays * 24 * 60 * 60 * 1000;
+  const dailyMap = new Map<string, ChapterSnapshot>();
+  for (const s of regular) {
+    if (s.timestamp >= dailyCutoff) {
+      const day = new Date(s.timestamp).toISOString().slice(0, 10);
+      dailyMap.set(day, s);
+    }
+  }
+
+  // 每周保留（取每周最后一个）
+  const weeklyCutoff = Date.now() - config.weeklyRetentionWeeks * 7 * 24 * 60 * 60 * 1000;
+  const weeklyMap = new Map<string, ChapterSnapshot>();
+  for (const s of regular) {
+    if (s.timestamp >= weeklyCutoff) {
+      const d = new Date(s.timestamp);
+      const week = `${d.getFullYear()}-W${String(Math.ceil(d.getDate() / 7)).padStart(2, '0')}`;
+      weeklyMap.set(week, s);
+    }
+  }
+
+  // 合并去重
+  const idSet = new Set<string>();
+  const result: ChapterSnapshot[] = [];
+  for (const s of [...important, ...recent, ...dailyMap.values(), ...weeklyMap.values()]) {
+    if (!idSet.has(s.id)) {
+      idSet.add(s.id);
+      result.push(s);
+    }
+  }
+  return result.sort((a, b) => a.timestamp - b.timestamp);
+}
+
+/** 获取备份统计信息 */
+export function getBackupStats(storage: StorageLike, chapterId: string): {
+  total: number;
+  important: number;
+  oldest: number | null;
+  newest: number | null;
+  storageEstimate: number;
+} {
+  const snaps = loadSnapshots(storage, chapterId);
+  const important = snaps.filter(s => s.label).length;
+  const oldest = snaps.length > 0 ? snaps[0].timestamp : null;
+  const newest = snaps.length > 0 ? snaps[snaps.length - 1].timestamp : null;
+  const storageEstimate = snaps.reduce((s, snap) => s + snap.content.length * 2, 0);
+  return { total: snaps.length, important, oldest, newest, storageEstimate };
+}
+
 export function diffTexts(oldText: string, newText: string): DiffLine[] {
   const oldLines = oldText.split('\n');
   const newLines = newText.split('\n');

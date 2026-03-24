@@ -261,10 +261,7 @@
   line-height: var(--cm-line-height, 1.6);
 }
 
-/* 首行缩进（通过 --cm-text-indent 控制） */
-.cm-font-override .cm-line {
-  text-indent: var(--cm-text-indent, 0);
-}
+/* 首行缩进由 textIndentPlugin (Widget Decoration) 控制，不再使用 CSS text-indent */
 
 .cm-font-override .cm-gutters {
   font-size: var(--cm-font-size, 14px);

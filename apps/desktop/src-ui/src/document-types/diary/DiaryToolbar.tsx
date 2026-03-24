@@ -25,6 +25,7 @@ import {
   formatDateDisplay,
 } from './types';
 import { BUILTIN_TEMPLATES } from './diaryTemplates';
+import ColorLabelPicker from './ColorLabelPicker';
 
 interface DiaryToolbarProps {
   diary: DiaryDocumentContent;
@@ -57,6 +58,7 @@ interface DiaryToolbarProps {
   onTemplateApply: (templateId: string) => void;
   onToggleStarred: () => void;
   onJournalChange: (journalId: string) => void;
+  onColorLabelChange: (color: string | undefined) => void;
   editorAppearanceSlot?: React.ReactNode;
   allTags?: string[];
 }
@@ -71,7 +73,7 @@ export default function DiaryToolbar({
   onOpenVersionHistory, onOpenDashboard, onOpenExport, onOpenImport, onOpenSettings,
   onMoodChange, onWeatherChange, onTemperatureChange,
   onTagToggle, onTemplateApply, onToggleStarred,
-  onJournalChange,
+  onJournalChange, onColorLabelChange,
   editorAppearanceSlot,
   allTags: allTagsProp,
 }: DiaryToolbarProps) {
@@ -267,6 +269,12 @@ export default function DiaryToolbar({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          <div className="w-px h-4 bg-border mx-0.5" />
+          {/* 颜色标签 */}
+          <ColorLabelPicker
+            selectedColor={activeEntry.colorLabel}
+            onSelect={onColorLabelChange}
+          />
           <div className="w-px h-4 bg-border mx-0.5" />
           {/* 收藏 */}
           <Button variant="ghost" size="icon" className="h-5 w-5" onClick={onToggleStarred}

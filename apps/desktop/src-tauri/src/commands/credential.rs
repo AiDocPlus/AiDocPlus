@@ -63,11 +63,30 @@ pub fn get_ai_key_from_keyring(service_id: &str) -> Option<String> {
     if service_id.is_empty() {
         return None;
     }
-    let entry = keyring::Entry::new(AI_KEYRING_SERVICE, service_id).ok()?;
-    match entry.get_password() {
-        Ok(key) if !key.is_empty() => Some(key),
-        _ => None,
+    // 优先使用 keyring crate
+    if let Ok(entry) = keyring::Entry::new(AI_KEYRING_SERVICE, service_id) {
+        if let Ok(key) = entry.get_password() {
+            if !key.is_empty() {
+                return Some(key);
+            }
+        }
     }
+    // macOS 备用：使用 security 命令行工具直接读取
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(output) = std::process::Command::new("security")
+            .args(["find-generic-password", "-s", AI_KEYRING_SERVICE, "-a", service_id, "-w"])
+            .output()
+        {
+            if output.status.success() {
+                let key = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !key.is_empty() {
+                    return Some(key);
+                }
+            }
+        }
+    }
+    None
 }
 
 /// 批量迁移：将明文 API Key 存入 keyring 并返回需要清除的服务 ID 列表

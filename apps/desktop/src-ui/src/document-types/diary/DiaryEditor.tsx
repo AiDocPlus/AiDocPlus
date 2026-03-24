@@ -17,10 +17,11 @@ interface DiaryEditorProps {
   host: DocTypeHostAPI;
   onChange: (content: string) => void;
   placeholder?: string;
+  textIndent?: boolean;
 }
 
 export default function DiaryEditor({
-  entryId, content, host: _host, onChange, placeholder,
+  entryId, content, host: _host, onChange, placeholder, textIndent = false,
 }: DiaryEditorProps) {
   const { t } = useTranslation();
   const onChangeRef = useRef(onChange);
@@ -55,6 +56,7 @@ export default function DiaryEditor({
           showViewModeSwitch={true}
           showStatusBar={false}
           editorId={`diary-${entryId}`}
+          textIndent={textIndent}
         />
       </div>
     </div>

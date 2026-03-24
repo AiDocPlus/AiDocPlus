@@ -21,15 +21,19 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { MarkdownPreview } from '@/components/editor/MarkdownPreview';
 import { useTranslation } from '@/i18n';
 import { useSettingsStore, getAIInvokeParamsForService } from '@/stores/useSettingsStore';
-import { getProviderConfig, getActiveService } from '@aidocplus/shared-types';
+import { getProviderConfig, getActiveService, type AIProvider } from '@aidocplus/shared-types';
 import { parseThinkTags } from '@/utils/thinkTagParser';
+import { resolveTheme } from '@/components/chat/ChatMessage';
+import { CollapsibleThinkingBlock } from '@/document-types/_shared/CollapsibleThinkingBlock';
 import { formatBackendError } from '@/lib/backendError';
 import type { DocTypeHostAPI } from '@/doctype-sdk/types';
 import type { Document } from '@aidocplus/shared-types';
 import type { NovelDocumentContent } from './types';
 import {
-  detectNovelPhase, buildContextForMode, buildSmartSystemPrompt,
+  detectNovelPhase, buildSmartSystemPrompt,
   getContextSummary, autoContextMode, type NovelContextMode,
+  buildContextWithBudget, getContextTokenInfo, estimateTokens,
+  DEFAULT_TOKEN_BUDGET, TOKEN_BUDGETS, type TokenBudgetLevel,
 } from './novelContext';
 import {
   loadQuickActions, saveQuickActions, recordRecentUsed,
@@ -39,6 +43,7 @@ import {
   getNovelSuggestions, getNovelPhaseIndicator, getNovelInputPlaceholder,
 } from './novelSuggestions';
 import { NovelCommandPalette } from './NovelCommandPalette';
+import { buildStyleAnalysisPrompt } from './novelStyleAnalysis';
 import type { StorageLike } from './constants';
 
 // ── 消息类型 ──
@@ -137,7 +142,7 @@ export default function NovelAISidebar({
   const aiAvailable = !!(aiParams.provider && aiParams.apiKey && aiParams.model);
   const providerCaps = (() => {
     if (!aiParams.provider) return { webSearch: false, thinking: false };
-    const cfg = getProviderConfig(aiParams.provider);
+    const cfg = getProviderConfig(aiParams.provider as AIProvider);
     return cfg?.capabilities || { webSearch: false, thinking: false };
   })();
 
@@ -194,6 +199,14 @@ export default function NovelAISidebar({
   // ── 上下文模式 ──
   const [contextMode, setContextMode] = useState<NovelContextMode>(() => autoContextMode(phase));
   useEffect(() => { setContextMode(autoContextMode(phase)); }, [phase]);
+
+  // ── Token 预算 ──
+  const [tokenBudget, setTokenBudget] = useState<TokenBudgetLevel>(() => {
+    return (host.storage.get<string>('_novel_token_budget') as TokenBudgetLevel) || DEFAULT_TOKEN_BUDGET;
+  });
+  const tokenInfo = useMemo(() =>
+    getContextTokenInfo(novel, activeChapterId, contextMode, tokenBudget, customPrompt || undefined, activeSceneId),
+  [novel, activeChapterId, contextMode, tokenBudget, customPrompt, activeSceneId]);
 
   // ── 持久化 ──
   const persistSessions = useCallback((updated: NovelAISession[]) => {
@@ -257,23 +270,25 @@ export default function NovelAISidebar({
     setStreamingContent('');
 
     const systemPrompt = customPrompt || buildSmartSystemPrompt(novel, activeChapterId, { coachMode, activeSceneId });
-    const contextStr = buildContextForMode(novel, activeChapterId, contextMode);
+    // N1.3: 使用 Token 预算感知的上下文构建
+    const historyMessages = [...(activeSession?.messages || []), userMsg];
+    const recentHistory = historyMessages.slice(-8);
+    const historyTokens = recentHistory.reduce((s, m) => s + estimateTokens(m.content), 0);
+    const contextStr = buildContextWithBudget(novel, activeChapterId, contextMode, tokenBudget, historyTokens);
     const fullSystem = systemPrompt + contextStr;
 
-    const historyMessages = [...(activeSession?.messages || []), userMsg];
     const apiMessages = [
       { role: 'system' as const, content: fullSystem },
-      ...historyMessages.slice(-8).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+      ...recentHistory.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
     ];
 
     const abortController = new AbortController();
     abortRef.current = abortController;
 
     try {
-      let fullContent = '';
-      await host.ai.chatStream(apiMessages, (chunk: string) => {
-        fullContent += chunk;
-        setStreamingContent(fullContent);
+      // DocTypeHost.chatStream：onChunk 为已累计全文，非增量
+      const fullContent = await host.ai.chatStream(apiMessages, (cumulative: string) => {
+        setStreamingContent(cumulative);
       }, {
         signal: abortController.signal,
         enableWebSearch: enableWebSearch && providerCaps.webSearch ? true : undefined,
@@ -304,7 +319,7 @@ export default function NovelAISidebar({
       setStreamingContent('');
       abortRef.current = null;
     }
-  }, [streaming, aiAvailable, customPrompt, novel, activeChapterId, contextMode, activeSession, enableWebSearch, enableThinking, providerCaps, host.ai, updateActiveSession]);
+  }, [streaming, aiAvailable, customPrompt, novel, activeChapterId, contextMode, activeSession, enableWebSearch, enableThinking, providerCaps, host.ai, updateActiveSession, tokenBudget, coachMode, activeSceneId]);
 
   sendMessageRef.current = sendMessage;
 
@@ -359,6 +374,10 @@ export default function NovelAISidebar({
       prompt = prompt.replace(/\{\{outline\}\}/g, ch.outline || '（无大纲）');
       prompt = prompt.replace(/\{\{style\}\}/g, novel.settings.style || '（未设定）');
       prompt = prompt.replace(/\{\{mood\}\}/g, '');
+    }
+    // N3.4: 风格分析模板变量
+    if (prompt.includes('{{styleAnalysis}}')) {
+      prompt = buildStyleAnalysisPrompt(novel);
     }
     sendMessageRef.current(prompt);
   }, [qaStore, host.storage, activeChapterId, novel]);
@@ -447,6 +466,11 @@ export default function NovelAISidebar({
           <span className={`text-xs ${phaseIndicator.color}`}>
             {phaseIndicator.label}
             {contextSummary ? ` · ${contextSummary}` : ''}
+          </span>
+          {/* N1.3: Token 用量指示 */}
+          <span className={`text-[10px] tabular-nums ${tokenInfo.overBudget ? 'text-red-500' : tokenInfo.usage > 0.8 ? 'text-amber-500' : 'text-muted-foreground/60'}`}
+            title={`系统提示 ${tokenInfo.systemPromptTokens} + 上下文 ${tokenInfo.contextTokens} = ${tokenInfo.totalTokens} / ${tokenInfo.budgetTokens} tokens`}>
+            {tokenInfo.totalTokens > 999 ? `${(tokenInfo.totalTokens / 1000).toFixed(1)}k` : tokenInfo.totalTokens}/{tokenBudget}
           </span>
           <Popover open={promptOpen} onOpenChange={setPromptOpen}>
             <PopoverTrigger asChild>
@@ -567,15 +591,11 @@ export default function NovelAISidebar({
                     {msg.role === 'assistant' && parsed ? (
                       <div className="space-y-2">
                         {parsed.thinking && (
-                          <details className="group/think">
-                            <summary className="flex items-center gap-1 cursor-pointer text-xs text-muted-foreground hover:text-foreground transition-colors select-none">
-                              <Brain className="h-3 w-3" /><span>深度思考</span>
-                              <ChevronDown className="h-3 w-3 transition-transform group-open/think:rotate-180" />
-                            </summary>
-                            <div className="mt-1 pl-4 border-l-2 border-muted-foreground/20 text-xs text-muted-foreground">
-                              <MarkdownPreview content={parsed.thinking} className="text-xs opacity-80" />
-                            </div>
-                          </details>
+                          <CollapsibleThinkingBlock
+                            thinking={parsed.thinking}
+                            isThinking={false}
+                            theme={resolveTheme()}
+                          />
                         )}
                         <MarkdownPreview content={parsed.content || msg.content} className="text-sm" />
                       </div>
@@ -622,14 +642,11 @@ export default function NovelAISidebar({
             <div className="flex justify-start">
               <div className="max-w-[85%] rounded-lg px-3 py-2 bg-muted text-sm space-y-2">
                 {streamParsed.thinking && (
-                  <details open className="group">
-                    <summary className="flex items-center gap-1 cursor-pointer text-xs text-muted-foreground">
-                      <Brain className="h-3 w-3 animate-pulse" /><span>思考中...</span>
-                    </summary>
-                    <div className="mt-1 pl-4 border-l-2 border-muted-foreground/20 text-xs text-muted-foreground">
-                      <MarkdownPreview content={streamParsed.thinking} className="text-xs opacity-80" />
-                    </div>
-                  </details>
+                  <CollapsibleThinkingBlock
+                    thinking={streamParsed.thinking}
+                    isThinking={streamParsed.isThinking}
+                    theme={resolveTheme()}
+                  />
                 )}
                 {streamParsed.content && <MarkdownPreview content={streamParsed.content} className="text-sm" />}
               </div>
@@ -666,6 +683,20 @@ export default function NovelAISidebar({
               <mode.icon className="h-3 w-3" /><span>{mode.label}</span>
             </button>
           ))}
+          {/* N1.3: Token 预算选择 */}
+          <select
+            className="h-5 text-[10px] bg-transparent border rounded px-1 text-muted-foreground cursor-pointer focus:outline-none"
+            value={tokenBudget}
+            onChange={e => {
+              const v = e.target.value as TokenBudgetLevel;
+              setTokenBudget(v);
+              host.storage.set('_novel_token_budget', v);
+            }}
+            title="Token 预算">
+            {Object.keys(TOKEN_BUDGETS).map(k => (
+              <option key={k} value={k}>{k}</option>
+            ))}
+          </select>
         </div>
 
         <textarea ref={inputRef} value={inputValue} onChange={e => setInputValue(e.target.value)}

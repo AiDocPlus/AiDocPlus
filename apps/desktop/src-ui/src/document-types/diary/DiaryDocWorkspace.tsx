@@ -30,20 +30,22 @@ import DiaryImportDialog from './DiaryImportDialog';
 import DiaryTemplateDialog from './DiaryTemplateDialog';
 import DiaryDailyPrompt from './DiaryDailyPrompt';
 import DiaryTrashPanel from './DiaryTrashPanel';
+import DiaryStatusBar from './DiaryStatusBar';
 import NovelEditorSettings, { loadAppearance, getAppearanceStyle, getEditorInnerStyle, type EditorAppearance } from '../novel/NovelEditorSettings';
 import {
   parseDiaryContent, createEmptyDiaryContent, createEntry,
   updateEntryContent, updateEntryMeta, toggleEntryStarred, softDeleteEntry, duplicateEntry, moveEntryToJournal,
   addGlobalTag, collectAllTags, addSnapshot, restoreFromSnapshot,
-  getEntriesByDate, getEntryById, getEntriesOnThisDay,
+  getEntryById, getEntriesOnThisDay,
   getPrevEntryDate, getNextEntryDate, getTodayDateStr,
   getTotalWordCount, getTodayWordCount, calculateStreak,
   getEntryWordCount, applyFilter, EMPTY_FILTER,
-  MOOD_EMOJI, WEATHER_EMOJI, MOOD_LABEL,
+  MOOD_EMOJI,
   type DiaryDocumentContent, type DiaryMood, type DiaryWeatherType, type DiaryFilterState,
 } from './types';
 import { getTemplateById } from './diaryTemplates';
 import { createDemoDiaryContent } from './diaryDemoData';
+import { DEFAULT_LEFT_WIDTH, DEFAULT_RIGHT_WIDTH, CONTENT_SAVE_DEBOUNCE_MS, META_SAVE_DEBOUNCE_MS, SAVE_STATUS_DISPLAY_MS } from './constants';
 
 export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTypeEditorProps) {
   const { t } = useTranslation();
@@ -52,8 +54,8 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
   })));
 
   // ── 布局状态 ──
-  const [leftWidth, setLeftWidth] = useState(260);
-  const [rightWidth, setRightWidth] = useState(320);
+  const [leftWidth, setLeftWidth] = useState(DEFAULT_LEFT_WIDTH);
+  const [rightWidth, setRightWidth] = useState(DEFAULT_RIGHT_WIDTH);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false); // AI 默认展开
   const [focusMode, setFocusMode] = useState(false);
@@ -108,11 +110,7 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
     return parseDiaryContent(d.content || '') || createEmptyDiaryContent();
   }, [host.doc]);
 
-  const [diary, setDiary] = useState<DiaryDocumentContent>(getDiary);
-  const diaryRef = useRef(diary);
-  diaryRef.current = diary;
-  const filteredEntries = useMemo(() => applyFilter(diary, advancedFilter), [diary, advancedFilter]);
-
+  // ── 初始化日记数据 ──
   useEffect(() => {
     const d = getDiary();
     setDiary(d);
@@ -144,8 +142,12 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
       setSelectedDate(getTodayDateStr());
       setCalendarDate(new Date());
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc.id]);
+  }, [doc.id, getDiary, host.doc, host.storage]);
+
+  const [diary, setDiary] = useState<DiaryDocumentContent>(getDiary);
+  const diaryRef = useRef(diary);
+  diaryRef.current = diary;
+  const filteredEntries = useMemo(() => applyFilter(diary, advancedFilter), [diary, advancedFilter]);
 
   // ── 保存（非编辑操作：元数据/心情/天气等，立即同步到 store，独立 debounce 写磁盘） ──
   const metaSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -161,8 +163,8 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
       host.doc.save();
       metaSaveTimerRef.current = null;
       if (saveStatusTimerRef.current) clearTimeout(saveStatusTimerRef.current);
-      saveStatusTimerRef.current = setTimeout(() => setSaveStatus('saved'), 1500);
-    }, 2000);
+      saveStatusTimerRef.current = setTimeout(() => setSaveStatus('saved'), SAVE_STATUS_DISPLAY_MS);
+    }, META_SAVE_DEBOUNCE_MS);
   }, [host.doc]);
 
   const handleSave = useCallback(() => {
@@ -186,46 +188,80 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
 
   // ── 选中条目 ──
   const selectEntry = useCallback((entryId: string) => {
-    // 保存当前条目
-    if (activeEntryId && entryContent !== undefined) {
-      const updated = updateEntryContent(diary, activeEntryId, entryContent);
-      saveDiary(updated);
+    if (!entryId) return; // 防御：无效 entryId 直接返回
+
+    // 取消待处理的保存
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
     }
-    const entry = getEntryById(diary, entryId);
-    setActiveEntryId(entryId);
-    setEntryContent(entry?.content || '');
-    // 持久化上次编辑的条目
-    host.storage.set('_diary_last_entry_id', entryId);
-    if (entry) {
-      setSelectedDate(entry.date);
-      host.storage.set('_diary_last_date', entry.date);
-      // 同步日历月份
-      const [y, m] = entry.date.split('-').map(Number);
-      if (calendarDate.getFullYear() !== y || calendarDate.getMonth() + 1 !== m) {
-        setCalendarDate(new Date(y, m - 1, 1));
+
+    // 保存当前条目（仅当内容真的变化了才保存）
+    const currentActiveId = activeEntryId;
+    const currentContent = entryContent;
+    if (currentActiveId && currentContent !== undefined) {
+      const currentEntry = diaryRef.current.entries.find(e => e.id === currentActiveId);
+      // 只有内容真的变化了才保存
+      if (currentEntry && currentEntry.content !== currentContent) {
+        const updated = updateEntryContent(diaryRef.current, currentActiveId, currentContent);
+        saveDiary(updated);
       }
     }
-  }, [activeEntryId, entryContent, diary, saveDiary, calendarDate, host.storage]);
+
+    // 查找新条目（防御：确保条目存在）
+    const entry = diaryRef.current.entries.find(e => e.id === entryId);
+    if (!entry) {
+      console.warn('[Diary] selectEntry: entry not found', entryId);
+      return;
+    }
+
+    // 更新状态
+    setActiveEntryId(entryId);
+    setEntryContent(entry.content || '');
+    setSelectedDate(entry.date);
+    host.storage.set('_diary_last_entry_id', entryId);
+    host.storage.set('_diary_last_date', entry.date);
+
+    // 同步日历月份
+    const [y, m] = entry.date.split('-').map(Number);
+    if (calendarDate.getFullYear() !== y || calendarDate.getMonth() + 1 !== m) {
+      setCalendarDate(new Date(y, m - 1, 1));
+    }
+  }, [activeEntryId, entryContent, saveDiary, calendarDate, host.storage]);
 
   // ── 日期选择 ──
   const selectDate = useCallback((dateStr: string) => {
-    // 保存当前条目
-    if (activeEntryId && entryContent !== undefined) {
-      const updated = updateEntryContent(diary, activeEntryId, entryContent);
-      saveDiary(updated);
+    if (!dateStr) return; // 防御：无效 dateStr 直接返回
+
+    // 取消待处理的保存
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
     }
+
+    // 保存当前条目（仅当内容真的变化了才保存）
+    const currentActiveId = activeEntryId;
+    const currentContent = entryContent;
+    if (currentActiveId && currentContent !== undefined) {
+      const currentEntry = diaryRef.current.entries.find(e => e.id === currentActiveId);
+      if (currentEntry && currentEntry.content !== currentContent) {
+        const updated = updateEntryContent(diaryRef.current, currentActiveId, currentContent);
+        saveDiary(updated);
+      }
+    }
+
     setSelectedDate(dateStr);
     host.storage.set('_diary_last_date', dateStr);
-    const entries = getEntriesByDate(diary, dateStr);
+    const entries = diaryRef.current.entries.filter(e => e.date === dateStr).sort((a, b) => a.createdAt - b.createdAt);
     if (entries.length > 0) {
       setActiveEntryId(entries[0].id);
-      setEntryContent(entries[0].content);
+      setEntryContent(entries[0].content || '');
       host.storage.set('_diary_last_entry_id', entries[0].id);
     } else {
       setActiveEntryId(null);
       setEntryContent('');
     }
-  }, [activeEntryId, entryContent, diary, saveDiary, host.storage]);
+  }, [activeEntryId, entryContent, saveDiary, host.storage]);
 
   // ── 新建条目 ──
   const handleNewEntry = useCallback(() => {
@@ -276,8 +312,8 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
       });
       saveTimerRef.current = null;
       if (saveStatusTimerRef.current) clearTimeout(saveStatusTimerRef.current);
-      saveStatusTimerRef.current = setTimeout(() => setSaveStatus('saved'), 1500);
-    }, 5000);
+      saveStatusTimerRef.current = setTimeout(() => setSaveStatus('saved'), SAVE_STATUS_DISPLAY_MS);
+    }, CONTENT_SAVE_DEBOUNCE_MS);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
   }, [entryContent, activeEntryId, host.doc]);
 
@@ -348,6 +384,11 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
   const handleToggleStarred = useCallback(() => {
     if (!activeEntryId) return;
     saveDiary(toggleEntryStarred(diaryRef.current, activeEntryId));
+  }, [activeEntryId, saveDiary]);
+
+  const handleColorLabelChange = useCallback((colorLabel: string | undefined) => {
+    if (!activeEntryId) return;
+    saveDiary(updateEntryMeta(diaryRef.current, activeEntryId, { colorLabel }));
   }, [activeEntryId, saveDiary]);
 
   // ── Phase 2: 条目信息面板回调 ──
@@ -611,6 +652,7 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
             onTemplateApply={handleTemplateApply}
             onToggleStarred={handleToggleStarred}
             onJournalChange={handleMoveToJournal}
+            onColorLabelChange={handleColorLabelChange}
             allTags={allTags}
             editorAppearanceSlot={
               <NovelEditorSettings storage={host.storage} appearance={editorAppearance} onAppearanceChange={setEditorAppearance} />
@@ -628,10 +670,19 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
                   content={entryContent}
                   host={host}
                   onChange={handleContentChange}
+                  textIndent={editorAppearance.textIndent}
                   key={`${activeEntry.id}-${editorRevision}`}
                 />
               </div>
             </div>
+            {/* 状态栏 */}
+            <DiaryStatusBar
+              entry={activeEntry}
+              todayWordCount={getTodayWordCount(diary)}
+              dailyGoal={diary.metadata.dailyWordGoal || 0}
+              streak={calculateStreak(diary).current}
+              saveStatus={saveStatus}
+            />
             {/* 条目信息面板 */}
             <DiaryEntryInfo
               entry={activeEntry}
@@ -778,12 +829,6 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
               <span>{paragraphCount}{t('diary.paragraphUnit', { defaultValue: '段' })}</span>
               <span className="w-px h-3 bg-border" />
               <span className="flex items-center gap-0.5"><Clock className="h-2.5 w-2.5" />{t('diary.readingTime', { defaultValue: '约{{min}}分钟', min: readingTimeMin })}</span>
-              {activeEntry.mood && (
-                <><span className="w-px h-3 bg-border" /><span>{MOOD_EMOJI[activeEntry.mood]} {MOOD_LABEL[activeEntry.mood]}</span></>
-              )}
-              {activeEntry.weather && (
-                <><span className="w-px h-3 bg-border" /><span>{WEATHER_EMOJI[activeEntry.weather.type]}{activeEntry.weather.temperature !== undefined ? ` ${activeEntry.weather.temperature}°C` : ''}</span></>
-              )}
               {/* 每日字数目标进度 */}
               {dailyWordGoal > 0 && (
                 <>

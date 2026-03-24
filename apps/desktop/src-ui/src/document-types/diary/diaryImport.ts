@@ -22,7 +22,7 @@ export interface ImportedEntry {
 }
 
 export interface ImportResult {
-  format: 'aidocplus-json' | 'dayone-json' | 'markdown' | 'plaintext' | 'unknown';
+  format: 'aidocplus-json' | 'dayone-json' | 'markdown' | 'plaintext' | 'csv' | 'unknown';
   entries: ImportedEntry[];
   errors: string[];
   dateRange: { from: string; to: string } | null;
@@ -51,6 +51,9 @@ export function detectFormat(content: string): ImportResult['format'] {
       return 'unknown';
     }
   }
+  // D4.2: CSV 检测
+  const firstLine = trimmed.split('\n')[0];
+  if (/^["']?(?:date|日期|Date)["']?[,\t]/.test(firstLine)) return 'csv';
   if (trimmed.startsWith('#') || /^\d{4}-\d{2}-\d{2}/.test(trimmed)) return 'markdown';
   return 'plaintext';
 }
@@ -239,11 +242,77 @@ export function parsePlainText(content: string): ImportResult {
 // 统一入口
 // ═══════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════
+// D4.2: 解析 CSV 格式（逗号/制表符分隔）
+// ═══════════════════════════════════════════════════════
+
+function parseCSVLine(line: string, sep: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuote = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"' && !inQuote) {
+      inQuote = true;
+    } else if (ch === '"' && inQuote) {
+      if (i + 1 < line.length && line[i + 1] === '"') { current += '"'; i++; }
+      else inQuote = false;
+    } else if (ch === sep && !inQuote) {
+      result.push(current.trim()); current = '';
+    } else {
+      current += ch;
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
+export function parseCSV(content: string): ImportResult {
+  const errors: string[] = [];
+  const entries: ImportedEntry[] = [];
+  const lines = content.split('\n').filter(l => l.trim());
+  if (lines.length < 2) return { format: 'csv', entries: [], errors: ['CSV 至少需要表头+1行数据'], dateRange: null };
+
+  const sep = lines[0].includes('\t') ? '\t' : ',';
+  const headers = parseCSVLine(lines[0], sep).map(h => h.toLowerCase().replace(/["']/g, ''));
+
+  const dateIdx = headers.findIndex(h => ['date', '日期'].includes(h));
+  const contentIdx = headers.findIndex(h => ['content', '内容', 'text', '正文'].includes(h));
+  const titleIdx = headers.findIndex(h => ['title', '标题'].includes(h));
+  const moodIdx = headers.findIndex(h => ['mood', '心情'].includes(h));
+  const tagsIdx = headers.findIndex(h => ['tags', '标签'].includes(h));
+  const timeIdx = headers.findIndex(h => ['time', '时间'].includes(h));
+  const locationIdx = headers.findIndex(h => ['location', '位置', '地点'].includes(h));
+
+  if (dateIdx < 0) return { format: 'csv', entries: [], errors: ['CSV 表头未找到 date/日期 列'], dateRange: null };
+  if (contentIdx < 0) return { format: 'csv', entries: [], errors: ['CSV 表头未找到 content/内容 列'], dateRange: null };
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCSVLine(lines[i], sep);
+    const date = (cols[dateIdx] || '').replace(/["']/g, '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { errors.push(`第${i + 1}行日期无效: "${date}"`); continue; }
+    const text = (cols[contentIdx] || '').replace(/["']/g, '').replace(/\\n/g, '\n');
+    const tags = tagsIdx >= 0 ? (cols[tagsIdx] || '').replace(/["']/g, '').split(/[,;|]/).map(t => t.trim()).filter(Boolean) : [];
+    entries.push({
+      date,
+      time: timeIdx >= 0 ? (cols[timeIdx] || '00:00').replace(/["']/g, '') : '00:00',
+      title: titleIdx >= 0 ? (cols[titleIdx] || '').replace(/["']/g, '') : '',
+      content: text,
+      mood: moodIdx >= 0 ? (cols[moodIdx] || '').replace(/["']/g, '') || undefined : undefined,
+      tags, starred: false,
+      location: locationIdx >= 0 ? (cols[locationIdx] || '').replace(/["']/g, '') || undefined : undefined,
+    });
+  }
+  const dates = entries.map(e => e.date).sort();
+  return { format: 'csv', entries, errors, dateRange: dates.length > 0 ? { from: dates[0], to: dates[dates.length - 1] } : null };
+}
+
 export function parseImport(content: string): ImportResult {
   const format = detectFormat(content);
   switch (format) {
     case 'aidocplus-json': return parseAidocplusJson(content);
     case 'dayone-json': return parseDayOneJson(content);
+    case 'csv': return parseCSV(content);
     case 'markdown': return parseMarkdown(content);
     case 'plaintext': return parsePlainText(content);
     default: return { format: 'unknown', entries: [], errors: ['无法识别的文件格式'], dateRange: null };

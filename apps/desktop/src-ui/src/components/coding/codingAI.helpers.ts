@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 import { listen } from '@tauri-apps/api/event';
 import { parseThinkTags } from '@/utils/thinkTagParser';
 
@@ -102,6 +103,7 @@ export async function streamCodingChatResponse({
       requestId,
       enableWebSearch: enableWebSearch || undefined,
       enableThinking: enableThinking || undefined,
+      maxTokens: useSettingsStore.getState().ai.maxTokens ?? 4096,
     });
     return parseThinkTags(rawAccumulated).content;
   } finally {

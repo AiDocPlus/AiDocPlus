@@ -11,7 +11,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { getAIInvokeParamsForService } from '@/stores/useSettingsStore';
+import { getAIInvokeParamsForService, useSettingsStore } from '@/stores/useSettingsStore';
 import { parseThinkTags } from '@/utils/thinkTagParser';
 import { getDefaultSystemPrompt } from '@/stores/useCodingStore';
 import type { AssistantMode } from '@/stores/useCodingStore';
@@ -107,6 +107,7 @@ async function aiChatStream(
       requestId,
       enableWebSearch: options?.enableWebSearch || undefined,
       enableThinking: options?.enableThinking || undefined,
+      maxTokens: useSettingsStore.getState().ai.maxTokens ?? 4096,
     });
     const finalParsed = parseThinkTags(rawAccumulated);
     return finalParsed.content;

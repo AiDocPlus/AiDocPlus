@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X, Monitor, Type, Globe, Zap, Download, Upload, RotateCcw, Loader2, Puzzle, Mail, Search, ChevronDown, ChevronRight, LayoutTemplate, Bot, Play, Square, Circle, FolderOpen, Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { X, Monitor, Type, Globe, Zap, Download, Upload, RotateCcw, Loader2, Puzzle, Mail, Search, ChevronDown, ChevronRight, LayoutTemplate, Bot, Play, Square, Circle, FolderOpen, Lock, Eye, EyeOff, ShieldCheck, TrendingUp, KeyRound, CheckCircle, Trash2, RefreshCw } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { invoke } from '@tauri-apps/api/core';
@@ -96,6 +96,91 @@ export function SettingsPanel({ open, onClose, defaultTab }: SettingsPanelProps)
       await pollImBotStatus();
     } catch (e) { console.error('停止 IM Bot 失败:', e); }
     finally { setImBotLoading(false); }
+  };
+
+  // Tushare 设置状态
+  const [tushareToken, setTushareToken] = useState('');
+  const [tushareCredential, setTushareCredential] = useState<{ tokenPrefix: string } | null>(null);
+  const [tushareLoading, setTushareLoading] = useState(false);
+  const [tushareSaving, setTushareSaving] = useState(false);
+  const [tushareMessage, setTushareMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // 初始化时检查 Tushare Token 状态
+  useEffect(() => {
+    if (open && activeTab === 'advanced') {
+      checkTushareToken();
+    }
+  }, [open, activeTab]);
+
+  const checkTushareToken = async () => {
+    setTushareLoading(true);
+    try {
+      const result = await invoke<{ valid: boolean; token_prefix?: string }>('tushare_token_check');
+      if (result.valid) {
+        setTushareCredential({
+          tokenPrefix: result.token_prefix || '',
+        });
+      } else {
+        setTushareCredential(null);
+      }
+    } catch {
+      setTushareCredential(null);
+    } finally {
+      setTushareLoading(false);
+    }
+  };
+
+  const handleSaveTushareToken = async () => {
+    if (!tushareToken.trim()) {
+      setTushareMessage({ type: 'error', text: t('settings.tushare.tokenRequired', { defaultValue: '请输入 Token' }) });
+      return;
+    }
+    setTushareSaving(true);
+    setTushareMessage(null);
+    try {
+      await invoke('store_tushare_credential', { token: tushareToken.trim() });
+      setTushareToken('');
+      await checkTushareToken();
+      setTushareMessage({ type: 'success', text: t('settings.tushare.tokenSaved', { defaultValue: 'Token 已保存' }) });
+    } catch (e) {
+      setTushareMessage({ type: 'error', text: String(e) });
+    } finally {
+      setTushareSaving(false);
+    }
+  };
+
+  const handleDeleteTushareToken = async () => {
+    setTushareSaving(true);
+    setTushareMessage(null);
+    try {
+      await invoke('delete_tushare_credential');
+      setTushareCredential(null);
+      setTushareMessage({ type: 'success', text: t('settings.tushare.tokenDeleted', { defaultValue: 'Token 已删除' }) });
+    } catch (e) {
+      setTushareMessage({ type: 'error', text: String(e) });
+    } finally {
+      setTushareSaving(false);
+    }
+  };
+
+  const handleTestTushareConnection = async () => {
+    setTushareLoading(true);
+    setTushareMessage(null);
+    try {
+      const result = await invoke<{ valid: boolean; token_prefix?: string }>('tushare_token_check');
+      if (result.valid) {
+        setTushareCredential({
+          tokenPrefix: result.token_prefix || '',
+        });
+        setTushareMessage({ type: 'success', text: t('settings.tushare.connectionSuccess', { defaultValue: '连接成功' }) });
+      } else {
+        setTushareMessage({ type: 'error', text: t('settings.tushare.connectionFailed', { defaultValue: '连接失败：Token 无效' }) });
+      }
+    } catch (e) {
+      setTushareMessage({ type: 'error', text: String(e) });
+    } finally {
+      setTushareLoading(false);
+    }
   };
 
   // 密码设置状态
@@ -928,6 +1013,120 @@ export function SettingsPanel({ open, onClose, defaultTab }: SettingsPanelProps)
                       checked={imBot.autoStart}
                       onCheckedChange={(checked) => updateImBotSettings({ autoStart: checked })}
                     />
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Tushare 设置 */}
+              <div>
+                <h3 className="text-lg font-semibold mb-4">
+                  <TrendingUp className="w-5 h-5 inline-block mr-2" />
+                  {t('stockResearch.tushareSettings', { defaultValue: 'Tushare 数据源' })}
+                </h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {t('stockResearch.tushareDesc', { defaultValue: 'Tushare 是金融数据接口，用于获取A股行情、财务数据等。' })}
+                  <a
+                    href="https://tushare.pro/register"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline ml-1"
+                  >
+                    {t('stockResearch.tushareRegisterLink', { defaultValue: '点击注册获取 Token' })}
+                  </a>
+                </p>
+
+                <div className="space-y-4">
+                  {/* Token 输入 */}
+                  <div className="space-y-2">
+                    <Label>{t('stockResearch.tushareToken', { defaultValue: 'API Token' })}</Label>
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        value={tushareToken}
+                        onChange={(e) => setTushareToken(e.target.value)}
+                        placeholder={t('stockResearch.tokenPlaceholder', { defaultValue: '输入 Tushare Pro Token' })}
+                        className="flex-1 px-3 py-2 text-sm border rounded-md bg-background"
+                      />
+                      <Button
+                        onClick={handleSaveTushareToken}
+                        disabled={tushareSaving || !tushareToken.trim()}
+                        size="sm"
+                      >
+                        {tushareSaving ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          t('common.save', { defaultValue: '保存' })
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* 连接状态 */}
+                  {tushareCredential && (
+                    <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CheckCircle className="w-4 h-4 text-green-500" />
+                        <span className="text-sm font-medium text-green-500">
+                          {t('stockResearch.connected', { defaultValue: '已连接' })}
+                        </span>
+                      </div>
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">{t('stockResearch.tokenPrefix', { defaultValue: 'Token' })}: </span>
+                        <span className="font-mono">{tushareCredential.tokenPrefix}***</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 无 Token 状态 */}
+                  {!tushareCredential && !tushareLoading && (
+                    <div className="p-3 rounded-lg bg-muted/50 border">
+                      <div className="flex items-center gap-2">
+                        <KeyRound className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">
+                          {t('stockResearch.notConfigured', { defaultValue: '未配置 Token' })}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 消息提示 */}
+                  {tushareMessage && (
+                    <div
+                      className={`p-3 rounded-lg text-sm ${
+                        tushareMessage.type === 'success'
+                          ? 'bg-green-500/10 text-green-500'
+                          : 'bg-red-500/10 text-red-500'
+                      }`}
+                    >
+                      {tushareMessage.text}
+                    </div>
+                  )}
+
+                  {/* 操作按钮 */}
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleTestTushareConnection}
+                      disabled={tushareLoading}
+                    >
+                      <RefreshCw className={`w-4 h-4 mr-1 ${tushareLoading ? 'animate-spin' : ''}`} />
+                      {t('stockResearch.testConnection', { defaultValue: '测试连接' })}
+                    </Button>
+                    {tushareCredential && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleDeleteTushareToken}
+                        disabled={tushareSaving}
+                        className="border-red-200 text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        {t('stockResearch.deleteToken', { defaultValue: '删除 Token' })}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>

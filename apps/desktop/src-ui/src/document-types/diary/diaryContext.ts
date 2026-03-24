@@ -205,6 +205,32 @@ export const DIARY_QUICK_ACTIONS: DiaryQuickAction[] = [
     icon: '🙏',
     promptTemplate: '请帮我从今天的经历中发现值得感恩的事情，引导我以感恩的心态看待生活。\n\n{{content}}',
   },
+  // D1.1: 报告生成
+  {
+    id: 'yearly',
+    label: '年度回顾',
+    icon: '📆',
+    promptTemplate: '请帮我生成一份年度日记回顾。分析全年的主要经历、成长轨迹、心情变化趋势、重要事件和里程碑。用结构化格式输出（年度关键词、季度概述、最难忘时刻、成长收获、明年展望）。',
+  },
+  // D1.2: 情绪洞察
+  {
+    id: 'emotion-insight',
+    label: '情绪洞察',
+    icon: '🔮',
+    promptTemplate: '{{emotionInsight}}',
+  },
+  {
+    id: 'emotion-trigger',
+    label: '情绪触发器',
+    icon: '⚡',
+    promptTemplate: '请分析我近期日记中的情绪变化，帮我找出情绪触发器：\n1. 哪些事件/人/地点让我心情变好？\n2. 哪些因素导致心情低落？\n3. 我的情绪模式有什么规律？\n\n基于分析给出具体的情绪管理建议。',
+  },
+  {
+    id: 'habit-insight',
+    label: '习惯分析',
+    icon: '📊',
+    promptTemplate: '请分析我的日记写作习惯和生活规律：\n1. 写作频率和时间偏好\n2. 常见的主题和话题\n3. 情绪与活动的关联\n4. 建议如何优化日常习惯以提升幸福感',
+  },
 ];
 
 /** 检测是否连续多天心情低落 */

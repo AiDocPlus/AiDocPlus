@@ -6,7 +6,7 @@ import type { DocTypeHostAPI, ChatMessage, AIOptions, AIStreamOptions } from './
 import { DOCTYPE_SDK_VERSION } from './types';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { useSettingsStore, getAIInvokeParams } from '@/stores/useSettingsStore';
+import { useSettingsStore, getAIInvokeParams, getAIInvokeParamsForService } from '@/stores/useSettingsStore';
 import { useAppStore } from '@/stores/useAppStore';
 import { parseThinkTags } from '@/utils/thinkTagParser';
 import i18n from '@/i18n';
@@ -55,11 +55,11 @@ export function createDocTypeHost(opts: CreateDocTypeHostOptions): DocTypeHostAP
   };
 
   // ── AI 服务 ──
-  let lastThinking = '';
-
   const ai: DocTypeHostAPI['ai'] = {
     async chat(messages: ChatMessage[], options?: AIOptions) {
-      const aiParams = getAIInvokeParams();
+      const aiParams = options?.serviceId
+        ? getAIInvokeParamsForService(options.serviceId)
+        : getAIInvokeParams();
       if (!aiParams.provider) throw new Error('AI 服务未配置');
       const aiGlobal = useSettingsStore.getState().ai;
       const result = await invoke<string>('chat', {
@@ -68,17 +68,22 @@ export function createDocTypeHost(opts: CreateDocTypeHostOptions): DocTypeHostAP
         maxTokens: options?.maxTokens ?? aiGlobal.maxTokens ?? 4096,
       });
       const parsed = parseThinkTags(result);
-      lastThinking = parsed.thinking;
       return parsed.content;
     },
 
+    /**
+     * 流式对话（SSE）。`onChunk` 每次传入的是**截至当前的完整累积字符串**（已拼接所有已收 chunk），
+     * 不是单次事件的增量。调用方应 `setState(text)` 或直接赋值，禁止用 `acc += text`。
+     */
     async chatStream(messages: ChatMessage[], onChunk: (text: string) => void, options?: AIStreamOptions) {
-      const aiParams = getAIInvokeParams();
+      const aiParams = options?.serviceId
+        ? getAIInvokeParamsForService(options.serviceId)
+        : getAIInvokeParams();
       if (!aiParams.provider) throw new Error('AI 服务未配置');
       const requestId = `doctype_${docTypeId}_${Date.now()}`;
+      options?.onStreamRequestId?.(requestId);
 
       let rawAccumulated = '';
-      let prevContentLen = 0;
       let unlisten: (() => void) | null = null;
 
       try {
@@ -86,20 +91,14 @@ export function createDocTypeHost(opts: CreateDocTypeHostOptions): DocTypeHostAP
           if (options?.signal?.aborted) return;
           if (event.payload.request_id !== requestId) return;
           rawAccumulated += event.payload.content;
-          const parsed = parseThinkTags(rawAccumulated);
-          if (parsed.thinking !== lastThinking) {
-            lastThinking = parsed.thinking;
-          }
-          const currentLen = parsed.content.length;
-          if (currentLen > prevContentLen) {
-            onChunk(parsed.content.slice(prevContentLen));
-            prevContentLen = currentLen;
-          }
+          // 回传原始累积文本（含 think 标签），让前端自己解析
+          onChunk(rawAccumulated);
         });
 
         if (options?.signal?.aborted) throw new Error('Request aborted');
 
         // 直接调用 Rust chat_stream 命令，与主程序 sendChatMessage 一致
+        const aiGlobal = useSettingsStore.getState().ai;
         await invoke<string>('chat_stream', {
           messages,
           provider: aiParams.provider,
@@ -112,19 +111,26 @@ export function createDocTypeHost(opts: CreateDocTypeHostOptions): DocTypeHostAP
           requestTimeoutSecs: aiParams.requestTimeoutSecs,
           enableWebSearch: options?.enableWebSearch || undefined,
           enableThinking: options?.enableThinking || undefined,
+          enableTools: options?.enableTools || undefined,
+          toolScope: options?.toolScope || undefined,
+          maxTokens: options?.maxTokens ?? aiGlobal.maxTokens ?? 4096,
           requestId,
         });
 
-        const finalParsed = parseThinkTags(rawAccumulated);
-        lastThinking = finalParsed.thinking;
-        return finalParsed.content;
+        // 返回原始文本，让调用方自己解析 think 标签
+        return rawAccumulated;
+      } catch (err) {
+        console.error('[DocTypeHost] chat_stream error:', err);
+        throw err;
       } finally {
         if (unlisten) unlisten();
       }
     },
 
-    isAvailable() {
-      const p = getAIInvokeParams();
+    isAvailable(serviceId?: string) {
+      const p = serviceId
+        ? getAIInvokeParamsForService(serviceId)
+        : getAIInvokeParams();
       return !!(p.provider && p.apiKey && p.model);
     },
   };
@@ -148,12 +154,10 @@ export function createDocTypeHost(opts: CreateDocTypeHostOptions): DocTypeHostAP
       await navigator.clipboard.writeText(text);
     },
     showNotification(msg, type) {
-      // 简单实现：通过 console + 未来可扩展为 toast
       if (type === 'error') {
         console.error(`[${docTypeId}] ${msg}`);
-      } else {
-        console.log(`[${docTypeId}] ${msg}`);
       }
+      // info/success：预留 toast，避免生产环境 console.log
     },
   };
 

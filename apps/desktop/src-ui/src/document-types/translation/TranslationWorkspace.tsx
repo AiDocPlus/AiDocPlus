@@ -62,18 +62,16 @@ export default function TranslationWorkspace({ document: doc, host }: DocTypeEdi
     try {
       const srcLang = trans.direction === 'zh-en' ? '中文' : '英文';
       const tgtLang = trans.direction === 'zh-en' ? '英文' : '中文';
-      let accumulated = '';
-      await host.ai.chatStream(
+      const full = await host.ai.chatStream(
         [
           { role: 'system', content: '你是专业的中英文翻译助手。翻译时注重信、达、雅。只输出译文，不要添加任何说明。' },
           { role: 'user', content: `请将以下${srcLang}翻译为${tgtLang}：\n\n${trans.source}` },
         ],
-        (chunk) => {
-          accumulated += chunk;
-          setTrans(prev => ({ ...prev, target: accumulated }));
+        (cumulative: string) => {
+          setTrans(prev => ({ ...prev, target: cumulative }));
         },
       );
-      saveTrans({ ...trans, target: accumulated.trim() });
+      saveTrans({ ...trans, target: full.trim() });
     } catch (err) {
       console.error('[Translation] AI error:', err);
     } finally {

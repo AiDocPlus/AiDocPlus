@@ -134,10 +134,8 @@ export default function NovelInlineAI({ editorRef, host, novel, activeChapterId 
     abortRef.current = abortController;
 
     try {
-      let fullContent = '';
-      await host.ai.chatStream(messages, (chunk: string) => {
-        fullContent += chunk;
-        setGhostText(fullContent);
+      await host.ai.chatStream(messages, (cumulative: string) => {
+        setGhostText(cumulative);
       }, { signal: abortController.signal });
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {

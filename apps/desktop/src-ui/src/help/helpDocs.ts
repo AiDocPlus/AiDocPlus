@@ -541,6 +541,310 @@ AiDocPlus 支持将文档导出为多种格式。
 `,
 };
 
+const DOC_MCP_SERVER: HelpDoc = {
+  id: 'mcp-server',
+  title: 'MCP Server',
+  category: 'features',
+  keywords: ['MCP', 'Claude', 'Cursor', 'AI助手', '集成', 'API'],
+  content: `# MCP Server
+
+通过 [Model Context Protocol](https://modelcontextprotocol.io/) 让 AI 助手（Claude Desktop、Cursor 等）直接操作 AiDocPlus。
+
+## 前提条件
+
+- AiDocPlus 桌面程序正在运行（API Server 会自动启动）
+- Node.js 18+
+
+## 安装依赖
+
+\`\`\`bash
+cd packages/mcp-server
+npm install
+\`\`\`
+
+## Claude Desktop 配置
+
+编辑配置文件：
+
+- **macOS**：\`~/Library/Application Support/Claude/claude_desktop_config.json\`
+- **Windows**：\`%APPDATA%\\Claude\\claude_desktop_config.json\`
+
+添加以下配置：
+
+\`\`\`json
+{
+  "mcpServers": {
+    "aidocplus": {
+      "command": "node",
+      "args": ["/Users/你的用户名/Code/AiDocPlus/packages/mcp-server/index.js"]
+    }
+  }
+}
+\`\`\`
+
+配置完成后，重启 Claude Desktop 使配置生效。
+
+## 快速开始
+
+### 测试连接
+
+在 Claude Desktop 中输入：
+
+\`\`\`
+请用 aidocplus_status 查看 AiDocPlus 的运行状态
+\`\`\`
+
+### 列出项目
+
+\`\`\`
+列出我所有的 AiDocPlus 项目
+\`\`\`
+
+### 读取文档
+
+\`\`\`
+读取我当前正在编辑的文档内容
+\`\`\`
+
+## 工具分类（共72个工具）
+
+### 程序与项目
+
+| 工具名 | 说明 |
+|--------|------|
+| \`aidocplus_status\` | 获取程序运行状态 |
+| \`aidocplus_get_active_document\` | 获取当前编辑的文档 |
+| \`aidocplus_get_selected_text\` | 获取选中的文本 |
+| \`aidocplus_list_projects\` | 列出所有项目 |
+
+### 文档操作
+
+| 工具名 | 说明 |
+|--------|------|
+| \`aidocplus_list_documents\` | 列出项目中的文档 |
+| \`aidocplus_get_document\` | 获取文档详情 |
+| \`aidocplus_create_document\` | 创建新文档 |
+| \`aidocplus_save_document\` | 保存文档内容 |
+| \`aidocplus_search_documents\` | 搜索文档 |
+
+### AI 对话
+
+| 工具名 | 说明 |
+|--------|------|
+| \`aidocplus_ai_chat\` | AI 对话（支持 system_prompt 参数） |
+| \`aidocplus_ai_generate\` | AI 内容生成（快捷方式） |
+
+### 文件操作
+
+| 工具名 | 说明 |
+|--------|------|
+| \`aidocplus_file_read\` | 读取文件（限 ~/AiDocPlus/ 下） |
+| \`aidocplus_file_write\` | 写入文件（限 ~/AiDocPlus/ 下） |
+
+### 导出
+
+| 工具名 | 说明 |
+|--------|------|
+| \`aidocplus_export_markdown\` | 导出为 Markdown |
+| \`aidocplus_export_html\` | 导出为 HTML |
+| \`aidocplus_export_docx\` | 导出为 Word |
+| \`aidocplus_export_pdf\` | 导出为 PDF |
+| \`aidocplus_export_txt\` | 导出为纯文本 |
+
+### 脚本
+
+| 工具名 | 说明 |
+|--------|------|
+| \`aidocplus_list_scripts\` | 列出脚本文件 |
+
+## 工作原理
+
+\`\`\`
+Claude Desktop  ←(stdio/MCP)→  MCP Server  ←(HTTP)→  AiDocPlus API Server
+\`\`\`
+
+MCP Server 读取 \`~/.aidocplus/api.json\` 获取连接信息，然后将 MCP tool 调用转发为 HTTP API 请求。
+
+## 故障排查
+
+### MCP Server 未启动
+
+1. 确认 AiDocPlus 程序正在运行
+2. 确认已执行 \`npm install\`
+3. 检查配置文件路径是否正确（绝对路径）
+
+### 调用报错
+
+- **Connection refused**：检查 AiDocPlus 是否启动
+- **积分不足**：Tushare API 有权限限制，需升级积分
+`,
+};
+
+const DOC_TUSHARE_STOCK: HelpDoc = {
+  id: 'tushare-stock',
+  title: '股票研究（Tushare Pro）',
+  category: 'features',
+  keywords: ['股票', 'Tushare', '行情', '财务', '资金流向', '龙虎榜'],
+  content: `# 股票研究（Tushare Pro）
+
+AiDocPlus 内置 Tushare Pro 股票数据查询能力，可在**股票研究文档类型**中直接使用 AI 获取实时股票数据。
+
+## 前置配置
+
+### 获取 Tushare Token
+
+1. 访问 [Tushare Pro](https://tushare.pro/) 注册账号
+2. 进入「个人中心」→「我的 API」→「复制 Token」
+3. 在股票研究文档中打开 Tushare 设置面板，粘贴 Token 并保存
+
+### 积分说明
+
+Tushare API 调用受积分限制：
+
+| 积分 | 调用频率 | 可用接口数 |
+|------|---------|----------|
+| 120（注册即送） | 200次/分钟 | 基础行情 |
+| 1000 | 500次/分钟 | 标准行情 + 财务 |
+| 5000 | 1000次/分钟 | 全量数据 |
+| 10000（最高） | 2000次/分钟 | 全部接口 |
+
+## 使用方式
+
+### 在股票研究文档中使用
+
+1. 新建文档时选择 **股票研究** 类型
+2. 在 AI 面板中输入指令，AI 会自动调用股票工具获取数据
+3. 也可以在 Tushare 设置面板中手动查询
+
+### AI 请求的两阶段说明
+
+一次带「工具 + 联网」的请求通常分为：**先由模型调用 Tushare 等函数拿结构化数据**，再在后续阶段结合 **联网搜索** 补充新闻、公告与评论。数值结论应以工具返回为准；若未开启联网，定性信息可能较少。
+
+### 常用查询示例
+
+#### 查询股票基本信息
+
+\`\`\`
+帮我查询贵州茅台（600519.SH）的基本信息
+\`\`\`
+
+#### 查询日线行情
+
+\`\`\`
+获取贵州茅台最近20个交易日的日线数据
+\`\`\`
+
+#### 查询财务数据
+
+\`\`\`
+获取万科A最近2年的利润表数据
+\`\`\`
+
+#### 综合分析
+
+\`\`\`
+对宁德时代进行全面研究：基本信息 + 最近20日行情 + 财务数据 + 资金流向
+\`\`\`
+
+## 股票代码格式
+
+| 市场 | 代码格式 | 示例 |
+|------|---------|------|
+| 上海主板 | \`600519.SH\` | 贵州茅台 |
+| 上海科创板 | \`688005.SH\` | 容百科技 |
+| 深圳主板 | \`000001.SZ\` | 平安银行 |
+| 深圳中小板 | \`002594.SZ\` | 比亚迪 |
+| 深圳创业板 | \`300750.SZ\` | 宁德时代 |
+
+## API 工具分类（共49个）
+
+### 行情数据（14个）
+
+| 工具名 | 说明 |
+|--------|------|
+| \`stock_search\` | 搜索股票（按名称或代码） |
+| \`stock_basic_info\` | 获取股票基本信息 |
+| \`stock_daily\` | 获取日线行情 |
+| \`stock_weekly\` | 获取周线行情 |
+| \`stock_monthly\` | 获取月线行情 |
+| \`stock_realtime_quote\` | 获取股票实时行情 |
+| \`stock_price_limit\` | 获取每日涨跌停价格 |
+| \`stock_suspend_d\` | 获取停复牌数据 |
+| \`stock_adj_factor\` | 获取复权因子 |
+| \`stock_tick_data\` | 获取分笔数据 |
+| \`stock_index_daily\` | 获取指数日线数据 |
+| \`stock_index_basic\` | 获取指数基本信息 |
+| \`stock_index_weight\` | 获取指数成分股权重 |
+| \`stock_industry_index\` | 获取行业日行情 |
+
+### 财务数据（10个）
+
+| 工具名 | 说明 |
+|--------|------|
+| \`stock_income\` | 获取利润表数据 |
+| \`stock_balance_sheet\` | 获取资产负债表 |
+| \`stock_cashflow\` | 获取现金流量表 |
+| \`stock_indicator\` | 获取财务指标（ROE、PE、PB等） |
+| \`stock_forecast\` | 获取业绩预告/快报 |
+| \`stock_dividend\` | 获取分红送股数据 |
+| \`stock_float_holder\` | 获取流通股东数据 |
+| \`stock_top10_float_holder\` | 获取十大流通股东数据 |
+| \`stock_float_holder_num\` | 获取股东人数变化 |
+| \`stock_share_float\` | 获取流通股本数据 |
+
+### 资金流向（4个）
+
+| 工具名 | 说明 |
+|--------|------|
+| \`stock_moneyflow\` | 获取个股资金流向 |
+| \`stock_hsgt_top\` | 获取北向资金持股排行 |
+| \`stock_hsgt_shanghai\` | 获取沪股通每日持股明细 |
+| \`stock_hsgt_shenzhen\` | 获取深股通每日持股明细 |
+
+### 交易数据（5个）
+
+| 工具名 | 说明 |
+|--------|------|
+| \`stock_top_list\` | 获取龙虎榜每日明细 |
+| \`stock_top_inst\` | 获取龙虎榜机构明细 |
+| \`stock_block_trade\` | 获取大宗交易数据 |
+| \`stock_margin_detail\` | 获取融资融券每日明细 |
+| \`stock_new_share\` | 获取新股IPO数据 |
+
+### 板块数据（4个）
+
+| 工具名 | 说明 |
+|--------|------|
+| \`stock_board_industry\` | 获取股票所属行业信息 |
+| \`stock_board_concept\` | 获取概念板块信息 |
+| \`stock_concept_detail\` | 获取概念板块成分股 |
+
+### 期货期权（2个）
+
+| 工具名 | 说明 |
+|--------|------|
+| \`stock_future_daily\` | 获取期货日线行情 |
+| \`stock_option_daily\` | 获取期权日线行情 |
+
+### 宏观数据（4个）
+
+| 工具名 | 说明 |
+|--------|------|
+| \`stock_gdp\` | 获取国内生产总值（GDP） |
+| \`stock_cpi\` | 获取居民消费价格指数（CPI） |
+| \`stock_money_supply\` | 获取货币供应量 |
+| \`stock_money_supply_bal\` | 获取货币供应量余额 |
+
+### Token 管理（3个）
+
+| 工具名 | 说明 |
+|--------|------|
+| \`stock_token_check\` | 验证 Tushare Token 并返回账户信息 |
+| \`stock_store_credential\` | 存储 Tushare Token |
+| \`stock_delete_credential\` | 删除已存储的 Tushare Token |
+`,
+};
+
 const DOC_VERSION_HISTORY: HelpDoc = {
   id: 'version-history',
   title: '版本历史',
@@ -2047,7 +2351,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
     id: 'features',
     title: '核心功能',
     icon: '⭐',
-    docs: [DOC_EXPORT, DOC_VERSION_HISTORY],
+    docs: [DOC_EXPORT, DOC_VERSION_HISTORY, DOC_MCP_SERVER, DOC_TUSHARE_STOCK],
   },
   {
     id: 'settings',

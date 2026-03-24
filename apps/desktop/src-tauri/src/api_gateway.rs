@@ -189,6 +189,7 @@ pub async fn dispatch(
         "file" => handle_file(action, &params).await,
         "tts" => handle_tts(action, &params).await,
         "script" => handle_script(action, &params).await,
+        "stock" => handle_stock(action, &params).await,
         _ => Err(crate::error::AppError::Internal(format!("未知的命名空间: {}", namespace))),
     };
 
@@ -1031,6 +1032,346 @@ async fn handle_script(action: &str, _params: &Value) -> HandlerResult {
     }
 }
 
+/// stock 命名空间 — Tushare 股票数据
+async fn handle_stock(action: &str, params: &Value) -> HandlerResult {
+    use crate::commands::stock;
+
+    // 将 API params 转换为 Tauri command params
+    let ts_code = params.get("ts_code").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let start_date = params.get("start_date").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let end_date = params.get("end_date").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let trade_date = params.get("trade_date").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let period = params.get("period").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let search = params.get("search").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let index_code = params.get("index_code").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let name = params.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let keyword = params.get("keyword").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let suspend_date = params.get("suspend_date").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let resume_date = params.get("resume_date").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let month = params.get("month").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let quarter = params.get("quarter").and_then(|v| v.as_str()).unwrap_or("").to_string();
+
+    // 构建运行时来执行异步 stock 命令
+    let rt = tokio::runtime::Runtime::new()
+        .map_err(|e| crate::error::AppError::Internal(format!("创建异步运行时失败: {}", e)))?;
+
+    match action {
+        "token_check" => {
+            rt.block_on(async {
+                stock::tushare_token_check()
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "store_credential" => {
+            let token = params.get("token").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            stock::store_tushare_credential(token)
+                .map_err(|e| crate::error::AppError::Internal(e))?;
+            Ok(json!({ "success": true }))
+        }
+        "delete_credential" => {
+            stock::delete_tushare_credential()
+                .map_err(|e| crate::error::AppError::Internal(e))?;
+            Ok(json!({ "success": true }))
+        }
+        "basic_info" => {
+            rt.block_on(async {
+                stock::stock_basic_info(ts_code)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "daily" => {
+            rt.block_on(async {
+                stock::stock_daily(ts_code, start_date, end_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "weekly" => {
+            rt.block_on(async {
+                stock::stock_weekly(ts_code, start_date, end_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "monthly" => {
+            rt.block_on(async {
+                stock::stock_monthly(ts_code, start_date, end_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "realtime_quote" => {
+            rt.block_on(async {
+                stock::stock_realtime_quote(ts_code)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "price_limit" => {
+            rt.block_on(async {
+                stock::stock_price_limit(ts_code, trade_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "suspend_d" => {
+            rt.block_on(async {
+                stock::stock_suspend_d(ts_code, suspend_date, resume_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "adj_factor" => {
+            rt.block_on(async {
+                stock::stock_adj_factor(ts_code, start_date, end_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "income" => {
+            rt.block_on(async {
+                stock::stock_income(ts_code, start_date, end_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "balance_sheet" => {
+            rt.block_on(async {
+                stock::stock_balance_sheet(ts_code, start_date, end_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "cashflow" => {
+            rt.block_on(async {
+                stock::stock_cashflow(ts_code, start_date, end_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "indicator" => {
+            rt.block_on(async {
+                stock::stock_indicator(ts_code, start_date, end_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "forecast" => {
+            rt.block_on(async {
+                stock::stock_forecast(ts_code, start_date, end_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "dividend" => {
+            rt.block_on(async {
+                stock::stock_dividend(ts_code)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "float_holder" => {
+            rt.block_on(async {
+                stock::stock_float_holder(ts_code)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "top10_float_holder" => {
+            rt.block_on(async {
+                stock::stock_top10_float_holder(ts_code, period)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "float_holder_num" => {
+            rt.block_on(async {
+                stock::stock_float_holder_num(ts_code, start_date, end_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "share_float" => {
+            rt.block_on(async {
+                stock::stock_share_float(ts_code, start_date, end_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "moneyflow" => {
+            rt.block_on(async {
+                stock::stock_moneyflow(ts_code, start_date, end_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "hsgt_top" => {
+            rt.block_on(async {
+                stock::stock_hsgt_top(search, start_date, end_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "hsgt_shanghai" => {
+            rt.block_on(async {
+                stock::stock_hsgt_shanghai(start_date, end_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "top_list" => {
+            rt.block_on(async {
+                stock::stock_top_list(trade_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "top_inst" => {
+            rt.block_on(async {
+                stock::stock_top_inst(trade_date, ts_code)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "block_trade" => {
+            rt.block_on(async {
+                stock::stock_block_trade(ts_code, start_date, end_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "margin_detail" => {
+            rt.block_on(async {
+                stock::stock_margin_detail(ts_code, start_date, end_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "index_daily" => {
+            rt.block_on(async {
+                stock::stock_index_daily(ts_code, start_date, end_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "index_weight" => {
+            rt.block_on(async {
+                stock::stock_index_weight(index_code, trade_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "index_basic" => {
+            rt.block_on(async {
+                stock::stock_index_basic(ts_code, name)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "board_industry" => {
+            rt.block_on(async {
+                stock::stock_board_industry(ts_code)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "board_concept" => {
+            rt.block_on(async {
+                stock::stock_board_concept(ts_code)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "industry_index" => {
+            rt.block_on(async {
+                stock::stock_industry_index(ts_code, start_date, end_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "new_share" => {
+            rt.block_on(async {
+                stock::stock_new_share(start_date, end_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "search" => {
+            rt.block_on(async {
+                stock::stock_search(keyword)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "tick_data" => {
+            rt.block_on(async {
+                stock::stock_tick_data(ts_code, trade_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "future_daily" => {
+            rt.block_on(async {
+                stock::stock_future_daily(ts_code, start_date, end_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "option_daily" => {
+            rt.block_on(async {
+                stock::stock_option_daily(ts_code, start_date, end_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "gdp" => {
+            rt.block_on(async {
+                stock::stock_gdp(quarter)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "cpi" => {
+            rt.block_on(async {
+                stock::stock_cpi(month)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "money_supply" => {
+            rt.block_on(async {
+                stock::stock_money_supply(month)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "money_supply_bal" => {
+            rt.block_on(async {
+                stock::stock_money_supply_bal(month)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "concept_detail" => {
+            rt.block_on(async {
+                stock::stock_concept_detail(ts_code)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        "hsgt_shenzhen" => {
+            rt.block_on(async {
+                stock::stock_hsgt_shenzhen(start_date, end_date)
+                    .await
+                    .map_err(|e| crate::error::AppError::Internal(e))
+            })
+        }
+        _ => Err(crate::error::AppError::Internal(format!("stock 命名空间未知操作: {}", action))),
+    }
+}
+
 // ============================================================
 // API Schema（自描述）
 // ============================================================
@@ -1129,6 +1470,29 @@ pub fn get_api_schema() -> Value {
             "script": {
                 "actions": {
                     "listFiles": { "description": "列出 ~/AiDocPlus/CodingScripts/ 下的脚本文件", "params": {} }
+                }
+            },
+            "stock": {
+                "actions": {
+                    "token_check": { "description": "验证 Tushare Token 并返回账户信息", "params": {} },
+                    "store_credential": { "description": "存储 Tushare Token", "params": { "token": "string (必填)" } },
+                    "delete_credential": { "description": "删除已存储的 Tushare Token", "params": {} },
+                    "basic_info": { "description": "获取股票基本信息", "params": { "ts_code": "string (必填)" } },
+                    "daily": { "description": "获取日线行情", "params": { "ts_code": "string (必填)", "start_date?": "string (如 20230101)", "end_date?": "string" } },
+                    "weekly": { "description": "获取周线行情", "params": { "ts_code": "string (必填)", "start_date?": "string", "end_date?": "string" } },
+                    "monthly": { "description": "获取月线行情", "params": { "ts_code": "string (必填)", "start_date?": "string", "end_date?": "string" } },
+                    "realtime_quote": { "description": "获取实时行情", "params": { "ts_code": "string (必填)" } },
+                    "price_limit": { "description": "获取涨跌停价格", "params": { "ts_code": "string", "trade_date": "string" } },
+                    "income": { "description": "获取利润表数据", "params": { "ts_code": "string (必填)", "start_date?": "string", "end_date?": "string" } },
+                    "balance_sheet": { "description": "获取资产负债表数据", "params": { "ts_code": "string (必填)", "start_date?": "string", "end_date?": "string" } },
+                    "cashflow": { "description": "获取现金流量表数据", "params": { "ts_code": "string (必填)", "start_date?": "string", "end_date?": "string" } },
+                    "indicator": { "description": "获取财务指标（ROE、PE、PB等）", "params": { "ts_code": "string (必填)", "start_date?": "string", "end_date?": "string" } },
+                    "moneyflow": { "description": "获取个股资金流向", "params": { "ts_code": "string (必填)", "start_date?": "string", "end_date?": "string" } },
+                    "hsgt_top": { "description": "获取北向资金持股排行", "params": { "search?": "string", "start_date?": "string", "end_date?": "string" } },
+                    "top_list": { "description": "获取龙虎榜每日明细", "params": { "trade_date": "string (必填)" } },
+                    "margin_detail": { "description": "获取融资融券每日明细", "params": { "ts_code": "string (必填)", "start_date?": "string", "end_date?": "string" } },
+                    "index_daily": { "description": "获取指数日线数据", "params": { "ts_code": "string (必填)", "start_date?": "string", "end_date?": "string" } },
+                    "search": { "description": "搜索股票", "params": { "keyword": "string (必填)" } }
                 }
             }
         }

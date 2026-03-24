@@ -9,7 +9,7 @@ import { getProviderConfig, getActiveService } from '@aidocplus/shared-types';
 import type { PromptTemplate, Attachment, ChatContextMode, ChatImage } from '@aidocplus/shared-types';
 import { useTemplatesStore } from '@/stores/useTemplatesStore';
 import { useTranslation } from '@/i18n';
-import { parseThinkTags } from '@/utils/thinkTagParser';
+import { parseThinkTags, wrapThinkForChatMessage } from '@/utils/thinkTagParser';
 import { parseBackendError, formatBackendError } from '@/lib/backendError';
 import { TokenUsageIndicator } from './TokenUsageIndicator';
 import { ChatMessage, getContextModes, getContextModeLabels } from './ChatMessage';
@@ -408,13 +408,15 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
           useAppStore.getState().updateDocumentInMemory(docId, { aiGeneratedContent: parsed.content });
           // 更新聊天区 thinking 状态
           if (parsed.thinking) {
-            const thinkMsg = parsed.isThinking
-              ? t('chat.aiThinking', { defaultValue: '💭 **AI 正在思考...**\n\n{{thinking}}', thinking: parsed.thinking })
-              : t('chat.aiThinkingDone', { defaultValue: '💭 **AI 思考过程：**\n\n{{thinking}}', thinking: parsed.thinking });
+            const thinkMsg = wrapThinkForChatMessage(
+              parsed.thinking,
+              parsed.content || '',
+              parsed.isThinking,
+            );
             const messages = useAppStore.getState().getAiMessages(effectiveTabId);
             if (messages.length > 0) {
               const lastMsg = messages[messages.length - 1];
-              if (lastMsg.role === 'assistant' && (lastMsg.content.includes('正在生成') || lastMsg.content.startsWith('💭') || lastMsg.content.includes('Generating'))) {
+              if (lastMsg.role === 'assistant' && (lastMsg.content.includes('正在生成') || lastMsg.content.startsWith('💭') || lastMsg.content.includes('Generating') || lastMsg.content.includes('\u003Cthink\u003E'))) {
                 useAppStore.getState().updateLastAiMessage(effectiveTabId, { content: thinkMsg });
               }
             }
@@ -455,7 +457,11 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
         // Replace the streaming message with completion message（包含思考内容）
         let completionContent = t('chat.generationComplete', { defaultValue: '已根据您的提示词生成内容。\n\n生成的内容已自动更新到编辑器的 AI 内容栏。' });
         if (finalParsed.thinking) {
-          completionContent = `${t('chat.aiThinkingDone', { defaultValue: '💭 **AI 思考过程：**\n\n{{thinking}}', thinking: finalParsed.thinking })}\n\n---\n\n${completionContent}`;
+          completionContent = wrapThinkForChatMessage(
+            finalParsed.thinking,
+            `\n\n---\n\n${completionContent}`,
+            false,
+          );
         }
         const completionMessage = {
           role: 'assistant' as const,
@@ -500,7 +506,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
         // Add confirmation message to chat（包含思考内容）
         let msgContent = t('chat.generationComplete', { defaultValue: '已根据您的提示词生成内容。\n\n生成的内容已自动更新到编辑器的 AI 内容栏。' });
         if (parsed.thinking) {
-          msgContent = `${t('chat.aiThinkingDone', { defaultValue: '💭 **AI 思考过程：**\n\n{{thinking}}', thinking: parsed.thinking })}\n\n---\n\n${msgContent}`;
+          msgContent = wrapThinkForChatMessage(parsed.thinking, `\n\n---\n\n${msgContent}`, false);
         }
         const assistantMessage = {
           role: 'assistant' as const,

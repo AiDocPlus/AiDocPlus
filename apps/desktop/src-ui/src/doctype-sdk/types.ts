@@ -119,11 +119,24 @@ export interface AIOptions {
   temperature?: number;
 }
 
+/** chat_stream / 文档类型 AI 工具作用域 */
+export type DocTypeToolScope =
+  | 'stock'
+  | 'stock:financial'
+  | 'stock:technical'
+  | 'document'
+  | 'all';
+
 /** AI 流式调用选项 */
 export interface AIStreamOptions extends AIOptions {
   signal?: AbortSignal;
   enableWebSearch?: boolean;
   enableThinking?: boolean;
+  enableTools?: boolean;
+  /** 工具作用域，默认 'all' */
+  toolScope?: DocTypeToolScope;
+  /** Rust 侧 `chat_stream` 的 request_id，可用于 `stop_ai_stream` */
+  onStreamRequestId?: (requestId: string) => void;
 }
 
 /**
@@ -163,8 +176,8 @@ export interface DocTypeHostAPI {
       onChunk: (text: string) => void,
       options?: AIStreamOptions,
     ): Promise<string>;
-    /** AI 服务是否可用 */
-    isAvailable(): boolean;
+    /** AI 服务是否可用（与 `chatStream` 使用同一 `serviceId` 解析逻辑） */
+    isAvailable(serviceId?: string): boolean;
   };
 
   // ═══ UI 能力 ═══

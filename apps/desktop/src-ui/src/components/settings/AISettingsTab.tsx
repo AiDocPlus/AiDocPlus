@@ -78,14 +78,19 @@ export function AISettingsTab({ tempAI, updateTempAI }: AISettingsTabProps) {
     const providerCfg = getProviderConfig(editingService.provider);
     const svcName = editingService.name.trim() || providerCfg?.name || editingService.provider;
     const realApiKey = editingService.apiKey;
+    let storedToKeyring = false;
     if (realApiKey && realApiKey !== '__KEYRING__') {
       try {
         await invoke('store_ai_credential', { serviceId: editingService.id, apiKey: realApiKey });
+        storedToKeyring = true;
       } catch (e) {
-        console.warn('存储 API Key 到密钥链失败，将保留在配置文件中:', e);
+        console.error('存储 API Key 到系统密钥链失败:', e);
+        alert(`API Key 存储到系统密钥链失败：${e}\n\nAPI Key 将以明文保存在配置文件中。`);
       }
+    } else if (realApiKey === '__KEYRING__') {
+      storedToKeyring = true;
     }
-    const svc = { ...editingService, name: svcName, apiKey: realApiKey ? '__KEYRING__' : '' };
+    const svc = { ...editingService, name: svcName, apiKey: storedToKeyring ? '__KEYRING__' : (realApiKey || '') };
     const services = [...tempAI.services];
     const idx = services.findIndex(s => s.id === svc.id);
     if (idx >= 0) { services[idx] = svc; } else { services.push(svc); }

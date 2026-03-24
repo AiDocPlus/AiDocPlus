@@ -82,6 +82,8 @@ export interface NovelChapter {
   lastEditedAt?: number;
   tags?: string[];
   scenes?: NovelScene[];
+  /** N2.4: 章节批注列表 */
+  annotations?: NovelAnnotation[];
 }
 
 export interface NovelScene {
@@ -110,6 +112,14 @@ export interface NovelPlotline {
   description?: string;
 }
 
+/** N1.2: 角色情感弧线节点 */
+export interface NovelCharacterEmotion {
+  chapterId: string;
+  emotion: string;       // 如"愤怒""悲伤""坚定""迷茫"
+  intensity: number;     // 1-10
+  note?: string;
+}
+
 export interface NovelCharacter {
   id: string;
   name: string;
@@ -126,6 +136,10 @@ export interface NovelCharacter {
   strengths?: string;
   weaknesses?: string;
   dialogueStyle?: string;
+  /** N1.2: 角色对话样本（3-5段典型对话，AI 学习角色语气） */
+  dialogueSamples?: string[];
+  /** N1.2: 角色情感弧线（按章节记录情感状态变化） */
+  emotionArc?: NovelCharacterEmotion[];
   factionId?: string;
   tags?: string[];
   color?: string;
@@ -202,6 +216,35 @@ export interface NovelMaterial {
   chapterId?: string;
   createdAt: number;
 }
+
+/** N2.4: 批注类别 */
+export type NovelAnnotationCategory = 'todo' | 'verify' | 'idea' | 'plot-issue' | 'style' | 'general';
+
+/** N2.4: 章节行内批注 */
+export interface NovelAnnotation {
+  id: string;
+  chapterId: string;
+  /** 批注锚定的正文起始位置（字符偏移） */
+  from: number;
+  /** 批注锚定的正文结束位置 */
+  to: number;
+  /** 锚定的原文片段（用于位置漂移后重新定位） */
+  anchor: string;
+  category: NovelAnnotationCategory;
+  content: string;
+  resolved: boolean;
+  createdAt: number;
+  resolvedAt?: number;
+}
+
+export const ANNOTATION_CATEGORY_LABELS: Record<NovelAnnotationCategory, string> = {
+  'todo': '待修改',
+  'verify': '需查证',
+  'idea': '灵感',
+  'plot-issue': '剧情问题',
+  'style': '文风问题',
+  'general': '一般',
+};
 
 export function createEmptyNovelContent(): NovelDocumentContent {
   const vol1Id = genId();

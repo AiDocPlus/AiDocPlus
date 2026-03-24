@@ -14,8 +14,8 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   Send, Square, Trash2, Loader2, Copy, Check, ArrowDownToLine,
-  ChevronDown, Globe, Brain, RefreshCw, Pencil, Zap,
-  MessageSquarePlus, X, ScrollText, RotateCcw, BookHeart,
+  ChevronDown, Globe, RefreshCw, Pencil, Zap,
+  MessageSquarePlus, X, ScrollText, RotateCcw, BookHeart, Brain,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -26,7 +26,7 @@ import {
 import { MarkdownPreview } from '@/components/editor/MarkdownPreview';
 import { useTranslation } from '@/i18n';
 import { useSettingsStore, getAIInvokeParamsForService } from '@/stores/useSettingsStore';
-import { getProviderConfig } from '@aidocplus/shared-types';
+import { getProviderConfig, type AIProvider } from '@aidocplus/shared-types';
 import { useShallow } from 'zustand/react/shallow';
 import { parseThinkTags } from '@/utils/thinkTagParser';
 import { formatBackendError } from '@/lib/backendError';
@@ -37,6 +37,9 @@ import {
   DIARY_QUICK_ACTIONS, detectMoodAlert,
   type DiaryContextMode,
 } from './diaryContext';
+import { buildEmotionInsightPrompt } from './diaryAnalysis';
+import { resolveTheme } from '@/components/chat/ChatMessage';
+import { CollapsibleThinkingBlock } from '@/document-types/_shared/CollapsibleThinkingBlock';
 
 // ═══════════════════════════════════════════════════════
 // 消息 & 会话类型
@@ -129,7 +132,7 @@ export default function DiaryAISidebar({
   const aiAvailable = !!(aiParams.provider && aiParams.apiKey && aiParams.model);
   const providerCaps = useMemo(() => {
     if (!aiParams.provider) return { webSearch: false, thinking: false };
-    const cfg = getProviderConfig(aiParams.provider);
+    const cfg = getProviderConfig(aiParams.provider as AIProvider);
     return cfg?.capabilities || { webSearch: false, thinking: false };
   }, [aiParams.provider]);
 
@@ -245,11 +248,10 @@ export default function DiaryAISidebar({
     abortRef.current = controller;
 
     try {
-      let full = '';
-      await host.ai.chatStream(apiMessages, (chunk: string) => {
-        full += chunk;
-        streamingContentRef.current = full;
-        setStreamingContent(full);
+      // DocTypeHost.chatStream 的 onChunk 参数为已累计的**全文**，非增量，禁止 += 拼接
+      const full = await host.ai.chatStream(apiMessages, (cumulative: string) => {
+        streamingContentRef.current = cumulative;
+        setStreamingContent(cumulative);
       }, {
         signal: controller.signal,
         enableWebSearch: enableWebSearch && providerCaps.webSearch ? true : undefined,
@@ -322,9 +324,13 @@ export default function DiaryAISidebar({
   // ── 快捷操作 ──
   const handleQuickAction = useCallback((promptTemplate: string) => {
     const content = activeEntry?.content || '';
-    const prompt = promptTemplate.replace('{{content}}', content);
+    let prompt = promptTemplate.replace('{{content}}', content);
+    // D1.2: 情绪洞察模板变量
+    if (prompt.includes('{{emotionInsight}}')) {
+      prompt = buildEmotionInsightPrompt(diary);
+    }
     sendMessage(prompt);
-  }, [activeEntry, sendMessage]);
+  }, [activeEntry, diary, sendMessage]);
 
   // ── 自动滚动 ──
   useEffect(() => {
@@ -507,15 +513,11 @@ export default function DiaryAISidebar({
                     {msg.role === 'assistant' && parsed ? (
                       <div className="space-y-2">
                         {parsed.thinking && (
-                          <details className="group/think">
-                            <summary className="flex items-center gap-1 cursor-pointer text-xs text-muted-foreground hover:text-foreground transition-colors select-none">
-                              <Brain className="h-3 w-3" /><span>{t('diary.aiThinking', { defaultValue: '思考过程' })}</span>
-                              <ChevronDown className="h-3 w-3 transition-transform group-open/think:rotate-180" />
-                            </summary>
-                            <div className="mt-1 pl-4 border-l-2 border-muted-foreground/20 text-xs text-muted-foreground">
-                              <MarkdownPreview content={parsed.thinking} className="text-xs opacity-80" />
-                            </div>
-                          </details>
+                          <CollapsibleThinkingBlock
+                            thinking={parsed.thinking}
+                            isThinking={false}
+                            theme={resolveTheme()}
+                          />
                         )}
                         <MarkdownPreview content={parsed.content || msg.content} className="text-sm" />
                       </div>
@@ -563,14 +565,11 @@ export default function DiaryAISidebar({
             <div className="flex justify-start">
               <div className="max-w-[85%] rounded-lg px-3 py-2 bg-muted text-sm space-y-2">
                 {streamParsed.thinking && (
-                  <details open className="group">
-                    <summary className="flex items-center gap-1 cursor-pointer text-xs text-muted-foreground">
-                      <Brain className="h-3 w-3 animate-pulse" /><span>{t('diary.aiThinkingStatus', { defaultValue: '思考中...' })}</span>
-                    </summary>
-                    <div className="mt-1 pl-4 border-l-2 border-muted-foreground/20 text-xs text-muted-foreground">
-                      <MarkdownPreview content={streamParsed.thinking} className="text-xs opacity-80" />
-                    </div>
-                  </details>
+                  <CollapsibleThinkingBlock
+                    thinking={streamParsed.thinking}
+                    isThinking={streamParsed.isThinking}
+                    theme={resolveTheme()}
+                  />
                 )}
                 {streamParsed.content && <MarkdownPreview content={streamParsed.content} className="text-sm" />}
               </div>

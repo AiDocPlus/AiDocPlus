@@ -14,6 +14,8 @@ import { meetingMinutesDocType } from './meeting-minutes/definition';
 import { academicPaperDocType } from './academic-paper/definition';
 import { screenplayDocType } from './screenplay/definition';
 import { diaryDocType } from './diary/definition';
+import { essayDocType } from './essay/definition';
+import { stockResearchDocType } from './stock-research/definition';
 
 export function registerBuiltinDocTypes(): void {
   registerDocType(normalDocType);
@@ -27,4 +29,6 @@ export function registerBuiltinDocTypes(): void {
   registerDocType(academicPaperDocType);
   registerDocType(screenplayDocType);
   registerDocType(diaryDocType);
+  registerDocType(essayDocType);
+  registerDocType(stockResearchDocType);
 }

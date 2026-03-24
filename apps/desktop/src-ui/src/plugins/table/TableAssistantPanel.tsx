@@ -18,7 +18,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { usePluginHost, useThinkingContent } from '../_framework/PluginHostAPI';
 import { formatBackendError } from '@/lib/backendError';
 import { useSettingsStore, getAIInvokeParamsForService } from '@/stores/useSettingsStore';
-import { getProviderConfig, getActiveService } from '@aidocplus/shared-types';
+import { getProviderConfig, getActiveService, type AIProvider } from '@aidocplus/shared-types';
 import type { PluginAssistantPanelProps } from '../types';
 import {
   type AssistantMessage,
@@ -48,6 +48,7 @@ import {
 import type { TablePhase, TableContextMode } from './tableContext';
 import { fortuneToTableSheets } from './tableDataBridge';
 import { parseThinkTags } from '@/utils/thinkTagParser';
+import { CollapsibleThinkingBlock } from '@/document-types/_shared/CollapsibleThinkingBlock';
 import { loadQuickActions, saveQuickActions } from './quickActionDefs';
 import type { QuickActionStore, QuickActionItem } from './quickActionDefs';
 import { QuickActionManagerDialog } from './dialogs/QuickActionManagerDialog';
@@ -157,7 +158,7 @@ export function TableAssistantPanel({
   const aiAvailable = !!(aiParams.provider && aiParams.apiKey && aiParams.model);
   const providerCaps = (() => {
     if (!aiParams.provider) return { webSearch: false, thinking: false };
-    const cfg = getProviderConfig(aiParams.provider);
+    const cfg = getProviderConfig(aiParams.provider as AIProvider);
     return cfg?.capabilities || { webSearch: false, thinking: false };
   })();
 
@@ -776,9 +777,7 @@ export function TableAssistantPanel({
     return (
       <div className="space-y-1">
         {thinkingText && (
-          <div className="text-xs text-muted-foreground italic border-l-2 border-muted pl-2 mb-1.5 max-h-40 overflow-y-auto whitespace-pre-wrap">
-            {thinkingText}
-          </div>
+          <CollapsibleThinkingBlock thinking={thinkingText} isThinking={false} theme={theme} />
         )}
         {segments.map((seg, i) => {
           if (seg.type === 'text') {
@@ -1005,9 +1004,11 @@ export function TableAssistantPanel({
                   <span className="text-sm">思考中...</span>
                 </div>
                 {thinkingContent && (
-                  <div className="text-xs text-muted-foreground italic border-l-2 border-muted pl-2 max-h-40 overflow-y-auto whitespace-pre-wrap">
-                    {thinkingContent}
-                  </div>
+                  <CollapsibleThinkingBlock
+                    thinking={thinkingContent}
+                    isThinking
+                    theme={resolveTheme()}
+                  />
                 )}
               </div>
             )}

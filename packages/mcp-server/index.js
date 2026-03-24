@@ -335,6 +335,525 @@ const TOOLS = [
     description: '列出 ~/AiDocPlus/CodingScripts/ 下的脚本文件',
     inputSchema: { type: 'object', properties: {} },
   },
+  // ═══════════════════════════════════════════════════════
+  // 股票数据工具（Tushare Pro）
+  // ═══════════════════════════════════════════════════════
+  {
+    name: 'aidocplus_stock_token_check',
+    description: '验证 Tushare Token 并返回账户信息（积分余额等）',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'aidocplus_stock_search',
+    description: '搜索股票（按名称或代码）',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        keyword: { type: 'string', description: '搜索关键词' },
+      },
+      required: ['keyword'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_basic_info',
+    description: '获取股票基本信息（名称、上市日期、行业、股本等）',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string', description: '股票代码（如 000001.SZ）' },
+      },
+      required: ['ts_code'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_daily',
+    description: '获取股票日线行情（开盘、收盘、最高、最低、成交量、成交额）',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string', description: '股票代码' },
+        start_date: { type: 'string', description: '开始日期（如 20230101）' },
+        end_date: { type: 'string', description: '结束日期' },
+      },
+      required: ['ts_code'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_weekly',
+    description: '获取股票周线行情',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string' },
+        start_date: { type: 'string' },
+        end_date: { type: 'string' },
+      },
+      required: ['ts_code'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_monthly',
+    description: '获取股票月线行情',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string' },
+        start_date: { type: 'string' },
+        end_date: { type: 'string' },
+      },
+      required: ['ts_code'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_income',
+    description: '获取利润表数据（营业收入、净利润等）',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string' },
+        start_date: { type: 'string' },
+        end_date: { type: 'string' },
+      },
+      required: ['ts_code'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_balance_sheet',
+    description: '获取资产负债表数据',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string' },
+        start_date: { type: 'string' },
+        end_date: { type: 'string' },
+      },
+      required: ['ts_code'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_cashflow',
+    description: '获取现金流量表数据',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string' },
+        start_date: { type: 'string' },
+        end_date: { type: 'string' },
+      },
+      required: ['ts_code'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_indicator',
+    description: '获取财务指标（ROE、ROA、毛利率、净利率、PE、PB等）',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string' },
+        start_date: { type: 'string' },
+        end_date: { type: 'string' },
+      },
+      required: ['ts_code'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_moneyflow',
+    description: '获取个股资金流向（主力/散户资金）',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string' },
+        start_date: { type: 'string' },
+        end_date: { type: 'string' },
+      },
+      required: ['ts_code'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_top_list',
+    description: '获取龙虎榜每日明细',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        trade_date: { type: 'string', description: '交易日期（如 20231001）' },
+      },
+      required: ['trade_date'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_margin_detail',
+    description: '获取融资融券每日明细',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string' },
+        start_date: { type: 'string' },
+        end_date: { type: 'string' },
+      },
+      required: ['ts_code'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_index_daily',
+    description: '获取指数日线数据',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string', description: '指数代码（如 000001.SH 上证指数）' },
+        start_date: { type: 'string' },
+        end_date: { type: 'string' },
+      },
+      required: ['ts_code'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_realtime_quote',
+    description: '获取股票实时行情（当日分时数据）',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string', description: '股票代码（如 000001.SZ）' },
+      },
+      required: ['ts_code'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_price_limit',
+    description: '获取每日涨跌停价格',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string' },
+        trade_date: { type: 'string', description: '交易日期' },
+      },
+    },
+  },
+  {
+    name: 'aidocplus_stock_suspend_d',
+    description: '获取停复牌数据',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string' },
+        suspend_date: { type: 'string' },
+        resume_date: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'aidocplus_stock_adj_factor',
+    description: '获取复权因子',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string' },
+        start_date: { type: 'string' },
+        end_date: { type: 'string' },
+      },
+      required: ['ts_code'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_forecast',
+    description: '获取业绩预告/快报数据',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string' },
+        start_date: { type: 'string' },
+        end_date: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'aidocplus_stock_dividend',
+    description: '获取分红送股数据',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string' },
+      },
+      required: ['ts_code'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_float_holder',
+    description: '获取流通股东数据',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string' },
+      },
+      required: ['ts_code'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_top10_float_holder',
+    description: '获取十大流通股东数据',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string' },
+        period: { type: 'string', description: '报告期（如 20220930）' },
+      },
+      required: ['ts_code'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_float_holder_num',
+    description: '获取股东人数变化',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string' },
+        start_date: { type: 'string' },
+        end_date: { type: 'string' },
+      },
+      required: ['ts_code'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_share_float',
+    description: '获取流通股本数据',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string' },
+        start_date: { type: 'string' },
+        end_date: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'aidocplus_stock_hsgt_top',
+    description: '获取北向资金持股排行',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        search: { type: 'string', description: '股票名称或代码' },
+        start_date: { type: 'string' },
+        end_date: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'aidocplus_stock_hsgt_shanghai',
+    description: '获取北向资金沪股通每日持股明细',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        start_date: { type: 'string' },
+        end_date: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'aidocplus_stock_top_inst',
+    description: '获取龙虎榜机构明细',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        trade_date: { type: 'string' },
+        ts_code: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'aidocplus_stock_block_trade',
+    description: '获取大宗交易数据',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string' },
+        start_date: { type: 'string' },
+        end_date: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'aidocplus_stock_index_weight',
+    description: '获取指数成分股权重',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        index_code: { type: 'string' },
+        trade_date: { type: 'string' },
+      },
+      required: ['index_code'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_index_basic',
+    description: '获取指数基本信息',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string' },
+        name: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'aidocplus_stock_board_industry',
+    description: '获取股票所属行业信息',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string' },
+      },
+      required: ['ts_code'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_board_concept',
+    description: '获取概念板块信息',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string', description: '概念板块代码' },
+      },
+    },
+  },
+  {
+    name: 'aidocplus_stock_industry_index',
+    description: '获取行业日行情',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string' },
+        start_date: { type: 'string' },
+        end_date: { type: 'string' },
+      },
+      required: ['ts_code'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_new_share',
+    description: '获取新股IPO数据',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        start_date: { type: 'string' },
+        end_date: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'aidocplus_stock_tick_data',
+    description: '获取分笔数据（每日分笔明细）',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string' },
+        trade_date: { type: 'string', description: '交易日期' },
+      },
+      required: ['ts_code', 'trade_date'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_future_daily',
+    description: '获取期货日线行情',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string', description: '期货代码' },
+        start_date: { type: 'string' },
+        end_date: { type: 'string' },
+      },
+      required: ['ts_code'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_option_daily',
+    description: '获取期权日线行情',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string', description: '期权代码' },
+        start_date: { type: 'string' },
+        end_date: { type: 'string' },
+      },
+      required: ['ts_code'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_gdp',
+    description: '获取国内生产总值（GDP）数据',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        quarter: { type: 'string', description: '季度（如 202201）' },
+      },
+    },
+  },
+  {
+    name: 'aidocplus_stock_cpi',
+    description: '获取居民消费价格指数（CPI）',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        month: { type: 'string', description: '月份（如 202301）' },
+      },
+    },
+  },
+  {
+    name: 'aidocplus_stock_money_supply',
+    description: '获取货币供应量数据',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        month: { type: 'string', description: '月份（如 202301）' },
+      },
+    },
+  },
+  {
+    name: 'aidocplus_stock_money_supply_bal',
+    description: '获取货币供应量余额数据',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        month: { type: 'string', description: '月份（如 202301）' },
+      },
+    },
+  },
+  {
+    name: 'aidocplus_stock_concept_detail',
+    description: '获取概念板块成分股',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ts_code: { type: 'string', description: '概念板块代码' },
+      },
+      required: ['ts_code'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_hsgt_shenzhen',
+    description: '获取北向资金深股通每日持股明细',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        start_date: { type: 'string' },
+        end_date: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'aidocplus_stock_store_credential',
+    description: '存储 Tushare Token 到 AiDocPlus',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        token: { type: 'string', description: 'Tushare Pro API Token' },
+      },
+      required: ['token'],
+    },
+  },
+  {
+    name: 'aidocplus_stock_delete_credential',
+    description: '删除已存储的 Tushare Token',
+    inputSchema: { type: 'object', properties: {} },
+  },
 ];
 
 // 工具名 → API 方法的映射
@@ -362,6 +881,52 @@ const TOOL_METHOD_MAP = {
   aidocplus_export_markdown: 'export.markdown',
   aidocplus_export_pdf: 'export.pdf',
   aidocplus_list_scripts: 'script.listFiles',
+  // 股票数据工具
+  aidocplus_stock_token_check: 'stock.token_check',
+  aidocplus_stock_store_credential: 'stock.store_credential',
+  aidocplus_stock_delete_credential: 'stock.delete_credential',
+  aidocplus_stock_search: 'stock.search',
+  aidocplus_stock_basic_info: 'stock.basic_info',
+  aidocplus_stock_daily: 'stock.daily',
+  aidocplus_stock_weekly: 'stock.weekly',
+  aidocplus_stock_monthly: 'stock.monthly',
+  aidocplus_stock_income: 'stock.income',
+  aidocplus_stock_balance_sheet: 'stock.balance_sheet',
+  aidocplus_stock_cashflow: 'stock.cashflow',
+  aidocplus_stock_indicator: 'stock.indicator',
+  aidocplus_stock_moneyflow: 'stock.moneyflow',
+  aidocplus_stock_top_list: 'stock.top_list',
+  aidocplus_stock_margin_detail: 'stock.margin_detail',
+  aidocplus_stock_index_daily: 'stock.index_daily',
+  aidocplus_stock_realtime_quote: 'stock.realtime_quote',
+  aidocplus_stock_price_limit: 'stock.price_limit',
+  aidocplus_stock_suspend_d: 'stock.suspend_d',
+  aidocplus_stock_adj_factor: 'stock.adj_factor',
+  aidocplus_stock_forecast: 'stock.forecast',
+  aidocplus_stock_dividend: 'stock.dividend',
+  aidocplus_stock_float_holder: 'stock.float_holder',
+  aidocplus_stock_top10_float_holder: 'stock.top10_float_holder',
+  aidocplus_stock_float_holder_num: 'stock.float_holder_num',
+  aidocplus_stock_share_float: 'stock.share_float',
+  aidocplus_stock_hsgt_top: 'stock.hsgt_top',
+  aidocplus_stock_hsgt_shanghai: 'stock.hsgt_shanghai',
+  aidocplus_stock_top_inst: 'stock.top_inst',
+  aidocplus_stock_block_trade: 'stock.block_trade',
+  aidocplus_stock_index_weight: 'stock.index_weight',
+  aidocplus_stock_index_basic: 'stock.index_basic',
+  aidocplus_stock_board_industry: 'stock.board_industry',
+  aidocplus_stock_board_concept: 'stock.board_concept',
+  aidocplus_stock_industry_index: 'stock.industry_index',
+  aidocplus_stock_new_share: 'stock.new_share',
+  aidocplus_stock_tick_data: 'stock.tick_data',
+  aidocplus_stock_future_daily: 'stock.future_daily',
+  aidocplus_stock_option_daily: 'stock.option_daily',
+  aidocplus_stock_gdp: 'stock.gdp',
+  aidocplus_stock_cpi: 'stock.cpi',
+  aidocplus_stock_money_supply: 'stock.money_supply',
+  aidocplus_stock_money_supply_bal: 'stock.money_supply_bal',
+  aidocplus_stock_concept_detail: 'stock.concept_detail',
+  aidocplus_stock_hsgt_shenzhen: 'stock.hsgt_shenzhen',
 };
 
 // ============================================================

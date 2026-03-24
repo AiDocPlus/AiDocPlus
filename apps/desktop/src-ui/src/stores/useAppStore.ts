@@ -805,7 +805,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ isAiStreaming: false, aiStreamingTabId: null });
   },
   // AI Actions（流式聊天，支持停止）
-  sendChatMessage: async ({ tabId, content, enableWebSearch, contextInfo, enableTools, enableThinking: optEnableThinking, planMode, images }) => {
+  sendChatMessage: async ({ tabId, content, enableWebSearch, contextInfo, enableTools, toolScope, enableThinking: optEnableThinking, planMode, images }) => {
     // 获取当前标签页的流状态
     const currentStreamState = get().streamStateByTab[tabId] || {
       unlistenFn: null,
@@ -951,6 +951,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         enableWebSearch: enableWebSearch || undefined,
         enableThinking: (optEnableThinking ?? aiSettings.enableThinking) || undefined,
         enableTools: enableTools || undefined,
+        toolScope: toolScope || undefined,
+        maxTokens: aiSettings.maxTokens ?? 4096,
         requestId
       });
 
@@ -1095,6 +1097,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         })(),
         enableWebSearch: enableWebSearch || undefined,
         enableThinking: aiSettings.enableThinking || undefined,
+        maxTokens: aiSettings.maxTokens ?? 4096,
         requestId
       };
 

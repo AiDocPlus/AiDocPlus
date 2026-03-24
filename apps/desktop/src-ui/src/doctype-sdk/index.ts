@@ -14,6 +14,7 @@ export type {
   ChatMessage,
   AIOptions,
   AIStreamOptions,
+  DocTypeToolScope,
 } from './types';
 
 export { DOCTYPE_SDK_VERSION } from './types';

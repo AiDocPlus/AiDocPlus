@@ -542,10 +542,22 @@ export const useEmailSettings = () => useSettingsStore((state) => state.email);
 export const useShortcuts = () => useSettingsStore((state) => state.shortcuts);
 export const usePluginsSettings = () => useSettingsStore((state) => state.plugins);
 
+/** AI 服务 invoke 调用参数 */
+export interface AIInvokeParams {
+  provider?: string;
+  apiKey?: string;
+  model?: string;
+  baseUrl?: string;
+  serviceId?: string;
+  proxyUrl?: string;
+  connectTimeoutSecs?: number;
+  requestTimeoutSecs?: number;
+}
+
 /**
  * 获取当前激活的 AI 服务的 invoke 调用参数。
  */
-export function getAIInvokeParams() {
+export function getAIInvokeParams(): AIInvokeParams {
   const ai = useSettingsStore.getState().ai;
   const service = getActiveService(ai);
   if (!service) {
@@ -583,7 +595,7 @@ useSettingsStore.subscribe((state) => {
  * 按指定 serviceId 获取 AI 服务的 invoke 调用参数。
  * 为空时回退到全局 activeServiceId。
  */
-export function getAIInvokeParamsForService(serviceId?: string) {
+export function getAIInvokeParamsForService(serviceId?: string): AIInvokeParams {
   const ai = useSettingsStore.getState().ai;
   let service;
   if (serviceId) {
