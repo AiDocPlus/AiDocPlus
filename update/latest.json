@@ -1,19 +1,19 @@
 {
-  "version": "0.3.10",
-  "notes": "v0.3.10: 日记本全面优化 — Bug修复、性能提升、AI服务选择器、日历双击创建",
-  "pub_date": "2026-03-20T15:00:00Z",
+  "version": "0.3.11",
+  "notes": "## AiDocPlus v0.3.11\n\n### 更新说明\n- 修复 AIProvider 类型断言问题\n- 修复 calculateStreak 返回值类型\n- 清理 stock-research 模块未使用变量\n- 新增散文文档类型 (essay)\n- 新增股票研究文档类型 (stock-research)\n\n### 下载\n- **macOS (Apple Silicon)**: https://github.com/AiDocPlus/AiDocPlus/releases/download/v0.3.11/AiDocPlus_0.3.11_aarch64.dmg\n- **Windows x64**: https://github.com/AiDocPlus/AiDocPlus/releases/download/v0.3.11/AiDocPlus_0.3.11_x64-setup.exe\n",
+  "pub_date": "2026-03-24T08:25:04.551Z",
   "platforms": {
-    "darwin-aarch64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRWhsdURydWpGQnMzSnFHdHJ1dWQ3anFINmkxYVc5NXNJL3F5MU9xd1RHK2RlbTU2c1hTQTNJd0E2K3RoSXB1RDlISVNqRnMyMEhDU2hlSGRzYStka2cwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczOTkwNTI1CWZpbGU6QWlEb2NQbHVzLmFwcC50YXIuZ3oKTXJ6a1lLcTVkRDVDWXFXYVA0Znl1K0ZrQ1ZYQkJOWGxsM09Qd05SR0ZOWng0R3JhSjZOeFZaVFpGcGxhYnFLNWYySWRjRnVuaFZacmVyNlNuUGtERHc9PQo=",
-      "url": "https://github.com/AiDocPlus/AiDocPlus/releases/download/v0.3.10/AiDocPlus.app.tar.gz"
-    },
-    "darwin-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRWhsdURydWpGQnMzSnFHdHJ1dWQ3anFINmkxYVc5NXNJL3F5MU9xd1RHK2RlbTU2c1hTQTNJd0E2K3RoSXB1RDlISVNqRnMyMEhDU2hlSGRzYStka2cwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczOTkwNTI1CWZpbGU6QWlEb2NQbHVzLmFwcC50YXIuZ3oKTXJ6a1lLcTVkRDVDWXFXYVA0Znl1K0ZrQ1ZYQkJOWGxsM09Qd05SR0ZOWng0R3JhSjZOeFZaVFpGcGxhYnFLNWYySWRjRnVuaFZacmVyNlNuUGtERHc9PQo=",
-      "url": "https://github.com/AiDocPlus/AiDocPlus/releases/download/v0.3.10/AiDocPlus.app.tar.gz"
-    },
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRXZpdDhqWWZQc0h1dUpKakRneHBreVZHaXlPdTFZSHQrWEY3NEVsd20yZVZ5SnRmYVZJbjJCSDRncG9GRkxaT1pEa3lYbFF4OVcwSUZFMTBFc0hTUFFRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczOTkxNTc2CWZpbGU6QWlEb2NQbHVzXzAuMy4xMF94NjQtc2V0dXAuZXhlCnN5dHE0c3NUNElKLzJtSkVqc3hFQXRxQ05kRlFIbDhWL1ZUWWVqV1d3Q2tKUzh0aXdMNXlDZk1XSzNQRFF6UklKdVhRbG1SUmRaaXlaeHRjWlQwdUF3PT0K",
-      "url": "https://github.com/AiDocPlus/AiDocPlus/releases/download/v0.3.10/AiDocPlus_0.3.10_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRWxZdWJzQmlzdEpMQ2xJbXBGWTFiQ3hMbzQrVnZ6eXkvM2hETlpOL05zNjlmZFJKOGd0ZThMQWNPelpnOVA5b2lTaTR5RGtwTUJMQzJUbU9sazJXc3dvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc0MzQwNzAwCWZpbGU6QWlEb2NQbHVzXzAuMy4xMV94NjQtc2V0dXAuZXhlCmkvK0VQQTdPd2c4SE5zWGx5dkpUV3pNZWdtSGJkV2NqVHFaTXcxQ3VmTjNYczhEVC9DNkYveGJ2b2dZTFYwelFlWFhwck5vWEFpdWJEUThtNlhpa0RBPT0K",
+      "url": "https://github.com/AiDocPlus/AiDocPlus/releases/download/v0.3.11/AiDocPlus_0.3.11_x64-setup.exe"
+    },
+    "windows-x86_64-nsis": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRWxZdWJzQmlzdEpMQ2xJbXBGWTFiQ3hMbzQrVnZ6eXkvM2hETlpOL05zNjlmZFJKOGd0ZThMQWNPelpnOVA5b2lTaTR5RGtwTUJMQzJUbU9sazJXc3dvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc0MzQwNzAwCWZpbGU6QWlEb2NQbHVzXzAuMy4xMV94NjQtc2V0dXAuZXhlCmkvK0VQQTdPd2c4SE5zWGx5dkpUV3pNZWdtSGJkV2NqVHFaTXcxQ3VmTjNYczhEVC9DNkYveGJ2b2dZTFYwelFlWFhwck5vWEFpdWJEUThtNlhpa0RBPT0K",
+      "url": "https://github.com/AiDocPlus/AiDocPlus/releases/download/v0.3.11/AiDocPlus_0.3.11_x64-setup.exe"
+    },
+    "darwin-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRXNBenBrbkU3SGlxMEJtVXg2UEpBcHRZTXZCVklVdEc5dTQxWjhVWVc2azdhQXdDdmlVNHQ1dU9ybFlkOFc5dFRBVTZ4b0kwQk9MOEQyQ0NvMXJ4ZVFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc0MzM3ODIzCWZpbGU6QWlEb2NQbHVzLmFwcC50YXIuZ3oKaXlvbC9YSmdxUTdwY0plOUFPU0xMNTU3RHFUMEg5RHNCcEpjQkpXRHEvb3A3aVFJS2RsNlBKUmRtdUVGMGNINzYwYjh1bEF2ZVhsajNGNVI5R1kxQmc9PQo=",
+      "url": "https://github.com/AiDocPlus/AiDocPlus/releases/download/v0.3.11/AiDocPlus.app.tar.gz"
     }
   }
 }
