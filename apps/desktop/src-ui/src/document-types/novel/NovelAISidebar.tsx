@@ -12,7 +12,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   Send, Square, Trash2, Loader2, Copy, Check, ArrowDownToLine,
-  ChevronDown, Globe, Brain, Zap, RefreshCw, Pencil,
+  ChevronDown, Globe, Brain, RefreshCw, Pencil,
   MessageSquarePlus, X, ScrollText, RotateCcw,
   BookOpen, Eye, GitBranch, MessageSquareText,
 } from 'lucide-react';
@@ -21,7 +21,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { MarkdownPreview } from '@/components/editor/MarkdownPreview';
 import { useTranslation } from '@/i18n';
 import { useSettingsStore, getAIInvokeParamsForService } from '@/stores/useSettingsStore';
-import { getProviderConfig, getActiveService, type AIProvider } from '@aidocplus/shared-types';
+import { getProviderConfig, type AIProvider } from '@aidocplus/shared-types';
 import { parseThinkTags } from '@/utils/thinkTagParser';
 import { resolveTheme } from '@/components/chat/ChatMessage';
 import { CollapsibleThinkingBlock } from '@/document-types/_shared/CollapsibleThinkingBlock';
@@ -45,6 +45,14 @@ import {
 import { NovelCommandPalette } from './NovelCommandPalette';
 import { buildStyleAnalysisPrompt } from './novelStyleAnalysis';
 import type { StorageLike } from './constants';
+import { DocTypeAIServiceMenu } from '@/document-types/_shared/DocTypeAIServiceMenu';
+import { cn } from '@/lib/utils';
+import {
+  AI_OPTION_BTN_BASE, AI_OPTION_ACTIVE, AI_OPTION_THINKING_ACTIVE, AI_OPTION_INACTIVE,
+  SIDEBAR_AI_HEADER_PANEL,
+  SIDEBAR_AI_HEADER_ROW,
+  SIDEBAR_AI_HEADER_SUBROW,
+} from '@/document-types/_shared/styles';
 
 // ── 消息类型 ──
 
@@ -135,9 +143,6 @@ export default function NovelAISidebar({
   const [selectedServiceId, setSelectedServiceId] = useState<string>(() => {
     return host.storage.get<string>('_novel_assistant_service_id') || '';
   });
-  const effectiveService = selectedServiceId
-    ? enabledServices.find(s => s.id === selectedServiceId) || getActiveService(settingsStore.ai)
-    : getActiveService(settingsStore.ai);
   const aiParams = getAIInvokeParamsForService(selectedServiceId || undefined);
   const aiAvailable = !!(aiParams.provider && aiParams.apiKey && aiParams.model);
   const providerCaps = (() => {
@@ -167,8 +172,8 @@ export default function NovelAISidebar({
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [enableWebSearch, setEnableWebSearch] = useState(false);
-  const [enableThinking, setEnableThinking] = useState(false);
+  const [enableWebSearch, setEnableWebSearch] = useState(true);
+  const [enableThinking, setEnableThinking] = useState(true);
 
   // ── Phase 8: 教练模式 ──
   const [coachMode, setCoachMode] = useState(false);
@@ -429,9 +434,8 @@ export default function NovelAISidebar({
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-background">
-      {/* ── 顶栏 ── */}
-      <div className="flex-shrink-0 border-b">
-        <div className="flex items-center gap-1.5 px-2.5 py-1.5">
+      <div className={SIDEBAR_AI_HEADER_PANEL}>
+        <div className={cn(SIDEBAR_AI_HEADER_ROW, 'gap-1.5')}>
           <BookOpen className="h-4 w-4 text-amber-500" />
           <Popover open={sessionMenuOpen} onOpenChange={setSessionMenuOpen}>
             <PopoverTrigger asChild>
@@ -506,12 +510,10 @@ export default function NovelAISidebar({
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
-      </div>
 
-      {/* ── 快捷操作栏 ── */}
-      <div className="flex items-center gap-1 px-2.5 py-1 border-b bg-muted/20 flex-shrink-0 overflow-x-auto">
+        <div className={SIDEBAR_AI_HEADER_SUBROW}>
         <Button variant="outline" size="sm" className="h-6 text-xs gap-1 shrink-0" onClick={() => setQaPaletteOpen(true)} title="快捷操作 (⌘K)">
-          <Zap className="h-3 w-3" />快捷操作
+          快捷操作
         </Button>
         {messages.length > 0 && suggestions.length > 0 && !streaming && (
           suggestions.slice(0, 3).map(chip => (
@@ -530,6 +532,7 @@ export default function NovelAISidebar({
             {action.label}
           </Button>
         ))}
+        </div>
       </div>
 
       {/* ── 消息列表 ── */}
@@ -545,9 +548,8 @@ export default function NovelAISidebar({
                 <p className="text-xs font-medium text-muted-foreground px-1">{t('novel.suggestedActions', { defaultValue: '建议操作' })}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {suggestions.map(chip => (
-                    <Button key={chip.id} variant="outline" size="sm" className="h-8 text-xs justify-start gap-1.5"
+                    <Button key={chip.id} variant="outline" size="sm" className="h-8 text-xs justify-start"
                       onClick={() => sendMessage(chip.prompt)} disabled={streaming || !aiAvailable}>
-                      <Zap className="h-3 w-3 flex-shrink-0" />
                       <span className="truncate">{chip.label}</span>
                     </Button>
                   ))}
@@ -561,7 +563,7 @@ export default function NovelAISidebar({
                   {recommendedActions.map(action => (
                     <Button key={action.id} variant="outline" size="sm" className="h-7 text-xs"
                       onClick={() => handleQuickAction(action)}>
-                      <Zap className="h-3 w-3 mr-1" />{action.label}
+                      {action.label}
                     </Button>
                   ))}
                 </div>
@@ -705,35 +707,56 @@ export default function NovelAISidebar({
           rows={2} disabled={streaming || !aiAvailable}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (!streaming) sendMessage(inputValue); } }} />
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1 border-t border-border/60 pt-1.5">
+          <DocTypeAIServiceMenu
+            enabledServices={enabledServices}
+            value={aiParams.serviceId ?? ''}
+            onChange={(id) => {
+              setSelectedServiceId(id);
+              host.storage.set('_novel_assistant_service_id', id);
+            }}
+            disabled={streaming}
+          />
           {providerCaps.webSearch && (
-            <Button variant="ghost" size="sm" className={`h-7 px-1.5 ${enableWebSearch ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}
-              onClick={() => setEnableWebSearch(v => !v)} title={enableWebSearch ? '联网搜索：已开启' : '联网搜索：已关闭'}>
-              <Globe className="h-3.5 w-3.5" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                AI_OPTION_BTN_BASE,
+                enableWebSearch ? AI_OPTION_ACTIVE : AI_OPTION_INACTIVE,
+              )}
+              onClick={() => setEnableWebSearch(v => !v)}
+              disabled={streaming}
+              title={enableWebSearch ? '联网搜索：已开启' : '联网搜索：已关闭'}
+            >
+              <Globe className="h-3 w-3" />
+              {t('chat.webSearch', { defaultValue: '联网' })}
             </Button>
           )}
           {providerCaps.thinking && (
-            <Button variant="ghost" size="sm" className={`h-7 px-1.5 ${enableThinking ? 'text-purple-600 dark:text-purple-400' : 'text-muted-foreground'}`}
-              onClick={() => setEnableThinking(v => !v)} title={enableThinking ? '深度思考：已开启' : '深度思考：已关闭'}>
-              <Brain className="h-3.5 w-3.5" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                AI_OPTION_BTN_BASE,
+                enableThinking ? AI_OPTION_THINKING_ACTIVE : AI_OPTION_INACTIVE,
+              )}
+              onClick={() => setEnableThinking(v => !v)}
+              disabled={streaming}
+              title={enableThinking ? '深度思考：已开启' : '深度思考：已关闭'}
+            >
+              <Brain className="h-3 w-3" />
+              {t('chat.thinking', { defaultValue: '深度思考' })}
             </Button>
           )}
+        </div>
+
+        <div className="flex items-center gap-1.5">
           {/* Phase 8: 教练模式开关 */}
           <Button variant="ghost" size="sm" className={`h-7 px-1.5 ${coachMode ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}
             onClick={() => setCoachMode(v => !v)} title={coachMode ? '教练模式：已开启（AI 不写正文，通过提问引导）' : '教练模式：已关闭'}>
             🎓
           </Button>
-          {enabledServices.length > 1 && (
-            <button className="text-xs text-muted-foreground hover:text-foreground truncate max-w-[90px] px-1"
-              title="切换 AI 服务" onClick={() => {
-                const idx = enabledServices.findIndex(s => s.id === (selectedServiceId || effectiveService?.id));
-                const next = enabledServices[(idx + 1) % enabledServices.length];
-                setSelectedServiceId(next.id);
-                host.storage.set('_novel_assistant_service_id', next.id);
-              }}>
-              {effectiveService?.name || 'AI'}
-            </button>
-          )}
           <div className="flex-1" />
           {streaming ? (
             <Button variant="outline" size="icon" className="h-7 w-7 flex-shrink-0" onClick={handleStop} title={t('novel.aiStop', { defaultValue: '停止生成' })}>

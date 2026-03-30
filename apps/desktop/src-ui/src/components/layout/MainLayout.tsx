@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useAppStore } from '@/stores/useAppStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useTranslation } from '@/i18n';
+import i18n from 'i18next';
 import { useMenuEvents } from '@/hooks/useMenuEvents';
 import { FileTree } from '../file-tree/FileTree';
 import { TabArea } from '../tabs/TabArea';
@@ -288,17 +289,19 @@ export function MainLayout() {
       {/* 创建项目弹窗 */}
       <CreateProjectDialog
         open={createProjectOpen}
-        onClose={() => setCreateProjectOpen(false)}
+        onOpenChange={setCreateProjectOpen}
         onCreate={async (name, description, firstDocType) => {
           try {
             const project = await createProject(name, description);
             await openProject(project.id);
-            // 如果选择了文档类型，自动创建第一个文档
+            // 如果选择了文档类型，自动创建第一个文档（文档名用类型名称，不与项目同名）
             if (firstDocType) {
               const { getDocTypeOrDefault } = await import('@/doctype-sdk/registry');
               const typeDef = getDocTypeOrDefault(firstDocType);
+              // 用文档类型的本地化名称作为首个文档名（而非项目名）
+              const docTypeName = i18n.t(typeDef.labelKey, { defaultValue: typeDef.id });
               const { createDocument, openTab } = useAppStore.getState();
-              const newDoc = await createDocument(project.id, name);
+              const newDoc = await createDocument(project.id, docTypeName);
               if (newDoc && firstDocType !== 'normal') {
                 await invoke('save_document', {
                   payload: {

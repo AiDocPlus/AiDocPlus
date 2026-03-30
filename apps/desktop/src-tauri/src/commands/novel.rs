@@ -1,3 +1,5 @@
+#![allow(dead_code)] // 长篇小说写作功能预留代码，后续开发使用
+
 use crate::config;
 use crate::error::ResultExt;
 use serde::{Deserialize, Serialize};
@@ -60,7 +62,10 @@ pub fn load_novel_settings(project_id: String) -> crate::error::Result<Option<No
 
 /// 保存小说设定集
 #[tauri::command]
-pub fn save_novel_settings(project_id: String, settings: NovelSettings) -> crate::error::Result<()> {
+pub fn save_novel_settings(
+    project_id: String,
+    settings: NovelSettings,
+) -> crate::error::Result<()> {
     let path = novel_settings_path(&project_id);
 
     // 确保项目目录存在
@@ -107,13 +112,17 @@ pub fn load_style_corpus_list(project_id: String) -> crate::error::Result<Vec<se
         return Ok(vec![]);
     }
     let content = std::fs::read_to_string(&index_path).context("读取风格语料库索引失败")?;
-    let list: Vec<serde_json::Value> = serde_json::from_str(&content).context("解析风格语料库索引失败")?;
+    let list: Vec<serde_json::Value> =
+        serde_json::from_str(&content).context("解析风格语料库索引失败")?;
     Ok(list)
 }
 
 /// 保存风格语料库列表
 #[tauri::command]
-pub fn save_style_corpus_list(project_id: String, list: Vec<serde_json::Value>) -> crate::error::Result<()> {
+pub fn save_style_corpus_list(
+    project_id: String,
+    list: Vec<serde_json::Value>,
+) -> crate::error::Result<()> {
     let dir = style_corpus_dir(&project_id);
     std::fs::create_dir_all(&dir).context("创建风格语料库目录失败")?;
     let index_path = dir.join("index.json");
@@ -124,7 +133,12 @@ pub fn save_style_corpus_list(project_id: String, list: Vec<serde_json::Value>) 
 
 /// 保存风格语料库的单个文本文件
 #[tauri::command]
-pub fn save_style_corpus_file(project_id: String, corpus_id: String, file_name: String, content: String) -> crate::error::Result<String> {
+pub fn save_style_corpus_file(
+    project_id: String,
+    corpus_id: String,
+    file_name: String,
+    content: String,
+) -> crate::error::Result<String> {
     let dir = style_corpus_dir(&project_id).join(&corpus_id);
     std::fs::create_dir_all(&dir).context("创建语料库文件目录失败")?;
     let file_path = dir.join(&file_name);
@@ -134,8 +148,14 @@ pub fn save_style_corpus_file(project_id: String, corpus_id: String, file_name: 
 
 /// 读取风格语料库的单个文本文件
 #[tauri::command]
-pub fn read_style_corpus_file(project_id: String, corpus_id: String, file_name: String) -> crate::error::Result<String> {
-    let file_path = style_corpus_dir(&project_id).join(&corpus_id).join(&file_name);
+pub fn read_style_corpus_file(
+    project_id: String,
+    corpus_id: String,
+    file_name: String,
+) -> crate::error::Result<String> {
+    let file_path = style_corpus_dir(&project_id)
+        .join(&corpus_id)
+        .join(&file_name);
     let content = std::fs::read_to_string(&file_path).context("读取语料库文件失败")?;
     Ok(content)
 }
@@ -148,4 +168,114 @@ pub fn delete_style_corpus(project_id: String, corpus_id: String) -> crate::erro
         std::fs::remove_dir_all(&dir).context("删除语料库目录失败")?;
     }
     Ok(())
+}
+
+/// 读取风格语料库所有文件内容（用于 AI 分析）
+#[tauri::command]
+pub fn read_style_corpus_all_files(
+    project_id: String,
+    corpus_id: String,
+) -> crate::error::Result<Vec<StyleCorpusFileContent>> {
+    let dir = style_corpus_dir(&project_id).join(&corpus_id);
+    if !dir.exists() {
+        return Ok(vec![]);
+    }
+
+    let mut files = vec![];
+    for entry in std::fs::read_dir(&dir).context("读取语料库目录失败")? {
+        let entry = entry.context("读取目录条目失败")?;
+        let path = entry.path();
+        if path.is_file() {
+            if let Some(ext) = path.extension() {
+                if ext == "txt" || ext == "md" {
+                    let content = std::fs::read_to_string(&path).context("读取语料库文件失败")?;
+                    let file_name = path
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| "unnamed".to_string());
+                    let word_count = content.chars().filter(|c| !c.is_whitespace()).count() as u32;
+                    files.push(StyleCorpusFileContent {
+                        file_name,
+                        content,
+                        word_count,
+                    });
+                }
+            }
+        }
+    }
+    Ok(files)
+}
+
+/// 风格语料库文件内容
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StyleCorpusFileContent {
+    pub file_name: String,
+    pub content: String,
+    pub word_count: u32,
+}
+
+/// 保存风格画像（AI 分析结果）
+#[tauri::command]
+pub fn save_style_profile(
+    project_id: String,
+    corpus_id: String,
+    profile: serde_json::Value,
+) -> crate::error::Result<()> {
+    let dir = style_corpus_dir(&project_id).join(&corpus_id);
+    std::fs::create_dir_all(&dir).context("创建语料库目录失败")?;
+    let profile_path = dir.join("style-profile.json");
+    let json = serde_json::to_string_pretty(&profile).context("序列化风格画像失败")?;
+    config::atomic_write(&profile_path, &json)?;
+    Ok(())
+}
+
+/// 读取风格画像
+#[tauri::command]
+pub fn read_style_profile(
+    project_id: String,
+    corpus_id: String,
+) -> crate::error::Result<Option<serde_json::Value>> {
+    let profile_path = style_corpus_dir(&project_id)
+        .join(&corpus_id)
+        .join("style-profile.json");
+    if !profile_path.exists() {
+        return Ok(None);
+    }
+    let content = std::fs::read_to_string(&profile_path).context("读取风格画像失败")?;
+    let profile: serde_json::Value = serde_json::from_str(&content).context("解析风格画像失败")?;
+    Ok(Some(profile))
+}
+
+/// 保存文本块索引（用于 RAG 检索）
+#[tauri::command]
+pub fn save_style_chunks_index(
+    project_id: String,
+    corpus_id: String,
+    chunks: Vec<serde_json::Value>,
+) -> crate::error::Result<()> {
+    let dir = style_corpus_dir(&project_id).join(&corpus_id);
+    std::fs::create_dir_all(&dir).context("创建语料库目录失败")?;
+    let chunks_path = dir.join("chunks-index.json");
+    let json = serde_json::to_string_pretty(&chunks).context("序列化文本块索引失败")?;
+    config::atomic_write(&chunks_path, &json)?;
+    Ok(())
+}
+
+/// 读取文本块索引
+#[tauri::command]
+pub fn read_style_chunks_index(
+    project_id: String,
+    corpus_id: String,
+) -> crate::error::Result<Vec<serde_json::Value>> {
+    let chunks_path = style_corpus_dir(&project_id)
+        .join(&corpus_id)
+        .join("chunks-index.json");
+    if !chunks_path.exists() {
+        return Ok(vec![]);
+    }
+    let content = std::fs::read_to_string(&chunks_path).context("读取文本块索引失败")?;
+    let chunks: Vec<serde_json::Value> =
+        serde_json::from_str(&content).context("解析文本块索引失败")?;
+    Ok(chunks)
 }

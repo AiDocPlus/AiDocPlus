@@ -21,6 +21,7 @@ import {
   getDefaultStore, getBuiltinPrompt, getBuiltinCategoryLabel,
   genActionId, exportConfig, importConfig,
 } from '../quickActionDefs';
+import { saveTextFileWithDialog } from '@/lib/tauriSaveTextFile';
 
 const DIALOG_STYLE = { fontFamily: '宋体', fontSize: '16px' };
 
@@ -242,15 +243,17 @@ export function QuickActionManagerDialog({ open, onOpenChange, store: initialSto
     setConfirmResetOpen(false);
   }, []);
 
-  const handleExport = useCallback(() => {
+  const handleExport = useCallback(async () => {
     const json = exportConfig(draft);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'table-quick-actions-config.json';
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      await saveTextFileWithDialog({
+        defaultPath: 'table-quick-actions-config.json',
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+        content: json,
+      });
+    } catch (e) {
+      console.error('[Table QuickActionManagerDialog] export', e);
+    }
   }, [draft]);
 
   const handleImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {

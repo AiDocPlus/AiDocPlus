@@ -19,7 +19,7 @@ permalink: /docs/
 
 - [生成区（编辑器）](./guide/editor) — Markdown 编辑器、双栏布局、文档管理
 - [AI 对话与生成](./guide/ai-chat) — AI 助手、提示词模板、上下文模式
-- [插件系统](./guide/plugins) — 27 个插件的使用方法
+- [插件系统](./guide/plugins) — 28 个插件的使用方法
 - [合并区](./guide/composer) — 多来源内容整合
 - [编程区](./guide/coding) — 代码编辑、执行与 AI 辅助编程
 - [模板管理](./guide/templates) — 提示词模板和文档模板

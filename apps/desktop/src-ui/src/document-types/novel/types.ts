@@ -29,6 +29,157 @@ export interface NovelDocSettings {
   worldRules?: string;
   worldGeography?: string;
   worldCulture?: string;
+  /** P0: 风格学习 — 关联的风格语料库 ID 列表 */
+  styleCorpusIds?: string[];
+  /** P0: 风格学习 — 风格语料库权重（用于多语料混合） */
+  styleCorpusWeights?: Record<string, number>;
+  /** P0: 风格学习 — 当前激活的合成风格画像 */
+  activeStyleProfile?: StyleProfile;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// P0: 风格学习系统类型
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** 风格语料库（存储在项目目录的 style-corpora/{id}/ 下） */
+export interface StyleCorpus {
+  id: string;
+  name: string;
+  authorName?: string;
+  /** 来源类型 */
+  sourceType: 'upload' | 'chapter' | 'external';
+  /** 语料文件列表 */
+  files: StyleCorpusFile[];
+  /** 总字数 */
+  totalWords: number;
+  /** 总块数 */
+  totalChunks: number;
+  /** AI 分析后的风格画像 */
+  styleProfile?: StyleProfile;
+  /** 导入时间 */
+  importedAt: number;
+  /** 最后分析时间 */
+  analyzedAt?: number;
+}
+
+/** 风格语料库文件 */
+export interface StyleCorpusFile {
+  id: string;
+  /** 原始文件名 */
+  fileName: string;
+  /** 文本块列表 */
+  chunks: StyleTextChunk[];
+  /** 文件字数 */
+  wordCount: number;
+  /** 导入时间 */
+  importedAt: number;
+}
+
+/** 风格文本块（用于 RAG 检索） */
+export interface StyleTextChunk {
+  id: string;
+  /** 块内容 */
+  content: string;
+  /** 字数 */
+  wordCount: number;
+  /** 场景类型（用于按场景类型检索） */
+  sceneType?: 'dialogue' | 'action' | 'description' | 'internal' | 'transition';
+  /** 关键词列表（用于 BM25 检索） */
+  keywords?: string[];
+}
+
+/** 风格画像（AI 分析生成） */
+export interface StyleProfile {
+  // ═══ 统计特征 ═══
+  /** 平均句长（字符） */
+  avgSentenceLength: number;
+  /** 句长标准差 */
+  sentenceLengthStdDev: number;
+  /** 平均段落长度 */
+  avgParagraphLength: number;
+  /** 段落长度范围 */
+  paragraphLengthRange: { min: number; max: number };
+  /** 对话比例 */
+  dialogueRatio: number;
+  /** 叙述比例 */
+  narrationRatio: number;
+  /** 词汇多样性（TTR） */
+  vocabularyDiversity: number;
+
+  // ═══ 文风特征 ═══
+  /** 叙事视角：第一人称/第三人称/全知视角 */
+  narrativeVoice: string;
+  /** 时态偏好：过去/现在/混合 */
+  tensePreference: string;
+  /** 语调风格：严肃/幽默/抒情/平实 */
+  toneStyle: string;
+
+  // ═══ 修辞特征 ═══
+  /** 常用比喻模式 */
+  commonMetaphors: string[];
+  /** 修辞手法：排比/反问/夸张/拟人 */
+  rhetoricalDevices: string[];
+  /** 高频句式 */
+  topPatterns: string[];
+
+  // ═══ 对话风格 ═══
+  /** 对话风格：简洁/冗长/书面化/口语化 */
+  dialogueStyle: string;
+  /** 对话标签动词偏好：说/道/问/答 */
+  tagVerbPreference: string[];
+
+  // ═══ 场景描写 ═══
+  /** 五感偏好：视觉/听觉/嗅觉/触觉/味觉 */
+  sensoryFocus: string[];
+  /** 节奏偏好：快节奏/慢节奏/张弛有致 */
+  pacingPreference: string;
+
+  // ═══ AI 定性分析 ═══
+  /** 整体风格概述（200-300 字） */
+  summary: string;
+  /** 标志性特征 */
+  signature: string;
+  /** AI 原始分析结果 */
+  rawAnalysis?: string;
+  /** 分析时间 */
+  analyzedAt: number;
+}
+
+/** 风格语料库 */
+export interface StyleCorpus {
+  id: string;
+  name: string;
+  authorName?: string;
+  /** 来源类型：上传文件/从章节提取/外部导入 */
+  sourceType: 'upload' | 'chapter' | 'external';
+  files: StyleCorpusFile[];
+  totalWords: number;
+  totalChunks: number;
+  /** 风格画像（AI 分析后生成） */
+  styleProfile?: StyleProfile;
+  importedAt: number;
+  analyzedAt?: number;
+}
+
+/** 风格语料库文件 */
+export interface StyleCorpusFile {
+  id: string;
+  fileName: string;
+  /** 文本块列表 */
+  chunks: StyleTextChunk[];
+  wordCount: number;
+  importedAt: number;
+}
+
+/** 风格文本块（用于 RAG 检索） */
+export interface StyleTextChunk {
+  id: string;
+  content: string;
+  wordCount: number;
+  /** 场景类型（对话/动作/描写/心理/过渡） */
+  sceneType?: 'dialogue' | 'action' | 'description' | 'internal' | 'transition';
+  /** 关键词列表（用于检索） */
+  keywords?: string[];
 }
 
 export interface NovelWritingSession {
@@ -84,6 +235,16 @@ export interface NovelChapter {
   scenes?: NovelScene[];
   /** N2.4: 章节批注列表 */
   annotations?: NovelAnnotation[];
+
+  // ═══ P1: 四层记忆架构 ═══
+  /** P1: AI 自动生成的摘要（200-300 字） */
+  autoSummary?: string;
+  /** P1: 关键情节节点（用于上下文注入） */
+  keyEvents?: string[];
+  /** P1: 角色状态快照（本章结束时各角色状态） */
+  characterStates?: ChapterCharacterState[];
+  /** P1: 摘要生成时间 */
+  summaryGeneratedAt?: number;
 }
 
 export interface NovelScene {
@@ -102,6 +263,71 @@ export interface NovelScene {
   status: 'draft' | 'revised' | 'done';
   tags?: string[];
   timelineDate?: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// P1: 四层记忆架构
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** P1: 章节角色状态快照（记录本章结束时角色的状态） */
+export interface ChapterCharacterState {
+  /** 角色 ID */
+  characterId: string;
+  /** 角色在本章的情感状态 */
+  emotion?: string;
+  /** 角色在本章的关键行动 */
+  keyActions?: string[];
+  /** 角色在本章的关键变化 */
+  changes?: string;
+  /** 角色当前所在地 */
+  currentLocation?: string;
+  /** 角色在本章说过的关键台词 */
+  keyDialogue?: string;
+  /** 角色与其他角色的关系变化 */
+  relationChanges?: {
+    targetId: string;
+    change: string;
+  }[];
+}
+
+/** P1: 四层记忆上下文 */
+export interface NovelMemoryContext {
+  /** Layer 0: 风格层（来自风格学习系统） */
+  layer0Style?: {
+    profile: StyleProfile;
+    samples?: string[];
+  };
+  /** Layer 1: 设定层 */
+  layer1Settings?: {
+    worldRules?: string;
+    relatedCharacters?: NovelCharacter[];
+    openForeshadowing?: NovelForeshadowing[];
+    activePlotlines?: NovelPlotline[];
+  };
+  /** Layer 2: 近章层 */
+  layer2RecentChapters?: {
+    summaries: {
+      chapterId: string;
+      chapterTitle: string;
+      summary: string;
+      keyEvents: string[];
+    }[];
+  };
+  /** Layer 3: 当前章节层 */
+  layer3CurrentChapter?: {
+    outline?: string;
+    contentTail: string;
+    povCharacter?: NovelCharacter;
+    characterStates?: ChapterCharacterState[];
+  };
+  /** Token 使用统计 */
+  tokenUsage?: {
+    layer0: number;
+    layer1: number;
+    layer2: number;
+    layer3: number;
+    total: number;
+  };
 }
 
 export interface NovelPlotline {

@@ -18,9 +18,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { invoke } from '@tauri-apps/api/core';
 import {
   Sparkles, Settings, ChevronDown,
-  TrendingUp, FileText, BarChart3, Loader2, Zap,
-  DollarSign, LineChart, Lightbulb, Target, ScrollText, RotateCcw, RefreshCw,
+  Loader2,
+  ScrollText, RotateCcw,
   FileEdit, AlertTriangle,
+  TrendingUp, Zap, FileText,
+  Target, BarChart3,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -28,7 +30,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { DocTypeEditorProps, DocTypeToolScope } from '@/doctype-sdk/types';
 import DocTypeAIChatBase, { sendDocTypeAIMessage } from '@/document-types/_shared/DocTypeAIChatBase';
+import { DocTypeAIServiceMenu } from '@/document-types/_shared/DocTypeAIServiceMenu';
 import type { DocTypeChatMsg } from '@/document-types/_shared/DocTypeChatMessage';
+import {
+  SIDEBAR_AI_HEADER_PANEL,
+  SIDEBAR_AI_HEADER_ROW,
+  SIDEBAR_AI_HEADER_SUBROW,
+} from '@/document-types/_shared/styles';
 import { useSettingsStore, getAIInvokeParamsForService } from '@/stores/useSettingsStore';
 import { useShallow } from 'zustand/react/shallow';
 import type { StockResearchDocumentContent } from './types';
@@ -39,13 +47,17 @@ import {
 } from './stockResearchContext';
 import {
   getQuickActionsByCategory, getPromptForAction,
-  type QuickAction, type QuickActionCategory,
+  type QuickAction,
 } from './stockResearchQuickActions';
 import { QUICK_ACTION_CATEGORIES } from './stockResearchQuickActions';
 import { RESEARCH_PHASES, DEFAULT_ONE_CLICK_PROMPT } from './constants';
-import { parseAIResearchOutput, type AIResearchOutput } from './ai/outputParser';
+import { parseAIResearchOutputWithDebug, type AIResearchOutput } from './ai/outputParser';
 import ResearchProgressIndicator, {
-  createResearchSteps, updateStepsFromMessage, finalizeResearchStepsOnSuccess, type ResearchStep,
+  createResearchSteps,
+  updateStepsFromMessage,
+  finalizeResearchStepsOnSuccess,
+  detectResearchJsonInStream,
+  type ResearchStep,
 } from './ResearchProgressIndicator';
 
 interface StockResearchAISidebarProps {
@@ -61,31 +73,11 @@ interface StockResearchAISidebarProps {
   tushareRecheckNonce?: number;
 }
 
-// 分类图标映射
-const CATEGORY_ICONS: Record<QuickActionCategory, typeof TrendingUp> = {
-  financial: DollarSign,
-  technical: LineChart,
-  thesis: Lightbulb,
-  comparison: BarChart3,
-  report: FileText,
-  refresh: RefreshCw,
-};
-
-// 分类颜色映射
 function toolScopeForQuickAction(action: QuickAction): DocTypeToolScope {
   if (action.category === 'financial') return 'stock:financial';
   if (action.category === 'technical') return 'stock:technical';
   return 'stock';
 }
-
-const CATEGORY_COLORS: Record<QuickActionCategory, string> = {
-  financial: 'text-green-500',
-  technical: 'text-blue-500',
-  thesis: 'text-amber-500',
-  comparison: 'text-purple-500',
-  report: 'text-slate-500',
-  refresh: 'text-orange-500',
-};
 
 // 数据新鲜度指示器组件
 interface DataFreshnessIndicatorProps {
@@ -129,7 +121,7 @@ export default function StockResearchAISidebar({
   onOpenTushareSettings,
   tushareRecheckNonce = 0,
 }: StockResearchAISidebarProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const [tushareOk, setTushareOk] = useState<boolean | null>(null);
   useEffect(() => {
@@ -150,11 +142,12 @@ export default function StockResearchAISidebar({
   const [isResearching, setIsResearching] = useState(false);
   const [researchSteps, setResearchSteps] = useState<ResearchStep[]>([]);
   const oneClickResearchActiveRef = useRef(false);
+  const lastStreamAccumRef = useRef('');
+  const aiStreamActiveRef = useRef(false);
 
   // ── AI 服务 ──
-  const { services, activeServiceId } = useSettingsStore(useShallow(s => ({
+  const { services } = useSettingsStore(useShallow(s => ({
     services: s.ai.services,
-    activeServiceId: s.ai.activeServiceId,
   })));
   const enabledServices = useMemo(() => services.filter(sv => sv.enabled), [services]);
   const [selectedServiceId, setSelectedServiceId] = useState<string>(() =>
@@ -166,7 +159,7 @@ export default function StockResearchAISidebar({
 
   // ── 系统提示词编辑 ──
   const [promptOpen, setPromptOpen] = useState(false);
-  const defaultPrompt = useMemo(() => buildSystemPrompt(research), [research]);
+  const defaultPrompt = useMemo(() => buildSystemPrompt(research, i18n.language), [research, i18n.language]);
   const [customPrompt, setCustomPrompt] = useState<string>(() =>
     host.storage.get<string>('_stock_ai_prompt') || ''
   );
@@ -235,6 +228,7 @@ export default function StockResearchAISidebar({
     oneClickResearchActiveRef.current = true;
     setIsResearching(true);
     setResearchSteps(createResearchSteps(t));
+    lastStreamAccumRef.current = '';
 
     sendDocTypeAIMessage({
       documentId: doc.id,
@@ -250,9 +244,25 @@ export default function StockResearchAISidebar({
     setResearchInput('');
   }, [doc.id, t, systemPrompt, customOneClickPrompt]);
 
+  const handleAiStreamingChange = useCallback((active: boolean) => {
+    aiStreamActiveRef.current = active;
+    if (!active && oneClickResearchActiveRef.current) {
+      setResearchSteps(prev =>
+        updateStepsFromMessage(prev, lastStreamAccumRef.current, { streamActive: false }),
+      );
+      oneClickResearchActiveRef.current = false;
+      setIsResearching(false);
+    }
+  }, []);
+
   const onAssistantStreamUpdate = useCallback((text: string) => {
     if (!oneClickResearchActiveRef.current) return;
-    setResearchSteps(prev => updateStepsFromMessage(prev, text));
+    // 首段 chunk 可能早于 React 将 streaming 置为 true 的 effect，进度条需按「仍在输出」处理
+    aiStreamActiveRef.current = true;
+    lastStreamAccumRef.current = text;
+    setResearchSteps(prev =>
+      updateStepsFromMessage(prev, text, { streamActive: true }),
+    );
   }, []);
 
   // 监听 AI 完成/失败事件，重置研究状态
@@ -277,28 +287,29 @@ export default function StockResearchAISidebar({
 
   // Header Slot: 一键研究 + AI服务选择 + 快捷操作下拉菜单 + 上下文模式切换
   const headerSlot: ReactNode = (
-    <div className="border-b p-2 space-y-1.5 bg-card">
+    <div className={SIDEBAR_AI_HEADER_PANEL}>
       {tushareOk === false && onOpenTushareSettings && (
-        <button
-          type="button"
-          onClick={onOpenTushareSettings}
-          className="w-full flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-left text-[10px] text-amber-950 dark:text-amber-100 hover:bg-amber-500/15 transition-colors"
-        >
-          <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-          <span className="flex-1 min-w-0">
-            <span className="block">{t('stockResearch.tushareBannerInvalid', { defaultValue: '未检测到有效 Tushare Token，股票工具可能无法返回数据。' })}</span>
-            <span className="text-primary underline font-medium">{t('stockResearch.tushareOpenSettings', { defaultValue: '打开 Tushare 设置' })}</span>
-          </span>
-        </button>
+        <div className="px-2 pt-2 pb-1">
+          <button
+            type="button"
+            onClick={onOpenTushareSettings}
+            className="w-full flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-left text-[10px] text-amber-950 dark:text-amber-100 hover:bg-amber-500/15 transition-colors"
+          >
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            <span className="flex-1 min-w-0">
+              <span className="block">{t('stockResearch.tushareBannerInvalid', { defaultValue: '未检测到有效 Tushare Token，股票工具可能无法返回数据。' })}</span>
+              <span className="text-primary underline font-medium">{t('stockResearch.tushareOpenSettings', { defaultValue: '打开 Tushare 设置' })}</span>
+            </span>
+          </button>
+        </div>
       )}
 
-      {/* 一键研究输入框 + 按钮 */}
-      <div className="flex items-center gap-1">
+      <div className={cn(SIDEBAR_AI_HEADER_ROW, 'flex-wrap gap-1 py-1.5')}>
         <Input
           placeholder={t('stockResearch.inputStockPlaceholder')}
           value={researchInput}
           onChange={(e) => setResearchInput(e.target.value)}
-          className="h-6 text-xs flex-1"
+          className="h-7 text-xs min-w-[100px] flex-1 basis-[40%]"
           onKeyDown={(e) => {
             if (e.key === 'Enter' && researchInput.trim()) {
               handleOneClickResearch(researchInput.trim());
@@ -308,7 +319,7 @@ export default function StockResearchAISidebar({
         <Button
           variant="default"
           size="sm"
-          className="h-6 w-6 p-0"
+          className="h-7 shrink-0 px-2 text-xs inline-flex items-center"
           onClick={() => {
             if (researchInput.trim()) {
               handleOneClickResearch(researchInput.trim());
@@ -318,48 +329,29 @@ export default function StockResearchAISidebar({
           title={t('stockResearch.oneClickResearchHint')}
         >
           {isResearching ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
+            <>
+              <Loader2 className="h-3 w-3 animate-spin shrink-0" />
+              <span className="ml-1">{t('stockResearch.oneClickResearching')}</span>
+            </>
           ) : (
-            <Sparkles className="h-3 w-3" />
+            t('stockResearch.oneClickResearch')
           )}
         </Button>
-      </div>
-
-      {/* 研究进度指示器 */}
-      {researchSteps.length > 0 && (
-        <ResearchProgressIndicator
-          steps={researchSteps}
-          isActive={isResearching}
-          onCancel={() => {
-            window.dispatchEvent(new CustomEvent('doctype-ai-stop', { detail: { documentId: doc.id } }));
-            oneClickResearchActiveRef.current = false;
-            setIsResearching(false);
-            setResearchSteps([]);
-          }}
-        />
-      )}
-
-      {/* 工具栏：快捷操作 + 上下文模式 */}
-      <div className="flex items-center gap-1">
-        {/* 快捷操作下拉菜单 */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-6 text-xs gap-1 flex-1">
-              <Zap className="h-3 w-3" />
-              {t('stockResearch.quickActions')}
-              <ChevronDown className="h-3 w-3 ml-auto" />
+            <Button variant="outline" size="sm" className="h-7 text-xs gap-1 min-w-0 flex-1 basis-[min(160px,100%)] justify-start max-sm:max-w-full">
+              <span className="truncate">{t('stockResearch.quickActions')}</span>
+              <ChevronDown className="h-3 w-3 ml-auto shrink-0 opacity-60" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-56">
             {QUICK_ACTION_CATEGORIES.map(categoryDef => {
               const actions = getQuickActionsByCategory(categoryDef.key);
               if (actions.length === 0) return null;
-              const Icon = CATEGORY_ICONS[categoryDef.key];
 
               return (
                 <DropdownMenuSub key={categoryDef.key}>
                   <DropdownMenuSubTrigger className="text-xs">
-                    <Icon className={cn('h-3 w-3 mr-1.5', CATEGORY_COLORS[categoryDef.key])} />
                     {t(categoryDef.labelKey)}
                     <span className="ml-auto text-muted-foreground text-[10px]">{actions.length}</span>
                   </DropdownMenuSubTrigger>
@@ -370,7 +362,6 @@ export default function StockResearchAISidebar({
                         className="text-xs"
                         onClick={() => handleQuickAction(action)}
                       >
-                        <action.icon className="h-3 w-3 mr-1.5" />
                         {t(action.labelKey)}
                       </DropdownMenuItem>
                     ))}
@@ -380,12 +371,10 @@ export default function StockResearchAISidebar({
             })}
           </DropdownMenuContent>
         </DropdownMenu>
-
-        {/* 上下文模式 */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-6 w-6">
-              <Settings className="h-3 w-3" />
+            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+              <Settings className="h-3.5 w-3.5" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -402,25 +391,22 @@ export default function StockResearchAISidebar({
         </DropdownMenu>
       </div>
 
-      {/* AI 服务选择 */}
-      {enabledServices.length >= 2 && (
-        <div className="flex items-center gap-1">
-          <span className="text-[10px] text-muted-foreground">{t('stockResearch.aiService')}:</span>
-          <select
-            className="h-5 text-[10px] px-1.5 border rounded bg-background flex-1 truncate"
-            value={selectedServiceId || activeServiceId || ''}
-            onChange={e => { setSelectedServiceId(e.target.value); host.storage.set('_stock_ai_service_id', e.target.value); }}
-            title={t('stockResearch.selectAiService')}
-          >
-            {enabledServices.map(s => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
+      {researchSteps.length > 0 && (
+        <div className="px-2 pb-1.5 border-t border-border/40">
+          <ResearchProgressIndicator
+            steps={researchSteps}
+            isActive={isResearching}
+            onCancel={() => {
+              window.dispatchEvent(new CustomEvent('doctype-ai-stop', { detail: { documentId: doc.id } }));
+              oneClickResearchActiveRef.current = false;
+              setIsResearching(false);
+              setResearchSteps([]);
+            }}
+          />
         </div>
       )}
 
-      {/* Token 统计 + 数据新鲜度 + Prompt 编辑 */}
-      <div className="flex justify-between items-center text-[10px] text-muted-foreground">
+      <div className={cn(SIDEBAR_AI_HEADER_SUBROW, 'justify-between gap-2 text-[10px] text-muted-foreground')}>
         <div className="flex items-center gap-2">
           <span>{t('stockResearch.contextTokens', { count: context.totalTokens })}</span>
           <DataFreshnessIndicator research={research} t={t} />
@@ -540,13 +526,19 @@ export default function StockResearchAISidebar({
     </div>
   );
 
-  // 消息操作：插入到文档 + 应用研究结果（仅当消息包含可解析 JSON 时显示）
+  // 消息操作：插入到文档 + 应用研究结果（带调试信息）
   const messageActions = useCallback((msg: DocTypeChatMsg): ReactNode => {
-    const parsed = parseAIResearchOutput(msg.content);
+    const { result: parsed, error, rawJson } = parseAIResearchOutputWithDebug(msg.content);
+
+    // 围栏代码块、解析器提取的 JSON、或正文中的裸研究对象（模型常省略 ```json）
+    const hasResearchPayload =
+      parsed != null
+      || rawJson !== undefined
+      || detectResearchJsonInStream(msg.content);
 
     return (
       <div className="flex gap-1">
-        {/* 插入到文档 */}
+        {/* 插入到文档 - 始终显示 */}
         <Button
           variant="ghost"
           size="sm"
@@ -556,23 +548,63 @@ export default function StockResearchAISidebar({
           <FileText className="h-3 w-3 mr-1" />
           {t('stockResearch.insertToDoc')}
         </Button>
-        {/* 应用研究结果（仅当消息包含可解析 JSON 时显示） */}
-        {parsed && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-6 text-[10px]"
-            onClick={() => {
-              onApplyResearchResult(parsed);
-            }}
-          >
-            <Zap className="h-3 w-3 mr-1" />
-            {t('stockResearch.applyResearch', { defaultValue: '应用研究结果' })}
-          </Button>
+        {/* 应用研究结果 - 有结构化 JSON 时显示 */}
+        {hasResearchPayload && (
+          parsed ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-6 text-[10px]"
+              onClick={() => onApplyResearchResult(parsed)}
+            >
+              <Zap className="h-3 w-3 mr-1" />
+              {t('stockResearch.applyResearch', { defaultValue: '应用研究结果' })}
+            </Button>
+          ) : (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 text-[10px] text-amber-600 dark:text-amber-500"
+                >
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  {t('stockResearch.applyResearchFailed', { defaultValue: '解析失败' })}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="max-w-xs text-xs" side="top">
+                <p className="font-medium mb-1">{t('stockResearch.parseErrorTitle', { defaultValue: '解析失败原因：' })}</p>
+                <p className="text-muted-foreground">{error}</p>
+                {rawJson && (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-primary text-[11px]">
+                      {t('stockResearch.viewExtractedJson', { defaultValue: '查看提取的 JSON' })}
+                    </summary>
+                    <pre className="mt-1 p-2 bg-muted rounded text-[10px] overflow-auto max-h-32 whitespace-pre-wrap break-all">{rawJson}</pre>
+                  </details>
+                )}
+              </PopoverContent>
+            </Popover>
+          )
         )}
       </div>
     );
   }, [onInsertToDoc, onApplyResearchResult, t]);
+
+  const inputAccessorySlot: ReactNode = (
+    <div className="flex items-center gap-1 min-w-0">
+      <span className="text-[10px] text-muted-foreground shrink-0">{t('stockResearch.aiService')}:</span>
+      <DocTypeAIServiceMenu
+        enabledServices={enabledServices}
+        value={aiParams.serviceId ?? ''}
+        onChange={(id) => {
+          setSelectedServiceId(id);
+          host.storage.set('_stock_ai_service_id', id);
+        }}
+        className="min-w-0 flex-1"
+      />
+    </div>
+  );
 
   return (
     <DocTypeAIChatBase
@@ -584,20 +616,24 @@ export default function StockResearchAISidebar({
       emptyStateSlot={emptyStateSlot}
       messageActions={messageActions}
       onAssistantStreamUpdate={onAssistantStreamUpdate}
+      onStreamingChange={handleAiStreamingChange}
+      showStreamingAssistantActions
       placeholder={t('stockResearch.inputPlaceholder')}
       historyLimit={6}
       showAIOptions={true}
-      defaultWebSearch={true}
-      defaultThinking={true}
       enableTools={true}
       toolScope="stock"
+      inputAccessorySlot={inputAccessorySlot}
     />
   );
 }
 
 // 构建系统提示词
-function buildSystemPrompt(research: StockResearchDocumentContent): string {
+function buildSystemPrompt(research: StockResearchDocumentContent, locale?: string): string {
   const today = new Date().toLocaleDateString('zh-CN');
+  const calcBridge = locale?.startsWith('en')
+    ? '[Calculator] Users can cross-check PE, PB, ROE, DuPont, CAGR, dividend yield, position sizing in a Calculator document (templates: Equities & valuation). When giving pastable lines, use a ```formula block, one expression per line, only supported functions.'
+    : '【计算文档】可将 PE、PB、ROE、杜邦、CAGR、股息率、仓位与止损等放入「计算文档」逐行核对；内置模板与函数菜单「股市与估值」。需要可粘贴算式时用 ```formula，每行一条，勿编造未支持的函数名。';
 
   const basePrompt = `你是一位资深的股票研究分析师，拥有 CFA 和 CPA 资质。
 
@@ -608,6 +644,8 @@ function buildSystemPrompt(research: StockResearchDocumentContent): string {
 【输出规范】
 - 常规问答：可用 Markdown 标题、列表、表格
 - **一键研究 / 需要写入研究卡片时**：在正文末尾输出与「一键研究」模板一致的 \`\`\`json 代码块（字段含 stock、financials、technicals、theses、risk、news、peers），以便用户点击「应用研究结果」
+
+${calcBridge}
 
 【工具】
 可调用的函数与参数以请求中的 tools 列表为准。流程建议：stock_search → ts_code → 按需调用行情/财报/指标/资金流等；工具无数据时明确说明，勿臆测。联网用于新闻与公告等定性信息。Tushare Token 在应用设置中配置。`;

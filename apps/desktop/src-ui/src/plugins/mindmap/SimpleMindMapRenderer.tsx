@@ -9,7 +9,15 @@
  * - 适应窗口 / 导出 SVG
  */
 
-import { useEffect, useRef, useCallback, useState, forwardRef, useImperativeHandle } from 'react';
+import {
+  useEffect,
+  useRef,
+  useCallback,
+  useState,
+  forwardRef,
+  useImperativeHandle,
+  type ForwardedRef,
+} from 'react';
 import type { SMNode } from './mindmapConverter';
 import { mindMapDataToMarkdown } from './mindmapConverter';
 
@@ -149,10 +157,25 @@ interface SimpleMindMapRendererProps {
   rainbowLines?: boolean;
   /** 缩放变化回调 */
   onScaleChange?: (scale: number) => void;
+  /** 节点点击回调 */
+  onNodeClick?: (nodeData: { id: string; text: string }) => void;
 }
 
-export const SimpleMindMapRenderer = forwardRef<SimpleMindMapRendererRef, SimpleMindMapRendererProps>(
-  function SimpleMindMapRenderer({ data, layout = 'logicalStructure', theme = 'default', readonly = false, onDataChange, className, showMiniMap = false, rainbowLines = false, onScaleChange }, ref) {
+export const SimpleMindMapRenderer = forwardRef(function SimpleMindMapRenderer(
+  {
+    data,
+    layout = 'logicalStructure',
+    theme = 'default',
+    readonly = false,
+    onDataChange,
+    className,
+    showMiniMap = false,
+    rainbowLines = false,
+    onScaleChange,
+    onNodeClick,
+  }: SimpleMindMapRendererProps,
+  ref: ForwardedRef<SimpleMindMapRendererRef>
+) {
     const containerRef = useRef<HTMLDivElement>(null);
     const miniMapRef = useRef<HTMLDivElement>(null);
     const mindMapRef = useRef<any>(null);
@@ -161,6 +184,8 @@ export const SimpleMindMapRenderer = forwardRef<SimpleMindMapRendererRef, Simple
     onDataChangeRef.current = onDataChange;
     const onScaleChangeRef = useRef(onScaleChange);
     onScaleChangeRef.current = onScaleChange;
+    const onNodeClickRef = useRef(onNodeClick);
+    onNodeClickRef.current = onNodeClick;
     // 防止 data_change 回调触发外部 setData 后又回流到本组件的循环
     const selfUpdatingRef = useRef(false);
     const pluginsRegistered = useRef(false);
@@ -219,6 +244,7 @@ export const SimpleMindMapRenderer = forwardRef<SimpleMindMapRendererRef, Simple
           containerRef.current.style.minHeight = '300px';
         }
 
+        // as any: 包自带类型不完整，缺少 rainbowLinesOpen 等插件选项
         const mm = new MindMap({
           el: containerRef.current,
           data: data || { data: { text: '思维导图' }, children: [] },
@@ -272,7 +298,7 @@ export const SimpleMindMapRenderer = forwardRef<SimpleMindMapRendererRef, Simple
             if (code === 'read_clipboard_error') return;
             console.warn('[SimpleMindMap] 错误:', code, error);
           },
-        });
+        } as any);
 
         mindMapRef.current = mm;
 
@@ -293,6 +319,13 @@ export const SimpleMindMapRenderer = forwardRef<SimpleMindMapRendererRef, Simple
           onScaleChangeRef.current?.(Math.round(scale * 100));
         });
 
+        // 监听节点点击
+        mm.on('node_click', (node: any) => {
+          const id = node?.nodeData?.data?.id;
+          const text = node?.nodeData?.data?.text || '';
+          if (id) onNodeClickRef.current?.({ id, text });
+        });
+
         // 使用 Scrollbar 插件的 scrollbar_change 事件更新滚动条状态
         mm.on('scrollbar_change', (sbData: { vertical: { top: number; height: number }; horizontal: { left: number; width: number } }) => {
           setScrollbarData(sbData);
@@ -304,7 +337,7 @@ export const SimpleMindMapRenderer = forwardRef<SimpleMindMapRendererRef, Simple
         // 初始化小地图
         if (miniMapRef.current) {
           try {
-            mm.miniMap.init(miniMapRef.current);
+            (mm as any).miniMap.init(miniMapRef.current);
           } catch { /* 小地图初始化失败不影响主功能 */ }
         }
 
@@ -794,5 +827,4 @@ export const SimpleMindMapRenderer = forwardRef<SimpleMindMapRendererRef, Simple
         )}
       </div>
     );
-  },
-);
+});

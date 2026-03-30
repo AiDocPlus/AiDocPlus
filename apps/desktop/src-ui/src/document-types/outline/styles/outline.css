@@ -1,0 +1,588 @@
+/**
+ * 大纲文档样式
+ *
+ * 包含大纲编辑器、引导线、富文本编辑器等样式
+ */
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   ProseMirror 节点编辑器样式
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.prose-mirror-node-editor {
+  min-height: 1.5em;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.prose-mirror-node-editor p {
+  margin: 0;
+}
+
+.prose-mirror-node-editor p.is-editor-empty:first-child::before {
+  color: var(--muted-foreground);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* 占位符样式 */
+.prose-mirror-node-editor .ProseMirror p.is-editor-empty:first-child::before {
+  color: hsl(var(--muted-foreground));
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.prose-mirror-node-editor .ProseMirror-focused {
+  outline: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   富文本标记样式
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* 加粗 */
+.prose-mirror-node-editor strong {
+  font-weight: 600;
+}
+
+/* 斜体 */
+.prose-mirror-node-editor em {
+  font-style: italic;
+}
+
+/* 下划线 */
+.prose-mirror-node-editor u {
+  text-decoration: underline;
+}
+
+/* 删除线 */
+.prose-mirror-node-editor s,
+.prose-mirror-node-editor del {
+  text-decoration: line-through;
+}
+
+/* 高亮 */
+.outline-highlight {
+  padding: 0.1em 0.2em;
+  border-radius: 0.2em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   标签样式
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* #标签 */
+.outline-tag.hash {
+  display: inline;
+  padding: 0.1em 0.3em;
+  background-color: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
+  border-radius: 0.25em;
+  font-size: 0.9em;
+}
+
+/* @提及 */
+.outline-tag.mention {
+  display: inline;
+  padding: 0.1em 0.3em;
+  background-color: hsl(217 91% 60% / 0.1);
+  color: hsl(217 91% 60%);
+  border-radius: 0.25em;
+  font-size: 0.9em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   层级引导线样式
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.outline-row {
+  position: relative;
+}
+
+.outline-guide-line {
+  position: absolute;
+  left: var(--outline-guide-left, 0);
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background-color: hsl(var(--border));
+  pointer-events: none;
+}
+
+/* 不同层级的引导线样式 */
+.outline-guide-line[data-level="0"] {
+  opacity: 0.3;
+}
+
+.outline-guide-line[data-level="1"] {
+  opacity: 0.4;
+}
+
+.outline-guide-line[data-level="2"] {
+  opacity: 0.5;
+}
+
+.outline-guide-line[data-level="3"] {
+  opacity: 0.6;
+}
+
+/* 连接线（L形） */
+.outline-connector {
+  position: absolute;
+  pointer-events: none;
+}
+
+.outline-connector-horizontal {
+  height: 1px;
+  background-color: hsl(var(--border) / 0.5);
+}
+
+.outline-connector-vertical {
+  width: 1px;
+  background-color: hsl(var(--border) / 0.5);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   节点样式
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* 节点行 */
+.outline-row {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  transition: background-color 0.1s ease;
+}
+
+.outline-row:hover {
+  background-color: hsl(var(--muted) / 0.3);
+}
+
+.outline-row.selected {
+  background-color: hsl(var(--primary) / 0.1);
+}
+
+.outline-row.active {
+  background-color: hsl(var(--muted) / 0.5);
+}
+
+/* 搜索匹配高亮 */
+.outline-row.search-match {
+  background-color: hsl(45 93% 47% / 0.2);
+}
+
+/* 完成状态 */
+.outline-row.completed .outline-node-content {
+  text-decoration: line-through;
+  color: hsl(var(--muted-foreground));
+}
+
+/* 缩进统一由 JS 计算的 --outline-indent CSS 变量控制，支持任意深度 */
+.outline-row {
+  padding-left: var(--outline-indent, 0.5rem);
+}
+
+/* 正文字号不随树深度变化；仅节点「标题级别」格式（H1–H7）改变字号，见 outlineHeadingEditorClass */
+
+/* ⋯ / 折叠 / 小黑点：与正文首行同一行盒对齐，勿加 margin-top（会整体偏下） */
+.outline-row-gutter {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 0.25rem;
+  min-height: 1.5em;
+  line-height: 1.5;
+}
+
+/* 小黑点与正文之间：由 .outline-row 的 gap-x-[1ch] 控制，约 1 个字符宽 */
+
+@media (prefers-reduced-motion: reduce) {
+  .outline-bullet.circle::before,
+  .outline-bullet.progress::before,
+  .outline-bullet.filled::before {
+    transition: none !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   完成状态指示器
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* 行首原点：较大点击区（含拖拽），视觉为中央小黑点 — 对齐幕布 */
+.outline-bullet {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  min-width: 1.25rem;
+  min-height: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  padding: 0;
+  border-radius: 9999px;
+  position: relative;
+  isolation: isolate;
+}
+
+/* 未完成：月晕 — 悬停时外圈柔和放大，提示可交互 */
+.outline-bullet.circle {
+  background: transparent;
+}
+
+.outline-bullet.circle::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-left: -0.625rem;
+  margin-top: -0.625rem;
+  border-radius: 9999px;
+  background: hsl(var(--foreground) / 0.07);
+  transform: scale(0.35);
+  opacity: 0;
+  transition:
+    transform 0.22s cubic-bezier(0.33, 1, 0.68, 1),
+    opacity 0.18s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.outline-bullet.circle:hover::before {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.outline-bullet.circle:active::before {
+  transform: scale(0.92);
+  opacity: 0.85;
+}
+
+/* 有子节点进度百分比：同样月晕提示 */
+.outline-bullet.progress::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-left: -0.625rem;
+  margin-top: -0.625rem;
+  border-radius: 9999px;
+  background: hsl(var(--foreground) / 0.06);
+  transform: scale(0.35);
+  opacity: 0;
+  transition:
+    transform 0.22s cubic-bezier(0.33, 1, 0.68, 1),
+    opacity 0.18s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.outline-bullet.progress:hover::before {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.outline-bullet-dot {
+  display: block;
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background-color: hsl(var(--foreground));
+  opacity: 0.75;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.dark .outline-bullet-dot {
+  opacity: 0.85;
+}
+
+/* 已完成：悬停时轻微外扩光晕 */
+.outline-bullet.filled {
+  background-color: hsl(142 76% 36%);
+  border-radius: 50%;
+  color: white;
+}
+
+.outline-bullet.filled::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-left: -0.625rem;
+  margin-top: -0.625rem;
+  border-radius: 9999px;
+  background: hsl(142 76% 36% / 0.28);
+  transform: scale(0.4);
+  opacity: 0;
+  transition:
+    transform 0.22s cubic-bezier(0.33, 1, 0.68, 1),
+    opacity 0.18s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.outline-bullet.filled:hover::before {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.outline-bullet.filled svg {
+  position: relative;
+  z-index: 1;
+}
+
+/* 进度圆环 */
+.outline-bullet.progress {
+  position: relative;
+}
+
+.outline-bullet-progress-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   备注样式
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.outline-note {
+  font-size: 0.8em;
+  color: hsl(var(--muted-foreground));
+  background-color: hsl(var(--muted) / 0.3);
+  border-radius: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  margin-top: 0.25rem;
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
+
+/* 悬浮工具栏色块按钮：用 class 映射颜色，避免 inline style */
+.outline-highlight-swatch-yellow { background-color: #fef3c7; }
+.outline-highlight-swatch-green { background-color: #dcfce7; }
+.outline-highlight-swatch-blue { background-color: #dbeafe; }
+.outline-highlight-swatch-pink { background-color: #fce7f3; }
+.outline-highlight-swatch-purple { background-color: #f3e8ff; }
+.outline-highlight-swatch-orange { background-color: #fed7aa; }
+
+.outline-note:hover {
+  background-color: hsl(var(--muted) / 0.5);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   拖拽样式
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.outline-row.dragging {
+  opacity: 0.5;
+  background-color: hsl(var(--primary) / 0.1);
+}
+
+.outline-row.drag-over {
+  border-top: 2px solid hsl(var(--primary));
+}
+
+.outline-row.drag-over-child {
+  border-left: 2px solid hsl(var(--primary));
+  margin-left: -2px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   多选样式
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.outline-row.multi-selected {
+  background-color: hsl(var(--primary) / 0.15);
+  box-shadow: inset 0 0 0 1px hsl(var(--primary) / 0.3);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   工具栏样式
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.outline-floating-toolbar {
+  position: absolute;
+  z-index: 50;
+  animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   行间距变体
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.outline-editor {
+  font-family: "Songti SC", "SimSun", "STSong", sans-serif;
+}
+
+.outline-editor.font-14 { font-size: 14px; }
+.outline-editor.font-16 { font-size: 16px; }
+.outline-editor.font-18 { font-size: 18px; }
+
+.outline-editor.compact .outline-row {
+  padding-top: 0.125rem;
+  padding-bottom: 0.125rem;
+}
+
+.outline-editor.normal .outline-row {
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+
+.outline-editor.loose .outline-row {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   搜索面板样式
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.outline-search-panel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: hsl(var(--card));
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.outline-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  background-color: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.375rem;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.outline-search-input:focus {
+  border-color: hsl(var(--primary));
+}
+
+.outline-search-count {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  white-space: nowrap;
+}
+
+/* 搜索匹配文本高亮 */
+.search-highlight {
+  background-color: hsl(45 93% 47% / 0.4);
+  border-radius: 0.125rem;
+  padding: 0 0.125rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   专注模式样式
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.outline-focus-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  background-color: hsl(var(--muted) / 0.3);
+  border-radius: 0.375rem;
+  margin-bottom: 0.5rem;
+}
+
+.outline-focus-breadcrumb-item {
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.outline-focus-breadcrumb-item:hover {
+  color: hsl(var(--foreground));
+}
+
+.outline-focus-breadcrumb-separator {
+  color: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   标签云样式
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.outline-tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.outline-tag-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.outline-tag-item.hash {
+  background-color: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
+}
+
+.outline-tag-item.mention {
+  background-color: hsl(217 91% 60% / 0.1);
+  color: hsl(217 91% 60%);
+}
+
+.outline-tag-item:hover {
+  filter: brightness(0.95);
+}
+
+.outline-tag-item.selected {
+  font-weight: 500;
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+
+.outline-tag-count {
+  font-size: 0.625rem;
+  opacity: 0.7;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   深色模式适配
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.dark .outline-row.search-match {
+  background-color: hsl(45 93% 47% / 0.15);
+}
+
+.dark .search-highlight {
+  background-color: hsl(45 93% 47% / 0.3);
+}

@@ -109,6 +109,7 @@ export default function DocTypeEditorBase({
           value={content}
           onChange={handleChange}
           placeholder={placeholder || t('docTypeChat.editorPlaceholder', { defaultValue: '开始撰写...' })}
+          theme={host.ui.getTheme()}
           showToolbar={showToolbar}
           showViewModeSwitch={showViewModeSwitch}
           showStatusBar={false}

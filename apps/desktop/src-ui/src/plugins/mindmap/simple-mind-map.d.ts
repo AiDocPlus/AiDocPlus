@@ -1,87 +1,12 @@
 /**
- * simple-mind-map 类型声明
+ * simple-mind-map 类型补充声明
  *
- * 为 simple-mind-map 库及其插件提供基础类型声明，
- * 避免 TypeScript 隐式 any 类型错误。
+ * 包自带 types/index.d.ts，这里只补充包类型中缺失的部分：
+ * 1. 插件 src 路径的模块声明（包类型只声明了 types/src/plugins/*.d.ts）
+ * 2. 通过 declare module 增强包类型
  */
 
-declare module 'simple-mind-map' {
-  interface MindMapOptions {
-    el: HTMLElement;
-    data?: any;
-    viewData?: any;
-    readonly?: boolean;
-    layout?: string;
-    theme?: string;
-    themeConfig?: Record<string, any>;
-    fit?: boolean;
-    enableAutoEnterTextEditWhenKeydown?: boolean;
-    isEndNodeTextEditOnClickOuter?: boolean;
-    nodeTextEditZIndex?: number;
-    maxHistoryCount?: number;
-    addHistoryTime?: number;
-    alwaysShowExpandBtn?: boolean;
-    expandBtnStyle?: Record<string, any>;
-    openPerformance?: boolean;
-    enableShortcutOnlyWhenMouseInSvg?: boolean;
-    defaultInsertSecondLevelNodeText?: string;
-    defaultInsertBelowSecondLevelNodeText?: string;
-    errorHandler?: (code: string, error: Error) => void;
-    [key: string]: any;
-  }
-
-  class MindMap {
-    constructor(opt: MindMapOptions);
-    static usePlugin(plugin: any, opt?: any): typeof MindMap;
-    static hasPlugin(plugin: any): number;
-    static pluginList: any[];
-    static defineTheme(name: string, config: Record<string, any>): void;
-
-    el: HTMLElement;
-    opt: MindMapOptions;
-    view: {
-      fit: () => void;
-      reset: () => void;
-      getTransformData: () => any;
-      setScale: (scale: number, cx?: number, cy?: number) => void;
-      translateXTo: (x: number) => void;
-      translateYTo: (y: number) => void;
-      translateXY: (x: number, y: number) => void;
-      scale: number;
-      x: number;
-      y: number;
-    };
-    renderer: any;
-    command: any;
-    doExport: any;
-    miniMap: any;
-    svg: any;
-    draw: any;
-
-    on(event: string, fn: (...args: any[]) => void): void;
-    off(event: string, fn: (...args: any[]) => void): void;
-    emit(event: string, ...args: any[]): void;
-    render(callback?: () => void, source?: string): void;
-    reRender(callback?: () => void, source?: string): void;
-    resize(): void;
-    setData(data: any): void;
-    getData(withConfig?: boolean): any;
-    setTheme(theme: string, notRender?: boolean): void;
-    getTheme(): string;
-    setLayout(layout: string, notRender?: boolean): void;
-    getLayout(): string;
-    setMode(mode: 'readonly' | 'edit'): void;
-    execCommand(command: string, ...args: any[]): void;
-    export(type: string, ...args: any[]): Promise<any>;
-    getSvgData(opt?: any): any;
-    destroy(): void;
-    addPlugin(plugin: any, opt?: any): void;
-    removePlugin(plugin: any): void;
-  }
-
-  export default MindMap;
-}
-
+// 补充包类型中缺失的插件 src 路径声明
 declare module 'simple-mind-map/src/plugins/Drag.js' {
   const Drag: any;
   export default Drag;

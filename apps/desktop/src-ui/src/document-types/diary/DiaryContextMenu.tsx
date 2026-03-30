@@ -46,18 +46,23 @@ export default function DiaryContextMenu({
 
   if (!entry) return null;
 
-  const menuItem = 'flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-accent cursor-pointer transition-colors';
+  const menuItem = 'diary-ctx-item flex items-center gap-2 px-3 py-1.5 text-xs cursor-pointer';
   const subHeader = 'px-3 py-1 text-[10px] text-muted-foreground font-medium border-t mt-0.5';
 
   return (
     <div
       ref={ref}
-      className="fixed z-50 min-w-[180px] rounded-md border bg-card shadow-lg py-1 overflow-hidden"
+      className="fixed z-50 min-w-[180px] rounded-md border shadow-lg py-1 overflow-hidden"
       style={{
         left: Math.min(position.x, window.innerWidth - 200),
         top: Math.min(position.y, window.innerHeight - 400),
         fontFamily: "'宋体', 'SimSun', serif",
         fontSize: '16px',
+        opacity: 1,
+        backgroundColor: 'hsl(var(--card))',
+        color: 'hsl(var(--card-foreground))',
+        backdropFilter: 'none',
+        WebkitBackdropFilter: 'none',
       }}
     >
       {/* 收藏 */}

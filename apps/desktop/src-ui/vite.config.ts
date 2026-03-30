@@ -29,6 +29,8 @@ export default defineConfig({
         main: path.resolve(__dirname, 'index.html'),
         manager: path.resolve(__dirname, 'manager.html'),
         help: path.resolve(__dirname, 'help.html'),
+        scratchpad: path.resolve(__dirname, 'scratchpad.html'),
+        reader: path.resolve(__dirname, 'reader.html'),
       },
       output: {
         manualChunks(id) {

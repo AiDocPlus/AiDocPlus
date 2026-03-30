@@ -39,6 +39,17 @@ pub fn remove_document_index(db: &Database, document_id: &str) -> Result<()> {
     Ok(())
 }
 
+/// 按项目 ID 删除所有搜索索引（删除项目时调用）
+pub fn remove_project_index(db: &Database, project_id: &str) -> Result<()> {
+    let conn = db.search();
+    conn.execute(
+        "DELETE FROM search_index WHERE project_id = ?1",
+        params![project_id],
+    ).context("删除项目搜索索引失败")?;
+
+    Ok(())
+}
+
 /// FTS5 全文搜索结果
 #[allow(dead_code)]
 pub struct FtsSearchResult {

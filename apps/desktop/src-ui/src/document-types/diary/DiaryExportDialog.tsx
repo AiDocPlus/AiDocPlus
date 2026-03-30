@@ -12,6 +12,7 @@ import { useTranslation } from '@/i18n';
 import { invoke } from '@tauri-apps/api/core';
 import { save } from '@tauri-apps/plugin-dialog';
 import type { DiaryDocumentContent } from './types';
+import { saveTextFileWithDialog } from '@/lib/tauriSaveTextFile';
 import {
   exportToMarkdown, exportToPlainText, exportToJSON, buildExportMarkdown,
   DEFAULT_EXPORT_OPTIONS, type DiaryExportOptions,
@@ -63,21 +64,20 @@ export default function DiaryExportDialog({
     setExporting(true);
     try {
       if (format === 'markdown' || format === 'plaintext' || format === 'json') {
-        // 前端直接导出
         const content = format === 'markdown' ? exportToMarkdown(diary, options)
           : format === 'plaintext' ? exportToPlainText(diary, options)
           : exportToJSON(diary, options);
         const ext = format === 'markdown' ? 'md' : format === 'plaintext' ? 'txt' : 'json';
-        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `diary-export.${ext}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        onOpenChange(false);
+        const filters =
+          ext === 'md'
+            ? [{ name: 'Markdown', extensions: ['md', 'markdown'] }]
+            : [{ name: ext.toUpperCase(), extensions: [ext] }];
+        const path = await saveTextFileWithDialog({
+          defaultPath: `diary-export.${ext}`,
+          filters,
+          content,
+        });
+        if (path) onOpenChange(false);
       } else {
         // DOCX/PDF/HTML: 通过 Rust 后端导出
         const md = buildExportMarkdown(diary, options);

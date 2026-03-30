@@ -9,22 +9,24 @@
  * 内置能力：
  * - Markdown 渲染（AI 回复）
  * - 流式输出 + 停止按钮
- * - 联网搜索 / 深度思考开关（根据模型能力自动显示）
+ * - 联网搜索 / 深度思考 / AI 服务选择（输入框下方，根据模型能力显示）
  * - 复制按钮（内置）
  * - 对话历史 + 清空
  * - 自动滚动
  */
-import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Send, Square, Eraser, Globe, Brain, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/i18n';
 import { cn } from '@/lib/utils';
-import { getAIInvokeParams, type AIInvokeParams } from '@/stores/useSettingsStore';
+import { useSettingsStore, getAIInvokeParamsForService, type AIInvokeParams } from '@/stores/useSettingsStore';
+import { useShallow } from 'zustand/react/shallow';
 import { getProviderConfig, type AIProvider } from '@aidocplus/shared-types';
 import type { DocTypeHostAPI, DocTypeToolScope } from '@/doctype-sdk/types';
 import type { Document } from '@aidocplus/shared-types';
 import { DocTypeChatMessage, type DocTypeChatMsg } from './DocTypeChatMessage';
+import { DocTypeAIServiceMenu } from './DocTypeAIServiceMenu';
 import {
   INPUT_AREA_CLASS, TEXTAREA_CLASS, MSG_LIST_CLASS,
   AI_OPTION_BTN_BASE, AI_OPTION_ACTIVE, AI_OPTION_THINKING_ACTIVE, AI_OPTION_INACTIVE,
@@ -47,12 +49,14 @@ export interface DocTypeAIChatBaseProps {
   historyLimit?: number;
   /** 是否显示联网/深度思考开关（默认 true） */
   showAIOptions?: boolean;
-  /** 默认开启联网搜索（默认 false） */
+  /** 侧栏内是否显示 AI 服务选择（默认 true；若传入 aiParams 则由父组件负责服务选择） */
+  showServicePicker?: boolean;
+  /** 默认开启联网搜索（默认 true） */
   defaultWebSearch?: boolean;
-  /** 默认开启深度思考（默认 false） */
+  /** 默认开启深度思考（默认 true） */
   defaultThinking?: boolean;
-  /** AI 回复完成后的回调 */
-  onAIResponse?: (content: string) => void;
+  /** AI 回复完成后的回调（meta.label 为触发消息的 label，可用于区分操作类型） */
+  onAIResponse?: (content: string, meta?: { label?: string }) => void;
   /** 输入框占位符 */
   placeholder?: string;
   /** 启用工具调用（Function Calling） */
@@ -61,6 +65,15 @@ export interface DocTypeAIChatBaseProps {
   toolScope?: DocTypeToolScope;
   /** 流式输出累积文本变化（用于股票研究进度等） */
   onAssistantStreamUpdate?: (accumulatedText: string) => void;
+  /** SSE 是否进行中（用于父组件同步进度条等） */
+  onStreamingChange?: (streaming: boolean) => void;
+  /** 流式回复过程中也渲染 messageActions（如应用结构化 JSON） */
+  showStreamingAssistantActions?: boolean;
+  /**
+   * 渲染在输入框下方、与联网/深度思考同一行（靠前）。
+   * 用于在传入 aiParams 时仍可在底部展示自定义控件（如股票研究的 AI 服务选择）。
+   */
+  inputAccessorySlot?: ReactNode;
 }
 
 export default function DocTypeAIChatBase({
@@ -73,19 +86,33 @@ export default function DocTypeAIChatBase({
   aiParams: aiParamsProp,
   historyLimit = 6,
   showAIOptions = true,
-  defaultWebSearch = false,
-  defaultThinking = false,
+  showServicePicker = true,
+  defaultWebSearch = true,
+  defaultThinking = true,
   onAIResponse,
   placeholder,
   enableTools = false,
   toolScope,
   onAssistantStreamUpdate,
+  onStreamingChange,
+  showStreamingAssistantActions = false,
+  inputAccessorySlot,
 }: DocTypeAIChatBaseProps) {
   const { t } = useTranslation();
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<DocTypeChatMsg[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [streamContent, setStreamContent] = useState('');
+
+  const { services, activeServiceId } = useSettingsStore(useShallow(s => ({
+    services: s.ai.services,
+    activeServiceId: s.ai.activeServiceId,
+  })));
+  const enabledServices = useMemo(() => services.filter(s => s.enabled), [services]);
+
+  const [sidebarServiceId, setSidebarServiceId] = useState<string>(() =>
+    host.storage.get<string>('_doc_ai_service_id') || '',
+  );
 
   // AI 选项开关（支持默认值）
   const [enableWebSearch, setEnableWebSearch] = useState(defaultWebSearch);
@@ -97,14 +124,32 @@ export default function DocTypeAIChatBase({
     setEnableThinking(defaultThinking);
   }, [doc.id, defaultWebSearch, defaultThinking]);
 
+  useEffect(() => {
+    setSidebarServiceId(host.storage.get<string>('_doc_ai_service_id') || '');
+  }, [doc.id, host.storage]);
+
+  const handleSidebarServiceChange = useCallback((id: string) => {
+    setSidebarServiceId(id);
+    host.storage.set('_doc_ai_service_id', id);
+  }, [host.storage]);
+
   const endRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const streamRequestIdRef = useRef<string | null>(null);
   const userStoppedRef = useRef(false);
+  const currentLabelRef = useRef<string | undefined>(undefined);
+  // 用 ref 持有 onAIResponse 和 onAssistantStreamUpdate，避免它们在 useCallback 依赖中
+  // 导致 callAI 频繁重建 → doctype-ai-send listener 反复解绑/重绑
+  const onAIResponseRef = useRef(onAIResponse);
+  onAIResponseRef.current = onAIResponse;
+  const onAssistantStreamUpdateRef = useRef(onAssistantStreamUpdate);
+  onAssistantStreamUpdateRef.current = onAssistantStreamUpdate;
 
-  // 检测当前模型能力（优先使用传入的 aiParams，否则回退到全局）
-  const globalAiParams = getAIInvokeParams();
-  const aiParams = aiParamsProp || globalAiParams;
+  const aiParams = useMemo(() => {
+    if (aiParamsProp) return aiParamsProp;
+    return getAIInvokeParamsForService(sidebarServiceId || undefined);
+  }, [aiParamsProp, sidebarServiceId, activeServiceId]);
+
   const providerConfig = aiParams.provider ? getProviderConfig(aiParams.provider as AIProvider) : null;
   const supportsWebSearch = providerConfig?.capabilities?.webSearch ?? false;
   const supportsThinking = providerConfig?.capabilities?.thinking ?? false;
@@ -122,9 +167,17 @@ export default function DocTypeAIChatBase({
     setStreaming(false);
   }, [doc.id]);
 
+  useEffect(() => {
+    onStreamingChange?.(streaming);
+  }, [streaming, onStreamingChange]);
+
   // AI 调用（流式）
   const callAI = useCallback(async (userPrompt: string, overrideSystemPrompt?: string, forceWebSearch?: boolean, overrideToolScope?: DocTypeToolScope) => {
     if (streaming) {
+      // 通知父组件调用被跳过，防止 isTranslating 等状态永远无法重置
+      window.dispatchEvent(new CustomEvent('doctype-ai-done', {
+        detail: { documentId: doc.id, success: false, error: 'already streaming' },
+      }));
       return;
     }
     setStreaming(true);
@@ -158,7 +211,7 @@ export default function DocTypeAIChatBase({
 
       const result = await host.ai.chatStream(allMsgs, (rawText) => {
         setStreamContent(rawText);
-        onAssistantStreamUpdate?.(rawText);
+        onAssistantStreamUpdateRef.current?.(rawText);
       }, {
         serviceId: aiParams.serviceId,
         signal: abortRef.current.signal,
@@ -173,7 +226,8 @@ export default function DocTypeAIChatBase({
         setMessages(prev => [...prev, { role: 'assistant', content: result }]);
       }
       userStoppedRef.current = false;
-      onAIResponse?.(result);
+      onAIResponseRef.current?.(result, { label: currentLabelRef.current });
+      currentLabelRef.current = undefined;
       window.dispatchEvent(new CustomEvent('doctype-ai-done', { detail: { documentId: doc.id, success: true, result } }));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -191,7 +245,7 @@ export default function DocTypeAIChatBase({
       abortRef.current = null;
       streamRequestIdRef.current = null;
     }
-  }, [streaming, messages, streamContent, host.ai, systemPrompt, historyLimit, enableWebSearch, enableThinking, supportsWebSearch, supportsThinking, onAIResponse, onAssistantStreamUpdate, t, aiParams, enableTools, supportsFunctionCalling, toolScope]);
+  }, [streaming, messages, streamContent, host.ai, systemPrompt, historyLimit, enableWebSearch, enableThinking, supportsWebSearch, supportsThinking, t, aiParams, enableTools, supportsFunctionCalling, toolScope]);
 
   // 停止生成
   const handleStop = useCallback(() => {
@@ -215,6 +269,8 @@ export default function DocTypeAIChatBase({
     if (!trimmed || streaming) return;
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: trimmed }]);
+    // 手动发送的消息没有 label，清除 ref
+    currentLabelRef.current = undefined;
     callAI(trimmed);
   }, [input, streaming, callAI]);
 
@@ -233,6 +289,8 @@ export default function DocTypeAIChatBase({
         const userMsg = detail.message as string;
         const label = detail.label as string | undefined;
         const forceWebSearch = detail.forceWebSearch as boolean | undefined;
+        // 保存 label 供 onAIResponse 回调使用
+        currentLabelRef.current = label;
         // 如果强制联网搜索，临时开启
         if (forceWebSearch && supportsWebSearch) {
           setEnableWebSearch(true);
@@ -261,6 +319,13 @@ export default function DocTypeAIChatBase({
 
   const defaultPlaceholder = placeholder || t('docTypeChat.placeholder', { defaultValue: '输入问题或指令...' });
   const toolsWantedButUnsupported = enableTools && !supportsFunctionCalling;
+
+  const menuServiceValue = aiParams.serviceId ?? '';
+
+  const showInputToolbar =
+    inputAccessorySlot != null
+    || (showServicePicker && !aiParamsProp)
+    || (showAIOptions && (supportsWebSearch || supportsThinking));
 
   return (
     <div className="h-full flex flex-col">
@@ -301,6 +366,8 @@ export default function DocTypeAIChatBase({
           <DocTypeChatMessage
             message={{ role: 'assistant', content: streamContent }}
             isStreaming
+            allowActionsWhileStreaming={showStreamingAssistantActions}
+            actions={showStreamingAssistantActions ? messageActions?.({ role: 'assistant', content: streamContent }) : undefined}
           />
         )}
         <div ref={endRef} />
@@ -343,15 +410,27 @@ export default function DocTypeAIChatBase({
           </div>
         </div>
 
-        {/* AI 选项开关 */}
-        {showAIOptions && (supportsWebSearch || supportsThinking) && (
-          <div className="flex items-center gap-1 flex-wrap">
-            {supportsWebSearch && (
+        {showInputToolbar && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1 border-t border-border/60 pt-1.5">
+            {inputAccessorySlot}
+            {showServicePicker && !aiParamsProp && (
+              <DocTypeAIServiceMenu
+                enabledServices={enabledServices}
+                value={menuServiceValue}
+                onChange={handleSidebarServiceChange}
+                disabled={streaming}
+              />
+            )}
+            {showAIOptions && supportsWebSearch && (
               <Button
-                variant="ghost" size="sm"
-                className={cn(AI_OPTION_BTN_BASE,
-                  enableWebSearch ? AI_OPTION_ACTIVE : AI_OPTION_INACTIVE)}
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  AI_OPTION_BTN_BASE,
+                  enableWebSearch ? AI_OPTION_ACTIVE : AI_OPTION_INACTIVE,
+                )}
                 onClick={() => setEnableWebSearch(v => !v)}
+                disabled={streaming}
                 title={enableWebSearch
                   ? t('docTypeChat.webSearchOn', { defaultValue: '联网搜索：已开启' })
                   : t('docTypeChat.webSearchOff', { defaultValue: '联网搜索：已关闭' })}
@@ -360,12 +439,16 @@ export default function DocTypeAIChatBase({
                 {t('chat.webSearch', { defaultValue: '联网' })}
               </Button>
             )}
-            {supportsThinking && (
+            {showAIOptions && supportsThinking && (
               <Button
-                variant="ghost" size="sm"
-                className={cn(AI_OPTION_BTN_BASE,
-                  enableThinking ? AI_OPTION_THINKING_ACTIVE : AI_OPTION_INACTIVE)}
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  AI_OPTION_BTN_BASE,
+                  enableThinking ? AI_OPTION_THINKING_ACTIVE : AI_OPTION_INACTIVE,
+                )}
                 onClick={() => setEnableThinking(v => !v)}
+                disabled={streaming}
                 title={enableThinking
                   ? t('docTypeChat.thinkingOn', { defaultValue: '深度思考：已开启' })
                   : t('docTypeChat.thinkingOff', { defaultValue: '深度思考：已关闭' })}

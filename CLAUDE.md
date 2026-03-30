@@ -31,7 +31,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 #### 前端（React）
 - **框架**: React 19
-- **语言**: TypeScript 5.8+
+- **语言**: TypeScript 5.9+
 - **状态管理**: Zustand（持久化到 localStorage）
 - **UI 框架**: Radix UI + Tailwind CSS 4
 - **编辑器**: CodeMirror 6（Markdown 编辑器，支持语法高亮、代码折叠、自动补全等）
@@ -64,6 +64,8 @@ AiDocPlus/
 │           ├── manager.html # 资源管理器窗口入口（Vite 多入口构建）
 │           ├── src/
 │           │   ├── manager/     # 资源管理器前端（ManagerWindow, configs, panels）
+│           │   ├── document-types/  # 内置文档类型（各类型 Workspace、definition.ts、AI 侧栏）
+│           │   ├── doctype-sdk/     # DocType SDK（registry、host、types、hooks）
 │           │   ├── components/
 │           │   │   ├── editor/    # 编辑器组件（EditorPanel, MarkdownEditor, EditorToolbar 等）
 │           │   │   ├── chat/      # AI 聊天面板（ChatPanel）
@@ -74,7 +76,7 @@ AiDocPlus/
 │           │   │   ├── settings/  # 设置面板
 │           │   │   ├── templates/ # 提示词模板
 │           │   │   └── ui/        # 基础 UI 组件
-│           │   ├── plugins/    # 插件系统（SDK + 框架 + 27 个插件）
+│           │   ├── plugins/    # 插件系统（SDK + 框架 + 28 个插件）
 │           │   │   ├── _framework/    # 插件框架 SDK（PluginHostAPI, 布局组件, UI 原语, i18n）
 │           │   │   ├── types.ts       # 插件接口定义（DocumentPlugin, PluginPanelProps）
 │           │   │   ├── constants.ts   # 默认启用插件列表 + 分类定义
@@ -123,7 +125,7 @@ AiDocPlus/
 - **多格式导出**：Markdown、HTML、DOCX、TXT（原生导出 + Pandoc）
 - **工作区状态保存和恢复**：标签页、面板布局、项目状态持久化
 - **附件系统**：支持添加参考文件，AI 生成时自动读取附件内容
-- **插件系统**：27 个插件，自注册 + 自动发现 + manifest 驱动
+- **插件系统**：28 个插件，自注册 + 自动发现 + manifest 驱动
 - **资源数据**：提示词模板、AI 提供商、文档模板等资源数据在 `resources/` 目录，通过 `build-resources.sh` 生成 TypeScript 文件和 bundled-resources
 - **文档标签与收藏**：文档可添加自定义标签，支持收藏（星标），文件树按标签筛选/按收藏筛选，编辑器工具栏内联标签编辑器（TagEditor）
 - **长篇小说写作**（规划中）：设定集系统（世界观/人物/地点/势力/时间线）、章节层级（卷→章 + 拖拽排序）、大纲系统、AI 四层记忆写作引擎、作家风格学习（导入作品→风格分析→RAG 检索→写作注入）、伏笔追踪、写作仪表盘、全书导出 + EPUB
@@ -131,7 +133,7 @@ AiDocPlus/
 - **功能区**：功能类插件工作区（格式转换、OCR、代码工具等），独立于内容生成类插件
 - **开放 API**：HTTP API Server + JSON-RPC 网关（11 个命名空间 30+ 操作），MCP Server（23 个工具），Python / JS SDK
 - **脚本自动化**：编程区运行脚本时自动注入 API 连接参数，零配置调用 AiDocPlus 全部功能
-- **文档类型系统**：10 种内置文档类型，每种类型有专属编辑器和 AI 侧栏，基于 DocType SDK 统一架构
+- **文档类型系统**：16 种内置文档类型，每种类型有专属编辑器和 AI 侧栏，基于 DocType SDK 统一架构
 
 ## 文档类型系统
 
@@ -145,18 +147,18 @@ AiDocPlus/
 
 ### 10 种内置文档类型
 
-| 类型 ID | 名称 | 布局模式 | 编辑器 | AI 侧栏 |
-|---------|------|---------|--------|---------|
+| 类型 ID | 名称 | 布局模式 | 编辑器 / 工作区 | AI 侧栏 |
+|---------|------|---------|----------------|---------|
 | `normal` | 通用文档 | standard | EditorPanel（主程序） | ChatPanel（主程序） |
 | `study-notes` | 学习体会 | standard | DocTypeEditorBase 包装 | StudyNotesAISidebar |
 | `novel` | 长篇小说 | full | NovelDocWorkspace（三栏） | NovelAISidebar |
 | `translation` | 中英翻译 | standard | TranslationWorkspace（双栏） | TranslationAISidebar |
-| `official-doc` | 公文写作 | standard | OfficialDocEditor | OfficialDocAISidebar |
-| `wechat-article` | 公众号文章 | standard | WechatArticleEditor | WechatArticleAISidebar |
-| `business-plan` | 商业计划书 | standard | BusinessPlanEditor | BusinessPlanAISidebar |
-| `meeting-minutes` | 会议纪要 | standard | MeetingMinutesEditor | MeetingMinutesAISidebar |
-| `academic-paper` | 学术论文 | standard | AcademicPaperEditor | AcademicPaperAISidebar |
-| `screenplay` | 电影剧本 | standard | ScreenplayEditor | ScreenplayAISidebar |
+| `diary` | 日记 | full | DiaryDocWorkspace | DiaryAISidebar |
+| `essay` | 散文写作 | full | EssayDocWorkspace | EssayAISidebar |
+| `stock-research` | 股票研究 | full | StockResearchWorkspace | StockResearchAISidebar |
+| `imitative-writing` | 仿写练习 | full | ImitativeWritingWorkspace | ImitativeWritingAISidebar |
+| `calculator` | 计算文档 | full | CalculatorWorkspace | CalculatorAISidebar |
+| `task-list` | 任务清单 | full | TaskListWorkspace | TaskListAISidebar |
 
 ### 共享基础组件
 
@@ -465,7 +467,7 @@ Layer 3: 当前章节上下文（~2000-4000 token）
 
 ### 插件体系操作规范（强制）
 
-> **⚠️ 最高优先级规则：所有 27 个插件的代码直接存放在 Monorepo 的 `apps/desktop/src-ui/src/plugins/` 目录下。**
+> **⚠️ 最高优先级规则：所有 28 个插件的代码直接存放在 Monorepo 的 `apps/desktop/src-ui/src/plugins/` 目录下。**
 >
 > **插件在仓库中直接开发和修改。** `_framework/` 为插件 SDK 框架，其余每个子目录为一个独立插件。
 
@@ -498,7 +500,7 @@ Layer 3: 当前章节上下文（~2000-4000 token）
 
 ### 插件架构（v3 — 全外部插件体系）
 
-应用采用**插件架构**，所有 27 个插件通过自注册 + 自动发现机制加载。插件分为「内容生成类」和「功能执行类」两大类，通过三层解耦设计实现松耦合。
+应用采用**插件架构**，所有 28 个插件通过自注册 + 自动发现机制加载。插件分为「内容生成类」和「功能执行类」两大类，通过三层解耦设计实现松耦合（以各插件 `manifest.json` 的 `majorCategory` 为准；其中 **10** 个为 `content-generation`，**18** 个为 `functional`）。
 
 #### 核心机制
 
@@ -818,32 +820,27 @@ plugins/{name}/
 5. **弹窗集中管理**：复杂弹窗放 `dialogs/` 目录，功能类通过 `index.ts` barrel export
 6. **业务逻辑与 UI 解耦**：引擎、转换器、数据桥接等独立为模块，不混入面板组件
 
-#### 当前插件（27 个）
+#### 当前插件（28 个）
 
-**内容生成类**（使用 `PluginPanelLayout`）：
-- **表格插件**（`plugins/table/`）：AI 生成表格，FortuneSheet 编辑，Excel/CSV/JSON 导出 — **⭐ 内容生成类标杆插件**
-- **思维导图插件**（`plugins/mindmap/`）：AI 生成思维导图，多视图（导图/大纲/源码），多标签 — **⭐ 内容生成类标杆插件**
-- **摘要插件**（`plugins/summary/`）：AI 多风格文档摘要（轻量级插件示例）
-- **PPT 插件**（`plugins/ppt/`）：AI 生成演示文稿，支持编辑、预览、全屏播放、PPTX 导出
-- **测试题插件**（`plugins/quiz/`）：AI 生成单选、多选、判断题，支持 HTML 预览和导出
-- **翻译插件**（`plugins/translation/`）：AI 多语言翻译
-- **平行翻译插件**（`plugins/parallel-translation/`）：AI 双语对照翻译
-- **图表插件**（`plugins/diagram/`）：AI 生成 Mermaid 图表，支持 SVG 导出
-- **统计插件**（`plugins/analytics/`）：纯前端文档统计分析（非 AI 插件）
-- **教案插件**（`plugins/lessonplan/`）：AI 生成结构化教案
-- **时间线插件**（`plugins/timeline/`）：AI 生成时间线
-- **审阅插件**（`plugins/review/`）：AI 文档审阅和批注
-- **写作统计插件**（`plugins/writing-stats/`）：写作数据统计分析
+分类以各插件 `manifest.json` 的 `majorCategory` 为准（`content-generation` / `functional`）。下列为目录名与职责摘要；**不含** `plugins/_framework/`（SDK 框架）。
 
-**功能执行类**（使用 `ToolPluginLayout` + `usePluginHost()`）：
-- **邮件插件**（`plugins/email/`）：AI 辅助撰写邮件 + SMTP 发送 — **⭐ 功能执行类标杆插件**
-- **文档对比插件**（`plugins/diff/`）：文档版本对比
-- **加密插件**（`plugins/encrypt/`）：文档加密保护
-- **水印插件**（`plugins/watermark/`）：文档水印添加
-- **TTS 插件**（`plugins/tts/`）：文档朗读（文字转语音）
-- **Office 预览器**（`plugins/officeviewer/`）：预览 PDF/DOCX/XLSX/PPTX 文件
-- **Pandoc 导出**（`plugins/pandoc/`）：通过 Pandoc 导出多种格式
-- **发布插件**（`plugins/publish/`）：文档发布到外部平台
+**内容生成类（10 个，`majorCategory: content-generation`）** — 典型使用 `PluginPanelLayout`：
+- **表格**（`plugins/table/`）：AI 生成表格，FortuneSheet 编辑，Excel/CSV/JSON 导出 — **⭐ 标杆**
+- **思维导图**（`plugins/mindmap/`）：AI 生成思维导图，多视图（导图/大纲/源码）— **⭐ 标杆**
+- **Mermaid**（`plugins/mermaid/`）：AI 生成 Mermaid 图表与导出
+- **翻译**（`plugins/translation/`）、**平行翻译**（`plugins/parallel-translation/`）
+- **海报**（`plugins/poster/`）、**图片**（`plugins/image/`）
+- **词汇表**（`plugins/glossary/`）、**引用**（`plugins/citation/`）
+- **内容提取**（`plugins/extract/`）：从文档提取结构化信息
+
+**功能执行类（18 个，`majorCategory: functional`）** — 典型使用 `ToolPluginLayout` + `usePluginHost()`（部分面板实现因功能差异可自定义布局）：
+- **邮件**（`plugins/email/`）：AI 辅助撰写 + SMTP — **⭐ 标杆**
+- **摘要**（`plugins/summary/`）、**PPT**（`plugins/ppt/`）、**测验**（`plugins/quiz/`）、**教案**（`plugins/lessonplan/`）
+- **时间线**（`plugins/timeline/`）、**审阅**（`plugins/review/`）、**写作统计**（`plugins/writing-stats/`）
+- **文档统计**（`plugins/analytics/`）：纯前端统计分析
+- **闪卡**（`plugins/flashcard/`）、**合规检查**（`plugins/compliance/`）
+- **对比**（`plugins/diff/`）、**加密**（`plugins/encrypt/`）、**水印**（`plugins/watermark/`）
+- **TTS**（`plugins/tts/`）、**Office 预览**（`plugins/officeviewer/`）、**Pandoc**（`plugins/pandoc/`）、**发布**（`plugins/publish/`）
 
 ### 编程区（CodingPanel）
 

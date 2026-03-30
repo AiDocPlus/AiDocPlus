@@ -257,6 +257,28 @@ pub fn bulk_import_conversations(db: &Database, conversations: &[FullConversatio
     Ok(count)
 }
 
+/// 按文档 ID 列表删除对话及其消息（删除项目时调用，messages 通过 CASCADE 自动级联删除）
+pub fn delete_conversations_by_document_ids(db: &Database, document_ids: &[String]) -> Result<()> {
+    if document_ids.is_empty() {
+        return Ok(());
+    }
+    let conn = db.conversations();
+    // 构建 IN (?, ?, ...) 占位符
+    let placeholders: Vec<&str> = document_ids.iter().map(|_| "?").collect();
+    let sql = format!(
+        "DELETE FROM conversations WHERE document_id IN ({})",
+        placeholders.join(",")
+    );
+    let params: Vec<&dyn rusqlite::types::ToSql> = document_ids
+        .iter()
+        .map(|id| id as &dyn rusqlite::types::ToSql)
+        .collect();
+    conn.execute(&sql, params.as_slice())
+        .context("删除项目关联对话失败")?;
+
+    Ok(())
+}
+
 /// 检查 conversations 表是否为空
 pub fn is_empty(db: &Database) -> Result<bool> {
     let conn = db.conversations();

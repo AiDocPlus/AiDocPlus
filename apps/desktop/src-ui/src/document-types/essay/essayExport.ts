@@ -336,6 +336,48 @@ function generateMetadataHTML(essay: EssayDocumentContent): string {
 }
 
 /**
+ * 另存为对话框：默认文件名与扩展名（与 `exportEssay` 实际产出一致；「PDF」当前实现为 HTML 内容）
+ */
+export function getEssayExportSaveDialogParams(
+  format: ExportOptions['format'],
+  title: string,
+): { defaultPath: string; filters: { name: string; extensions: string[] }[] } {
+  const base = (title || '未命名散文').replace(/[/\\:*?"<>|]/g, '_');
+  switch (format) {
+    case 'word':
+      return {
+        defaultPath: `${base}.doc`,
+        filters: [{ name: 'Word', extensions: ['doc', 'docx', 'html', 'htm'] }],
+      };
+    case 'pdf':
+      return {
+        defaultPath: `${base}.html`,
+        filters: [{ name: 'HTML', extensions: ['html', 'htm'] }],
+      };
+    case 'html':
+      return {
+        defaultPath: `${base}.html`,
+        filters: [{ name: 'HTML', extensions: ['html', 'htm'] }],
+      };
+    case 'markdown':
+      return {
+        defaultPath: `${base}.md`,
+        filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }],
+      };
+    case 'txt':
+      return {
+        defaultPath: `${base}.txt`,
+        filters: [{ name: 'Text', extensions: ['txt'] }],
+      };
+    default:
+      return {
+        defaultPath: `${base}.txt`,
+        filters: [{ name: 'Text', extensions: ['txt'] }],
+      };
+  }
+}
+
+/**
  * 统一导出函数
  */
 export async function exportEssay(essay: EssayDocumentContent, options: ExportOptions): Promise<Blob> {

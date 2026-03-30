@@ -162,8 +162,9 @@ pub async fn chat(
         "stream": false
     });
 
-    // 注入 max_tokens：优先使用传入值，否则使用 provider 推荐的默认值
-    request_body["max_tokens"] = json!(max_tokens.unwrap_or_else(|| get_default_max_tokens(&config)));
+    // 注入 max_tokens：传入 0 或 None 时由 AI 模型自行决定
+    let max_tok = resolve_max_tokens(max_tokens, &config);
+    inject_max_tokens(&mut request_body, max_tok);
 
     // 联网搜索：根据 provider 注入正确的参数格式
     if web_search {
@@ -255,7 +256,7 @@ pub async fn chat_stream(
     let _guard = StreamGuard { request_id: req_id.clone() };
 
     let config = get_ai_config(&app, provider, api_key, model, base_url, service_id);
-    let stream_max_tokens = max_tokens.unwrap_or_else(|| get_default_max_tokens(&config));
+    let stream_max_tokens = resolve_max_tokens(max_tokens, &config);
     let web_search = enable_web_search.unwrap_or(false);
     let use_tools = enable_tools.unwrap_or(false);
 
@@ -272,12 +273,12 @@ pub async fn chat_stream(
     // 工具调用结束后再进行带 web_search 的流式输出
     // OpenAI + 纯联网搜索（无工具）→ Responses API
     if config.provider == "openai" && web_search && !use_tools {
-        return stream_openai_responses(&config, &messages, &req_id, &window).await;
+        return stream_openai_responses(&config, &messages, &req_id, &window, max_tokens).await;
     }
 
     // Anthropic + 纯联网搜索（无工具）→ Anthropic Messages API（原生格式）
     if config.provider == "anthropic" && web_search && !use_tools {
-        return stream_anthropic_with_search(&config, &messages, &req_id, &window).await;
+        return stream_anthropic_with_search(&config, &messages, &req_id, &window, max_tokens).await;
     }
 
     let client = ai_stream_client_with_opts(proxy_url.as_deref(), connect_timeout_secs, request_timeout_secs);
@@ -299,14 +300,14 @@ pub async fn chat_stream(
             if is_stream_cancelled(&req_id) { break; }
 
             // 使用流式请求检测工具调用（兼容 MiniMax 等不支持非流式 Function Calling 的 provider）
-            let tool_request = json!({
+            let mut tool_request = json!({
                 "messages": current_messages,
                 "model": config.get_default_model(),
                 "temperature": get_default_temperature(&config),
-                "max_tokens": stream_max_tokens,
                 "stream": true,
                 "tools": tool_defs
             });
+            inject_max_tokens(&mut tool_request, stream_max_tokens);
 
             let req_builder = config.apply_auth(
                 client.post(&url)
@@ -416,9 +417,9 @@ pub async fn chat_stream(
         "messages": current_messages,
         "model": config.get_default_model(),
         "temperature": get_default_temperature(&config),
-        "max_tokens": stream_max_tokens,
         "stream": true
     });
+    inject_max_tokens(&mut request_body, stream_max_tokens);
 
     // 联网搜索：根据 provider 注入正确的参数格式
     if web_search {
@@ -449,7 +450,7 @@ pub async fn chat_stream(
     }
 
     let mut full = stream_sse_chat_completions(response, &req_id, &window).await?;
-    if full.trim().is_empty() {
+    if !has_visible_content(&full) {
         let hint = "\n\n> ⚠️ 模型未返回正文（可能因上下文过长或输出限制）。可尝试在设置中提高「最大输出 token」或减少单次工具数据后重试。\n\n";
         let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": hint }));
         full.push_str(hint);
@@ -631,9 +632,8 @@ async fn call_openai_responses(
         "tools": [{ "type": "web_search" }]
     });
 
-    if let Some(mt) = max_tokens {
-        request_body["max_tokens"] = json!(mt);
-    }
+    let resolved = resolve_max_tokens(max_tokens, config);
+    inject_max_tokens(&mut request_body, resolved);
 
     let req_builder = config.apply_auth(
         client.post(&url)
@@ -686,7 +686,6 @@ async fn call_anthropic_with_search(
 
     let mut request_body = json!({
         "model": config.get_default_model(),
-        "max_tokens": max_tokens.unwrap_or(8192),
         "messages": api_messages,
         "tools": [{
             "type": "web_search_20250305",
@@ -694,6 +693,7 @@ async fn call_anthropic_with_search(
             "max_uses": 5
         }]
     });
+    inject_max_tokens(&mut request_body, resolve_max_tokens(max_tokens, config));
 
     if !system_content.is_empty() {
         request_body["system"] = json!(system_content);
@@ -974,7 +974,7 @@ async fn stream_sse_chat_completions(
     let mut full_content = String::new();
     let mut in_reasoning = false;
     // 过滤 minimax:tool_call 块（MiniMax 联网搜索内部格式）
-    let mut pending_buf = String::new();
+    let mut pending_buf: Option<String> = None;
     let mut in_tool_call_block = false;
 
     for_each_sse_event(response, req_id, |event| {
@@ -986,14 +986,15 @@ async fn stream_sse_chat_completions(
                     in_reasoning = false;
                 }
                 // 流结束时输出 pending_buf 中剩余的内容
-                if !pending_buf.is_empty() {
+                if let Some(buf) = pending_buf.as_mut() {
                     if in_tool_call_block {
-                        // 标签未闭合，尝试过滤后输出
-                        pending_buf = pending_buf.replace("<minimax:tool_call>", "");
+                        *buf = buf.replace("<minimax:tool_call>", "");
                     }
-                    full_content.push_str(&pending_buf);
-                    let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": &pending_buf }));
-                    pending_buf.clear();
+                    if !buf.is_empty() {
+                        full_content.push_str(buf);
+                        let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": &*buf }));
+                    }
+                    pending_buf = None;
                 }
             }
             SseEvent::Data(json_val) => {
@@ -1026,15 +1027,16 @@ async fn stream_sse_chat_completions(
                             }
 
                             // 将新内容追加到 pending_buf，处理 tool_call 块过滤
-                            pending_buf.push_str(content);
+                            let buf = pending_buf.get_or_insert_with(String::new);
+                            buf.push_str(content);
 
                             loop {
                                 if in_tool_call_block {
                                     // 在 tool_call 块内，寻找结束标签
-                                    if let Some(end_pos) = pending_buf.find("</minimax:tool_call>") {
+                                    if let Some(end_pos) = buf.find("</minimax:tool_call>") {
                                         // 跳过整个 tool_call 块（包括结束标签）
-                                        let after = pending_buf[end_pos + "</minimax:tool_call>".len()..].to_string();
-                                        pending_buf = after;
+                                        let after = buf[end_pos + "</minimax:tool_call>".len()..].to_string();
+                                        *buf = after;
                                         in_tool_call_block = false;
                                     } else {
                                         // 还没找到结束标签，继续等待
@@ -1042,28 +1044,28 @@ async fn stream_sse_chat_completions(
                                     }
                                 } else {
                                     // 不在 tool_call 块内，寻找开始标签
-                                    if let Some(start_pos) = pending_buf.find("<minimax:tool_call>") {
+                                    if let Some(start_pos) = buf.find("<minimax:tool_call>") {
                                         // 输出开始标签之前的内容
-                                        let before = pending_buf[..start_pos].to_string();
+                                        let before = buf[..start_pos].to_string();
                                         if !before.is_empty() {
                                             full_content.push_str(&before);
                                             let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": &before }));
                                         }
-                                        let after = pending_buf[start_pos + "<minimax:tool_call>".len()..].to_string();
-                                        pending_buf = after;
+                                        let after = buf[start_pos + "<minimax:tool_call>".len()..].to_string();
+                                        *buf = after;
                                         in_tool_call_block = true;
                                     } else {
                                         // 没有 tool_call 块，但需保留尾部可能是开始标签前缀的内容
                                         // 安全阈值：如果 pending_buf 超过开始标签长度，可以安全输出前面部分
                                         const TAG: &str = "<minimax:tool_call>";
-                                        if pending_buf.len() > TAG.len() {
-                                            let safe_len = pending_buf.len() - TAG.len();
-                                            let safe = pending_buf[..safe_len].to_string();
+                                        if buf.len() > TAG.len() {
+                                            let safe_len = buf.len() - TAG.len();
+                                            let safe = buf[..safe_len].to_string();
                                             if !safe.is_empty() {
                                                 full_content.push_str(&safe);
                                                 let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": &safe }));
                                             }
-                                            pending_buf = pending_buf[safe_len..].to_string();
+                                            *buf = buf[safe_len..].to_string();
                                         }
                                         break;
                                     }
@@ -1078,8 +1080,20 @@ async fn stream_sse_chat_completions(
 
     // 安全关闭：如果流结束时仍在 reasoning 状态
     if in_reasoning {
-        let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": "</think>" }));
-        full_content.push_str("</think>");
+        let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content":"" }));
+        full_content.push_str("");
+    }
+
+    // 安全 flush：确保 pending_buf 中残留内容全部输出
+    // （当 SSE 流未发送 [DONE] 就断开时，Done handler 不会触发，pending_buf 可能仍有 ≤17 字符残留）
+    if let Some(buf) = pending_buf.as_mut() {
+        if in_tool_call_block {
+            *buf = buf.replace("<minimax:tool_call>", "");
+        }
+        if !buf.is_empty() {
+            full_content.push_str(buf);
+            let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": &*buf }));
+        }
     }
 
     Ok(full_content)
@@ -1091,6 +1105,7 @@ async fn stream_openai_responses(
     messages: &[ChatMessage],
     req_id: &str,
     window: &tauri::Window,
+    max_tokens: Option<u32>,
 ) -> Result<String> {
     let client = ai_stream_client();
     let base_url = config.get_base_url();
@@ -1099,12 +1114,13 @@ async fn stream_openai_responses(
     // 将 ChatMessage 转换为 Responses API 的 input 格式（支持多模态图片）
     let input: Vec<serde_json::Value> = messages_to_json(messages, "openai");
 
-    let request_body = json!({
+    let mut request_body = json!({
         "model": config.get_default_model(),
         "input": input,
         "tools": [{ "type": "web_search" }],
         "stream": true
     });
+    inject_max_tokens(&mut request_body, resolve_max_tokens(max_tokens, config));
 
     let req_builder = config.apply_auth(
         client.post(&url)
@@ -1166,6 +1182,7 @@ async fn stream_anthropic_with_search(
     messages: &[ChatMessage],
     req_id: &str,
     window: &tauri::Window,
+    max_tokens: Option<u32>,
 ) -> Result<String> {
     let client = ai_stream_client();
     let base_url = config.get_base_url();
@@ -1185,7 +1202,6 @@ async fn stream_anthropic_with_search(
 
     let mut request_body = json!({
         "model": config.get_default_model(),
-        "max_tokens": 8192,
         "messages": api_messages,
         "tools": [{
             "type": "web_search_20250305",
@@ -1194,6 +1210,8 @@ async fn stream_anthropic_with_search(
         }],
         "stream": true
     });
+    // 使用本次请求 max_tokens（<=0 或 None 时回退 provider 默认值）
+    inject_max_tokens(&mut request_body, resolve_max_tokens(max_tokens, config));
 
     if !system_content.is_empty() {
         request_body["system"] = json!(system_content);
@@ -1344,6 +1362,51 @@ fn get_default_temperature(config: &AIConfig) -> f64 {
 /// 根据 provider 返回推荐的默认 max_tokens（从注册表获取）
 fn get_default_max_tokens(config: &AIConfig) -> u32 {
     config.defaults().default_max_tokens
+}
+
+/// 解析 max_tokens：用户显式传入 >0 时优先使用；否则使用 provider 默认值（16384）。
+fn resolve_max_tokens(requested: Option<u32>, config: &AIConfig) -> Option<u32> {
+    match requested {
+        Some(n) if n > 0 => Some(n),
+        _ => {
+            let default = get_default_max_tokens(config);
+            if default > 0 { Some(default) } else { None }
+        }
+    }
+}
+
+/// 如果 resolve_max_tokens 返回 Some，注入到 request_body；否则移除 max_tokens 字段。
+fn inject_max_tokens(body: &mut serde_json::Value, max_tokens: Option<u32>) {
+    match max_tokens {
+        Some(n) => { body["max_tokens"] = json!(n); }
+        None => { body.as_object_mut().map(|m| { m.remove("max_tokens"); }); }
+    }
+}
+
+/// 检查模型输出中是否包含可见正文（忽略 <think> 思考块）
+fn has_visible_content(raw: &str) -> bool {
+    let mut result = String::with_capacity(raw.len());
+    let mut idx = 0usize;
+
+    while let Some(start_rel) = raw[idx..].find("<think>") {
+        let start = idx + start_rel;
+        // 追加 <think> 之前的正文
+        result.push_str(&raw[idx..start]);
+        let after_start = start + "<think>".len();
+        if let Some(end_rel) = raw[after_start..].find("</think>") {
+            // 跳过完整 think 块
+            idx = after_start + end_rel + "</think>".len();
+        } else {
+            // 未闭合 think：后续全部视为思考内容
+            idx = raw.len();
+            break;
+        }
+    }
+    if idx < raw.len() {
+        result.push_str(&raw[idx..]);
+    }
+
+    !result.trim().is_empty()
 }
 
 /// 格式化工具调用显示文本（用于反馈给用户）

@@ -1,6 +1,7 @@
 import React, { useMemo, useEffect, useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from '@/i18n';
+import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -97,6 +98,10 @@ interface MarkdownPreviewProps {
   className?: string;
   fontSize?: number;
   fontFamily?: string;
+  /** 禁用截断，阅读器场景下显示完整内容 */
+  disableTruncation?: boolean;
+  /** 不设置内联 lineHeight，让外部 CSS 控制（阅读器场景） */
+  noInlineLineHeight?: boolean;
 }
 
 export const MarkdownPreview: React.FC<MarkdownPreviewProps> = React.memo(({
@@ -105,6 +110,8 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = React.memo(({
   className = '',
   fontSize = 14,
   fontFamily,
+  disableTruncation = false,
+  noInlineLineHeight = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const { t } = useTranslation();
@@ -186,14 +193,19 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = React.memo(({
 
   const customStyle = useMemo(() => ({
     fontSize: `${fontSize}px`,
-    lineHeight: 1.6,
+    ...(noInlineLineHeight ? {} : { lineHeight: 1.6 }),
     ...(fontFamily ? { fontFamily } : {}),
-  }), [fontSize, fontFamily]);
+  }), [fontSize, fontFamily, noInlineLineHeight]);
 
   return (
     <div
       ref={containerRef}
-      className={`markdown-preview max-w-none ${theme === 'dark' ? 'dark' : ''} ${className}`}
+      className={cn(
+        // 颜色跟随 documentElement 主题（--foreground / --background），勿在根上再套 .dark，
+        // 否则浅色应用下会出现浅色字 + 浅色底导致预览「看不见」。
+        'markdown-preview max-w-none min-h-0 text-foreground bg-background',
+        className,
+      )}
       style={customStyle}
     >
       <ReactMarkdown
@@ -201,12 +213,12 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = React.memo(({
         rehypePlugins={REHYPE_PLUGINS as any}
       >
         {preprocessMarkdown(
-          content.length > PREVIEW_TRUNCATE_THRESHOLD
+          !disableTruncation && content.length > PREVIEW_TRUNCATE_THRESHOLD
             ? content.slice(0, PREVIEW_TRUNCATE_THRESHOLD)
             : content
         )}
       </ReactMarkdown>
-      {content.length > PREVIEW_TRUNCATE_THRESHOLD && (
+      {!disableTruncation && content.length > PREVIEW_TRUNCATE_THRESHOLD && (
         <div className="text-center py-4 text-muted-foreground text-sm border-t mt-4">
           {t('editor.previewTruncated', { defaultValue: '文档较长（{{size}}K 字符），预览已截断以保证性能', size: Math.round(content.length / 1000) })}
         </div>

@@ -145,48 +145,6 @@ const translationSkills: DocTypeSkill[] = [
   },
 ];
 
-// ── 公文写作 Skills ──
-const officialDocSkills: DocTypeSkill[] = [
-  { id: 'official:format-check', docTypeId: 'official-doc', labelKey: 'officialDoc.formatCheck', descriptionKey: 'skill.officialFormatDesc', defaultPromptTemplate: '请检查以下公文的格式规范性：\n\n{{content}}', defaultSystemPrompt: '你是公文格式审查专家。' },
-  { id: 'official:polish', docTypeId: 'official-doc', labelKey: 'officialDoc.polish', descriptionKey: 'skill.officialPolishDesc', defaultPromptTemplate: '请润色以下公文：\n\n{{content}}', defaultSystemPrompt: '你是公文写作专家。' },
-  { id: 'official:generate-reply', docTypeId: 'official-doc', labelKey: 'officialDoc.generateReply', descriptionKey: 'skill.officialReplyDesc', defaultPromptTemplate: '请生成回复/批复文稿：\n\n{{content}}' },
-];
-
-// ── 公众号文章 Skills ──
-const wechatSkills: DocTypeSkill[] = [
-  { id: 'wechat:title-optimize', docTypeId: 'wechat-article', labelKey: 'wechat.titleOptimize', descriptionKey: 'skill.wechatTitleDesc', defaultPromptTemplate: '请提供5个吸引眼球的标题：\n\n{{content}}' },
-  { id: 'wechat:summary', docTypeId: 'wechat-article', labelKey: 'wechat.summary', descriptionKey: 'skill.wechatSummaryDesc', defaultPromptTemplate: '请生成摘要（50-100字）：\n\n{{content}}' },
-  { id: 'wechat:polish', docTypeId: 'wechat-article', labelKey: 'wechat.polish', descriptionKey: 'skill.wechatPolishDesc', defaultPromptTemplate: '请润色文章使其更有传播性：\n\n{{content}}' },
-];
-
-// ── 商业计划书 Skills ──
-const businessPlanSkills: DocTypeSkill[] = [
-  { id: 'bplan:market-analysis', docTypeId: 'business-plan', labelKey: 'businessPlan.marketAnalysis', descriptionKey: 'skill.bplanMarketDesc', defaultPromptTemplate: '请生成市场分析：\n\n{{content}}' },
-  { id: 'bplan:swot', docTypeId: 'business-plan', labelKey: 'businessPlan.swot', descriptionKey: 'skill.bplanSwotDesc', defaultPromptTemplate: '请生成SWOT分析：\n\n{{content}}' },
-  { id: 'bplan:financial', docTypeId: 'business-plan', labelKey: 'businessPlan.financial', descriptionKey: 'skill.bplanFinancialDesc', defaultPromptTemplate: '请生成3年财务预测：\n\n{{content}}' },
-];
-
-// ── 会议纪要 Skills ──
-const meetingSkills: DocTypeSkill[] = [
-  { id: 'meeting:extract-actions', docTypeId: 'meeting-minutes', labelKey: 'meeting.extractActions', descriptionKey: 'skill.meetingActionsDesc', defaultPromptTemplate: '请提取行动项：\n\n{{content}}' },
-  { id: 'meeting:summarize', docTypeId: 'meeting-minutes', labelKey: 'meeting.summarize', descriptionKey: 'skill.meetingSummaryDesc', defaultPromptTemplate: '请生成会议摘要：\n\n{{content}}' },
-  { id: 'meeting:format', docTypeId: 'meeting-minutes', labelKey: 'meeting.format', descriptionKey: 'skill.meetingFormatDesc', defaultPromptTemplate: '请整理为规范纪要格式：\n\n{{content}}' },
-];
-
-// ── 学术论文 Skills ──
-const academicSkills: DocTypeSkill[] = [
-  { id: 'academic:literature-review', docTypeId: 'academic-paper', labelKey: 'academic.literatureReview', descriptionKey: 'skill.academicLitDesc', defaultPromptTemplate: '请生成文献综述框架：\n\n{{content}}' },
-  { id: 'academic:abstract', docTypeId: 'academic-paper', labelKey: 'academic.abstract', descriptionKey: 'skill.academicAbstractDesc', defaultPromptTemplate: '请生成学术摘要：\n\n{{content}}' },
-  { id: 'academic:polish', docTypeId: 'academic-paper', labelKey: 'academic.polish', descriptionKey: 'skill.academicPolishDesc', defaultPromptTemplate: '请润色学术文本：\n\n{{content}}' },
-];
-
-// ── 电影剧本 Skills ──
-const screenplaySkills: DocTypeSkill[] = [
-  { id: 'screenplay:dialogue', docTypeId: 'screenplay', labelKey: 'screenplay.dialogue', descriptionKey: 'skill.screenplayDialogueDesc', defaultPromptTemplate: '请生成角色对白：\n\n{{content}}' },
-  { id: 'screenplay:scene-desc', docTypeId: 'screenplay', labelKey: 'screenplay.sceneDesc', descriptionKey: 'skill.screenplaySceneDesc', defaultPromptTemplate: '请补充场景描述：\n\n{{content}}' },
-  { id: 'screenplay:continue', docTypeId: 'screenplay', labelKey: 'screenplay.continue', descriptionKey: 'skill.screenplayContinueDesc', defaultPromptTemplate: '请续写剧本场景：\n\n{{content}}' },
-];
-
 /**
  * 注册所有内置 Skills
  */
@@ -196,11 +154,5 @@ export function registerBuiltinSkills(): void {
     ...novelSkills,
     ...studyNotesSkills,
     ...translationSkills,
-    ...officialDocSkills,
-    ...wechatSkills,
-    ...businessPlanSkills,
-    ...meetingSkills,
-    ...academicSkills,
-    ...screenplaySkills,
   ]);
 }

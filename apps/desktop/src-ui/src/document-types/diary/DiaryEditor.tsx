@@ -6,7 +6,7 @@
  * - 自动保存（5秒无操作）
  * - AI 插入事件监听
  */
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { MarkdownEditor } from '@/components/editor/MarkdownEditor';
 import { useTranslation } from '@/i18n';
 import type { DocTypeHostAPI } from '@/doctype-sdk/types';
@@ -43,13 +43,11 @@ export default function DiaryEditor({
     onChangeRef.current(val);
   }, []);
 
-  const [initialContent] = useState(content);
-
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 min-h-0">
         <MarkdownEditor
-          value={initialContent}
+          value={content}
           onChange={handleChange}
           placeholder={placeholder || t('diary.editorPlaceholder', { defaultValue: '开始记录今天的故事...' })}
           showToolbar={true}

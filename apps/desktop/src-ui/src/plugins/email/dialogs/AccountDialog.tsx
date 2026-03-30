@@ -9,6 +9,7 @@ import { AccountForm } from '../AccountForm';
 import { useEmailContext } from '../EmailContext';
 import type { EmailAccount, EmailStorageData } from '../types';
 import { newBlankAccount } from '../utils';
+import { saveTextFileWithDialog } from '@/lib/tauriSaveTextFile';
 
 const DIALOG_STYLE = { fontFamily: '宋体', fontSize: '16px' };
 
@@ -44,13 +45,19 @@ export function AccountDialog({ open, onOpenChange, onSaveAccount, onDeleteAccou
           <div className="flex gap-1 border-b pb-2 mb-2">
             <Button variant="outline" size="sm" className="gap-1 h-7 text-xs" title={t('exportSettings')}
               onClick={() => {
-                const data = host.storage.get<EmailStorageData>('emailData') || {};
-                const json = JSON.stringify(data, null, 2);
-                const blob = new Blob([json], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url; a.download = `email-settings-${new Date().toISOString().slice(0, 10)}.json`;
-                a.click(); URL.revokeObjectURL(url);
+                void (async () => {
+                  const data = host.storage.get<EmailStorageData>('emailData') || {};
+                  const json = JSON.stringify(data, null, 2);
+                  try {
+                    await saveTextFileWithDialog({
+                      defaultPath: `email-settings-${new Date().toISOString().slice(0, 10)}.json`,
+                      filters: [{ name: 'JSON', extensions: ['json'] }],
+                      content: json,
+                    });
+                  } catch (e) {
+                    console.error('[AccountDialog] export', e);
+                  }
+                })();
               }}>
               <Download className="h-3 w-3" />
               {t('exportSettings')}

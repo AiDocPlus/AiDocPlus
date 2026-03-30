@@ -2,20 +2,20 @@
  * 创建项目弹窗 — 项目是纯容器，可选同时创建第一个文档的类型
  */
 import { useState, useCallback } from 'react';
-import { X } from 'lucide-react';
 import { Button } from '../ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { useTranslation } from '@/i18n';
 import { cn } from '@/lib/utils';
 import { listDocTypes } from '@/doctype-sdk/registry';
 
 interface CreateProjectDialogProps {
   open: boolean;
-  onClose: () => void;
+  onOpenChange: (open: boolean) => void;
   /** name, description, 首个文档类型（空字符串表示不创建文档） */
   onCreate: (name: string, description: string, firstDocType?: string) => void;
 }
 
-export function CreateProjectDialog({ open, onClose, onCreate }: CreateProjectDialogProps) {
+export function CreateProjectDialog({ open, onOpenChange, onCreate }: CreateProjectDialogProps) {
   const { t } = useTranslation();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -28,36 +28,24 @@ export function CreateProjectDialog({ open, onClose, onCreate }: CreateProjectDi
     setName('');
     setDescription('');
     setSelectedDocType('normal');
-    onClose();
-  }, [name, description, selectedDocType, onCreate, onClose]);
+    onOpenChange(false);
+  }, [name, description, selectedDocType, onCreate, onOpenChange]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleCreate();
-    } else if (e.key === 'Escape') {
-      onClose();
     }
-  }, [handleCreate, onClose]);
-
-  if (!open) return null;
+  }, [handleCreate]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div
-        className="bg-card border rounded-lg shadow-xl w-[400px] max-w-[90vw]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-5 py-4 border-b">
-          <h2 className="text-base font-semibold">
-            {t('dialog.createProject', { defaultValue: '创建项目' })}
-          </h2>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[420px] max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
+          <DialogTitle>{t('dialog.createProject', { defaultValue: '创建项目' })}</DialogTitle>
+        </DialogHeader>
 
-        <div className="px-5 py-4 space-y-4">
+        <div className="space-y-4 overflow-y-auto flex-1 min-h-0 -mx-6 px-6">
           {/* 首个文档类型选择 */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-muted-foreground">
@@ -73,7 +61,9 @@ export function CreateProjectDialog({ open, onClose, onCreate }: CreateProjectDi
                     type="button"
                     className={cn(
                       'flex items-center gap-2 p-2.5 rounded-lg border transition-all cursor-pointer text-left',
-                      isSelected ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/30'
+                      isSelected
+                        ? 'border-primary bg-primary/10 ring-2 ring-primary/30 shadow-sm'
+                        : 'border-border hover:border-muted-foreground/30'
                     )}
                     onClick={() => setSelectedDocType(dt.id)}
                   >
@@ -125,15 +115,15 @@ export function CreateProjectDialog({ open, onClose, onCreate }: CreateProjectDi
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t">
-          <Button variant="outline" size="sm" onClick={onClose}>
+        <div className="flex items-center justify-end gap-2 pt-2 flex-shrink-0">
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
             {t('common.cancel', { defaultValue: '取消' })}
           </Button>
           <Button size="sm" onClick={handleCreate} disabled={!name.trim()}>
             {t('dialog.create', { defaultValue: '创建' })}
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

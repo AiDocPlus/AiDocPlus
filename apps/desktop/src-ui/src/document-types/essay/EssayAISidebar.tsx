@@ -11,10 +11,19 @@
  * - 写作阶段指示器
  * - AI 服务切换
  */
-import { useState, useCallback, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
+import {
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  useMemo,
+  forwardRef,
+  useImperativeHandle,
+  type ForwardedRef,
+} from 'react';
 import {
   Send, Square, Trash2, Loader2, Copy, Check, ArrowDownToLine,
-  ChevronDown, Globe, Brain, RefreshCw, Pencil, Zap,
+  ChevronDown, Globe, Brain, RefreshCw, Pencil,
   MessageSquarePlus, X, ScrollText, RotateCcw, Feather,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -41,6 +50,14 @@ import {
   type EssayContextMode,
 } from './essayContext';
 import { ESSAY_QUICK_ACTIONS, getQuickActionsByCategory } from './essayQuickActions';
+import { DocTypeAIServiceMenu } from '@/document-types/_shared/DocTypeAIServiceMenu';
+import { cn } from '@/lib/utils';
+import {
+  AI_OPTION_BTN_BASE, AI_OPTION_ACTIVE, AI_OPTION_THINKING_ACTIVE, AI_OPTION_INACTIVE,
+  SIDEBAR_AI_HEADER_PANEL,
+  SIDEBAR_AI_HEADER_ROW,
+  SIDEBAR_AI_HEADER_SUBROW,
+} from '@/document-types/_shared/styles';
 
 // ═══════════════════════════════════════════════════════
 // 消息 & 会话类型
@@ -116,15 +133,15 @@ export interface EssayAISidebarRef {
 // 组件
 // ═══════════════════════════════════════════════════════
 
-const EssayAISidebar = forwardRef<EssayAISidebarRef, EssayAISidebarProps>(function EssayAISidebar({
-  host, essay, editorContent, onInsertToDoc,
-}, ref) {
+const EssayAISidebar = forwardRef(function EssayAISidebar(
+  { host, essay, editorContent, onInsertToDoc }: EssayAISidebarProps,
+  ref: ForwardedRef<EssayAISidebarRef>
+) {
   const { t } = useTranslation();
 
   // ── AI 服务 ──
-  const { services, activeServiceId } = useSettingsStore(useShallow(s => ({
+  const { services } = useSettingsStore(useShallow(s => ({
     services: s.ai.services,
-    activeServiceId: s.ai.activeServiceId,
   })));
   const enabledServices = useMemo(() => services.filter(sv => sv.enabled), [services]);
   const [selectedServiceId, setSelectedServiceId] = useState<string>(() =>
@@ -158,8 +175,8 @@ const EssayAISidebar = forwardRef<EssayAISidebarRef, EssayAISidebarProps>(functi
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [enableWebSearch, setEnableWebSearch] = useState(false);
-  const [enableThinking, setEnableThinking] = useState(false);
+  const [enableWebSearch, setEnableWebSearch] = useState(true);
+  const [enableThinking, setEnableThinking] = useState(true);
   const [contextMode, setContextMode] = useState<EssayContextMode>('full');
 
   // ── 消息编辑 ──
@@ -359,9 +376,8 @@ const EssayAISidebar = forwardRef<EssayAISidebarRef, EssayAISidebarProps>(functi
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-background">
-      {/* ── 顶栏：会话管理 + 阶段指示器 + 提示词 ── */}
-      <div className="flex-shrink-0 border-b">
-        <div className="flex items-center gap-1.5 px-2.5 py-1.5">
+      <div className={SIDEBAR_AI_HEADER_PANEL}>
+        <div className={cn(SIDEBAR_AI_HEADER_ROW, 'gap-1.5')}>
           <Feather className="h-4 w-4 text-amber-600" />
           <Popover open={sessionMenuOpen} onOpenChange={setSessionMenuOpen}>
             <PopoverTrigger asChild>
@@ -428,10 +444,8 @@ const EssayAISidebar = forwardRef<EssayAISidebarRef, EssayAISidebarProps>(functi
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
-      </div>
 
-      {/* ── 快捷操作栏 ── */}
-      <div className="flex items-center gap-1 px-2.5 py-1 border-b bg-muted/20 flex-shrink-0">
+        <div className={SIDEBAR_AI_HEADER_SUBROW}>
         {/* 上下文模式切换 */}
         {(['full', 'paragraph', 'material'] as EssayContextMode[]).map(mode => (
           <button key={mode}
@@ -449,7 +463,7 @@ const EssayAISidebar = forwardRef<EssayAISidebarRef, EssayAISidebarProps>(functi
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="h-6 text-[11px] gap-1 shrink-0" disabled={streaming || !aiAvailable}>
-              <Zap className="h-3 w-3" />快捷操作
+              快捷操作
               <ChevronDown className="h-3 w-3 opacity-50" />
             </Button>
           </DropdownMenuTrigger>
@@ -459,16 +473,16 @@ const EssayAISidebar = forwardRef<EssayAISidebarRef, EssayAISidebarProps>(functi
                 {ci > 0 && <DropdownMenuSeparator />}
                 <DropdownMenuLabel className="text-[10px] text-muted-foreground">{cat.category}</DropdownMenuLabel>
                 {cat.actions.map(action => (
-                  <DropdownMenuItem key={action.id} className="text-xs gap-2 cursor-pointer"
+                  <DropdownMenuItem key={action.id} className="text-xs cursor-pointer"
                     onClick={() => handleQuickAction(action.promptTemplate)}>
-                    <span>{action.icon}</span>
-                    <span>{action.label}</span>
+                    {action.label}
                   </DropdownMenuItem>
                 ))}
               </div>
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+        </div>
       </div>
 
       {/* ── 消息列表 ── */}
@@ -487,9 +501,8 @@ const EssayAISidebar = forwardRef<EssayAISidebarRef, EssayAISidebarProps>(functi
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {recommendedActions.map(action => (
-                  <Button key={action.id} variant="outline" size="sm" className="h-7 text-xs justify-start gap-1"
+                  <Button key={action.id} variant="outline" size="sm" className="h-7 text-xs justify-start"
                     onClick={() => handleQuickAction(action.promptTemplate)} disabled={streaming || !aiAvailable}>
-                    <span>{action.icon}</span>
                     <span className="truncate">{action.label}</span>
                   </Button>
                 ))}
@@ -597,33 +610,51 @@ const EssayAISidebar = forwardRef<EssayAISidebarRef, EssayAISidebarProps>(functi
           rows={2} disabled={streaming || !aiAvailable}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (!streaming) sendMessage(inputValue); } }} />
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1 border-t border-border/60 pt-1.5">
+          <DocTypeAIServiceMenu
+            enabledServices={enabledServices}
+            value={aiParams.serviceId ?? ''}
+            onChange={(id) => {
+              setSelectedServiceId(id);
+              host.storage.set('_essay_ai_service_id', id);
+            }}
+            disabled={streaming}
+          />
           {providerCaps.webSearch && (
-            <Button variant="ghost" size="sm" className={`h-7 px-1.5 ${enableWebSearch ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                AI_OPTION_BTN_BASE,
+                enableWebSearch ? AI_OPTION_ACTIVE : AI_OPTION_INACTIVE,
+              )}
               onClick={() => setEnableWebSearch(v => !v)}
-              title={enableWebSearch ? '联网搜索：已开启' : '联网搜索：已关闭'}>
-              <Globe className="h-3.5 w-3.5" />
+              disabled={streaming}
+              title={enableWebSearch ? '联网搜索：已开启' : '联网搜索：已关闭'}
+            >
+              <Globe className="h-3 w-3" />
+              {t('chat.webSearch', { defaultValue: '联网' })}
             </Button>
           )}
           {providerCaps.thinking && (
-            <Button variant="ghost" size="sm" className={`h-7 px-1.5 ${enableThinking ? 'text-purple-600 dark:text-purple-400' : 'text-muted-foreground'}`}
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                AI_OPTION_BTN_BASE,
+                enableThinking ? AI_OPTION_THINKING_ACTIVE : AI_OPTION_INACTIVE,
+              )}
               onClick={() => setEnableThinking(v => !v)}
-              title={enableThinking ? '深度思考：已开启' : '深度思考：已关闭'}>
-              <Brain className="h-3.5 w-3.5" />
+              disabled={streaming}
+              title={enableThinking ? '深度思考：已开启' : '深度思考：已关闭'}
+            >
+              <Brain className="h-3 w-3" />
+              {t('chat.thinking', { defaultValue: '深度思考' })}
             </Button>
           )}
-          {enabledServices.length >= 2 && (
-            <select
-              className="h-6 text-[11px] px-1 border rounded bg-background max-w-[100px] truncate"
-              value={selectedServiceId || activeServiceId || ''}
-              onChange={e => { setSelectedServiceId(e.target.value); host.storage.set('_essay_ai_service_id', e.target.value); }}
-              title="选择 AI 服务"
-            >
-              {enabledServices.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          )}
+        </div>
+
+        <div className="flex items-center gap-1.5">
           <div className="flex-1" />
           {streaming ? (
             <Button variant="outline" size="icon" className="h-7 w-7 flex-shrink-0" onClick={handleStop} title="停止生成">

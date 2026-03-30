@@ -5,6 +5,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { usePluginHost, useThinkingContent } from '../_framework/PluginHostAPI';
 import { formatBackendError } from '@/lib/backendError';
+import { saveTextFileWithDialog } from '@/lib/tauriSaveTextFile';
 import { useSettingsStore, getAIInvokeParamsForService } from '@/stores/useSettingsStore';
 import { getProviderConfig, getActiveService, type AIProvider } from '@aidocplus/shared-types';
 import type { PluginAssistantPanelProps } from '../types';
@@ -244,11 +245,19 @@ export function MermaidAssistantPanel({ aiContent }: PluginAssistantPanelProps) 
     if (!window.confirm('确定要清除当前对话的所有消息吗？')) return;
     updateMessages([]); setStreamingContent('');
   }, [messages.length, updateMessages]);
-  const handleExport = useCallback(() => {
+  const handleExport = useCallback(async () => {
     if (messages.length === 0) return;
     const md = exportChatAsMarkdown(messages, t('assistant.title', { defaultValue: 'Mermaid AI 助手' }));
-    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' }); const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `MermaidAI对话_${new Date().toISOString().slice(0, 10)}.md`; a.click(); URL.revokeObjectURL(url);
+    const defaultPath = `MermaidAI对话_${new Date().toISOString().slice(0, 10)}.md`;
+    try {
+      await saveTextFileWithDialog({
+        defaultPath,
+        filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }],
+        content: md,
+      });
+    } catch (e) {
+      console.error('[MermaidAssistantPanel] export', e);
+    }
   }, [messages, t]);
   const handleCopy = useCallback((text: string, blockId: string) => { navigator.clipboard.writeText(text); setCopiedId(blockId); setTimeout(() => setCopiedId(null), 2000); }, []);
 

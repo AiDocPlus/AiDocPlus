@@ -22,5 +22,8 @@ pub mod coding;
 pub mod script_runner;
 pub mod imbot;
 pub mod help;
+pub mod ebook_reader;
+pub mod quick_capture;
 pub mod novel;
 pub mod stock;
+pub mod sync;

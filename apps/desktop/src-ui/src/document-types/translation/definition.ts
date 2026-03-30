@@ -1,6 +1,6 @@
 /**
  * translation 文档类型定义 — 中英文翻译
- * layoutMode='full'，自定义双栏对照布局
+ * layoutMode='full'，自定义双栏对照布局 + 可调宽 AI 侧栏
  */
 import { lazy } from 'react';
 import { Languages, Sparkles, RefreshCw, ShieldCheck } from 'lucide-react';
@@ -9,15 +9,15 @@ import { createEmptyTranslationContent, extractTranslationPlainText } from './ty
 
 export const translationDocType: DocTypeDefinition = {
   id: 'translation',
-  version: '1.0.0',
+  version: '2.0.0',
   labelKey: 'docType.translation',
   descriptionKey: 'docType.translationDesc',
   icon: Languages,
   category: 'writing',
+  fileSuffix: '.trans',
 
   EditorComponent: lazy(() => import('./TranslationWorkspace')),
-  layoutMode: 'standard',
-  AISidebarComponent: lazy(() => import('./TranslationAISidebar')),
+  layoutMode: 'full',
 
   createEmptyContent: () => JSON.stringify(createEmptyTranslationContent()),
   extractPlainText: (content) => extractTranslationPlainText(content),

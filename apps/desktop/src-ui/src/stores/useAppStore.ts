@@ -952,7 +952,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         enableThinking: (optEnableThinking ?? aiSettings.enableThinking) || undefined,
         enableTools: enableTools || undefined,
         toolScope: toolScope || undefined,
-        maxTokens: aiSettings.maxTokens ?? 4096,
+        ...(typeof aiSettings.maxTokens === 'number' && aiSettings.maxTokens > 0
+          ? { maxTokens: aiSettings.maxTokens }
+          : {}),
         requestId
       });
 
@@ -1097,7 +1099,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         })(),
         enableWebSearch: enableWebSearch || undefined,
         enableThinking: aiSettings.enableThinking || undefined,
-        maxTokens: aiSettings.maxTokens ?? 4096,
+        ...(typeof aiSettings.maxTokens === 'number' && aiSettings.maxTokens > 0
+          ? { maxTokens: aiSettings.maxTokens }
+          : {}),
         requestId
       };
 

@@ -83,6 +83,14 @@ function isCommandAllowed(command: string): boolean {
   return ALLOWED_PLUGIN_COMMANDS.has(command);
 }
 
+/**
+ * 设置里 maxTokens=0 表示未配置；此时不向后端透传，让 Rust 侧走 provider 默认值。
+ */
+function pickInvokeMaxTokens(explicit?: number, global?: number): number | undefined {
+  const v = explicit ?? global;
+  return typeof v === 'number' && v > 0 ? v : undefined;
+}
+
 // ============================================================
 // API 接口类型定义
 // ============================================================
@@ -415,6 +423,7 @@ export function createPluginHostAPI(opts: CreatePluginHostAPIOptions): PluginHos
   const ai: AIAPI = {
     chat: async (messages, options) => {
       const aiParams = getAIInvokeParamsForService(options?.serviceId || opts.getDocument().aiServiceId);
+      const maxTok = pickInvokeMaxTokens(options?.maxTokens, useSettingsStore.getState().ai.maxTokens);
       // 通知宿主：开始新的 AI 调用，清空思考内容
       lastThinking = '';
       opts.onThinkingUpdate?.('');
@@ -422,7 +431,7 @@ export function createPluginHostAPI(opts: CreatePluginHostAPIOptions): PluginHos
       const rawResult = await invoke<string>('chat', {
         messages,
         ...aiParams,
-        maxTokens: options?.maxTokens ?? 4096,
+        ...(maxTok != null ? { maxTokens: maxTok } : {}),
       });
 
       // 自动过滤 <think> 标签
@@ -436,6 +445,7 @@ export function createPluginHostAPI(opts: CreatePluginHostAPIOptions): PluginHos
     chatStream: async (messages, onChunk, options) => {
       const aiParams = getAIInvokeParamsForService(options?.serviceId || opts.getDocument().aiServiceId);
       const requestId = `plugin_${pluginId}_${Date.now()}`;
+      const maxTok = pickInvokeMaxTokens(options?.maxTokens, useSettingsStore.getState().ai.maxTokens);
 
       // 通知宿主：开始新的 AI 调用，清空思考内容
       lastThinking = '';
@@ -490,7 +500,7 @@ export function createPluginHostAPI(opts: CreatePluginHostAPIOptions): PluginHos
         await invoke<string>('chat_stream', {
           messages,
           ...aiParams,
-          maxTokens: options?.maxTokens ?? useSettingsStore.getState().ai.maxTokens ?? 4096,
+          ...(maxTok != null ? { maxTokens: maxTok } : {}),
           enableWebSearch: options?.enableWebSearch || undefined,
           enableThinking: options?.enableThinking || undefined,
           requestId,

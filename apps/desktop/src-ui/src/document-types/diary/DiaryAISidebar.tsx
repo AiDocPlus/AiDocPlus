@@ -14,7 +14,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   Send, Square, Trash2, Loader2, Copy, Check, ArrowDownToLine,
-  ChevronDown, Globe, RefreshCw, Pencil, Zap,
+  ChevronDown, Globe, RefreshCw, Pencil,
   MessageSquarePlus, X, ScrollText, RotateCcw, BookHeart, Brain,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -40,6 +40,14 @@ import {
 import { buildEmotionInsightPrompt } from './diaryAnalysis';
 import { resolveTheme } from '@/components/chat/ChatMessage';
 import { CollapsibleThinkingBlock } from '@/document-types/_shared/CollapsibleThinkingBlock';
+import { DocTypeAIServiceMenu } from '@/document-types/_shared/DocTypeAIServiceMenu';
+import { cn } from '@/lib/utils';
+import {
+  AI_OPTION_BTN_BASE, AI_OPTION_ACTIVE, AI_OPTION_THINKING_ACTIVE, AI_OPTION_INACTIVE,
+  SIDEBAR_AI_HEADER_PANEL,
+  SIDEBAR_AI_HEADER_ROW,
+  SIDEBAR_AI_HEADER_SUBROW,
+} from '@/document-types/_shared/styles';
 
 // ═══════════════════════════════════════════════════════
 // 消息 & 会话类型
@@ -119,9 +127,8 @@ export default function DiaryAISidebar({
   const { t } = useTranslation();
 
   // ── AI 服务 ──
-  const { services, activeServiceId } = useSettingsStore(useShallow(s => ({
+  const { services } = useSettingsStore(useShallow(s => ({
     services: s.ai.services,
-    activeServiceId: s.ai.activeServiceId,
   })));
   const enabledServices = useMemo(() => services.filter(sv => sv.enabled), [services]);
   const [selectedServiceId, setSelectedServiceId] = useState<string>(() =>
@@ -156,7 +163,7 @@ export default function DiaryAISidebar({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [enableWebSearch, setEnableWebSearch] = useState(true); // 联网默认开启
-  const [enableThinking, setEnableThinking] = useState(false);
+  const [enableThinking, setEnableThinking] = useState(true);
   const [contextMode, setContextMode] = useState<DiaryContextMode>('current');
 
   // ── 消息编辑 ──
@@ -350,9 +357,8 @@ export default function DiaryAISidebar({
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-background">
-      {/* ── 顶栏：会话管理 + 提示词 ── */}
-      <div className="flex-shrink-0 border-b">
-        <div className="flex items-center gap-1.5 px-2.5 py-1.5">
+      <div className={SIDEBAR_AI_HEADER_PANEL}>
+        <div className={cn(SIDEBAR_AI_HEADER_ROW, 'gap-1.5')}>
           <BookHeart className="h-4 w-4 text-blue-500" />
           <Popover open={sessionMenuOpen} onOpenChange={setSessionMenuOpen}>
             <PopoverTrigger asChild>
@@ -370,7 +376,12 @@ export default function DiaryAISidebar({
                       {sess.title} ({sess.messages.length})
                     </button>
                     {sessions.length > 1 && (
-                      <button className="opacity-50 hover:opacity-100 hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteSession(sess.id); }}>
+                      <button
+                        type="button"
+                        className="opacity-50 hover:opacity-100 hover:text-destructive"
+                        onClick={(e) => { e.stopPropagation(); handleDeleteSession(sess.id); }}
+                        title={t('common.delete', { defaultValue: '删除' })}
+                      >
                         <X className="h-3.5 w-3.5" />
                       </button>
                     )}
@@ -419,10 +430,8 @@ export default function DiaryAISidebar({
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
-      </div>
 
-      {/* ── 快捷操作栏 ── */}
-      <div className="flex items-center gap-1 px-2.5 py-1 border-b bg-muted/20 flex-shrink-0">
+        <div className={SIDEBAR_AI_HEADER_SUBROW}>
         {/* 上下文模式切换 */}
         {(['current', 'week', 'month'] as DiaryContextMode[]).map(mode => (
           <button key={mode}
@@ -442,20 +451,20 @@ export default function DiaryAISidebar({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="h-6 text-[11px] gap-1 shrink-0" disabled={streaming || !aiAvailable}>
-              <Zap className="h-3 w-3" />{t('diary.aiQuickActions', { defaultValue: '快捷操作' })}
+              {t('diary.aiQuickActions', { defaultValue: '快捷操作' })}
               <ChevronDown className="h-3 w-3 opacity-50" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="max-h-[300px] overflow-auto bg-card">
             {DIARY_QUICK_ACTIONS.map(action => (
-              <DropdownMenuItem key={action.id} className="text-xs gap-2 cursor-pointer"
+              <DropdownMenuItem key={action.id} className="text-xs cursor-pointer"
                 onClick={() => handleQuickAction(action.promptTemplate)}>
-                <span>{action.icon}</span>
-                <span>{action.label}</span>
+                {action.label}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+        </div>
       </div>
 
       {/* ── 心情预警 ── */}
@@ -480,9 +489,8 @@ export default function DiaryAISidebar({
               <p className="text-xs font-medium text-muted-foreground px-1">{t('diary.aiSuggestedActions', { defaultValue: '试试这些操作' })}</p>
               <div className="flex flex-wrap gap-1.5">
                 {recommendedActions.map(action => (
-                  <Button key={action.id} variant="outline" size="sm" className="h-7 text-xs justify-start gap-1"
+                  <Button key={action.id} variant="outline" size="sm" className="h-7 text-xs justify-start"
                     onClick={() => handleQuickAction(action.promptTemplate)} disabled={streaming || !aiAvailable}>
-                    <span>{action.icon}</span>
                     <span className="truncate">{action.label}</span>
                   </Button>
                 ))}
@@ -596,33 +604,51 @@ export default function DiaryAISidebar({
           rows={2} disabled={streaming || !aiAvailable}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (!streaming) sendMessage(inputValue); } }} />
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1 border-t border-border/60 pt-1.5">
+          <DocTypeAIServiceMenu
+            enabledServices={enabledServices}
+            value={aiParams.serviceId ?? ''}
+            onChange={(id) => {
+              setSelectedServiceId(id);
+              host.storage.set('_diary_ai_service_id', id);
+            }}
+            disabled={streaming}
+          />
           {providerCaps.webSearch && (
-            <Button variant="ghost" size="sm" className={`h-7 px-1.5 ${enableWebSearch ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                AI_OPTION_BTN_BASE,
+                enableWebSearch ? AI_OPTION_ACTIVE : AI_OPTION_INACTIVE,
+              )}
               onClick={() => setEnableWebSearch(v => !v)}
-              title={enableWebSearch ? t('diary.webSearchOn', { defaultValue: '联网搜索：已开启' }) : t('diary.webSearchOff', { defaultValue: '联网搜索：已关闭' })}>
-              <Globe className="h-3.5 w-3.5" />
+              disabled={streaming}
+              title={enableWebSearch ? t('diary.webSearchOn', { defaultValue: '联网搜索：已开启' }) : t('diary.webSearchOff', { defaultValue: '联网搜索：已关闭' })}
+            >
+              <Globe className="h-3 w-3" />
+              {t('chat.webSearch', { defaultValue: '联网' })}
             </Button>
           )}
           {providerCaps.thinking && (
-            <Button variant="ghost" size="sm" className={`h-7 px-1.5 ${enableThinking ? 'text-purple-600 dark:text-purple-400' : 'text-muted-foreground'}`}
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                AI_OPTION_BTN_BASE,
+                enableThinking ? AI_OPTION_THINKING_ACTIVE : AI_OPTION_INACTIVE,
+              )}
               onClick={() => setEnableThinking(v => !v)}
-              title={enableThinking ? t('diary.deepThinkOn', { defaultValue: '深度思考：已开启' }) : t('diary.deepThinkOff', { defaultValue: '深度思考：已关闭' })}>
-              <Brain className="h-3.5 w-3.5" />
+              disabled={streaming}
+              title={enableThinking ? t('diary.deepThinkOn', { defaultValue: '深度思考：已开启' }) : t('diary.deepThinkOff', { defaultValue: '深度思考：已关闭' })}
+            >
+              <Brain className="h-3 w-3" />
+              {t('chat.thinking', { defaultValue: '深度思考' })}
             </Button>
           )}
-          {enabledServices.length >= 2 && (
-            <select
-              className="h-6 text-[11px] px-1 border rounded bg-background max-w-[100px] truncate"
-              value={selectedServiceId || activeServiceId || ''}
-              onChange={e => { setSelectedServiceId(e.target.value); host.storage.set('_diary_ai_service_id', e.target.value); }}
-              title={t('diary.selectAiService', { defaultValue: '选择 AI 服务' })}
-            >
-              {enabledServices.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          )}
+        </div>
+
+        <div className="flex items-center gap-1.5">
           <div className="flex-1" />
           {streaming ? (
             <Button variant="outline" size="icon" className="h-7 w-7 flex-shrink-0" onClick={handleStop}

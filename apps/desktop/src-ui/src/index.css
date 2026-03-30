@@ -70,6 +70,7 @@
   .markdown-preview {
     padding: 1rem;
     color: hsl(var(--foreground));
+    background-color: hsl(var(--background));
   }
 
   .markdown-preview h1,
@@ -405,6 +406,16 @@ div[data-radix-tooltip-content] {
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+/* 日记条目右键菜单 - hover 高亮 */
+.diary-ctx-item:hover {
+  background-color: hsl(210 100% 90%) !important;
+  color: hsl(210 100% 20%) !important;
+}
+.dark .diary-ctx-item:hover {
+  background-color: hsl(210 60% 30%) !important;
+  color: hsl(210 100% 90%) !important;
 }
 
 /* 密码错误抖动动画 */

@@ -4,7 +4,16 @@
  * 功能：拖拽排序、圆点悬浮菜单、撤销/重做、完成状态、备注、展开/折叠、
  *       上下移动、克隆节点、键盘快捷键（对标幕布完整快捷键表）
  */
-import { useState, useCallback, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
+import {
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  useMemo,
+  forwardRef,
+  useImperativeHandle,
+  type ForwardedRef,
+} from 'react';
 import { ChevronRight, ChevronDown, GripVertical, Check, Trash2, MessageSquare, Copy, Search, X, Home } from 'lucide-react';
 import type { SMNode } from './mindmapConverter';
 import { mindMapDataToMarkdown } from './mindmapConverter';
@@ -135,8 +144,10 @@ function useUndoStack(data: SMNode, onDataChange: (d: SMNode) => void) {
 
 // ── 主组件 ──
 
-export const OutlineEditor = forwardRef<OutlineEditorRef, OutlineEditorProps>(
-  function OutlineEditor({ data, onDataChange, className }, ref) {
+export const OutlineEditor = forwardRef(function OutlineEditor(
+  { data, onDataChange, className }: OutlineEditorProps,
+  ref: ForwardedRef<OutlineEditorRef>
+) {
     const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
     const [fKey, setFKey] = useState<string | null>(null);
     const [fEnd, setFEnd] = useState(false);
@@ -802,5 +813,4 @@ export const OutlineEditor = forwardRef<OutlineEditorRef, OutlineEditorProps>(
         </div>
       </div>
     );
-  }
-);
+});

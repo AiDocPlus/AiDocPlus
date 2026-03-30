@@ -12,6 +12,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatBackendError } from '@/lib/backendError';
+import { saveTextFileWithDialog } from '@/lib/tauriSaveTextFile';
 import { Button } from '@/components/ui/button';
 import { useCodingStore, getDefaultSystemPrompt } from '@/stores/useCodingStore';
 import type { AssistantMode } from '@/stores/useCodingStore';
@@ -218,20 +219,23 @@ export function CodingAssistantPanel({
   }, []);
 
   // ── 导出对话 ──
-  const handleExportChat = useCallback(() => {
+  const handleExportChat = useCallback(async () => {
     if (messages.length === 0) return;
     const lines = messages.map(m => {
       const role = m.role === 'user' ? '👤 用户' : m.role === 'assistant' ? '🤖 助手' : '⚙ 系统';
       return `### ${role}\n\n${m.content}\n`;
     });
     const md = `# ${fileName || '对话记录'}\n\n${lines.join('\n---\n\n')}`;
-    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${(fileName || 'chat').replace(/\.[^.]+$/, '')}_chat_${new Date().toISOString().slice(0, 10)}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const defaultPath = `${(fileName || 'chat').replace(/\.[^.]+$/, '')}_chat_${new Date().toISOString().slice(0, 10)}.md`;
+    try {
+      await saveTextFileWithDialog({
+        defaultPath,
+        filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }],
+        content: md,
+      });
+    } catch (e) {
+      console.error('[CodingAssistantPanel] export chat', e);
+    }
   }, [messages, fileName]);
 
   // ── 复制代码 ──

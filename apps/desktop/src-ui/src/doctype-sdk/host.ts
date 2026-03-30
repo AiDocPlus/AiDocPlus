@@ -11,6 +11,12 @@ import { useAppStore } from '@/stores/useAppStore';
 import { parseThinkTags } from '@/utils/thinkTagParser';
 import i18n from '@/i18n';
 
+/** 设置里 maxTokens=0 表示未配置；前端不透传，Rust 端按 provider 默认值注入。 */
+function pickInvokeMaxTokens(explicit?: number, global?: number): number | undefined {
+  const v = explicit ?? global;
+  return typeof v === 'number' && v > 0 ? v : undefined;
+}
+
 export interface CreateDocTypeHostOptions {
   docTypeId: string;
   documentId: string;
@@ -38,6 +44,17 @@ export function createDocTypeHost(opts: CreateDocTypeHostOptions): DocTypeHostAP
         useAppStore.getState().markTabAsClean(tabId);
       }
     },
+    async saveAllDirtyTabs() {
+      const tabsSnapshot = useAppStore.getState().tabs;
+      for (const tab of tabsSnapshot) {
+        if (!tab.isDirty) continue;
+        const d = useAppStore.getState().documents.find(dd => dd.id === tab.documentId);
+        if (d) {
+          await useAppStore.getState().saveDocument(d);
+          useAppStore.getState().markTabAsClean(tab.id);
+        }
+      }
+    },
     markDirty() {
       useAppStore.getState().markTabAsDirty(tabId);
     },
@@ -62,10 +79,11 @@ export function createDocTypeHost(opts: CreateDocTypeHostOptions): DocTypeHostAP
         : getAIInvokeParams();
       if (!aiParams.provider) throw new Error('AI 服务未配置');
       const aiGlobal = useSettingsStore.getState().ai;
+      const maxTok = pickInvokeMaxTokens(options?.maxTokens, aiGlobal.maxTokens);
       const result = await invoke<string>('chat', {
         messages,
         ...aiParams,
-        maxTokens: options?.maxTokens ?? aiGlobal.maxTokens ?? 4096,
+        ...(maxTok != null ? { maxTokens: maxTok } : {}),
       });
       const parsed = parseThinkTags(result);
       return parsed.content;
@@ -99,7 +117,8 @@ export function createDocTypeHost(opts: CreateDocTypeHostOptions): DocTypeHostAP
 
         // 直接调用 Rust chat_stream 命令，与主程序 sendChatMessage 一致
         const aiGlobal = useSettingsStore.getState().ai;
-        await invoke<string>('chat_stream', {
+        const maxTok = pickInvokeMaxTokens(options?.maxTokens, aiGlobal.maxTokens);
+        const serverFull = await invoke<string>('chat_stream', {
           messages,
           provider: aiParams.provider,
           apiKey: aiParams.apiKey,
@@ -113,12 +132,16 @@ export function createDocTypeHost(opts: CreateDocTypeHostOptions): DocTypeHostAP
           enableThinking: options?.enableThinking || undefined,
           enableTools: options?.enableTools || undefined,
           toolScope: options?.toolScope || undefined,
-          maxTokens: options?.maxTokens ?? aiGlobal.maxTokens ?? 4096,
+          ...(maxTok != null ? { maxTokens: maxTok } : {}),
           requestId,
         });
 
+        // 优先使用服务端完整累积结果，防止 unlisten 时机导致最后 chunk 丢失
+        // （深度思考场景下正文只有最后几个 chunk，JS 端 SSE 可能因 unlisten 漏收）
+        const finalRaw = serverFull || rawAccumulated;
+
         // 返回原始文本，让调用方自己解析 think 标签
-        return rawAccumulated;
+        return finalRaw;
       } catch (err) {
         console.error('[DocTypeHost] chat_stream error:', err);
         throw err;
@@ -138,7 +161,7 @@ export function createDocTypeHost(opts: CreateDocTypeHostOptions): DocTypeHostAP
   // ── UI 能力 ──
   const ui: DocTypeHostAPI['ui'] = {
     getTheme() {
-      const theme = useSettingsStore.getState().ui?.theme || 'dark';
+      const theme = useSettingsStore.getState().ui?.theme || 'light';
       if (theme === 'auto') {
         return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       }

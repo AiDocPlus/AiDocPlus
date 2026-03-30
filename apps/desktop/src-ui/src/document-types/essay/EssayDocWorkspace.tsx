@@ -53,7 +53,8 @@ import EssayAnalysisPanel from './EssayAnalysisPanel';
 import EssaySelectionToolbar from './EssaySelectionToolbar';
 import EssayExportPanel from './EssayExportPanel';
 import { useEssaySelection, type EssaySelectionActions } from './useEssaySelection';
-import { exportEssay } from './essayExport';
+import { exportEssay, getEssayExportSaveDialogParams } from './essayExport';
+import { saveBlobWithDialog } from '@/lib/tauriSaveBlobFile';
 import EssayToolbar, { type ViewMode, type LeftTab as ToolbarLeftTab } from './EssayToolbar';
 import EssayEditor from './EssayEditor';
 import EssayStatusBar, { type SaveStatus } from './EssayStatusBar';
@@ -408,14 +409,13 @@ export default function EssayDocWorkspace({ document: doc, host, tabId }: DocTyp
                     const updated = deleteSnapshot(essayRef.current, snapshotId);
                     saveEssay(updated);
                   }}
-                  onExportDocument={async (format, settings) => {
+                  onExportDocument={async (_format, settings) => {
                     const blob = await exportEssay(essay, settings);
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `${essay.title || '未命名散文'}.${format}`;
-                    a.click();
-                    URL.revokeObjectURL(url);
+                    const { defaultPath, filters } = getEssayExportSaveDialogParams(
+                      settings.format,
+                      essay.title || '未命名散文',
+                    );
+                    await saveBlobWithDialog({ defaultPath, filters, blob });
                   }}
                   onShareDocument={async (_options) => {
                     return `${window.location.origin}/share/${Math.random().toString(36).substring(2, 15)}`;

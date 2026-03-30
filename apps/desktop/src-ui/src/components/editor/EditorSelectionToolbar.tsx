@@ -99,7 +99,7 @@ export default function EditorSelectionToolbar({
         messages,
         ...aiParams,
         requestId,
-        maxTokens: useSettingsStore.getState().ai.maxTokens ?? 4096,
+        maxTokens: (() => { const v = useSettingsStore.getState().ai.maxTokens; return (v && v > 0) ? v : undefined; })(),
       });
 
       unlisten();

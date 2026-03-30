@@ -1,7 +1,7 @@
 #!/bin/bash
 # AiDocPlus 资源构建脚本
 # 替代原来的 assemble.sh + 各资源仓库 deploy.sh
-# 功能：运行各资源的 build.py → 部署 generated TS + bundled-resources
+# 功能：运行各资源的 build.py -> 部署 generated TS + bundled-resources
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -13,7 +13,7 @@ BUNDLED_DIR="${PROJECT_ROOT}/apps/desktop/src-tauri/bundled-resources"
 echo "=== AiDocPlus 资源构建 ==="
 mkdir -p "$GENERATED_DIR"
 
-# ── 1. AI Providers ──
+# -- 1. AI Providers --
 echo ""
 echo "[build] AI Providers..."
 AI_DIR="${RESOURCES_DIR}/ai-providers"
@@ -31,17 +31,20 @@ mkdir -p "$AI_BUNDLED"
 if [ -f "${AI_DIR}/data/_meta.json" ]; then
   cp "${AI_DIR}/data/_meta.json" "${AI_BUNDLED}/"
 fi
-find "${AI_DIR}/data" -name "manifest.json" -not -path "*/_meta.json" | while read -r manifest_file; do
+
+# 使用更健壮的文件遍历方式（支持带空格的文件名）
+find "${AI_DIR}/data" -name "manifest.json" -not -path "*/_meta.json" -print0 | while IFS= read -r -d '' manifest_file; do
   provider_dir="$(dirname "$manifest_file")"
   rel_path="${provider_dir#${AI_DIR}/data/}"
   target_dir="${AI_BUNDLED}/${rel_path}"
   mkdir -p "$target_dir"
   cp "${provider_dir}/manifest.json" "$target_dir/"
 done
+
 TOTAL=$(find "${AI_DIR}/data" -name "manifest.json" -not -path "*/_meta.json" | wc -l | tr -d ' ')
 echo "   [ok] ${TOTAL} 个提供商 -> bundled-resources/"
 
-# ── 2. Prompt Templates ──
+# -- 2. Prompt Templates --
 echo ""
 echo "[build] Prompt Templates..."
 PT_DIR="${RESOURCES_DIR}/prompt-templates"
@@ -60,10 +63,10 @@ PT_BUNDLED="${BUNDLED_DIR}/prompt-templates"
 mkdir -p "$PT_BUNDLED"
 rm -f "$PT_BUNDLED"/*.json
 cp "${PT_DIR}/data"/*.json "$PT_BUNDLED/"
-JSON_COUNT=$(ls -1 "${PT_DIR}/data"/*.json 2>/dev/null | wc -l | tr -d ' ')
+JSON_COUNT=$(find "${PT_DIR}/data" -maxdepth 1 -name "*.json" | wc -l | tr -d ' ')
 echo "   [ok] ${JSON_COUNT} 个分类 JSON -> bundled-resources/"
 
-# ── 3. Doc Templates ──
+# -- 3. Doc Templates --
 echo ""
 echo "[build] Doc Templates..."
 DT_DIR="${RESOURCES_DIR}/doc-templates"
@@ -84,7 +87,7 @@ mkdir -p "$DT_BUNDLED"
 JSON_DIR="${DT_DIR}/dist/json"
 if [ -d "$JSON_DIR" ]; then
   cp "${JSON_DIR}"/*.json "$DT_BUNDLED/"
-  DT_COUNT=$(ls -1 "${JSON_DIR}"/*.json 2>/dev/null | wc -l | tr -d ' ')
+  DT_COUNT=$(find "${JSON_DIR}" -maxdepth 1 -name "*.json" | wc -l | tr -d ' ')
   echo "   [ok] ${DT_COUNT} 个分类 JSON -> bundled-resources/"
 else
   echo "   [warn] dist/json/ 不存在，跳过"

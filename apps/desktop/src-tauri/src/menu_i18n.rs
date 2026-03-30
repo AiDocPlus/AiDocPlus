@@ -14,7 +14,11 @@ fn is_chinese() -> bool {
             // AppleLanguages 返回类似 ("zh-Hans-CN", "en-CN", ...) 的数组
             // 只要第一个语言以 zh 开头就算中文
             if let Some(first) = lang.lines().nth(1) {
-                return first.trim().trim_matches('"').trim_matches(',').starts_with("zh");
+                return first
+                    .trim()
+                    .trim_matches('"')
+                    .trim_matches(',')
+                    .starts_with("zh");
             }
         }
     }
@@ -185,6 +189,11 @@ pub struct MenuTexts {
     pub view_composer: &'static str,
     pub view_functional: &'static str,
     pub view_coding: &'static str,
+    // 工具菜单
+    pub tools: &'static str,
+    pub tools_quick_capture: &'static str,
+    pub tools_ebook_reader: &'static str,
+    pub quick_capture_window_title: &'static str,
     // 帮助菜单
     pub help: &'static str,
     pub shortcuts_ref: &'static str,
@@ -203,8 +212,8 @@ const ZH: MenuTexts = MenuTexts {
     export_txt: "纯文本 (.txt)",
     new_project: "新建项目",
     new_document: "新建通用文档",
-    new_document_dialog: "新建文档...",
-    new_from_template: "从模板新建...",
+    new_document_dialog: "新建专业文档...",
+    new_from_template: "从模板新建通用文档...",
     save: "保存",
     save_all: "全部保存",
     import_file: "导入文件...",
@@ -323,6 +332,10 @@ const ZH: MenuTexts = MenuTexts {
     view_composer: "合并区",
     view_functional: "功能区",
     view_coding: "编程区",
+    tools: "工具",
+    tools_quick_capture: "速记窗口",
+    tools_ebook_reader: "电子书阅读器",
+    quick_capture_window_title: "速记 - AiDocPlus",
     help: "帮助",
     shortcuts_ref: "快捷键参考",
     first_run_guide: "新手引导",
@@ -340,8 +353,8 @@ const EN: MenuTexts = MenuTexts {
     export_txt: "Plain Text (.txt)",
     new_project: "New Project",
     new_document: "New Document",
-    new_document_dialog: "New Document...",
-    new_from_template: "New from Template...",
+    new_document_dialog: "New Professional Document...",
+    new_from_template: "New Document from Template...",
     save: "Save",
     save_all: "Save All",
     import_file: "Import File...",
@@ -460,6 +473,10 @@ const EN: MenuTexts = MenuTexts {
     view_composer: "Composer",
     view_functional: "Functions",
     view_coding: "Coding",
+    tools: "Tools",
+    tools_quick_capture: "Quick Capture",
+    tools_ebook_reader: "E-book Reader",
+    quick_capture_window_title: "Quick Capture - AiDocPlus",
     help: "Help",
     shortcuts_ref: "Keyboard Shortcuts",
     first_run_guide: "Getting Started",
@@ -472,5 +489,9 @@ const EN: MenuTexts = MenuTexts {
 
 /// 获取当前系统语言对应的菜单文本
 pub fn get_menu_texts() -> &'static MenuTexts {
-    if is_chinese() { &ZH } else { &EN }
+    if is_chinese() {
+        &ZH
+    } else {
+        &EN
+    }
 }

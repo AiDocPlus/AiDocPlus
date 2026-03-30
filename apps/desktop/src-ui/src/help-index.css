@@ -22,6 +22,8 @@
   --ring: 222.2 84% 4.9%;
   --radius: 0.5rem;
   --sidebar-bg: 210 40% 98%;
+  --toolbar-bg: 210 40% 97%;
+  --toolbar-btn-hover: 214.3 31.8% 93%;
 }
 
 .dark {
@@ -45,6 +47,8 @@
   --input: 217.2 32.6% 17.5%;
   --ring: 212.7 26.8% 83.9%;
   --sidebar-bg: 222.2 84% 6%;
+  --toolbar-bg: 222.2 84% 7%;
+  --toolbar-btn-hover: 217.2 32.6% 20%;
 }
 
 * {
@@ -267,4 +271,341 @@ body {
   border: none;
   padding: 0.125rem 0;
   font-family: inherit;
+}
+
+/* ── Sepia（护眼）主题 ── */
+:root.sepia {
+  --background: 35 60% 92%;
+  --foreground: 30 30% 20%;
+  --card: 35 55% 90%;
+  --card-foreground: 30 30% 20%;
+  --popover: 35 55% 90%;
+  --popover-foreground: 30 30% 20%;
+  --primary: 25 70% 35%;
+  --primary-foreground: 35 60% 95%;
+  --secondary: 35 40% 85%;
+  --secondary-foreground: 30 30% 20%;
+  --muted: 35 35% 85%;
+  --muted-foreground: 30 15% 40%;
+  --accent: 35 40% 85%;
+  --accent-foreground: 30 30% 20%;
+  --destructive: 0 72% 40%;
+  --destructive-foreground: 35 60% 95%;
+  --border: 35 25% 78%;
+  --input: 35 25% 78%;
+  --ring: 25 70% 35%;
+  --sidebar-bg: 35 50% 88%;
+  --toolbar-bg: 35 50% 90%;
+  --toolbar-btn-hover: 35 35% 83%;
+}
+
+/* ── hljs 语法高亮主题 ── */
+
+/* 亮色主题（GitHub 风格） */
+.hljs {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal { color: #d73a49; }
+.hljs-string,
+.hljs-doctag,
+.hljs-template-tag { color: #032f62; }
+.hljs-number,
+.hljs-built_in { color: #005cc5; }
+.hljs-comment,
+.hljs-quote { color: #6a737d; font-style: italic; }
+.hljs-title,
+.hljs-function,
+.hljs-section { color: #6f42c1; }
+.hljs-variable,
+.hljs-attr { color: #e36209; }
+.hljs-type,
+.hljs-params { color: #d73a49; }
+.hljs-meta { color: #005cc5; }
+.hljs-addition { color: #22863a; background-color: rgba(46,160,67,0.1); }
+.hljs-deletion { color: #b31d28; background-color: rgba(248,81,73,0.1); }
+.hljs-symbol,
+.hljs-bullet { color: #e36209; }
+.hljs-link { color: #032f62; text-decoration: underline; }
+.hljs-selector-class { color: #6f42c1; }
+.hljs-selector-id { color: #005cc5; }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: bold; }
+
+/* 暗色主题覆盖 */
+.dark .hljs {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+.dark .hljs-keyword,
+.dark .hljs-selector-tag,
+.dark .hljs-literal { color: #ff7b72; }
+.dark .hljs-string,
+.dark .hljs-doctag,
+.dark .hljs-template-tag { color: #a5d6ff; }
+.dark .hljs-number,
+.dark .hljs-built_in { color: #79c0ff; }
+.dark .hljs-comment,
+.dark .hljs-quote { color: #8b949e; font-style: italic; }
+.dark .hljs-title,
+.dark .hljs-function,
+.dark .hljs-section { color: #d2a8ff; }
+.dark .hljs-variable,
+.dark .hljs-attr { color: #ffa657; }
+.dark .hljs-type,
+.dark .hljs-params { color: #ff7b72; }
+.dark .hljs-meta { color: #79c0ff; }
+.dark .hljs-addition { color: #aff5b4; background-color: rgba(46,160,67,0.15); }
+.dark .hljs-deletion { color: #ffdcd7; background-color: rgba(248,81,73,0.15); }
+
+/* ── 阅读器 Markdown 排版增强 ── */
+.reader-markdown .markdown-preview {
+  padding: 0;
+  line-height: var(--reader-line-height, 1.8);
+  text-rendering: optimizeLegibility;
+  -webkit-hyphens: auto;
+  hyphens: auto;
+  word-break: break-word;
+  color: var(--reader-text, inherit);
+}
+.reader-markdown .markdown-preview h1,
+.reader-markdown .markdown-preview h2,
+.reader-markdown .markdown-preview h3,
+.reader-markdown .markdown-preview h4,
+.reader-markdown .markdown-preview h5,
+.reader-markdown .markdown-preview h6 {
+  color: var(--reader-heading, inherit);
+  text-align: center;
+  text-indent: 0;
+}
+.reader-markdown .markdown-preview p {
+  margin-bottom: calc(1em + var(--reader-paragraph-spacing, 1em));
+  text-indent: 2em;
+}
+.reader-markdown .markdown-preview pre + p,
+.reader-markdown .markdown-preview blockquote + p,
+.reader-markdown .markdown-preview ul + p,
+.reader-markdown .markdown-preview ol + p,
+.reader-markdown .markdown-preview table + p,
+.reader-markdown .markdown-preview hr + p {
+  text-indent: 0;
+}
+.reader-markdown .markdown-preview li > p {
+  text-indent: 0;
+}
+.reader-markdown .markdown-preview a {
+  color: var(--reader-accent, #2563eb);
+}
+.reader-markdown .markdown-preview pre,
+.reader-markdown .markdown-preview code {
+  background-color: var(--reader-code-bg, #f5f5f5);
+}
+.reader-markdown .markdown-preview h1 { margin-top: 2em; }
+.reader-markdown .markdown-preview h2 { margin-top: 1.75em; }
+.reader-markdown .markdown-preview h3 { margin-top: 1.5em; }
+.reader-markdown .markdown-preview pre {
+  border-radius: 0.5rem;
+  font-size: 0.9em;
+}
+
+/* ── DOCX 暗色主题（反色滤镜） ── */
+.dark .docx-viewer-wrapper {
+  filter: invert(1) hue-rotate(180deg);
+}
+.dark .docx-viewer-wrapper img,
+.dark .docx-viewer-wrapper video,
+.dark .docx-viewer-wrapper svg {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* ── Sepia 模式 hljs ── */
+.sepia .hljs {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+/* ── 阅读器工具栏按钮 ── */
+.reader-toolbar-btn {
+  @apply h-8 w-8 flex items-center justify-center rounded-lg transition-all duration-150;
+  color: hsl(var(--foreground) / 0.65);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.reader-toolbar-btn:hover {
+  background: hsl(var(--toolbar-btn-hover));
+  color: hsl(var(--foreground));
+  box-shadow: 0 1px 2px hsl(var(--foreground) / 0.04);
+}
+.reader-toolbar-btn:active {
+  transform: scale(0.94);
+}
+.reader-toolbar-btn.active {
+  background: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
+}
+.reader-toolbar-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── 阅读器渲染器按钮 ── */
+.reader-renderer-btn {
+  @apply h-8 w-8 flex items-center justify-center rounded-lg transition-all duration-150;
+  color: hsl(var(--foreground) / 0.65);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.reader-renderer-btn:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+.reader-renderer-btn:active {
+  transform: scale(0.94);
+}
+.reader-renderer-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ── 阅读器分隔线 ── */
+.reader-toolbar-sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: hsl(var(--border));
+}
+
+/* ── 阅读器工具栏按钮 ── */
+.reader-toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2rem;
+  width: 2rem;
+  border-radius: 0.5rem;
+  border: none;
+  background: transparent;
+  color: hsl(var(--foreground) / 0.65);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.reader-toolbar-btn:hover {
+  background: hsl(var(--toolbar-btn-hover));
+  color: hsl(var(--foreground));
+  box-shadow: 0 1px 2px hsl(var(--foreground) / 0.04);
+}
+.reader-toolbar-btn:active {
+  transform: scale(0.94);
+}
+.reader-toolbar-btn.active {
+  background: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
+}
+.reader-toolbar-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none;
+}
+.reader-toolbar-btn:disabled:hover {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* ── 阅读器渲染器按钮 ── */
+.reader-renderer-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2rem;
+  width: 2rem;
+  border-radius: 0.5rem;
+  border: none;
+  background: transparent;
+  color: hsl(var(--foreground) / 0.65);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.reader-renderer-btn:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+.reader-renderer-btn:active {
+  transform: scale(0.94);
+}
+.reader-renderer-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ── 阅读器滚动条 ── */
+.reader-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+.reader-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.reader-scroll::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground) / 0.15);
+  border-radius: 10px;
+}
+.reader-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--muted-foreground) / 0.3);
+}
+
+/* ── 阅读器工具栏容器 ── */
+.reader-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px;
+  border-bottom: 1px solid hsl(var(--border));
+  background: hsl(var(--toolbar-bg));
+  box-shadow: 0 1px 2px hsl(var(--foreground) / 0.03);
+}
+
+/* ContextMenu item hover highlight */
+[data-highlighted]:not([data-disabled]) {
+  background-color: hsl(210 100% 90%) !important;
+  color: hsl(210 100% 20%) !important;
+}
+
+.dark [data-highlighted]:not([data-disabled]) {
+  background-color: hsl(210 60% 30%) !important;
+  color: hsl(210 100% 90%) !important;
+}
+
+/* Fix ContextMenu transparency - force opaque background */
+[data-radix-popper-content-wrapper] > div {
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+div[data-state="open"][role="menu"] {
+  opacity: 1 !important;
+  background-color: hsl(var(--popover)) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* ── 电子书阅读器侧边栏右键菜单 ── */
+.reader-ctx-menu {
+  background-color: hsl(var(--popover)) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.reader-ctx-menu .reader-ctx-item:hover {
+  background-color: hsl(var(--accent)) !important;
+  color: hsl(var(--accent-foreground)) !important;
+}
+
+.reader-ctx-item.text-destructive:hover {
+  background-color: hsl(var(--destructive) / 0.1) !important;
+  color: hsl(var(--destructive)) !important;
 }

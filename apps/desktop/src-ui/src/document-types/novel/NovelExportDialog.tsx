@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/i18n';
 import { invoke } from '@tauri-apps/api/core';
 import { save } from '@tauri-apps/plugin-dialog';
+import { saveTextFileWithDialog } from '@/lib/tauriSaveTextFile';
 import type { NovelDocumentContent } from './types';
 import { exportToMarkdown, exportToPlainText, exportOutline, exportSettings, type ExportOptions } from './novelExport';
 import { DIALOG_STYLE } from './constants';
@@ -84,16 +85,16 @@ export default function NovelExportDialog({ open, onOpenChange, novel, documentI
         const extMap: Record<string, string> = { markdown: 'md', plaintext: 'txt', outline: 'md', settings: 'md' };
         const ext = extMap[format] || 'txt';
         const defaultName = `novel-${format}.${ext}`;
-        const blob = new Blob([exportContent], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = defaultName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        onOpenChange(false);
+        const filters =
+          ext === 'md'
+            ? [{ name: 'Markdown', extensions: ['md', 'markdown'] }]
+            : [{ name: ext.toUpperCase(), extensions: [ext] }];
+        const path = await saveTextFileWithDialog({
+          defaultPath: defaultName,
+          filters,
+          content: exportContent,
+        });
+        if (path) onOpenChange(false);
       }
     } catch (err) {
       console.error('Novel export error:', err);

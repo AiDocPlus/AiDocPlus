@@ -5,6 +5,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../../_framework/ui';
 import { Trash2, Search, Archive, Pencil, Download, Upload, Paperclip } from 'lucide-react';
+import { saveTextFileWithDialog } from '@/lib/tauriSaveTextFile';
 import { useEmailContext } from '../EmailContext';
 import type { EmailDraft, EmailAccount, EmailStorageData } from '../types';
 
@@ -149,16 +150,18 @@ export function DraftsDialog({ open, onOpenChange, onLoadDraft, onDeleteDraft, o
   }, [drafts, onDeleteDraft]);
 
   // ── 导出 ──
-  const handleExport = useCallback(() => {
+  const handleExport = useCallback(async () => {
     const json = JSON.stringify(drafts, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `email-drafts-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showStatus(t('draftExported'));
+    try {
+      await saveTextFileWithDialog({
+        defaultPath: `email-drafts-${new Date().toISOString().slice(0, 10)}.json`,
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+        content: json,
+      });
+      showStatus(t('draftExported'));
+    } catch (e) {
+      console.error('[DraftsDialog] export', e);
+    }
   }, [drafts, showStatus, t]);
 
   // ── 导入 ──

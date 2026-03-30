@@ -158,6 +158,8 @@ export interface DocTypeHostAPI {
     updateInMemory(patch: Partial<Document>): void;
     /** 保存文档到磁盘 */
     save(): Promise<void>;
+    /** 保存所有标签页中未落盘的文档（与主编辑器「全部保存」一致） */
+    saveAllDirtyTabs(): Promise<void>;
     /** 标记文档为脏（Tab 显示未保存标记） */
     markDirty(): void;
     /** 标记为干净 */

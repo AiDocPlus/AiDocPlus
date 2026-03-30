@@ -133,13 +133,20 @@ export function finalizeResearchStepsOnSuccess(steps: ResearchStep[]): ResearchS
   }));
 }
 
+export interface UpdateResearchStepsOptions {
+  /** SSE 仍在进行：已出现 JSON 也不把「生成报告」标为完成，避免与一键研究按钮转圈状态矛盾 */
+  streamActive?: boolean;
+}
+
 /**
  * 根据流式累积文本中的工具标记更新步骤（后端格式：`> 🔧 调用 stock_xxx(...)`）
  */
 export function updateStepsFromMessage(
   steps: ResearchStep[],
   messageContent: string,
+  options?: UpdateResearchStepsOptions,
 ): ResearchStep[] {
+  const streamActive = options?.streamActive ?? false;
   const updated = steps.map(s => ({ ...s }));
 
   const invoked = extractInvokedStockTools(messageContent);
@@ -165,12 +172,16 @@ export function updateStepsFromMessage(
         step.status = 'done';
       }
     } else if (step.id === 'news') {
-      if (hasStructured) step.status = 'done';
-      else if (webHint && significantBodyAfterWeb) step.status = 'done';
+      if (hasStructured && !streamActive) step.status = 'done';
+      else if (hasStructured && streamActive) step.status = 'running';
+      else if (webHint && significantBodyAfterWeb && !streamActive) step.status = 'done';
+      else if (webHint && significantBodyAfterWeb && streamActive) step.status = 'running';
       else if (webHint) step.status = 'running';
       else step.status = invoked.length > 0 ? 'running' : 'pending';
     } else if (step.id === 'report') {
-      step.status = hasStructured ? 'done' : (invoked.length > 0 || webHint ? 'running' : 'pending');
+      if (hasStructured && !streamActive) step.status = 'done';
+      else if (hasStructured && streamActive) step.status = 'running';
+      else step.status = invoked.length > 0 || webHint ? 'running' : 'pending';
     }
   }
 

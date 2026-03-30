@@ -17,7 +17,7 @@ export function useMenuEvents(onSettingsOpen: () => void) {
       switch (menuId) {
         // ── 文件菜单 ──
         case 'new_project':
-          window.dispatchEvent(new CustomEvent('menu-new-project'));
+          window.dispatchEvent(new CustomEvent('create-project-dialog'));
           break;
         case 'new_document':
           window.dispatchEvent(new CustomEvent('editor-new-document'));
@@ -28,6 +28,8 @@ export function useMenuEvents(onSettingsOpen: () => void) {
           const projectId = useAppStore.getState().currentProject?.id;
           if (projectId) {
             window.dispatchEvent(new CustomEvent('create-document-dialog', { detail: { projectId } }));
+          } else {
+            await message(i18n.t('menu.openProjectFirst'), { title: i18n.t('menu.newDocument'), kind: 'warning' });
           }
           break;
         }
@@ -37,9 +39,30 @@ export function useMenuEvents(onSettingsOpen: () => void) {
         case 'save_all':
           window.dispatchEvent(new CustomEvent('save-all-tabs'));
           break;
-        case 'import_file':
-          window.dispatchEvent(new CustomEvent('menu-import-file'));
+        case 'import_file': {
+          // 直接打开文件选择对话框并导入内容到编辑器
+          try {
+            const selected = await open({
+              multiple: false,
+              filters: [
+                {
+                  name: i18n.t('editor.toolbar.documentFiles', { defaultValue: '文档文件' }),
+                  extensions: ['txt', 'md', 'markdown', 'docx', 'csv', 'html', 'htm', 'json', 'xml', 'yaml', 'yml', 'toml', 'rst', 'tex', 'log'],
+                },
+                { name: i18n.t('editor.toolbar.allFiles', { defaultValue: '所有文件' }), extensions: ['*'] },
+              ],
+            });
+            if (!selected) break;
+            const filePath = typeof selected === 'string' ? selected : (selected as any)?.path ?? String(selected);
+            const content = await invoke<string>('import_file', { path: filePath });
+            if (content) {
+              window.dispatchEvent(new CustomEvent('editor-import-content', { detail: content }));
+            }
+          } catch (err) {
+            console.error('[MenuEvents] 导入文件失败:', err);
+          }
           break;
+        }
         case 'export_md':
           window.dispatchEvent(new CustomEvent('editor-export', { detail: 'md' }));
           break;
@@ -149,7 +172,7 @@ export function useMenuEvents(onSettingsOpen: () => void) {
 
         // ── 项目管理 ──
         case 'project_rename':
-          await handleProjectRename();
+          window.dispatchEvent(new CustomEvent('menu-rename-project'));
           break;
         case 'project_delete':
           await handleProjectDelete();
@@ -166,7 +189,7 @@ export function useMenuEvents(onSettingsOpen: () => void) {
 
         // ── 文档管理 ──
         case 'doc_rename':
-          await handleDocRename();
+          window.dispatchEvent(new CustomEvent('menu-rename-document'));
           break;
         case 'doc_delete':
           await handleDocDelete();
@@ -179,6 +202,14 @@ export function useMenuEvents(onSettingsOpen: () => void) {
           break;
         case 'doc_copy_to':
           window.dispatchEvent(new CustomEvent('menu-doc-copy-to'));
+          break;
+
+        // ── 工具菜单 ──
+        case 'tools_quick_capture':
+          await message(i18n.t('menu.featureComingSoon', { defaultValue: '功能开发中，敬请期待' }), { title: i18n.t('menu.quickCapture', { defaultValue: '快速记录' }), kind: 'info' });
+          break;
+        case 'tools_ebook_reader':
+          await message(i18n.t('menu.featureComingSoon', { defaultValue: '功能开发中，敬请期待' }), { title: i18n.t('menu.ebookReader', { defaultValue: '电子书阅读器' }), kind: 'info' });
           break;
 
         // ── 模板菜单 ──
@@ -298,27 +329,7 @@ async function handleProjectBackup() {
   }
 }
 
-/** 重命名当前项目 */
-async function handleProjectRename() {
-  const { currentProject, renameProject, loadProjects } = useAppStore.getState();
-  if (!currentProject) {
-    await message(i18n.t('menu.openProjectFirst'), { title: i18n.t('menu.renameProject'), kind: 'warning' });
-    return;
-  }
-
-  const newName = window.prompt(i18n.t('menu.renameProjectPrompt'), currentProject.name);
-  if (!newName || newName.trim() === '' || newName.trim() === currentProject.name) return;
-
-  try {
-    await renameProject(currentProject.id, newName.trim());
-    await loadProjects();
-    await message(i18n.t('menu.projectRenamed', { name: newName.trim() }), { title: i18n.t('menu.renameSuccess') });
-  } catch (err) {
-    await message(i18n.t('menu.renameFailed', { error: formatBackendError(err) }), { title: i18n.t('menu.renameError'), kind: 'error' });
-  }
-}
-
-/** 删除当前项目 */
+/** 删除当前文档 */
 async function handleProjectDelete() {
   const { currentProject, deleteProject, loadProjects, openProject } = useAppStore.getState();
   if (!currentProject) {
@@ -344,25 +355,6 @@ async function handleProjectDelete() {
     await message(i18n.t('menu.projectDeleted'), { title: i18n.t('menu.deleteSuccess') });
   } catch (err) {
     await message(i18n.t('menu.deleteFailed', { error: formatBackendError(err) }), { title: i18n.t('menu.deleteError'), kind: 'error' });
-  }
-}
-
-/** 重命名当前文档 */
-async function handleDocRename() {
-  const { currentDocument, renameDocument } = useAppStore.getState();
-  if (!currentDocument) {
-    await message(i18n.t('menu.openDocFirst'), { title: i18n.t('menu.renameDocument'), kind: 'warning' });
-    return;
-  }
-
-  const newTitle = window.prompt(i18n.t('menu.renameDocPrompt'), currentDocument.title);
-  if (!newTitle || newTitle.trim() === '' || newTitle.trim() === currentDocument.title) return;
-
-  try {
-    await renameDocument(currentDocument.projectId, currentDocument.id, newTitle.trim());
-    await message(i18n.t('menu.docRenamed', { title: newTitle.trim() }), { title: i18n.t('menu.renameSuccess') });
-  } catch (err) {
-    await message(i18n.t('menu.docRenameFailed', { error: formatBackendError(err) }), { title: i18n.t('menu.renameError'), kind: 'error' });
   }
 }
 

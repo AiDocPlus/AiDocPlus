@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Default capabilities for the main window",
-  "windows": ["main", "pdf-preview", "help-center"],
+  "windows": ["main", "pdf-preview", "help-center", "quick-capture", "ebook-reader"],
   "permissions": [
     "core:app:default",
     "core:path:default",
@@ -11,6 +11,9 @@
     "core:event:allow-emit",
     "core:event:allow-unlisten",
     "core:window:default",
+    "core:window:allow-set-fullscreen",
+    "core:window:allow-is-fullscreen",
+    "core:window:allow-set-always-on-top",
     "core:webview:allow-print",
     "shell:allow-open",
     "dialog:allow-open",

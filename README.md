@@ -21,7 +21,7 @@ AiDocPlus/
 │   └── src-ui/                    # React 前端
 │       └── src/
 │           ├── components/        # UI 组件（editor, chat, file-tree, tabs, settings, templates, coding）
-│           ├── plugins/           # 插件系统（SDK + 27 个插件）
+│           ├── plugins/           # 插件系统（SDK + 28 个插件）
 │           │   ├── _framework/    # 插件 SDK（PluginHostAPI, 布局组件, UI 原语）
 │           │   └── {name}/        # 各插件目录
 │           ├── stores/            # Zustand 状态管理
@@ -55,7 +55,7 @@ AiDocPlus/
 - **多标签页编辑** — 独立面板状态
 - **版本控制** — 自动保存，预览和恢复
 - **多格式导出** — Markdown、HTML、DOCX、TXT、PDF（原生 + Pandoc）
-- **插件系统** — 27 个插件，自注册 + 自动发现 + manifest 驱动
+- **插件系统** — 28 个插件（内容生成 10 + 功能 18，以 manifest 为准），自注册 + 自动发现 + manifest 驱动
 - **资源管理器** — 多窗口模式（提示词模板 + 文档模板）
 - **长篇小说写作**（规划中） — 设定集（世界观/人物/地点/势力/时间线）、章节层级（卷→章 + 拖拽排序）、大纲系统、AI 四层记忆写作引擎、作家风格学习（导入作品→风格分析→RAG 风格检索→写作注入）、伏笔追踪、写作仪表盘、全书导出 + EPUB
 - **编程区** — 独立多语言代码编辑与执行环境，集成 AI 助手

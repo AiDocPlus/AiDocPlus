@@ -170,7 +170,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
         baseUrl: svc.baseUrl || PROVIDER_BASE_URLS[svc.provider] || '',
         apiKey: svc.apiKey,
         model: svc.model,
-        maxTokens: sharedMeta.maxTokens || 0,
+        maxTokens: sharedMeta.maxTokens > 0 ? sharedMeta.maxTokens : 4096,
         temperature: sharedMeta.temperature || 0.7,
       };
       if (existIdx >= 0) {
@@ -525,6 +525,7 @@ function ServiceEditor({
               value={form.maxTokens}
               onChange={(e) => update('maxTokens', parseInt(e.target.value) || 0)}
               className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none focus:ring-1 focus:ring-ring"
+              placeholder="4096（0 表示未配置）"
             />
           </div>
           <div className="space-y-1.5">
@@ -537,6 +538,7 @@ function ServiceEditor({
               value={form.temperature}
               onChange={(e) => update('temperature', parseFloat(e.target.value) || 0.7)}
               className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm shadow-sm outline-none focus:ring-1 focus:ring-ring"
+              placeholder="0.7"
             />
           </div>
         </div>

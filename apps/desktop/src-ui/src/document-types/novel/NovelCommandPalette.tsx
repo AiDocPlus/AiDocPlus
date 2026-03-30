@@ -9,7 +9,7 @@
  */
 
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { Search, Star, Clock, Zap, X } from 'lucide-react';
+import { Search, Star, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -203,10 +203,10 @@ export function NovelCommandPalette({
             全部
           </TabButton>
           <TabButton active={activeTab === 'favorites'} onClick={() => { setActiveTab('favorites'); setSelectedIndex(0); }}>
-            <span className="flex items-center gap-0.5"><Star className="h-3 w-3" />收藏</span>
+            收藏
           </TabButton>
           <TabButton active={activeTab === 'recent'} onClick={() => { setActiveTab('recent'); setSelectedIndex(0); }}>
-            <span className="flex items-center gap-0.5"><Clock className="h-3 w-3" />最近</span>
+            最近
           </TabButton>
           <div className="w-px h-4 bg-border mx-1" />
           {sortedCategories.map(cat => (
@@ -229,7 +229,7 @@ export function NovelCommandPalette({
               <div key={gi}>
                 {group.category && (activeTab === 'all' && !query) && (
                   <div className="px-3 pt-2 pb-1 text-xs font-medium text-muted-foreground">
-                    {group.category.id === '_fav' ? '⭐ 收藏' : group.category.label}
+                    {group.category.id === '_fav' ? '收藏' : group.category.label}
                   </div>
                 )}
 
@@ -257,7 +257,6 @@ export function NovelCommandPalette({
                         <Star className="h-3 w-3" fill={isFav ? 'currentColor' : 'none'} />
                       </button>
                       <span className="flex-1 truncate">{item.label}</span>
-                      <Zap className="h-3 w-3 text-muted-foreground/40 shrink-0" />
                     </div>
                   );
                 })}

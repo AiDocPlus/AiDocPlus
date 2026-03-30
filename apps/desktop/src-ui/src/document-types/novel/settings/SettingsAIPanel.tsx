@@ -4,10 +4,7 @@
  * 批量导入：解析 AI 回复 JSON 自动导入到设定集
  */
 import { useMemo, useCallback } from 'react';
-import {
-  Users, MapPin, Globe, Landmark, Eye, Lightbulb, Network, Shield, Calendar, BookText, ListTree,
-  Plus,
-} from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { DocTypeHostAPI } from '@/doctype-sdk/types';
 import type { NovelDocumentContent, NovelCharacter, NovelMaterialCategory } from '../types';
@@ -17,7 +14,7 @@ import {
   addCharacterRelation, addFaction, addTimelineEvent,
 } from '../types';
 import DocTypeAIChatBase, { sendDocTypeAIMessage } from '../../_shared/DocTypeAIChatBase';
-import { QUICK_ACTION_BAR, QUICK_ACTION_BTN, QUICK_ACTION_ICON, MSG_ACTION_BTN } from '../../_shared/styles';
+import { QUICK_ACTION_BAR, QUICK_ACTION_BTN, MSG_ACTION_BTN } from '../../_shared/styles';
 import type { DocTypeChatMsg } from '../../_shared/DocTypeChatMessage';
 
 type SettingsTab = 'synopsis' | 'outline' | 'characters' | 'relations' | 'locations' | 'factions' | 'foreshadowing' | 'timeline' | 'worldview' | 'materials' | 'goals' | 'check' | 'plotlines';
@@ -115,49 +112,49 @@ export default function SettingsAIPanel({
     switch (activeTab) {
       case 'synopsis':
         return [
-          { icon: BookText, label: '生成梗概', message: '请根据现有设定，为这个故事生成一段完整的梗概（300-500字）' },
+          { label: '生成梗概', message: '请根据现有设定，为这个故事生成一段完整的梗概（300-500字）' },
         ];
       case 'outline':
         return [
-          { icon: ListTree, label: '扩展大纲', message: '请根据故事梗概和角色设定，扩展全局大纲的细节' },
+          { label: '扩展大纲', message: '请根据故事梗概和角色设定，扩展全局大纲的细节' },
         ];
       case 'characters':
         return [
-          { icon: Users, label: '生成人物', message: '请为这个故事生成一个新角色的完整档案，以 JSON 数组格式输出，字段包含 name, role, description, gender, age, appearance, personality, background, motivation, arc, strengths, weaknesses, dialogueStyle, aliases' },
-          { icon: Users, label: '丰富背景', message: '请为现有角色补充更丰富的背景故事和人物弧光' },
+          { label: '生成人物', message: '请为这个故事生成一个新角色的完整档案，以 JSON 数组格式输出，字段包含 name, role, description, gender, age, appearance, personality, background, motivation, arc, strengths, weaknesses, dialogueStyle, aliases' },
+          { label: '丰富背景', message: '请为现有角色补充更丰富的背景故事和人物弧光' },
         ];
       case 'relations':
         return [
-          { icon: Network, label: '分析关系', message: '请分析现有角色之间可能存在的关系，并建议新增的人物关系' },
-          { icon: Network, label: '检测冲突', message: '请检查现有人物关系中是否存在逻辑冲突或不合理之处' },
+          { label: '分析关系', message: '请分析现有角色之间可能存在的关系，并建议新增的人物关系' },
+          { label: '检测冲突', message: '请检查现有人物关系中是否存在逻辑冲突或不合理之处' },
         ];
       case 'locations':
         return [
-          { icon: MapPin, label: '生成地点', message: '请为故事生成一个新的地点设定，以 JSON 数组格式输出，字段包含 name, description, type, atmosphere, significance' },
+          { label: '生成地点', message: '请为故事生成一个新的地点设定，以 JSON 数组格式输出，字段包含 name, description, type, atmosphere, significance' },
         ];
       case 'factions':
         return [
-          { icon: Shield, label: '生成阵营', message: '请为故事生成一个新的阵营/势力设定，包含名称、类型、描述、目标和势力关系' },
+          { label: '生成阵营', message: '请为故事生成一个新的阵营/势力设定，包含名称、类型、描述、目标和势力关系' },
         ];
       case 'foreshadowing':
         return [
-          { icon: Eye, label: '检测伏笔', message: '请根据现有章节内容，检测是否有未回收的伏笔或可以埋设的新伏笔' },
-          { icon: Eye, label: '解决建议', message: '请为当前未解伏笔提供合理的解决方案建议' },
+          { label: '检测伏笔', message: '请根据现有章节内容，检测是否有未回收的伏笔或可以埋设的新伏笔' },
+          { label: '解决建议', message: '请为当前未解伏笔提供合理的解决方案建议' },
         ];
       case 'timeline':
         return [
-          { icon: Calendar, label: '梳理时间线', message: '请根据故事情节梳理完整的时间线，以 JSON 数组格式输出，字段包含 title, date, description, importance' },
-          { icon: Calendar, label: '检测冲突', message: '请检查现有时间线中是否存在时间逻辑冲突' },
+          { label: '梳理时间线', message: '请根据故事情节梳理完整的时间线，以 JSON 数组格式输出，字段包含 title, date, description, importance' },
+          { label: '检测冲突', message: '请检查现有时间线中是否存在时间逻辑冲突' },
         ];
       case 'worldview':
         return [
-          { icon: Globe, label: '扩展世界观', message: '请根据现有设定，进一步完善世界观的细节' },
-          { icon: Globe, label: '力量体系', message: '请为这个世界设计一套完整的力量体系/魔法系统' },
-          { icon: Landmark, label: '检查一致性', message: '请检查现有世界观设定是否存在自相矛盾之处' },
+          { label: '扩展世界观', message: '请根据现有设定，进一步完善世界观的细节' },
+          { label: '力量体系', message: '请为这个世界设计一套完整的力量体系/魔法系统' },
+          { label: '检查一致性', message: '请检查现有世界观设定是否存在自相矛盾之处' },
         ];
       case 'materials':
         return [
-          { icon: Lightbulb, label: '生成素材', message: '请为故事生成一些创作素材（灵感、场景描写、关键对话），以 JSON 数组格式输出，字段包含 title, category, content' },
+          { label: '生成素材', message: '请为故事生成一些创作素材（灵感、场景描写、关键对话），以 JSON 数组格式输出，字段包含 title, category, content' },
         ];
       default:
         return [];
@@ -248,7 +245,7 @@ export default function SettingsAIPanel({
           {quickActions.map((action, i) => (
             <Button key={i} variant="outline" size="sm" className={QUICK_ACTION_BTN}
               onClick={() => sendDocTypeAIMessage({ documentId, message: action.message, label: action.label })}>
-              <action.icon className={QUICK_ACTION_ICON} />{action.label}
+              {action.label}
             </Button>
           ))}
         </div>

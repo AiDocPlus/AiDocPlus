@@ -34,6 +34,8 @@ interface DocTypeChatMessageProps {
   message: DocTypeChatMsg;
   /** 是否正在流式输出（仅最后一条 AI 消息） */
   isStreaming?: boolean;
+  /** 流式过程中仍显示复制区与自定义操作（如股票研究「应用研究结果」） */
+  allowActionsWhileStreaming?: boolean;
   /** 自定义操作按钮（如"插入到正文"、"替换译文"等） */
   actions?: ReactNode;
 }
@@ -41,6 +43,7 @@ interface DocTypeChatMessageProps {
 export const DocTypeChatMessage = memo(function DocTypeChatMessage({
   message,
   isStreaming,
+  allowActionsWhileStreaming = false,
   actions,
 }: DocTypeChatMessageProps) {
   const { t } = useTranslation();
@@ -92,7 +95,7 @@ export const DocTypeChatMessage = memo(function DocTypeChatMessage({
       {isStreaming && <span className={MSG_STREAMING_CURSOR} />}
 
       {/* 操作区 */}
-      {!isStreaming && parsed.content.length > 5 && (
+      {(!isStreaming || allowActionsWhileStreaming) && parsed.content.length > 5 && (
         <div className={MSG_ACTION_AREA}>
           <button className={MSG_ACTION_BTN} onClick={handleCopy}>
             {copied

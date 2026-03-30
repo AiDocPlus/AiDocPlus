@@ -10,7 +10,15 @@
  * - 撤销/重做
  */
 
-import { useRef, useEffect, useCallback, forwardRef, useImperativeHandle, useState } from 'react';
+import {
+  useRef,
+  useEffect,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+  useState,
+  type ForwardedRef,
+} from 'react';
 import { Canvas as FabricCanvas, Rect, Circle, Triangle, Line, Textbox, FabricImage, Polygon, PencilBrush, CircleBrush, SprayBrush, ActiveSelection, Point, Group, loadSVGFromString } from 'fabric';
 import { CanvasHistory } from './canvasHistory';
 
@@ -57,9 +65,17 @@ export interface FabricCanvasEditorProps {
 
 const GRID_SIZE = 20;
 
-const FabricCanvasEditor = forwardRef<FabricCanvasEditorRef, FabricCanvasEditorProps>(function FabricCanvasEditor(
-  { width, height, fabricJson, onModified, onSelectionChange, onObjectCount, onZoomChange },
-  ref,
+const FabricCanvasEditor = forwardRef(function FabricCanvasEditor(
+  {
+    width,
+    height,
+    fabricJson,
+    onModified,
+    onSelectionChange,
+    onObjectCount,
+    onZoomChange,
+  }: FabricCanvasEditorProps,
+  ref: ForwardedRef<FabricCanvasEditorRef>
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasElRef = useRef<HTMLCanvasElement>(null);

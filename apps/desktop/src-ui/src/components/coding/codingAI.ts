@@ -107,7 +107,7 @@ async function aiChatStream(
       requestId,
       enableWebSearch: options?.enableWebSearch || undefined,
       enableThinking: options?.enableThinking || undefined,
-      maxTokens: useSettingsStore.getState().ai.maxTokens ?? 4096,
+      maxTokens: (() => { const v = useSettingsStore.getState().ai.maxTokens; return (v && v > 0) ? v : undefined; })(),
     });
     const finalParsed = parseThinkTags(rawAccumulated);
     return finalParsed.content;

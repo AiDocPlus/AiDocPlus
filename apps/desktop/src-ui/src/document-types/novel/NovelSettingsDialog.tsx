@@ -9,13 +9,13 @@ import { useState, useCallback } from 'react';
 import {
   BookText, ListTree, Users, MapPin, Eye, Globe, Lightbulb,
   Network, Shield, Calendar, Sparkles, PanelRightClose, PanelRightOpen, Target, ShieldCheck, GitBranch,
-  Plus, Trash2,
+  Plus, Trash2, Palette, Wand2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import type { DocTypeHostAPI } from '@/doctype-sdk/types';
-import type { NovelDocumentContent } from './types';
+import type { NovelDocumentContent, StyleProfile } from './types';
 import { addPlotline, deletePlotline } from './types';
 import SynopsisPanel from './settings/SynopsisPanel';
 import OutlinePanel from './settings/OutlinePanel';
@@ -28,11 +28,12 @@ import TimelinePanel from './settings/TimelinePanel';
 import WorldViewPanel from './settings/WorldViewPanel';
 import MaterialPanel from './settings/MaterialPanel';
 import GoalPanel from './settings/GoalPanel';
+import StyleLearningPanel from './settings/StyleLearningPanel';
 import SettingsAIPanel from './settings/SettingsAIPanel';
 import { checkConsistency } from './novelAnalysis';
 import { DIALOG_STYLE } from './constants';
 
-type SettingsTab = 'synopsis' | 'outline' | 'characters' | 'relations' | 'locations' | 'factions' | 'foreshadowing' | 'timeline' | 'worldview' | 'materials' | 'goals' | 'check' | 'plotlines';
+type SettingsTab = 'synopsis' | 'outline' | 'characters' | 'relations' | 'locations' | 'factions' | 'foreshadowing' | 'timeline' | 'worldview' | 'materials' | 'goals' | 'plotlines' | 'check' | 'style';
 
 const TABS: { key: SettingsTab; icon: typeof BookText; label: string }[] = [
   { key: 'synopsis', icon: BookText, label: '梗概' },
@@ -47,6 +48,7 @@ const TABS: { key: SettingsTab; icon: typeof BookText; label: string }[] = [
   { key: 'materials', icon: Lightbulb, label: '素材库' },
   { key: 'goals', icon: Target, label: '目标' },
   { key: 'plotlines', icon: GitBranch, label: '情节线' },
+  { key: 'style', icon: Palette, label: '风格' },
   { key: 'check', icon: ShieldCheck, label: '检查' },
 ];
 
@@ -70,6 +72,75 @@ export default function NovelSettingsDialog({
   const updateSettings = useCallback((patch: Partial<NovelDocumentContent['settings']>) => {
     onNovelChange({ ...novel, settings: { ...novel.settings, ...patch } });
   }, [novel, onNovelChange]);
+
+  // 风格分析回调：调用 AI 分析文本风格
+  const handleAnalyzeStyle = useCallback(async (corpusId: string, text: string): Promise<StyleProfile | null> => {
+    try {
+      const STYLE_ANALYSIS_PROMPT = `你是一位专业的文学风格分析师。请分析以下文本的写作风格，提取可供模仿的风格特征。
+
+**重要规则**：
+1. 分析必须基于原文实际特征，每个特征都要附上原文例句佐证
+2. 不要泛泛而谈，要给出具体可操作的建议
+3. 输出必须是严格的 JSON 格式
+
+请分析以下文本的写作风格：
+
+\`\`\`
+${text.slice(0, 15000)}
+\`\`\`
+
+请从以下维度进行分析，输出 JSON 格式的风格画像：
+
+\`\`\`json
+{
+  "avgSentenceLength": 25.5,
+  "sentenceLengthStdDev": 12.3,
+  "avgParagraphLength": 180,
+  "paragraphLengthRange": { "min": 50, "max": 350 },
+  "dialogueRatio": 0.35,
+  "narrationRatio": 0.65,
+  "vocabularyDiversity": 0.42,
+  "narrativeVoice": "第三人称有限视角",
+  "tensePreference": "过去时",
+  "toneStyle": "冷峻克制",
+  "commonMetaphors": ["刀剑意象", "自然力量", "光影对比"],
+  "rhetoricalDevices": ["短句排比", "动作细节", "环境烘托"],
+  "topPatterns": ["四字成语+动作", "对话+心理"],
+  "dialogueStyle": "简洁有力，少用形容词",
+  "tagVerbPreference": ["道", "问", "答"],
+  "sensoryFocus": ["视觉", "触觉", "听觉"],
+  "pacingPreference": "快节奏，句式短促",
+  "summary": "整体风格概述（200-300字），描述文风的主要特点...",
+  "signature": "标志性特征（如：四字成语密集+动作描写+环境烘托）"
+}
+\`\`\``;
+
+      const result = await host.ai.chat([
+        { role: 'user', content: STYLE_ANALYSIS_PROMPT }
+      ], { temperature: 0.3 });
+
+      // 解析 JSON
+      const jsonMatch = result.match(/```json\s*([\s\S]*?)\s*```/);
+      if (jsonMatch) {
+        const profile = JSON.parse(jsonMatch[1]) as StyleProfile;
+        profile.analyzedAt = Date.now();
+        return profile;
+      }
+
+      // 尝试直接解析
+      try {
+        const profile = JSON.parse(result) as StyleProfile;
+        profile.analyzedAt = Date.now();
+        return profile;
+      } catch {
+        console.error('Failed to parse style profile:', result);
+        return null;
+      }
+    } catch (error) {
+      console.error('Style analysis failed:', error);
+      return null;
+    }
+  }, [host.ai]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -173,6 +244,14 @@ export default function NovelSettingsDialog({
                   </div>
                 ))}
               </div>
+            )}
+            {activeTab === 'style' && (
+              <StyleLearningPanel
+                novel={novel}
+                projectId={host.doc.getDocument().projectId}
+                onNovelChange={onNovelChange}
+                onAnalyzeStyle={handleAnalyzeStyle}
+              />
             )}
             {activeTab === 'check' && (
               <div className="h-full p-3 overflow-auto space-y-2">

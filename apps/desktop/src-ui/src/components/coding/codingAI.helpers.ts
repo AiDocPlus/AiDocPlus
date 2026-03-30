@@ -103,7 +103,7 @@ export async function streamCodingChatResponse({
       requestId,
       enableWebSearch: enableWebSearch || undefined,
       enableThinking: enableThinking || undefined,
-      maxTokens: useSettingsStore.getState().ai.maxTokens ?? 4096,
+      maxTokens: (() => { const v = useSettingsStore.getState().ai.maxTokens; return (v && v > 0) ? v : undefined; })(),
     });
     return parseThinkTags(rawAccumulated).content;
   } finally {

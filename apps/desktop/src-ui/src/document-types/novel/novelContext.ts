@@ -11,6 +11,7 @@ import type {
   NovelDocumentContent, NovelChapter, NovelVolume,
 } from './types';
 import { getChapterById, getTotalWordCount, getVolumeByChapterId, getEffectiveContent, getChapterWordCount } from './types';
+import { buildStyleInjectionPrompt } from './styleProfileGenerator';
 
 // ═══ Token 预算系统 ═══
 
@@ -46,7 +47,7 @@ export function estimateTokens(text: string): number {
 /**
  * 根据 token 预算智能裁剪文本，保留开头和结尾
  */
-function trimToTokenBudget(text: string, maxTokens: number): string {
+export function trimToTokenBudget(text: string, maxTokens: number): string {
   const currentTokens = estimateTokens(text);
   if (currentTokens <= maxTokens) return text;
 
@@ -447,6 +448,15 @@ export function buildSmartSystemPrompt(
   const base = getDefaultNovelSystemPrompt();
   const phase = detectNovelPhase(novel, activeChapterId);
   const parts: string[] = [base];
+
+  // ═══ Layer 0: 风格画像注入（P0 风格学习系统）═══
+  // 如果激活了风格画像，将其作为最高优先级注入
+  if (novel.settings.activeStyleProfile) {
+    const stylePrompt = buildStyleInjectionPrompt(novel.settings.activeStyleProfile, 800);
+    if (stylePrompt) {
+      parts.push('\n\n' + stylePrompt);
+    }
+  }
 
   // 阶段提示
   switch (phase) {

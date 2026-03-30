@@ -9,7 +9,7 @@ import {
   PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
   ChevronLeft, ChevronRight, CalendarDays, FilePlus, X, XCircle,
   Save, SaveAll, History, BarChart3, FileDown, FileUp, Settings,
-  Maximize2, Star, StarOff, Cloud, Tag, FileText, BookOpen,
+  Maximize2, Star, StarOff, Cloud, Tag, FileText, BookOpen, Smile,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -82,9 +82,9 @@ export default function DiaryToolbar({
   const [tempInput, setTempInput] = useState('');
 
   return (
-    <div className="flex flex-col border-b flex-shrink-0 bg-card">
+    <div className="flex flex-col border-b flex-shrink-0 bg-card min-w-0">
       {/* 第一行：导航与文件操作 */}
-      <div className="flex items-center gap-1 px-2 py-1 text-xs">
+      <div className="flex items-center gap-1 px-2 py-1 text-xs overflow-x-auto min-w-0">
         <Button variant="ghost" size="icon" className="h-5 w-5" onClick={onToggleLeft}
           title={leftCollapsed ? t('diary.showLeft', { defaultValue: '显示左栏' }) : t('diary.hideLeft', { defaultValue: '隐藏左栏' })}>
           {leftCollapsed ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
@@ -150,7 +150,7 @@ export default function DiaryToolbar({
 
       {/* 第二行：条目元数据 */}
       {activeEntry && !focusMode && (
-        <div className="flex items-center gap-1 px-2 py-0.5 border-t text-xs">
+        <div className="flex items-center gap-1 px-2 py-0.5 border-t text-xs overflow-x-auto min-w-0">
           {/* 所属日记本 */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -170,21 +170,26 @@ export default function DiaryToolbar({
             </DropdownMenuContent>
           </DropdownMenu>
           <div className="w-px h-4 bg-border mx-0.5" />
-          {/* 心情选择 */}
-          <div className="flex items-center gap-0.5">
-            {MOOD_VALUES.map(mood => (
-              <button key={mood}
-                className={cn(
-                  'h-5 w-5 rounded text-sm flex items-center justify-center transition-all',
-                  activeEntry.mood === mood ? 'bg-primary/15 ring-1 ring-primary scale-110' : 'hover:bg-accent opacity-60 hover:opacity-100',
-                )}
-                onClick={() => onMoodChange(activeEntry.mood === mood ? undefined : mood)}
-                title={MOOD_LABEL[mood]}
-              >
-                {MOOD_EMOJI[mood]}
-              </button>
-            ))}
-          </div>
+          {/* 心情下拉 */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="h-5 px-1.5 text-xs gap-0.5">
+                {activeEntry.mood
+                  ? <span>{MOOD_EMOJI[activeEntry.mood]} {MOOD_LABEL[activeEntry.mood]}</span>
+                  : <><Smile className="h-3 w-3" /><span className="text-muted-foreground">{t('diary.mood', { defaultValue: '心情' })}</span></>
+                }
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="bg-card">
+              {MOOD_VALUES.map(mood => (
+                <DropdownMenuItem key={mood} className="text-xs gap-1.5" onClick={() => onMoodChange(activeEntry.mood === mood ? undefined : mood)}>
+                  <span className="text-sm">{MOOD_EMOJI[mood]}</span>
+                  <span>{MOOD_LABEL[mood]}</span>
+                  {activeEntry.mood === mood && <span className="ml-auto text-primary">✓</span>}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <div className="w-px h-4 bg-border mx-0.5" />
           {/* 天气下拉 */}
           <DropdownMenu>

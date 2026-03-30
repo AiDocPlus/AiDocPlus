@@ -20,6 +20,7 @@ mod tools;
 mod menu_i18n;
 mod search_store;
 mod security;
+mod sync;
 mod version_store;
 mod workspace;
 
@@ -48,12 +49,16 @@ use commands::{
     script_runner::*,
     imbot::*,
     help::*,
+    ebook_reader::*,
+    quick_capture::*,
     novel::*,
     stock::*,
+    sync::*,
 };
 use commands::tts::TtsState;
 use commands::script_runner::RunningScriptState;
 use commands::imbot::ImBotState;
+use commands::sync::SyncState;
 use aidocplus_manager_rust::commands::DataDirState;
 use tauri::{Manager, Emitter, Listener};
 use tauri::menu::{
@@ -80,6 +85,7 @@ fn main() {
             app.manage(ImBotState::default());
             app.manage(DataDirState::new());
             app.manage(ManagerWindowState(std::sync::Mutex::new(None)));
+            app.manage(SyncState::new());
 
             // 注册自动更新插件
             #[cfg(desktop)]
@@ -126,8 +132,8 @@ fn main() {
                 // ── 新建 ──
                 .item(&MenuItem::with_id(handle, "new_project", t.new_project, true, Some("CmdOrCtrl+Shift+N"))?)
                 .item(&MenuItem::with_id(handle, "new_document", t.new_document, true, Some("CmdOrCtrl+N"))?)
-                .item(&MenuItem::with_id(handle, "new_document_dialog", t.new_document_dialog, true, Some("CmdOrCtrl+Alt+N"))?)
                 .item(&MenuItem::with_id(handle, "new_from_template", t.new_from_template, true, Some("CmdOrCtrl+Shift+T"))?)
+                .item(&MenuItem::with_id(handle, "new_document_dialog", t.new_document_dialog, true, Some("CmdOrCtrl+Alt+N"))?)
                 .separator()
                 // ── 保存 ──
                 .item(&MenuItem::with_id(handle, "save", t.save, true, Some("CmdOrCtrl+S"))?)
@@ -287,7 +293,7 @@ fn main() {
                 .item(&MenuItem::with_id(handle, "select_all", t.select_all, true, Some("CmdOrCtrl+A"))?)
                 .separator()
                 .item(&MenuItem::with_id(handle, "find", t.find, true, Some("CmdOrCtrl+F"))?)
-                .item(&MenuItem::with_id(handle, "find_replace", t.find_replace, true, Some("CmdOrCtrl+H"))?)
+                .item(&MenuItem::with_id(handle, "find_replace", t.find_replace, true, None::<&str>)?)
                 .separator()
                 .item(&selection_sub)
                 .separator()
@@ -325,6 +331,24 @@ fn main() {
                 .item(&MenuItem::with_id(handle, "view_coding", t.view_coding, true, None::<&str>)?)
                 .build()?;
 
+            // 工具菜单
+            let tools_menu = SubmenuBuilder::new(handle, t.tools)
+                .item(&MenuItem::with_id(
+                    handle,
+                    "tools_quick_capture",
+                    t.tools_quick_capture,
+                    true,
+                    None::<&str>,
+                )?)
+                .item(&MenuItem::with_id(
+                    handle,
+                    "tools_ebook_reader",
+                    t.tools_ebook_reader,
+                    true,
+                    None::<&str>,
+                )?)
+                .build()?;
+
             // 帮助菜单
             let help_menu = SubmenuBuilder::new(handle, t.help)
                 .item(&MenuItem::with_id(handle, "shortcuts_ref", t.shortcuts_ref, true, None::<&str>)?)
@@ -344,6 +368,7 @@ fn main() {
                 .item(&file_menu)
                 .item(&edit_menu)
                 .item(&view_menu)
+                .item(&tools_menu)
                 .item(&help_menu)
                 .build()?;
 
@@ -356,6 +381,12 @@ fn main() {
                     // 「使用文档」直接打开帮助中心窗口
                     "help_docs" => {
                         let _ = commands::help::open_help_center(app_handle.clone());
+                    }
+                    "tools_quick_capture" => {
+                        let _ = commands::quick_capture::open_quick_capture(app_handle.clone());
+                    }
+                    "tools_ebook_reader" => {
+                        let _ = commands::ebook_reader::open_ebook_reader(app_handle.clone());
                     }
                     // 其他事件转发到前端
                     _ => {
@@ -633,6 +664,26 @@ fn main() {
 
             // 帮助中心
             open_help_center,
+            open_quick_capture,
+
+            // 电子书阅读器
+            get_ebook_library_dir,
+            get_library_index,
+            list_ebook_library,
+            import_ebook,
+            delete_ebook,
+            toggle_ebook_starred,
+            rename_ebook,
+            move_ebook,
+            read_ebook_file,
+            create_category,
+            rename_category,
+            delete_category,
+            reorder_books,
+            reorder_categories,
+            open_ebook_reader,
+            export_ebook,
+            move_category,
 
             // 小说写作
             load_novel_settings,
@@ -690,6 +741,14 @@ fn main() {
             stock_money_supply_bal,
             stock_concept_detail,
             stock_hsgt_shenzhen,
+
+            // 云同步
+            configure_sync,
+            sync_now,
+            get_sync_status,
+            test_sync_connection,
+            cancel_sync,
+            load_sync_config,
 
         ])
         .run(tauri::generate_context!())

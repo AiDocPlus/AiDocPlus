@@ -23,20 +23,23 @@ pub struct ProviderDefaults {
 }
 
 /// 所有已知提供商的静态注册表
+/// default_max_tokens 统一设为 16384：深度思考模型（Qwen3/GLM-5/DeepSeek 等）的 reasoning_content
+/// 可能消耗数千 tokens，4096 不足以同时容纳思考+正文。16384 ≈ 约1万字中文，对绝大多数场景足够；
+/// 用户可在设置中手动指定更大值来覆盖此默认值。
 pub static PROVIDER_REGISTRY: &[ProviderDefaults] = &[
-    ProviderDefaults { id: "openai",       base_url: "https://api.openai.com/v1",                                    default_model: "gpt-4.1",             auth_style: AuthStyle::Bearer,       default_temperature: 0.7, default_max_tokens: 4096 },
-    ProviderDefaults { id: "anthropic",    base_url: "https://api.anthropic.com/v1",                                 default_model: "claude-opus-4-6",     auth_style: AuthStyle::ApiKeyHeader,  default_temperature: 0.7, default_max_tokens: 8192 },
-    ProviderDefaults { id: "gemini",       base_url: "https://generativelanguage.googleapis.com/v1beta/openai",      default_model: "gemini-3-flash-preview", auth_style: AuthStyle::Bearer,    default_temperature: 0.7, default_max_tokens: 4096 },
-    ProviderDefaults { id: "xai",          base_url: "https://api.x.ai/v1",                                         default_model: "grok-4-0709",         auth_style: AuthStyle::Bearer,       default_temperature: 0.7, default_max_tokens: 4096 },
-    ProviderDefaults { id: "deepseek",     base_url: "https://api.deepseek.com",                                     default_model: "deepseek-chat",       auth_style: AuthStyle::Bearer,       default_temperature: 0.7, default_max_tokens: 4096 },
-    ProviderDefaults { id: "qwen",         base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",            default_model: "qwen3-max",           auth_style: AuthStyle::Bearer,       default_temperature: 0.7, default_max_tokens: 4096 },
-    ProviderDefaults { id: "glm",          base_url: "https://open.bigmodel.cn/api/paas/v4",                         default_model: "glm-5",               auth_style: AuthStyle::Bearer,       default_temperature: 1.0, default_max_tokens: 8192 },
-    ProviderDefaults { id: "glm-code",     base_url: "https://open.bigmodel.cn/api/coding/paas/v4",                  default_model: "GLM-5",               auth_style: AuthStyle::Bearer,       default_temperature: 1.0, default_max_tokens: 8192 },
-    ProviderDefaults { id: "minimax",      base_url: "https://api.minimaxi.com/v1",                                  default_model: "MiniMax-M2.5",        auth_style: AuthStyle::Bearer,       default_temperature: 1.0, default_max_tokens: 8192 },
-    ProviderDefaults { id: "minimax-code", base_url: "https://api.minimaxi.com/v1",                                  default_model: "MiniMax-M2.5",        auth_style: AuthStyle::Bearer,       default_temperature: 1.0, default_max_tokens: 8192 },
-    ProviderDefaults { id: "kimi",         base_url: "https://api.moonshot.cn/v1",                                   default_model: "kimi-k2.5",           auth_style: AuthStyle::Bearer,       default_temperature: 0.7, default_max_tokens: 4096 },
-    ProviderDefaults { id: "kimi-code",    base_url: "https://api.kimi.com/coding/v1",                               default_model: "kimi-for-coding",     auth_style: AuthStyle::Bearer,       default_temperature: 0.7, default_max_tokens: 4096 },
-    ProviderDefaults { id: "litellm",      base_url: "http://localhost:4000",                                        default_model: "gpt-4.1",             auth_style: AuthStyle::Bearer,       default_temperature: 0.7, default_max_tokens: 4096 },
+    ProviderDefaults { id: "openai",       base_url: "https://api.openai.com/v1",                                    default_model: "gpt-4.1",             auth_style: AuthStyle::Bearer,       default_temperature: 0.7, default_max_tokens: 16384 },
+    ProviderDefaults { id: "anthropic",    base_url: "https://api.anthropic.com/v1",                                 default_model: "claude-opus-4-6",     auth_style: AuthStyle::ApiKeyHeader,  default_temperature: 0.7, default_max_tokens: 16384 },
+    ProviderDefaults { id: "gemini",       base_url: "https://generativelanguage.googleapis.com/v1beta/openai",      default_model: "gemini-3-flash-preview", auth_style: AuthStyle::Bearer,    default_temperature: 0.7, default_max_tokens: 16384 },
+    ProviderDefaults { id: "xai",          base_url: "https://api.x.ai/v1",                                         default_model: "grok-4-0709",         auth_style: AuthStyle::Bearer,       default_temperature: 0.7, default_max_tokens: 16384 },
+    ProviderDefaults { id: "deepseek",     base_url: "https://api.deepseek.com",                                     default_model: "deepseek-chat",       auth_style: AuthStyle::Bearer,       default_temperature: 0.7, default_max_tokens: 16384 },
+    ProviderDefaults { id: "qwen",         base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",            default_model: "qwen3-max",           auth_style: AuthStyle::Bearer,       default_temperature: 0.7, default_max_tokens: 16384 },
+    ProviderDefaults { id: "glm",          base_url: "https://open.bigmodel.cn/api/paas/v4",                         default_model: "glm-5",               auth_style: AuthStyle::Bearer,       default_temperature: 1.0, default_max_tokens: 16384 },
+    ProviderDefaults { id: "glm-code",     base_url: "https://open.bigmodel.cn/api/coding/paas/v4",                  default_model: "GLM-5",               auth_style: AuthStyle::Bearer,       default_temperature: 1.0, default_max_tokens: 16384 },
+    ProviderDefaults { id: "minimax",      base_url: "https://api.minimaxi.com/v1",                                  default_model: "MiniMax-M2.5",        auth_style: AuthStyle::Bearer,       default_temperature: 1.0, default_max_tokens: 16384 },
+    ProviderDefaults { id: "minimax-code", base_url: "https://api.minimaxi.com/v1",                                  default_model: "MiniMax-M2.5",        auth_style: AuthStyle::Bearer,       default_temperature: 1.0, default_max_tokens: 16384 },
+    ProviderDefaults { id: "kimi",         base_url: "https://api.moonshot.cn/v1",                                   default_model: "kimi-k2.5",           auth_style: AuthStyle::Bearer,       default_temperature: 0.7, default_max_tokens: 16384 },
+    ProviderDefaults { id: "kimi-code",    base_url: "https://api.kimi.com/coding/v1",                               default_model: "kimi-for-coding",     auth_style: AuthStyle::Bearer,       default_temperature: 0.7, default_max_tokens: 16384 },
+    ProviderDefaults { id: "litellm",      base_url: "http://localhost:4000",                                        default_model: "gpt-4.1",             auth_style: AuthStyle::Bearer,       default_temperature: 0.7, default_max_tokens: 16384 },
 ];
 
 /// 默认回退配置（未知提供商）
@@ -46,7 +49,7 @@ static FALLBACK_DEFAULTS: ProviderDefaults = ProviderDefaults {
     default_model: "gpt-4.1",
     auth_style: AuthStyle::Bearer,
     default_temperature: 0.7,
-    default_max_tokens: 4096,
+    default_max_tokens: 16384,
 };
 
 /// 按 provider ID 查找注册表

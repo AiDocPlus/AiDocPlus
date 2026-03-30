@@ -13,7 +13,15 @@ export const MSG_STREAMING_CURSOR = 'inline-block w-1.5 h-4 bg-primary/60 animat
 // ═══ 快捷操作按钮 ═══
 export const QUICK_ACTION_BTN = 'h-7 text-xs px-2 gap-1';
 export const QUICK_ACTION_ICON = 'h-3.5 w-3.5';
-export const QUICK_ACTION_BAR = 'flex flex-wrap gap-1 px-2 py-2 border-b flex-shrink-0';
+/** DocTypeAIChatBase headerSlot：单层底边，与侧栏顶栏统一 */
+export const QUICK_ACTION_BAR = 'flex flex-wrap gap-1 px-2 py-1.5 border-b flex-shrink-0 bg-card';
+
+// ═══ AI 侧栏顶部（会话 + 快捷）合并为一块，减少多条 border-b ═══
+export const SIDEBAR_AI_HEADER_PANEL = 'flex-shrink-0 border-b bg-card';
+export const SIDEBAR_AI_HEADER_ROW = 'flex items-center gap-1 px-2 py-1 min-h-0';
+export const SIDEBAR_AI_HEADER_SUBROW = 'flex items-center gap-1 px-2 py-1 border-t border-border/40 flex-wrap overflow-x-auto min-h-0';
+/** 顶栏第三行：纵向堆叠（如建议芯片 + 工具条） */
+export const SIDEBAR_AI_HEADER_SUBROW_STACK = 'flex flex-col gap-1 px-2 py-1.5 border-t border-border/40 shrink-0 min-w-0';
 
 // ═══ 工具栏 ═══
 export const TOOLBAR_CLASS = 'flex items-center gap-2 px-3 py-1.5 border-b flex-shrink-0 bg-card';

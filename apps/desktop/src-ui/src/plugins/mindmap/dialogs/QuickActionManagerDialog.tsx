@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { QuickActionStore, QuickActionCategory, QuickActionItem } from '../quickActionDefs';
 import { getDefaultStore, getBuiltinPrompt, genActionId, exportConfig, importConfig } from '../quickActionDefs';
+import { saveTextFileWithDialog } from '@/lib/tauriSaveTextFile';
 
 const DIALOG_STYLE = { fontFamily: '宋体', fontSize: '16px' };
 const CONTEXT_MODES = [
@@ -120,9 +121,17 @@ export function QuickActionManagerDialog({ open, onOpenChange, store: init, onSa
   const updCat = useCallback((cid: string, patch: Partial<QuickActionCategory>) => setDraft(p => ({ ...p, categories: p.categories.map(c => c.id === cid ? { ...c, ...patch } : c) })), []);
 
   const handleResetAll = useCallback(() => { setDraft(getDefaultStore()); setSel(null); setConfirmReset(false); }, []);
-  const handleExport = useCallback(() => {
-    const b = new Blob([exportConfig(draft)], { type: 'application/json' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'mindmap-quick-actions.json'; a.click(); URL.revokeObjectURL(a.href);
+  const handleExport = useCallback(async () => {
+    const json = exportConfig(draft);
+    try {
+      await saveTextFileWithDialog({
+        defaultPath: 'mindmap-quick-actions.json',
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+        content: json,
+      });
+    } catch (e) {
+      console.error('[Mindmap QuickActionManagerDialog] export', e);
+    }
   }, [draft]);
   const handleImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;

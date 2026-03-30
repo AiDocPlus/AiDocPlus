@@ -9,6 +9,7 @@ import { useTranslation } from '../../i18n';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import { SUPPORTED_LANGUAGES, type SupportedLanguage, changeAppLanguage } from '../../i18n';
 import { formatBackendError } from '@/lib/backendError';
+import { saveTextFileWithDialog } from '@/lib/tauriSaveTextFile';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Button } from '../ui/button';
@@ -20,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Separator } from '../ui/separator';
 import { AISettingsTab } from './AISettingsTab';
 import { EmailSettingsTab } from './EmailSettingsTab';
+import { SyncSettingsTab } from './SyncSettingsTab';
 
 interface SettingsPanelProps {
   open: boolean;
@@ -331,22 +333,18 @@ export function SettingsPanel({ open, onClose, defaultTab }: SettingsPanelProps)
     setHasChanges(true);
   };
 
-  const handleExport = () => {
+  const handleExport = useCallback(async () => {
     try {
       const settingsJson = exportSettings();
-      const blob = new Blob([settingsJson], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `aidocplus-settings-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      await saveTextFileWithDialog({
+        defaultPath: `aidocplus-settings-${new Date().toISOString().split('T')[0]}.json`,
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+        content: settingsJson,
+      });
     } catch (err) {
       console.error('Failed to export settings:', err);
     }
-  };
+  }, [exportSettings]);
 
   const handleImport = () => {
     const input = document.createElement('input');
@@ -433,6 +431,9 @@ export function SettingsPanel({ open, onClose, defaultTab }: SettingsPanelProps)
             <TabsTrigger value="email">
               <Mail className="w-4 h-4 mr-1" />
               {t('settings.emailTab', { defaultValue: '邮件' })}
+            </TabsTrigger>
+            <TabsTrigger value="sync">
+              {t('settings.syncTab', { defaultValue: '云同步' })}
             </TabsTrigger>
             <TabsTrigger value="advanced">
               {t('settings.advanced')}
@@ -952,6 +953,11 @@ export function SettingsPanel({ open, onClose, defaultTab }: SettingsPanelProps)
             {/* Email Settings */}
             <TabsContent value="email" className="space-y-6 p-4 bg-card h-full">
               <EmailSettingsTab tempEmail={tempSettings.email} updateTempEmail={updateTempEmail} />
+            </TabsContent>
+
+            {/* Sync Settings */}
+            <TabsContent value="sync" className="space-y-6 p-4 bg-card h-full">
+              <SyncSettingsTab />
             </TabsContent>
 
             {/* Advanced Settings */}

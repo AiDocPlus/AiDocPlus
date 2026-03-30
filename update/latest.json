@@ -1,19 +1,19 @@
 {
-  "version": "0.3.11",
-  "notes": "## AiDocPlus v0.3.11\n\n### 更新说明\n- 修复 AIProvider 类型断言问题\n- 修复 calculateStreak 返回值类型\n- 清理 stock-research 模块未使用变量\n- 新增散文文档类型 (essay)\n- 新增股票研究文档类型 (stock-research)\n\n### 下载\n- **macOS (Apple Silicon)**: https://github.com/AiDocPlus/AiDocPlus/releases/download/v0.3.11/AiDocPlus_0.3.11_aarch64.dmg\n- **Windows x64**: https://github.com/AiDocPlus/AiDocPlus/releases/download/v0.3.11/AiDocPlus_0.3.11_x64-setup.exe\n",
-  "pub_date": "2026-03-24T08:25:04.551Z",
+  "version": "0.3.12",
+  "notes": "## AiDocPlus v0.3.12\n\n### 更新说明\n- 删除 6 个专业文档类型（公文写作、公众号文章、商业计划书、会议纪要、学术论文、电影剧本）\n- 电子书阅读器侧边栏右键菜单全面完善（导出、复制、排序子菜单、属性对话框、分类移动等）\n- 速记窗口改为多条目记录模式（默认 3 条，支持新增/删除/复制/清空/合并复制）\n- 速记窗口复制成功后 Toast 动态提示\n- 速记窗口 Tab 键在条目之间切换\n\n### 下载\n- **macOS (Apple Silicon)**: https://github.com/AiDocPlus/AiDocPlus/releases/download/v0.3.12/AiDocPlus_0.3.12_aarch64.dmg\n- **Windows x64**: https://github.com/AiDocPlus/AiDocPlus/releases/download/v0.3.12/AiDocPlus_0.3.12_x64-setup.exe\n",
+  "pub_date": "2026-06-28T00:00:00.000Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRWxZdWJzQmlzdEpMQ2xJbXBGWTFiQ3hMbzQrVnZ6eXkvM2hETlpOL05zNjlmZFJKOGd0ZThMQWNPelpnOVA5b2lTaTR5RGtwTUJMQzJUbU9sazJXc3dvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc0MzQwNzAwCWZpbGU6QWlEb2NQbHVzXzAuMy4xMV94NjQtc2V0dXAuZXhlCmkvK0VQQTdPd2c4SE5zWGx5dkpUV3pNZWdtSGJkV2NqVHFaTXcxQ3VmTjNYczhEVC9DNkYveGJ2b2dZTFYwelFlWFhwck5vWEFpdWJEUThtNlhpa0RBPT0K",
-      "url": "https://github.com/AiDocPlus/AiDocPlus/releases/download/v0.3.11/AiDocPlus_0.3.11_x64-setup.exe"
+      "url": "https://github.com/AiDocPlus/AiDocPlus/releases/download/v0.3.12/AiDocPlus_0.3.12_x64-setup.exe",
+      "signature": ""
     },
     "windows-x86_64-nsis": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRWxZdWJzQmlzdEpMQ2xJbXBGWTFiQ3hMbzQrVnZ6eXkvM2hETlpOL05zNjlmZFJKOGd0ZThMQWNPelpnOVA5b2lTaTR5RGtwTUJMQzJUbU9sazJXc3dvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc0MzQwNzAwCWZpbGU6QWlEb2NQbHVzXzAuMy4xMV94NjQtc2V0dXAuZXhlCmkvK0VQQTdPd2c4SE5zWGx5dkpUV3pNZWdtSGJkV2NqVHFaTXcxQ3VmTjNYczhEVC9DNkYveGJ2b2dZTFYwelFlWFhwck5vWEFpdWJEUThtNlhpa0RBPT0K",
-      "url": "https://github.com/AiDocPlus/AiDocPlus/releases/download/v0.3.11/AiDocPlus_0.3.11_x64-setup.exe"
+      "url": "https://github.com/AiDocPlus/AiDocPlus/releases/download/v0.3.12/AiDocPlus_0.3.12_x64-setup.exe",
+      "signature": ""
     },
     "darwin-aarch64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRXNBenBrbkU3SGlxMEJtVXg2UEpBcHRZTXZCVklVdEc5dTQxWjhVWVc2azdhQXdDdmlVNHQ1dU9ybFlkOFc5dFRBVTZ4b0kwQk9MOEQyQ0NvMXJ4ZVFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc0MzM3ODIzCWZpbGU6QWlEb2NQbHVzLmFwcC50YXIuZ3oKaXlvbC9YSmdxUTdwY0plOUFPU0xMNTU3RHFUMEg5RHNCcEpjQkpXRHEvb3A3aVFJS2RsNlBKUmRtdUVGMGNINzYwYjh1bEF2ZVhsajNGNVI5R1kxQmc9PQo=",
-      "url": "https://github.com/AiDocPlus/AiDocPlus/releases/download/v0.3.11/AiDocPlus.app.tar.gz"
+      "url": "https://github.com/AiDocPlus/AiDocPlus/releases/download/v0.3.12/AiDocPlus.app.tar.gz",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUldSdHVyTEcxOEFmRW0wdjlIaGt1ZW5lYWM2bzVvR3FaNnV3ajdwNENmNDBCbWFZYkNJRnl1aGR5NUQ5S2lLWDhBR0NJQmw5T0JLN0hFbUpSbFVrN1dQd1dlVTAyWUZsS3dFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc0ODgwMTI0CWZpbGU6QWlEb2NQbHVzLmFwcC50YXIuZ3oKeE5EU0Yxa1lRZ1BuM1l5OVVTU2tzT1BFaXIzeXdnYkk4OGJVRzNYcXQzUTVxZXdSMTljcFkxaFduMXhpWDNaMEV2Zlk1Vys4dUZCUHNxTmZLeTByRGc9PQo="
     }
   }
 }

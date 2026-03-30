@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { invoke } from '@tauri-apps/api/core';
 import { getVersion } from '@tauri-apps/api/app';
 import { useTranslation } from '@/i18n';
-import { Globe, Github, FileText, ExternalLink } from 'lucide-react';
+import { Globe, CircleDot, FileText, ExternalLink } from 'lucide-react';
 import pkgJson from '../../../../package.json';
 
 interface AboutDialogProps {
@@ -62,7 +62,7 @@ export function AboutDialog({ open, onClose }: AboutDialogProps) {
               onClick={() => handleOpenUrl('https://github.com/AiDocPlus/AiDocPlus')}
               className="flex items-center justify-center gap-2 w-full py-2 px-3 rounded-md text-sm hover:bg-accent transition-colors cursor-pointer focus:outline-none"
             >
-              <Github className="h-4 w-4" />
+              <CircleDot className="h-4 w-4" />
               <span>{t('settings.about.github', { defaultValue: 'GitHub 仓库' })}</span>
               <ExternalLink className="h-3 w-3 text-muted-foreground" />
             </button>

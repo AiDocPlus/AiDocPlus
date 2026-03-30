@@ -118,14 +118,18 @@ function extractObjects(jsonStr: string): Record<string, unknown>[] {
   return items;
 }
 
-/** 将本地服务转为 AIServiceConfig（maxTokens 始终为 0，由 AI 自行决定输出长度） */
+/**
+ * 将本地服务转为 AIServiceConfig。
+ * maxTokens=0 视为未配置，此处给出安全兜底，避免推理模型只输出思考过程。
+ */
 function localToConfig(svc: LocalService): AIServiceConfig {
   const baseUrl = svc.baseUrl || PROVIDER_BASE_URLS[svc.provider] || '';
+  const effectiveMaxTokens = typeof svc.maxTokens === 'number' && svc.maxTokens > 0 ? svc.maxTokens : 4096;
   return {
     baseUrl,
     apiKey: svc.apiKey,
     model: svc.model,
-    maxTokens: 0,
+    maxTokens: effectiveMaxTokens,
     temperature: svc.temperature || 0.7,
   };
 }

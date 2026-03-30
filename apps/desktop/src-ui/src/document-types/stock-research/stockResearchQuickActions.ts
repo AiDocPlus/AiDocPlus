@@ -6,7 +6,7 @@ import {
   TrendingUp, BarChart3, PieChart, Activity,
   Target, AlertTriangle, FileText, FileSpreadsheet, MessageSquare,
   LineChart, DollarSign, Shield, Search, Lightbulb, Sparkles,
-  RotateCcw, RefreshCw,
+  RotateCcw, RefreshCw, Calculator,
 } from 'lucide-react';
 import { ALL_PROMPTS } from './ai/prompts';
 
@@ -216,6 +216,23 @@ const THESIS_ACTIONS: QuickAction[] = [
     requiresContext: 'all',
     order: 5,
   },
+  {
+    id: 'stock-research:scenario-sensitivity-calc',
+    labelKey: 'stockResearch.actionScenarioSensitivity',
+    icon: Calculator,
+    category: 'thesis',
+    promptTemplate: `【任务】为 {{stockName}}（{{stockCode}}）写「情景分析」用的计算文档行：例如基准/乐观/悲观下净利润或营收变动 → 推导 PE、估值差额或简易 DCF 中某一期的 npv 片段（可用 npv([], 折现率) 示意）。
+
+【要求】
+1. 变量命名清晰；情景用中文注释行区分。
+2. 仅使用计算器支持的函数；折现、增长用幂与百分数即可。
+3. 末尾 \`\`\`formula 输出。
+
+【上下文】
+{{fullContext}}`,
+    requiresContext: 'all',
+    order: 6,
+  },
 ];
 
 // ═══════════════════════════════════════════════════════
@@ -259,6 +276,23 @@ const COMPARISON_ACTIONS: QuickAction[] = [
     requiresContext: 'technicals',
     order: 4,
   },
+  {
+    id: 'stock-research:peer-ratio-lines',
+    labelKey: 'stockResearch.actionPeerRatioLines',
+    icon: BarChart3,
+    category: 'comparison',
+    promptTemplate: `【任务】基于 {{stockName}}（{{stockCode}}）与对标公司数据，生成「计算文档」用的多行算式，便于横向对比同一口径下的 PE、PB、ROE、毛利率、净利率等。
+
+【要求】
+1. 为每家公司预留变量前缀或用注释行区分（如 // 本公司、// 对标A）；仅使用计算器支持的函数与运算符。
+2. 数据缺失处用占位变量并注明来源。
+3. 末尾 \`\`\`formula 代码块输出全部行。
+
+【上下文】
+{{fullContext}}`,
+    requiresContext: 'all',
+    order: 5,
+  },
 ];
 
 // ═══════════════════════════════════════════════════════
@@ -283,6 +317,25 @@ const REPORT_ACTIONS: QuickAction[] = [
     promptId: 'full_report',
     requiresContext: 'all',
     order: 2,
+  },
+  {
+    id: 'stock-research:calc-formulas',
+    labelKey: 'stockResearch.actionCalcFormulas',
+    icon: Calculator,
+    category: 'report',
+    promptTemplate: `【任务】针对 {{stockName}}（{{stockCode}}），生成一批可在 AiDocPlus「计算文档」中直接粘贴、逐行执行的估值与财务比率算式。
+
+【硬性规则】
+1. 仅使用计算器已支持的语法：四则运算、百分数、幂、方括号数组，以及 npv、irr、pmt、fv、pv、nper、rate、sum、mean、median、std、variance、min、max 等与官方函数目录一致的函数；禁止编造 XIRR、VLOOKUP、GOOGLEFINANCE 等未列出名称。
+2. 每行一条；中文变量名；需要展示单位时用双引号，如 14.2 "倍"、9.8%。
+3. 结合下方上下文中的数据填数；缺失项写占位变量并注释「需从财报/行情填入」。
+4. 至少覆盖其中若干：PE、PB（若有）、PS（若有）、ROE、净利率/毛利率、股息率（若有）、营收或盈利同比增速、简易 CAGR 或持有期收益、利息覆盖倍数（若有 EBIT 与利息）。
+5. 回复末尾用单独一个 \`\`\`formula 代码块给出全部可执行行（可多行）。
+
+【当前数据】
+{{fullContext}}`,
+    requiresContext: 'all',
+    order: 3,
   },
 ];
 

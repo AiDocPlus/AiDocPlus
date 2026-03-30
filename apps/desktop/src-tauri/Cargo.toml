@@ -1,6 +1,6 @@
 [package]
 name = "aidocplus"
-version = "0.3.11"
+version = "0.3.12"
 edition = "2021"
 
 [build-dependencies]
@@ -44,6 +44,9 @@ keyring = { version = "3", features = ["apple-native", "windows-native", "sync-s
 encoding_rs = "0.8"
 chardetng = "0.1"
 rusqlite = { version = "0.33", features = ["bundled"] }
+sha2 = "0.10"
+urlencoding = "2"
+async-trait = "0.1"
 aidocplus-manager-rust = { path = "../../../packages/manager-rust" }
 
 # 本地开发构建：快速编译，重在测试

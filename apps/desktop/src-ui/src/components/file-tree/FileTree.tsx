@@ -388,14 +388,33 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
     }
   };
 
-
-
-  // 监听系统菜单的"新建项目"事件
+  // 监听系统菜单的"重命名项目/文档"事件，触发行内重命名
   useEffect(() => {
-    const handler = () => setIsCreating(true);
-    window.addEventListener('menu-new-project', handler);
-    return () => window.removeEventListener('menu-new-project', handler);
-  }, []);
+    const handleRenameProject = () => {
+      const proj = currentProject;
+      if (proj) {
+        // 确保项目在文件树中展开
+        setExpandedProjects(prev => new Set([...prev, proj.id]));
+        handleStartRenameProject(proj.id, proj.name);
+      }
+    };
+    const handleRenameDocument = () => {
+      const doc = documents.find(d => d.id === currentDocumentId);
+      if (doc) {
+        // 确保文档所在项目展开
+        setExpandedProjects(prev => new Set([...prev, doc.projectId]));
+        handleStartRename(doc.projectId, doc.id, doc.title);
+      }
+    };
+    window.addEventListener('menu-rename-project', handleRenameProject);
+    window.addEventListener('menu-rename-document', handleRenameDocument);
+    return () => {
+      window.removeEventListener('menu-rename-project', handleRenameProject);
+      window.removeEventListener('menu-rename-document', handleRenameDocument);
+    };
+  }, [currentProject, currentDocumentId, documents]);
+
+
 
   // Auto-expand project and highlight current document
   useEffect(() => {
@@ -685,7 +704,7 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => window.dispatchEvent(new CustomEvent('create-project-dialog'))}
+            onClick={() => setIsCreating(true)}
             className="h-6 w-6"
             title={t('fileTree.createProject', { defaultValue: '新建项目' })}
           >

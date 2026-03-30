@@ -10,6 +10,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { usePluginHost } from './PluginHostAPI';
 import { formatBackendError } from '@/lib/backendError';
+import { saveTextFileWithDialog } from '@/lib/tauriSaveTextFile';
 import { useSettingsStore, getAIInvokeParamsForService } from '@/stores/useSettingsStore';
 import { getProviderConfig, getActiveService } from '@aidocplus/shared-types';
 import type { Document } from '@aidocplus/shared-types';
@@ -226,16 +227,19 @@ export function PluginAssistantPanel({
   }, []);
 
   // ── 导出对话 ──
-  const handleExport = useCallback(() => {
+  const handleExport = useCallback(async () => {
     if (messages.length === 0) return;
     const md = exportChatAsMarkdown(messages, pluginName);
-    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${pluginName}_chat_${new Date().toISOString().slice(0, 10)}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const defaultPath = `${pluginName}_chat_${new Date().toISOString().slice(0, 10)}.md`;
+    try {
+      await saveTextFileWithDialog({
+        defaultPath,
+        filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }],
+        content: md,
+      });
+    } catch (e) {
+      console.error('[PluginAssistantPanel] export', e);
+    }
   }, [messages, pluginName]);
 
   // ── 复制 ──

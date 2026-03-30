@@ -101,6 +101,54 @@ pub fn rename_project(state: State<'_, AppState>, project_id: String, new_name: 
 #[tauri::command]
 pub fn delete_project(state: State<'_, AppState>, project_id: String) -> Result<()> {
     security::validate_id(&project_id, "project_id")?;
+
+    // ── 1. 清理 SQLite 关联数据（在删除文件之前） ──
+
+    // 收集该项目所有文档 ID，用于清理对话记录
+    let doc_ids: Vec<String> = {
+        let docs_dir = state.config().projects_dir.join(&project_id).join("documents");
+        if docs_dir.exists() {
+            std::fs::read_dir(&docs_dir)
+                .map(|entries| {
+                    entries
+                        .flatten()
+                        .filter_map(|entry| {
+                            let name = entry.path().file_stem()?.to_str()?.to_string();
+                            if !name.is_empty() { Some(name) } else { None }
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        }
+    };
+
+    // 清理搜索索引
+    if let Err(e) = crate::search_store::remove_project_index(&state.db, &project_id) {
+        eprintln!("[delete_project] 清理项目搜索索引失败: {}", e);
+    }
+
+    // 清理对话记录（messages 通过 CASCADE 自动级联删除）
+    if !doc_ids.is_empty() {
+        if let Err(e) = crate::conversation_store::delete_conversations_by_document_ids(&state.db, &doc_ids) {
+            eprintln!("[delete_project] 清理项目对话记录失败: {}", e);
+        }
+    }
+
+    // 清理版本历史
+    {
+        let conn = state.db.versions();
+        if let Err(e) = conn.execute(
+            "DELETE FROM versions WHERE project_id = ?1",
+            rusqlite::params![project_id],
+        ) {
+            eprintln!("[delete_project] 清理项目版本历史失败: {}", e);
+        }
+    }
+
+    // ── 2. 删除项目文件 ──
+
     let project_path = state.get_project_path(&project_id);
     let project_dir = state.config().projects_dir.join(&project_id);
 

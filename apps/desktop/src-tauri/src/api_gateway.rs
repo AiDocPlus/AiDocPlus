@@ -15,6 +15,7 @@ use tokio::sync::oneshot;
 use uuid::Uuid;
 
 use crate::config::AppState;
+use crate::error::ResultExt;
 
 // ============================================================
 // 请求 / 响应类型
@@ -278,7 +279,7 @@ async fn handle_document(action: &str, params: &Value, state: &AppState, app_han
             }
             let mut docs = Vec::new();
             let entries = std::fs::read_dir(&docs_dir)
-                .map_err(|e| crate::error::AppError::Internal(format!("读取文档目录失败: {}", e)))?;
+                .context("读取文档目录失败")?;
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.extension().and_then(|e| e.to_str()) == Some("json") {
@@ -307,9 +308,9 @@ async fn handle_document(action: &str, params: &Value, state: &AppState, app_han
                 return Err(crate::error::AppError::Internal(format!("文档不存在: {}", document_id)));
             }
             let content = std::fs::read_to_string(&doc_path)
-                .map_err(|e| crate::error::AppError::Internal(format!("读取文档失败: {}", e)))?;
+                .context("读取文档失败")?;
             let doc: Value = serde_json::from_str(&content)
-                .map_err(|e| crate::error::AppError::Internal(format!("解析文档 JSON 失败: {}", e)))?;
+                .context("解析文档 JSON 失败")?;
             Ok(doc)
         }
         "create" => {
@@ -328,9 +329,9 @@ async fn handle_document(action: &str, params: &Value, state: &AppState, app_han
                 author.to_string(),
             );
             let doc_path = state.get_document_path(project_id, &doc.id);
-            doc.save(&doc_path).map_err(|e| crate::error::AppError::Internal(format!("保存文档失败: {}", e)))?;
+            doc.save(&doc_path).context("保存文档失败")?;
             let doc_json = serde_json::to_value(&doc)
-                .map_err(|e| crate::error::AppError::Internal(format!("序列化文档失败: {}", e)))?;
+                .context("序列化文档失败")?;
             // 通知前端刷新文档列表
             let _ = app_handle.emit("document:external-change", json!({
                 "action": "create",
@@ -351,7 +352,7 @@ async fn handle_document(action: &str, params: &Value, state: &AppState, app_han
                 return Err(crate::error::AppError::Internal(format!("文档不存在: {}", document_id)));
             }
             let mut doc = crate::document::Document::load(&doc_path)
-                .map_err(|e| crate::error::AppError::Internal(format!("加载文档失败: {}", e)))?;
+                .context("加载文档失败")?;
             if let Some(title) = params.get("title").and_then(|v| v.as_str()) {
                 doc.title = title.to_string();
             }
@@ -367,9 +368,9 @@ async fn handle_document(action: &str, params: &Value, state: &AppState, app_han
                 doc.author_notes = notes.to_string();
             }
             doc.metadata.updated_at = chrono::Utc::now().timestamp();
-            doc.save(&doc_path).map_err(|e| crate::error::AppError::Internal(format!("保存文档失败: {}", e)))?;
+            doc.save(&doc_path).context("保存文档失败")?;
             let doc_json = serde_json::to_value(&doc)
-                .map_err(|e| crate::error::AppError::Internal(format!("序列化文档失败: {}", e)))?;
+                .context("序列化文档失败")?;
             // 通知前端刷新文档列表
             let _ = app_handle.emit("document:external-change", json!({
                 "action": "save",
@@ -392,7 +393,7 @@ async fn handle_project(action: &str, _params: &Value, state: &AppState) -> Hand
             }
             let mut projects = Vec::new();
             let entries = std::fs::read_dir(projects_dir)
-                .map_err(|e| crate::error::AppError::Internal(format!("读取项目目录失败: {}", e)))?;
+                .context("读取项目目录失败")?;
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.is_file() && path.extension().and_then(|e| e.to_str()) == Some("json") {
@@ -432,7 +433,7 @@ async fn handle_search(action: &str, params: &Value, state: &AppState) -> Handle
                 vec![pid.to_string()]
             } else {
                 std::fs::read_dir(projects_dir)
-                    .map_err(|e| crate::error::AppError::Internal(format!("读取目录失败: {}", e)))?
+                    .context("读取目录失败")?
                     .flatten()
                     .filter(|e| e.path().is_dir())
                     .filter_map(|e| e.file_name().into_string().ok())
@@ -484,7 +485,7 @@ async fn handle_template(action: &str, params: &Value) -> HandlerResult {
     match action {
         "list" => {
             let templates = crate::commands::resource::list_prompt_templates()
-                .map_err(|e| crate::error::AppError::Internal(format!("获取模板列表失败: {}", e)))?;
+                .context("获取模板列表失败")?;
             // 转换为简洁格式返回
             let list: Vec<Value> = templates.iter().map(|t| {
                 json!({
@@ -505,7 +506,7 @@ async fn handle_template(action: &str, params: &Value) -> HandlerResult {
                 .ok_or_else(|| crate::error::AppError::Internal("缺少参数 templateId".to_string()))?;
 
             let templates = crate::commands::resource::list_prompt_templates()
-                .map_err(|e| crate::error::AppError::Internal(format!("获取模板列表失败: {}", e)))?;
+                .context("获取模板列表失败")?;
             let found = templates.iter().find(|t| t.id == template_id);
             match found {
                 Some(t) => Ok(json!({
@@ -547,7 +548,7 @@ async fn handle_export(action: &str, params: &Value, state: &AppState) -> Handle
             return Err(crate::error::AppError::Internal(format!("文档未找到: {}", doc_id)));
         }
         let document = crate::document::Document::load(&doc_path)
-            .map_err(|e| crate::error::AppError::Internal(format!("加载文档失败: {}", e)))?;
+            .context("加载文档失败")?;
         // 优先使用 AI 生成内容，其次使用原始内容
         let content = if !document.ai_generated_content.is_empty() {
             document.ai_generated_content.clone()
@@ -566,7 +567,7 @@ async fn handle_export(action: &str, params: &Value, state: &AppState) -> Handle
         // 默认导出到 <data_root>/exports/
         let export_dir = crate::config::current_data_root().join("exports");
         std::fs::create_dir_all(&export_dir)
-            .map_err(|e| crate::error::AppError::Internal(format!("创建导出目录失败: {}", e)))?;
+            .context("创建导出目录失败")?;
         let safe_title = crate::security::sanitize_filename(&title);
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -602,7 +603,7 @@ async fn handle_export(action: &str, params: &Value, state: &AppState) -> Handle
     }
 
     let result = crate::native_export::export_native(&markdown, &title, &output_path, format)
-        .map_err(|e| crate::error::AppError::Internal(format!("导出失败: {}", e)))?;
+        .context("导出失败")?;
 
     Ok(json!({
         "outputPath": result,
@@ -664,9 +665,9 @@ async fn handle_plugin(action: &str, params: &Value) -> HandlerResult {
             }
 
             let content = std::fs::read_to_string(&storage_path)
-                .map_err(|e| crate::error::AppError::Internal(format!("读取插件存储失败: {}", e)))?;
+                .context("读取插件存储失败")?;
             let storage: Value = serde_json::from_str(&content)
-                .map_err(|e| crate::error::AppError::Internal(format!("解析插件存储失败: {}", e)))?;
+                .context("解析插件存储失败")?;
 
             // plugin-storage.json 结构: { "pluginId": { "key": value, ... }, ... }
             let plugin_data = storage.get(plugin_id).cloned().unwrap_or(json!(null));
@@ -692,7 +693,7 @@ async fn handle_plugin(action: &str, params: &Value) -> HandlerResult {
 
             let mut storage: Value = if storage_path.exists() {
                 let content = std::fs::read_to_string(&storage_path)
-                    .map_err(|e| crate::error::AppError::Internal(format!("读取插件存储失败: {}", e)))?;
+                    .context("读取插件存储失败")?;
                 serde_json::from_str(&content).unwrap_or(json!({}))
             } else {
                 json!({})
@@ -706,10 +707,10 @@ async fn handle_plugin(action: &str, params: &Value) -> HandlerResult {
 
             if let Some(parent) = storage_path.parent() {
                 std::fs::create_dir_all(parent)
-                    .map_err(|e| crate::error::AppError::Internal(format!("创建目录失败: {}", e)))?;
+                    .context("创建目录失败")?;
             }
             let json_str = serde_json::to_string_pretty(&storage)
-                .map_err(|e| crate::error::AppError::Internal(format!("序列化失败: {}", e)))?;
+                .context("序列化失败")?;
             crate::config::atomic_write(&storage_path, &json_str)?;
 
             Ok(json!({ "success": true }))
@@ -732,7 +733,7 @@ async fn handle_ai(action: &str, params: &Value, app_handle: &AppHandle) -> Hand
         "chat" | "generate" => {
             // 从前端获取 AI 配置
             let ai_config = query_frontend_state(app_handle, "getAiConfig").await
-                .map_err(|e| crate::error::AppError::Internal(format!("获取 AI 配置失败: {}", e)))?;
+                .context("获取 AI 配置失败")?;
 
             let provider = ai_config.get("provider").and_then(|v| v.as_str()).unwrap_or("openai");
             let raw_api_key = ai_config.get("apiKey").and_then(|v| v.as_str());
@@ -819,10 +820,15 @@ async fn handle_ai(action: &str, params: &Value, app_handle: &AppHandle) -> Hand
                 let mut body = json!({
                     "model": the_model,
                     "messages": api_messages,
-                    "max_tokens": max_tokens_val.unwrap_or(4096),
                     "temperature": temperature,
                     "stream": false
                 });
+                // 仅当用户显式配置了 max_tokens > 0 时注入，否则由模型自行决定
+                if let Some(tok) = max_tokens_val {
+                    if tok > 0 {
+                        body["max_tokens"] = json!(tok);
+                    }
+                }
                 if !system_text.is_empty() {
                     body["system"] = json!(system_text);
                 }
@@ -836,7 +842,7 @@ async fn handle_ai(action: &str, params: &Value, app_handle: &AppHandle) -> Hand
                     .timeout(std::time::Duration::from_secs(120))
                     .send()
                     .await
-                    .map_err(|e| crate::error::AppError::Internal(format!("Anthropic 服务连接失败: {}", e)))?;
+                    .context("Anthropic 服务连接失败")?;
 
                 if !resp.status().is_success() {
                     let status = resp.status();
@@ -845,7 +851,7 @@ async fn handle_ai(action: &str, params: &Value, app_handle: &AppHandle) -> Hand
                 }
 
                 let b: Value = resp.json().await
-                    .map_err(|e| crate::error::AppError::Internal(format!("解析 Anthropic 响应失败: {}", e)))?;
+                    .context("解析 Anthropic 响应失败")?;
                 (b, true)
             } else {
                 // OpenAI 兼容格式（含 DeepSeek/Qwen/GLM/MiniMax/Kimi/xAI/Gemini 等）
@@ -858,7 +864,12 @@ async fn handle_ai(action: &str, params: &Value, app_handle: &AppHandle) -> Hand
                     "temperature": temperature,
                     "stream": false
                 });
-                body["max_tokens"] = json!(max_tokens_val.unwrap_or(default_max_tokens));
+                // 仅当 max_tokens > 0 时注入，否则由模型自行决定
+                if let Some(tok) = max_tokens_val {
+                    if tok > 0 {
+                        body["max_tokens"] = json!(tok);
+                    }
+                }
 
                 let mut req_b = client.post(&url)
                     .header("Content-Type", "application/json")
@@ -868,7 +879,7 @@ async fn handle_ai(action: &str, params: &Value, app_handle: &AppHandle) -> Hand
                     .timeout(std::time::Duration::from_secs(120))
                     .send()
                     .await
-                    .map_err(|e| crate::error::AppError::Internal(format!("AI 服务连接失败: {}", e)))?;
+                    .context("AI 服务连接失败")?;
 
                 if !resp.status().is_success() {
                     let status = resp.status();
@@ -877,7 +888,7 @@ async fn handle_ai(action: &str, params: &Value, app_handle: &AppHandle) -> Hand
                 }
 
                 let b: Value = resp.json().await
-                    .map_err(|e| crate::error::AppError::Internal(format!("解析 AI 响应失败: {}", e)))?;
+                    .context("解析 AI 响应失败")?;
                 (b, false)
             };
 
@@ -923,25 +934,55 @@ async fn handle_ai(action: &str, params: &Value, app_handle: &AppHandle) -> Hand
 async fn handle_file(action: &str, params: &Value) -> HandlerResult {
     // 安全检查：只允许访问 <data_root> 下的文件
     let validate_path = |p: &str| -> Result<std::path::PathBuf, crate::error::AppError> {
-        let home = dirs::home_dir().ok_or_else(|| crate::error::AppError::Internal("无法获取用户目录".to_string()))?;
+        // 检查路径中是否包含危险字符
+        if p.contains("..") {
+            return Err(crate::error::AppError::SecurityError(
+                format!("路径包含危险的 '..' 序列: {}", p)
+            ));
+        }
+        
+        // 检查 ~ 使用是否正确
+        if p.contains('~') && !p.starts_with("~/") {
+            return Err(crate::error::AppError::SecurityError(
+                format!("路径中 ~ 只能出现在开头: {}", p)
+            ));
+        }
+        
+        let home = dirs::home_dir().ok_or_else(|| 
+            crate::error::AppError::Internal("无法获取用户目录".to_string())
+        )?;
         let allowed_root = crate::config::current_data_root();
-        let resolved = if p.starts_with('~') {
-            home.join(p.strip_prefix("~/").unwrap_or(p))
-        } else {
+        
+        let resolved = if p.starts_with("~/") {
+            home.join(p.strip_prefix("~/").unwrap())
+        } else if p.starts_with('/') {
             std::path::PathBuf::from(p)
+        } else {
+            return Err(crate::error::AppError::SecurityError(
+                format!("路径必须以 ~/ 或 / 开头: {}", p)
+            ));
         };
+        
+        // 规范化路径
         let canonical = resolved.canonicalize()
             .or_else(|_| {
                 // 文件可能不存在（write 场景），检查父目录
                 if let Some(parent) = resolved.parent() {
-                    parent.canonicalize().map(|p| p.join(resolved.file_name().unwrap_or_default()))
+                    if parent.exists() {
+                        parent.canonicalize().map(|p| p.join(resolved.file_name().unwrap_or_default()))
+                    } else {
+                        Err(std::io::Error::new(std::io::ErrorKind::NotFound, "父目录不存在"))
+                    }
                 } else {
                     Err(std::io::Error::new(std::io::ErrorKind::NotFound, "路径无效"))
                 }
             })
-            .map_err(|e| crate::error::AppError::Internal(format!("路径无效: {}", e)))?;
+            .map_err(|e| crate::error::AppError::SecurityError(format!("路径无效: {}", e)))?;
+        
         if !canonical.starts_with(&allowed_root) {
-            return Err(crate::error::AppError::Internal(format!("安全限制：只允许访问 ~/AiDocPlus/ 下的文件，当前路径: {}", p)));
+            return Err(crate::error::AppError::SecurityError(
+                format!("安全限制：只允许访问 ~/AiDocPlus/ 下的文件，尝试访问: {}", p)
+            ));
         }
         Ok(canonical)
     };
@@ -952,7 +993,7 @@ async fn handle_file(action: &str, params: &Value) -> HandlerResult {
                 .ok_or_else(|| crate::error::AppError::Internal("read 需要 path 参数".to_string()))?;
             let path = validate_path(path_str)?;
             let content = std::fs::read_to_string(&path)
-                .map_err(|e| crate::error::AppError::Internal(format!("读取文件失败: {}", e)))?;
+                .context("读取文件失败")?;
             Ok(json!({ "content": content, "path": path.to_string_lossy() }))
         }
         "write" => {
@@ -963,10 +1004,10 @@ async fn handle_file(action: &str, params: &Value) -> HandlerResult {
             let path = validate_path(path_str)?;
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent)
-                    .map_err(|e| crate::error::AppError::Internal(format!("创建目录失败: {}", e)))?;
+                    .context("创建目录失败")?;
             }
             std::fs::write(&path, content)
-                .map_err(|e| crate::error::AppError::Internal(format!("写入文件失败: {}", e)))?;
+                .context("写入文件失败")?;
             Ok(json!({ "success": true, "path": path.to_string_lossy() }))
         }
         "metadata" => {
@@ -974,7 +1015,7 @@ async fn handle_file(action: &str, params: &Value) -> HandlerResult {
                 .ok_or_else(|| crate::error::AppError::Internal("metadata 需要 path 参数".to_string()))?;
             let path = validate_path(path_str)?;
             let meta = std::fs::metadata(&path)
-                .map_err(|e| crate::error::AppError::Internal(format!("获取元数据失败: {}", e)))?;
+                .context("获取元数据失败")?;
             Ok(json!({
                 "path": path.to_string_lossy(),
                 "size": meta.len(),
@@ -1007,7 +1048,7 @@ async fn handle_script(action: &str, _params: &Value) -> HandlerResult {
             }
             let mut files = Vec::new();
             let entries = std::fs::read_dir(&dir)
-                .map_err(|e| crate::error::AppError::Internal(format!("读取脚本目录失败: {}", e)))?;
+                .context("读取脚本目录失败")?;
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.is_file() {
@@ -1051,322 +1092,232 @@ async fn handle_stock(action: &str, params: &Value) -> HandlerResult {
     let month = params.get("month").and_then(|v| v.as_str()).unwrap_or("").to_string();
     let quarter = params.get("quarter").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
-    // 构建运行时来执行异步 stock 命令
-    let rt = tokio::runtime::Runtime::new()
-        .map_err(|e| crate::error::AppError::Internal(format!("创建异步运行时失败: {}", e)))?;
-
     match action {
         "token_check" => {
-            rt.block_on(async {
-                stock::tushare_token_check()
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::tushare_token_check()
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "store_credential" => {
             let token = params.get("token").and_then(|v| v.as_str()).unwrap_or("").to_string();
             stock::store_tushare_credential(token)
-                .map_err(|e| crate::error::AppError::Internal(e))?;
+                .map_err(crate::error::AppError::Internal)?;
             Ok(json!({ "success": true }))
         }
         "delete_credential" => {
             stock::delete_tushare_credential()
-                .map_err(|e| crate::error::AppError::Internal(e))?;
+                .map_err(crate::error::AppError::Internal)?;
             Ok(json!({ "success": true }))
         }
         "basic_info" => {
-            rt.block_on(async {
-                stock::stock_basic_info(ts_code)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_basic_info(ts_code)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "daily" => {
-            rt.block_on(async {
-                stock::stock_daily(ts_code, start_date, end_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_daily(ts_code, start_date, end_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "weekly" => {
-            rt.block_on(async {
-                stock::stock_weekly(ts_code, start_date, end_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_weekly(ts_code, start_date, end_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "monthly" => {
-            rt.block_on(async {
-                stock::stock_monthly(ts_code, start_date, end_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_monthly(ts_code, start_date, end_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "realtime_quote" => {
-            rt.block_on(async {
-                stock::stock_realtime_quote(ts_code)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_realtime_quote(ts_code)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "price_limit" => {
-            rt.block_on(async {
-                stock::stock_price_limit(ts_code, trade_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_price_limit(ts_code, trade_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "suspend_d" => {
-            rt.block_on(async {
-                stock::stock_suspend_d(ts_code, suspend_date, resume_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_suspend_d(ts_code, suspend_date, resume_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "adj_factor" => {
-            rt.block_on(async {
-                stock::stock_adj_factor(ts_code, start_date, end_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_adj_factor(ts_code, start_date, end_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "income" => {
-            rt.block_on(async {
-                stock::stock_income(ts_code, start_date, end_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_income(ts_code, start_date, end_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "balance_sheet" => {
-            rt.block_on(async {
-                stock::stock_balance_sheet(ts_code, start_date, end_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_balance_sheet(ts_code, start_date, end_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "cashflow" => {
-            rt.block_on(async {
-                stock::stock_cashflow(ts_code, start_date, end_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_cashflow(ts_code, start_date, end_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "indicator" => {
-            rt.block_on(async {
-                stock::stock_indicator(ts_code, start_date, end_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_indicator(ts_code, start_date, end_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "forecast" => {
-            rt.block_on(async {
-                stock::stock_forecast(ts_code, start_date, end_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_forecast(ts_code, start_date, end_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "dividend" => {
-            rt.block_on(async {
-                stock::stock_dividend(ts_code)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_dividend(ts_code)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "float_holder" => {
-            rt.block_on(async {
-                stock::stock_float_holder(ts_code)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_float_holder(ts_code)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "top10_float_holder" => {
-            rt.block_on(async {
-                stock::stock_top10_float_holder(ts_code, period)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_top10_float_holder(ts_code, period)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "float_holder_num" => {
-            rt.block_on(async {
-                stock::stock_float_holder_num(ts_code, start_date, end_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_float_holder_num(ts_code, start_date, end_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "share_float" => {
-            rt.block_on(async {
-                stock::stock_share_float(ts_code, start_date, end_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_share_float(ts_code, start_date, end_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "moneyflow" => {
-            rt.block_on(async {
-                stock::stock_moneyflow(ts_code, start_date, end_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_moneyflow(ts_code, start_date, end_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "hsgt_top" => {
-            rt.block_on(async {
-                stock::stock_hsgt_top(search, start_date, end_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_hsgt_top(search, start_date, end_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "hsgt_shanghai" => {
-            rt.block_on(async {
-                stock::stock_hsgt_shanghai(start_date, end_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_hsgt_shanghai(start_date, end_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "top_list" => {
-            rt.block_on(async {
-                stock::stock_top_list(trade_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_top_list(trade_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "top_inst" => {
-            rt.block_on(async {
-                stock::stock_top_inst(trade_date, ts_code)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_top_inst(trade_date, ts_code)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "block_trade" => {
-            rt.block_on(async {
-                stock::stock_block_trade(ts_code, start_date, end_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_block_trade(ts_code, start_date, end_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "margin_detail" => {
-            rt.block_on(async {
-                stock::stock_margin_detail(ts_code, start_date, end_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_margin_detail(ts_code, start_date, end_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "index_daily" => {
-            rt.block_on(async {
-                stock::stock_index_daily(ts_code, start_date, end_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_index_daily(ts_code, start_date, end_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "index_weight" => {
-            rt.block_on(async {
-                stock::stock_index_weight(index_code, trade_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_index_weight(index_code, trade_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "index_basic" => {
-            rt.block_on(async {
-                stock::stock_index_basic(ts_code, name)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_index_basic(ts_code, name)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "board_industry" => {
-            rt.block_on(async {
-                stock::stock_board_industry(ts_code)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_board_industry(ts_code)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "board_concept" => {
-            rt.block_on(async {
-                stock::stock_board_concept(ts_code)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_board_concept(ts_code)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "industry_index" => {
-            rt.block_on(async {
-                stock::stock_industry_index(ts_code, start_date, end_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_industry_index(ts_code, start_date, end_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "new_share" => {
-            rt.block_on(async {
-                stock::stock_new_share(start_date, end_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_new_share(start_date, end_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "search" => {
-            rt.block_on(async {
-                stock::stock_search(keyword)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_search(keyword)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "tick_data" => {
-            rt.block_on(async {
-                stock::stock_tick_data(ts_code, trade_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_tick_data(ts_code, trade_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "future_daily" => {
-            rt.block_on(async {
-                stock::stock_future_daily(ts_code, start_date, end_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_future_daily(ts_code, start_date, end_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "option_daily" => {
-            rt.block_on(async {
-                stock::stock_option_daily(ts_code, start_date, end_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_option_daily(ts_code, start_date, end_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "gdp" => {
-            rt.block_on(async {
-                stock::stock_gdp(quarter)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_gdp(quarter)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "cpi" => {
-            rt.block_on(async {
-                stock::stock_cpi(month)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_cpi(month)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "money_supply" => {
-            rt.block_on(async {
-                stock::stock_money_supply(month)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_money_supply(month)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "money_supply_bal" => {
-            rt.block_on(async {
-                stock::stock_money_supply_bal(month)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_money_supply_bal(month)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "concept_detail" => {
-            rt.block_on(async {
-                stock::stock_concept_detail(ts_code)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_concept_detail(ts_code)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         "hsgt_shenzhen" => {
-            rt.block_on(async {
-                stock::stock_hsgt_shenzhen(start_date, end_date)
-                    .await
-                    .map_err(|e| crate::error::AppError::Internal(e))
-            })
+            stock::stock_hsgt_shenzhen(start_date, end_date)
+                .await
+                .map_err(crate::error::AppError::Internal)
         }
         _ => Err(crate::error::AppError::Internal(format!("stock 命名空间未知操作: {}", action))),
     }

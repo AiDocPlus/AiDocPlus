@@ -38,7 +38,7 @@ export default function DiaryDailyPrompt({ host, diary, onStartWithPrompt }: Dia
   const aiParams = getAIInvokeParamsForService();
   const aiAvailable = !!(aiParams.provider && aiParams.apiKey && aiParams.model);
 
-  // 从缓存加载
+  // 从缓存加载（不自动调用 AI，由用户主动触发）
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
     const cachedDate = host.storage.get<string>(CACHE_DATE_KEY);
@@ -46,14 +46,8 @@ export default function DiaryDailyPrompt({ host, diary, onStartWithPrompt }: Dia
       const cached = host.storage.get<CachedPrompt>(CACHE_KEY);
       if (cached && cached.prompts.length > 0) {
         setPrompts(cached.prompts);
-        return;
       }
     }
-    // 缓存过期或不存在，自动生成
-    if (aiAvailable) {
-      generatePrompts();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const generatePrompts = useCallback(async () => {
@@ -92,7 +86,6 @@ export default function DiaryDailyPrompt({ host, diary, onStartWithPrompt }: Dia
   }, [aiAvailable, loading, diary, host.ai, host.storage]);
 
   if (!aiAvailable) return null;
-  if (prompts.length === 0 && !loading && !error) return null;
 
   return (
     <div className="text-left space-y-1.5 w-full">

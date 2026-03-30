@@ -11,8 +11,12 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0"
+    "@modelcontextprotocol/sdk": "^1.28.0"
   },
-  "keywords": ["aidocplus", "mcp", "model-context-protocol"],
+  "keywords": [
+    "aidocplus",
+    "mcp",
+    "model-context-protocol"
+  ],
   "license": "MIT"
 }

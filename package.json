@@ -11,13 +11,16 @@
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {
-    "@types/node": "^25.3.2",
-    "turbo": "^2.8.11",
-    "typescript": "^5.9.3"
+    "@types/node": "^25.5.0",
+    "turbo": "^2.8.21",
+    "typescript": "~5.9.3"
   },
   "engines": {
     "node": ">=18.0.0",
     "pnpm": ">=9.0.0"
   },
-  "packageManager": "pnpm@10.29.1"
+  "packageManager": "pnpm@10.29.1",
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "canvas", "protobufjs"]
+  }
 }

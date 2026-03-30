@@ -171,7 +171,7 @@ export function HelpAIChat({ currentDoc }: HelpAIChatProps) {
           proxyUrl: aiConfig.proxyUrl || undefined,
           connectTimeoutSecs: aiConfig.connectTimeoutSecs || undefined,
           requestTimeoutSecs: aiConfig.requestTimeoutSecs || undefined,
-          maxTokens: typeof aiConfig.maxTokens === 'number' ? aiConfig.maxTokens : 4096,
+          maxTokens: (typeof aiConfig.maxTokens === 'number' && aiConfig.maxTokens > 0) ? aiConfig.maxTokens : undefined,
         });
 
         // 流式完成

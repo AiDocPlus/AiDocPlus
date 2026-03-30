@@ -128,7 +128,7 @@ export function MarkdownEditor({
   value,
   onChange,
   placeholder = '输入内容...',
-  theme = 'dark',
+  theme = 'light',
   editable = true,
   showToolbar = true,
   showViewModeSwitch = true,
@@ -155,6 +155,8 @@ export function MarkdownEditor({
   const onCursorLineChangeRef = useRef(onCursorLineChange);
   onCursorLineChangeRef.current = onCursorLineChange;
   const lastEmittedRef = useRef(value);
+  const lastValueSyncedRef = useRef(value); // 记录上一次 value effect 实际处理的值
+  const composingRef = useRef(false); // IME 组合状态，防止拼音输入时 value 同步覆盖
   const docContentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debounceRef = useRef(value.length > LARGE_DOC_THRESHOLD ? LARGE_DOC_DEBOUNCE : NORMAL_DOC_DEBOUNCE);
 
@@ -406,6 +408,18 @@ export function MarkdownEditor({
       compRef.current.textIndent.of(textIndent ? textIndentPlugin('2em') : []),
       // --- DOM 事件处理 ---
       EditorView.domEventHandlers({
+        // 跟踪 IME 组合状态，防止拼音输入确认时 value 同步覆盖已输入文本
+        compositionstart() { composingRef.current = true; },
+        compositionend(_event, view) {
+          // 延迟清除标记：compositionend 后 CodeMirror 的 updateListener
+          // 可能还没触发（docChanged 在下一帧），需要等 onChange 回调
+          // 更新 lastEmittedRef 后再解除保护
+          requestAnimationFrame(() => {
+            composingRef.current = false;
+            // 同步当前文档内容到 lastEmittedRef，避免后续 value effect 误判
+            lastEmittedRef.current = view.state.doc.toString();
+          });
+        },
         // 修复：编辑器无焦点时点击会导致错误选区扩展
         mousedown(event, view) {
           if (!view.hasFocus && event.button === 0 && !event.shiftKey) {
@@ -492,17 +506,49 @@ export function MarkdownEditor({
   useEffect(() => {
     const view = cmViewRef.current;
     if (!view) return;
-    // 只在外部值变化时更新（跳过自己 onChange 发出的值）
-    if (value !== lastEmittedRef.current) {
-      const currentDoc = view.state.doc.toString();
-      if (value !== currentDoc) {
-        view.dispatch({
-          changes: { from: 0, to: currentDoc.length, insert: value },
-        });
-      }
-      setDocContent(value);
+    // IME 组合期间跳过 value 同步，避免拼音输入确认时内容被覆盖消失
+    if (composingRef.current) return;
+    // 防止 React 批处理中同一值多次触发此 effect
+    if (value === lastValueSyncedRef.current) return;
+    lastValueSyncedRef.current = value;
+    // 跳过自己 onChange 发出的值
+    if (value === lastEmittedRef.current) return;
+    const currentDoc = view.state.doc.toString();
+    if (value !== currentDoc) {
+      // 使用 requestMeasure 确保在 CodeMirror 空闲时才执行 replace-all，
+      // 避免在 DOM input flush 中途 dispatch 导致
+      // "Position out of range" 崩溃（changeset 长度不一致）
+      view.requestMeasure({
+        read() {
+          // 在 read 阶段再次检查，因为 requestMeasure 延迟到空闲
+          // 如果用户在等待期间又做了编辑，doc 已经变了，跳过
+          const doc = view.state.doc.toString();
+          return doc !== value ? doc : null;
+        },
+        write(currentDocInWrite) {
+          if (currentDocInWrite === null) return;
+          // stale check：如果 lastEmittedRef 已经被 updateListener 更新了
+          // （说明用户在等待期间做了新编辑），放弃此次同步
+          if (lastEmittedRef.current !== value) return;
+          // 使用 setTimeout 将 dispatch 推迟到下一个微任务，
+          // 避免 "Calls to EditorView.update are not allowed while
+          // an update is in progress" 错误（requestMeasure 的 write
+          // 回调仍处于 CodeMirror 更新周期内）
+          const v = value;
+          setTimeout(() => {
+            if (lastEmittedRef.current !== v) return;
+            const len = view.state.doc.length;
+            view.dispatch({
+              changes: { from: 0, to: len, insert: v },
+            });
+          }, 0);
+        },
+      });
+      // 立即更新 lastEmittedRef，防止 React 批处理在同一微任务中
+      // 再次触发此 effect 时误判为外部变更
       lastEmittedRef.current = value;
     }
+    setDocContent(value);
   }, [value]);
 
   // 动态更新 Compartment 设置（设置变化时无需重建编辑器，批量 dispatch）
@@ -652,6 +698,23 @@ export function MarkdownEditor({
     document.addEventListener('mouseup', handleMouseUp);
     return () => document.removeEventListener('mouseup', handleMouseUp);
   }, [toolbarEnabled, toolbarTriggerAuto]);
+
+  // ── 菜单导入内容事件监听 ──
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const view = cmViewRef.current;
+      if (!view) return;
+      const content = (e as CustomEvent<string>).detail;
+      if (!content) return;
+      const { from, to, hasSelection } = lastSelectionRef.current;
+      view.dispatch({
+        changes: { from: hasSelection ? from : 0, to: hasSelection ? to : view.state.doc.length, insert: content },
+      });
+      view.focus();
+    };
+    window.addEventListener('editor-import-content', handler);
+    return () => { window.removeEventListener('editor-import-content', handler); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 系统菜单事件监听（通过 useMenuEvents 转发的 CustomEvent） ──
   useEffect(() => {

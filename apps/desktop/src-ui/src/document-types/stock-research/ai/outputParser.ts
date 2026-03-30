@@ -399,6 +399,41 @@ export function parseAIResearchOutput(content: string): AIResearchOutput | null 
   }
 }
 
+/** 解析结果（带调试信息） */
+export interface ParseResultWithDebug {
+  result: AIResearchOutput | null;
+  error?: string;
+  rawJson?: string;
+}
+
+/**
+ * 调试版本的 JSON 解析函数
+ * 返回解析结果 + 失败原因 + 提取的原始 JSON
+ * 用于 UI 中显示解析失败的具体原因
+ */
+export function parseAIResearchOutputWithDebug(content: string): ParseResultWithDebug {
+  // 1. 尝试提取 JSON
+  const rawJson = extractRawResearchJson(content);
+  if (!rawJson) {
+    return { result: null, error: '未找到有效的 JSON 结构' };
+  }
+
+  // 2. 尝试解析
+  try {
+    const parsed = JSON.parse(rawJson);
+    if (typeof parsed !== 'object' || parsed === null) {
+      return { result: null, error: 'JSON 不是对象类型', rawJson };
+    }
+    if (!looksLikeResearchPayload(parsed)) {
+      const keys = Object.keys(parsed).join(', ');
+      return { result: null, error: `JSON 顶层键不匹配，需要 stock/financials/technicals/theses/risk/news/peers 之一，实际: ${keys}`, rawJson };
+    }
+    return { result: parsed as AIResearchOutput, rawJson };
+  } catch (e) {
+    return { result: null, error: `JSON 语法错误: ${e instanceof Error ? e.message : String(e)}`, rawJson };
+  }
+}
+
 /**
  * 将 AI 研究输出应用到研究文档
  */

@@ -8,7 +8,16 @@
  * - 配置中文 locale、工具栏、hooks 等
  */
 
-import { useRef, useEffect, useCallback, forwardRef, useImperativeHandle, useState, useMemo } from 'react';
+import {
+  useRef,
+  useEffect,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+  useState,
+  useMemo,
+  type ForwardedRef,
+} from 'react';
 import { Workbook } from '@fortune-sheet/react';
 import type { WorkbookInstance } from '@fortune-sheet/react';
 import type { Sheet, Op, Cell, Selection, Hooks } from '@fortune-sheet/core';
@@ -70,8 +79,10 @@ export interface FortuneSheetRef {
   scroll: (opts: { scrollLeft?: number; scrollTop?: number; targetRow?: number; targetColumn?: number }) => void;
 }
 
-export const FortuneSheetWrapper = forwardRef<FortuneSheetRef, FortuneSheetWrapperProps>(
-  function FortuneSheetWrapper({ initialData, onDataChange, onSelectionChange, height = '100%' }, ref) {
+export const FortuneSheetWrapper = forwardRef(function FortuneSheetWrapper(
+  { initialData, onDataChange, onSelectionChange, height = '100%' }: FortuneSheetWrapperProps,
+  ref: ForwardedRef<FortuneSheetRef>
+) {
     const workbookRef = useRef<WorkbookInstance>(null);
     const onDataChangeRef = useRef(onDataChange);
     onDataChangeRef.current = onDataChange;
@@ -219,5 +230,4 @@ export const FortuneSheetWrapper = forwardRef<FortuneSheetRef, FortuneSheetWrapp
         />
       </div>
     );
-  },
-);
+});
