@@ -34,9 +34,13 @@ info "检查环境..."
 [ -z "$APPLE_ID" ] && fail "APPLE_ID 未设置"
 [ -z "$APPLE_PASSWORD" ] && fail "APPLE_PASSWORD 未设置"
 [ -z "$APPLE_TEAM_ID" ] && fail "APPLE_TEAM_ID 未设置"
+[ -z "$GITEE_TOKEN" ] && fail "GITEE_TOKEN 未设置（Gitee 私人令牌，用于上传 Release 附件）"
 command -v gh >/dev/null || fail "gh CLI 未安装"
 command -v pnpm >/dev/null || fail "pnpm 未安装"
 command -v xcrun >/dev/null || fail "xcrun 未安装"
+
+GITEE_OWNER="aidocplus"
+GITEE_REPO="aidocplus"
 
 # 读取版本号
 VERSION=$(python3 -c "import json; print(json.load(open('${TAURI_DIR}/tauri.conf.json'))['version'])")
@@ -153,7 +157,9 @@ gh release download "$TAG" --repo "$REPO" --pattern "latest.json" --output "$LAT
 
 # 读取 macOS 签名
 MAC_SIG=$(cat "$UPDATER_SIG")
-MAC_URL="https://github.com/${REPO}/releases/download/${TAG}/AiDocPlus.app.tar.gz"
+# 所有更新包 URL 统一指向 Gitee，加速国内下载
+GITEE_BASE="https://gitee.com/${GITEE_OWNER}/${GITEE_REPO}/releases/download/${TAG}"
+MAC_URL="${GITEE_BASE}/AiDocPlus.app.tar.gz"
 
 # 下载 Windows 签名
 WIN_SIG_FILE="/tmp/win_exe.sig"
@@ -161,7 +167,7 @@ gh release download "$TAG" --repo "$REPO" --pattern "*_x64-setup.exe.sig" --outp
     warn "Windows .exe.sig 下载失败"
 }
 WIN_EXE_NAME="AiDocPlus_${VERSION}_x64-setup.exe"
-WIN_URL="https://github.com/${REPO}/releases/download/${TAG}/${WIN_EXE_NAME}"
+WIN_URL="${GITEE_BASE}/${WIN_EXE_NAME}"
 
 # 用 python3 合并 latest.json（同时写入 macOS 和 Windows）
 python3 -c "
@@ -203,10 +209,77 @@ print('[完成] latest.json 已合并，平台:', ', '.join(data['platforms'].ke
 "
 rm -f "$WIN_SIG_FILE"
 
-# 上传合并后的 latest.json
+# 上传合并后的 latest.json 到 GitHub Release
 gh release upload "$TAG" "$LATEST_JSON" --repo "$REPO" --clobber
-ok "latest.json 已上传"
+ok "latest.json 已上传到 GitHub Release"
+
+# 同步到仓库 update/latest.json（Gitee 优先端点读取此文件）
+cp "$LATEST_JSON" "${PROJECT_ROOT}/update/latest.json"
 rm -f "$LATEST_JSON"
+
+# ── 7. 上传到 Gitee Release ──
+info "上传到 Gitee Release..."
+
+# 创建 Gitee Release
+GITEE_RELEASE_BODY="AiDocPlus ${TAG}"
+GITEE_RESPONSE=$(curl -s -X POST "https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/releases" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"access_token\": \"${GITEE_TOKEN}\",
+    \"tag_name\": \"${TAG}\",
+    \"target_commitish\": \"main\",
+    \"name\": \"AiDocPlus ${TAG}\",
+    \"body\": \"${GITEE_RELEASE_BODY}\",
+    \"prerelease\": false
+  }")
+
+GITEE_RELEASE_ID=$(echo "$GITEE_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))" 2>/dev/null || echo "")
+
+if [ -n "$GITEE_RELEASE_ID" ] && [ "$GITEE_RELEASE_ID" != "None" ]; then
+    ok "Gitee Release 创建成功 (ID: $GITEE_RELEASE_ID)"
+
+    gitee_upload() {
+        local FILE_PATH="$1"
+        local FILE_NAME=$(basename "$FILE_PATH")
+        if [ -f "$FILE_PATH" ]; then
+            info "  上传 ${FILE_NAME} 到 Gitee..."
+            curl -s -X POST "https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}/releases/${GITEE_RELEASE_ID}/attach_files" \
+                -H "Content-Type: multipart/form-data" \
+                -F "access_token=${GITEE_TOKEN}" \
+                -F "file=@${FILE_PATH}" > /dev/null
+            ok "  ${FILE_NAME}"
+        else
+            warn "  文件不存在: ${FILE_PATH}"
+        fi
+    }
+
+    # 上传 macOS 产物
+    gitee_upload "$DMG_PATH"
+    gitee_upload "$UPDATER_TAR"
+    gitee_upload "$UPDATER_SIG"
+
+    # 上传 Windows 产物（从 GitHub Release 下载后再传到 Gitee）
+    WIN_EXE_PATH="/tmp/${WIN_EXE_NAME}"
+    WIN_SIG_PATH="/tmp/${WIN_EXE_NAME}.sig"
+    gh release download "$TAG" --repo "$REPO" --pattern "${WIN_EXE_NAME}" --dir /tmp --clobber 2>/dev/null || true
+    gh release download "$TAG" --repo "$REPO" --pattern "${WIN_EXE_NAME}.sig" --dir /tmp --clobber 2>/dev/null || true
+    gitee_upload "$WIN_EXE_PATH"
+    gitee_upload "$WIN_SIG_PATH"
+    rm -f "$WIN_EXE_PATH" "$WIN_SIG_PATH"
+
+    ok "Gitee Release 上传完成"
+else
+    warn "Gitee Release 创建失败（可能已存在），请手动检查："
+    warn "  https://gitee.com/${GITEE_OWNER}/${GITEE_REPO}/releases"
+fi
+
+# ── 8. 提交并推送 latest.json ──
+info "提交 update/latest.json..."
+cd "$PROJECT_ROOT"
+git add update/latest.json
+git commit -m "chore: update latest.json for ${TAG} (Gitee URLs)" || info "  (无需提交，文件未变更)"
+git push origin main
+ok "latest.json 已推送到 GitHub + Gitee"
 
 # ── 完成 ──
 echo ""
@@ -214,7 +287,11 @@ echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}  AiDocPlus ${TAG} 发布完成！${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
-echo "  Release: https://github.com/${REPO}/releases/tag/${TAG}"
+echo "  GitHub Release: https://github.com/${REPO}/releases/tag/${TAG}"
+echo "  Gitee  Release: https://gitee.com/${GITEE_OWNER}/${GITEE_REPO}/releases/tag/${TAG}"
+echo "  Gitee  更新源:  https://gitee.com/${GITEE_OWNER}/${GITEE_REPO}/raw/main/update/latest.json"
+echo ""
+echo "  自动更新 URL 全部指向 Gitee，国内用户极速下载 ✅"
 echo ""
 
 # 列出 Release 资产
