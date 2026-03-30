@@ -4,11 +4,11 @@
   "pub_date": "2026-06-28T00:00:00.000Z",
   "platforms": {
     "windows-x86_64": {
-      "url": "https://github.com/AiDocPlus/AiDocPlus/releases/download/v0.3.12/AiDocPlus_0.3.12_x64-setup.exe",
+      "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.12/AiDocPlus_0.3.12_x64-setup.exe",
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRWg1dmFUTldKZEJ6N2lzU1JrT2xud0t3ZkF5cFQzOVp0RDRVRHRXYXFXL2RqNTRCb2JBaERINVQwR2NnZkJVT1Q3eWEvNWI2SWVaYnVURFhZM0RYT0E4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc0ODgxMDM1CWZpbGU6QWlEb2NQbHVzXzAuMy4xMl94NjQtc2V0dXAuZXhlClIybEdKM084YkQzL3pPdk1rYVpncTUyOGhPSDRRdlhLZU1BYXJ1OC8xb0FNSmprQU82TGpEMzdsS1ErUnhTMXh3dGJNR0tPMWNJbXhOWk5MRElXRERBPT0K"
     },
     "windows-x86_64-nsis": {
-      "url": "https://github.com/AiDocPlus/AiDocPlus/releases/download/v0.3.12/AiDocPlus_0.3.12_x64-setup.exe",
+      "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.12/AiDocPlus_0.3.12_x64-setup.exe",
       "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRWg1dmFUTldKZEJ6N2lzU1JrT2xud0t3ZkF5cFQzOVp0RDRVRHRXYXFXL2RqNTRCb2JBaERINVQwR2NnZkJVT1Q3eWEvNWI2SWVaYnVURFhZM0RYT0E4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc0ODgxMDM1CWZpbGU6QWlEb2NQbHVzXzAuMy4xMl94NjQtc2V0dXAuZXhlClIybEdKM084YkQzL3pPdk1rYVpncTUyOGhPSDRRdlhLZU1BYXJ1OC8xb0FNSmprQU82TGpEMzdsS1ErUnhTMXh3dGJNR0tPMWNJbXhOWk5MRElXRERBPT0K"
     },
     "darwin-aarch64": {
