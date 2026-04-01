@@ -980,7 +980,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       }));
 
-      await invoke<string>('chat_stream', {
+      // 后端返回完整累积文本，优先使用防止 IPC 事件丢失导致尾部内容缺失
+      const serverFull = await invoke<string>('chat_stream', {
         messages: finalMessages,
         ...aiParams,
         enableWebSearch: enableWebSearch || undefined,
@@ -996,6 +997,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       // 刷新残余的节流 chunk
       if (chatThrottleTimer) { clearTimeout(chatThrottleTimer); flushChatChunk(); }
+
+      // 如果后端返回了完整内容且比事件累积的更长，用后端版本覆盖
+      if (serverFull && serverFull.length > accumulatedContent.length) {
+        accumulatedContent = serverFull;
+        flushChatChunk();
+      }
 
       set({ isAiStreaming: false, aiStreamingTabId: null });
       return accumulatedContent;
@@ -1151,10 +1158,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
 
       // Invoke the streaming command with conversation history
-      await invoke<string>('generate_content_stream', invokeParams);
+      // 后端返回完整累积文本，优先使用（防止 IPC 事件丢失导致尾部内容缺失）
+      const serverFull = await invoke<string>('generate_content_stream', invokeParams);
 
       set({ isAiStreaming: false, aiStreamingTabId: null });
-      return '';
+      return serverFull || '';
     } catch (error) {
       set({ error: formatBackendError(error), isAiStreaming: false, aiStreamingTabId: null });
       throw error;

@@ -423,7 +423,8 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
           }
         };
 
-        await generateContentStream(
+        // 后端返回完整累积文本（权威来源），优先使用防止 IPC 事件丢失导致尾部内容缺失
+        const serverFull = await generateContentStream(
           notesToUse,
           contentForAI,
           (chunk) => {
@@ -444,8 +445,8 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
         // 清除可能残留的定时器
         if (throttleTimer) clearTimeout(throttleTimer);
 
-        // 最终解析：分离思考内容和正文
-        const finalParsed = parseThinkTags(accumulatedContent);
+        // 最终解析：使用后端返回的完整内容（而非事件累积的，避免尾部丢失）
+        const finalParsed = parseThinkTags(serverFull || accumulatedContent);
         const finalContent = finalParsed.content;
 
         // 确保最终正文内容更新到编辑器
