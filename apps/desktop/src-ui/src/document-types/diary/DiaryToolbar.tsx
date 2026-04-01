@@ -16,7 +16,6 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { cn } from '@/lib/utils';
 import { useTranslation } from '@/i18n';
 import type { DiaryDocumentContent, DiaryEntry, DiaryMood, DiaryWeatherType } from './types';
 import {
@@ -84,7 +83,7 @@ export default function DiaryToolbar({
   return (
     <div className="flex flex-col border-b flex-shrink-0 bg-card min-w-0">
       {/* 第一行：导航与文件操作 */}
-      <div className="flex items-center gap-1 px-2 py-1 text-xs overflow-x-auto min-w-0">
+      <div className="flex items-center gap-1 px-2 py-1 text-xs overflow-x-auto scrollbar-hide min-w-0">
         <Button variant="ghost" size="icon" className="h-5 w-5" onClick={onToggleLeft}
           title={leftCollapsed ? t('diary.showLeft', { defaultValue: '显示左栏' }) : t('diary.hideLeft', { defaultValue: '隐藏左栏' })}>
           {leftCollapsed ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
@@ -150,7 +149,7 @@ export default function DiaryToolbar({
 
       {/* 第二行：条目元数据 */}
       {activeEntry && !focusMode && (
-        <div className="flex items-center gap-1 px-2 py-0.5 border-t text-xs overflow-x-auto min-w-0">
+        <div className="flex items-center gap-1 px-2 py-0.5 border-t text-xs overflow-x-auto scrollbar-hide min-w-0">
           {/* 所属日记本 */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

@@ -193,6 +193,7 @@ pub struct MenuTexts {
     pub tools: &'static str,
     pub tools_quick_capture: &'static str,
     pub tools_ebook_reader: &'static str,
+    pub tools_mail_client: &'static str,
     pub quick_capture_window_title: &'static str,
     // 帮助菜单
     pub help: &'static str,
@@ -335,6 +336,7 @@ const ZH: MenuTexts = MenuTexts {
     tools: "工具",
     tools_quick_capture: "速记窗口",
     tools_ebook_reader: "电子书阅读器",
+    tools_mail_client: "电子邮件收发",
     quick_capture_window_title: "速记 - AiDocPlus",
     help: "帮助",
     shortcuts_ref: "快捷键参考",
@@ -476,6 +478,7 @@ const EN: MenuTexts = MenuTexts {
     tools: "Tools",
     tools_quick_capture: "Quick Capture",
     tools_ebook_reader: "E-book Reader",
+    tools_mail_client: "Mail Client",
     quick_capture_window_title: "Quick Capture - AiDocPlus",
     help: "Help",
     shortcuts_ref: "Keyboard Shortcuts",

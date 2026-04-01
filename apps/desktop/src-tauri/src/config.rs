@@ -117,12 +117,12 @@ impl AppState {
 
     /// 获取当前数据根目录
     pub fn data_root(&self) -> PathBuf {
-        self.inner.read().unwrap().data_root.clone()
+        self.inner.read().unwrap_or_else(|e| e.into_inner()).data_root.clone()
     }
 
     /// 获取当前项目目录
     pub fn projects_dir(&self) -> PathBuf {
-        self.inner.read().unwrap().projects_dir.clone()
+        self.inner.read().unwrap_or_else(|e| e.into_inner()).projects_dir.clone()
     }
 
     /// 切换数据根目录（运行时）
@@ -132,7 +132,7 @@ impl AppState {
         std::fs::create_dir_all(&new_config.projects_dir)
             .context("创建项目目录失败")?;
         save_custom_data_root(&new_root)?;
-        *self.inner.write().unwrap() = new_config;
+        *self.inner.write().unwrap_or_else(|e| e.into_inner()) = new_config;
         eprintln!("[config] 数据根目录已切换为: {}", new_root.display());
         Ok(())
     }
@@ -158,7 +158,7 @@ impl AppState {
 
     /// 获取完整配置快照
     pub fn config(&self) -> AppConfig {
-        self.inner.read().unwrap().clone()
+        self.inner.read().unwrap_or_else(|e| e.into_inner()).clone()
     }
 }
 

@@ -198,7 +198,7 @@ export function TabBar({ onSettingsOpen }: TabBarProps) {
       {/* 标签容器 */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 flex items-center overflow-x-auto"
+        className="flex-1 flex items-center overflow-x-auto scrollbar-hide"
         onScroll={checkScroll}
         onWheel={(e) => {
           if (scrollContainerRef.current && e.deltaY !== 0) {

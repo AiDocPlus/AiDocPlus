@@ -79,7 +79,7 @@ export default function EssayStatusBar({
     'text-red-500';
 
   return (
-    <div className="flex items-center gap-0 px-2 py-0.5 border-t text-[11px] text-muted-foreground flex-shrink-0 bg-card select-none overflow-x-auto">
+    <div className="flex items-center gap-0 px-2 py-0.5 border-t text-[11px] text-muted-foreground flex-shrink-0 bg-card select-none overflow-x-auto scrollbar-hide">
 
       {/* ── 写作阶段 ── */}
       <span className={cn('font-medium px-2 py-0.5 rounded-sm mr-1', phaseColor)}>

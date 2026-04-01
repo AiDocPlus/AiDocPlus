@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
 
+// ── 初始化锁 ──
+let _initPromise: Promise<void> | null = null;
+
 // ── 类型 ──
 
 /** 从文件名推断语言标识 */
@@ -280,77 +283,83 @@ export const useCodingStore = create<CodingState>()((set, get) => ({
 
   init: async () => {
     if (get().initialized) return;
-    try {
-      const dir = await invoke<string>('get_coding_scripts_dir');
-      const json = await invoke<string | null>('load_coding_state');
-      let tabs: CodingTab[] = [];
-      let activeTabId = '';
-      let favorites: string[] = [];
-      let settings = { ...DEFAULT_SETTINGS };
+    if (_initPromise) return _initPromise;
+    _initPromise = (async () => {
+      try {
+        const dir = await invoke<string>('get_coding_scripts_dir');
+        const json = await invoke<string | null>('load_coding_state');
+        let tabs: CodingTab[] = [];
+        let activeTabId = '';
+        let favorites: string[] = [];
+        let settings = { ...DEFAULT_SETTINGS };
 
-      if (json) {
-        try {
-          const state = JSON.parse(json);
-          favorites = state.favorites || [];
-          settings = { ...DEFAULT_SETTINGS, ...(state.settings || {}) };
-          const recentFiles = Array.isArray(state.recentFiles) ? state.recentFiles.slice(0, 20) : [];
-          const cachedPythonInfo = state.pythonInfo || null;
-          const cachedNodeInfo = state.nodeInfo || null;
-          set({ recentFiles, pythonInfo: cachedPythonInfo, nodeInfo: cachedNodeInfo });
-          activeTabId = state.activeTabId || '';
+        if (json) {
+          try {
+            const state = JSON.parse(json);
+            favorites = state.favorites || [];
+            settings = { ...DEFAULT_SETTINGS, ...(state.settings || {}) };
+            const recentFiles = Array.isArray(state.recentFiles) ? state.recentFiles.slice(0, 20) : [];
+            const cachedPythonInfo = state.pythonInfo || null;
+            const cachedNodeInfo = state.nodeInfo || null;
+            set({ recentFiles, pythonInfo: cachedPythonInfo, nodeInfo: cachedNodeInfo });
+            activeTabId = state.activeTabId || '';
 
-          // 恢复打开的标签页
-          if (Array.isArray(state.openTabs)) {
-            for (const t of state.openTabs) {
-              try {
-                const code = await invoke<string>('read_coding_script', { filePath: t.filePath });
-                const fname = t.filePath.replace(/^.*[\\/]/, '');
-                tabs.push({
-                  id: t.id || nextTabId(),
-                  filePath: t.filePath,
-                  title: fname,
-                  code,
-                  language: detectLangFromExt(fname),
-                  dirty: false,
-                  outputLines: [],
-                  lastExitCode: null,
-                  chatMessages: Array.isArray(t.chatMessages) ? t.chatMessages : [],
-                });
-              } catch {
-                // 文件已删除，跳过
+            // 恢复打开的标签页
+            if (Array.isArray(state.openTabs)) {
+              for (const t of state.openTabs) {
+                try {
+                  const code = await invoke<string>('read_coding_script', { filePath: t.filePath });
+                  const fname = t.filePath.replace(/^.*[\\/]/, '');
+                  tabs.push({
+                    id: t.id || nextTabId(),
+                    filePath: t.filePath,
+                    title: fname,
+                    code,
+                    language: detectLangFromExt(fname),
+                    dirty: false,
+                    outputLines: [],
+                    lastExitCode: null,
+                    chatMessages: Array.isArray(t.chatMessages) ? t.chatMessages : [],
+                  });
+                } catch {
+                  // 文件已删除，跳过
+                }
               }
             }
+          } catch {
+            // JSON 解析失败，使用默认值
           }
-        } catch {
-          // JSON 解析失败，使用默认值
         }
-      }
 
-      // 至少一个标签页
-      if (tabs.length === 0) {
-        const defaultTab: CodingTab = {
-          id: nextTabId(),
-          filePath: 'untitled_1.py',
-          title: 'untitled_1.py',
-          code: `# Python 脚本\n# 可通过环境变量获取文档内容：\n#   import os\n#   input_file = os.environ.get('AIDOCPLUS_INPUT_FILE')\n#   if input_file:\n#       with open(input_file, 'r', encoding='utf-8') as f:\n#           content = f.read()\n\nprint("Hello from Python!")\n`,
-          language: 'python',
-          dirty: true,
-          outputLines: [],
-          lastExitCode: null,
-        };
-        tabs = [defaultTab];
-        activeTabId = defaultTab.id;
-      }
+        // 至少一个标签页
+        if (tabs.length === 0) {
+          const defaultTab: CodingTab = {
+            id: nextTabId(),
+            filePath: 'untitled_1.py',
+            title: 'untitled_1.py',
+            code: `# Python 脚本\n# 可通过环境变量获取文档内容：\n#   import os\n#   input_file = os.environ.get('AIDOCPLUS_INPUT_FILE')\n#   if input_file:\n#       with open(input_file, 'r', encoding='utf-8') as f:\n#           content = f.read()\n\nprint("Hello from Python!")\n`,
+            language: 'python',
+            dirty: true,
+            outputLines: [],
+            lastExitCode: null,
+          };
+          tabs = [defaultTab];
+          activeTabId = defaultTab.id;
+        }
 
-      if (!activeTabId || !tabs.find(t => t.id === activeTabId)) {
-        activeTabId = tabs[0]?.id || '';
-      }
+        if (!activeTabId || !tabs.find(t => t.id === activeTabId)) {
+          activeTabId = tabs[0]?.id || '';
+        }
 
-      set({ tabs, activeTabId, favorites, settings, scriptsDir: dir, initialized: true });
-    } catch (e) {
-      console.error('编程区初始化失败:', e);
-      set({ initialized: true });
-    }
+        set({ tabs, activeTabId, favorites, settings, scriptsDir: dir, initialized: true });
+      } catch (e) {
+        console.error('编程区初始化失败:', e);
+        set({ initialized: true });
+      } finally {
+        _initPromise = null;
+      }
+    })();
+    return _initPromise;
   },
 
   detectPython: async (force = false) => {
@@ -436,7 +445,8 @@ export const useCodingStore = create<CodingState>()((set, get) => ({
     set(s => ({
       tabs: s.tabs.map(t => t.id === tabId ? { ...t, ...patch } : t),
     }));
-    if ('chatMessages' in patch) get().persistState();
+    // 更新 code/dirty/chatMessages 等关键字段时都需要持久化
+    if ('chatMessages' in patch || 'code' in patch || 'dirty' in patch) get().persistState();
   },
 
   saveFile: async (tabId) => {

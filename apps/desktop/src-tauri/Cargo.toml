@@ -1,6 +1,6 @@
 [package]
 name = "aidocplus"
-version = "0.3.12"
+version = "0.3.13"
 edition = "2021"
 
 [build-dependencies]
@@ -23,6 +23,7 @@ eventsource-client = "0.17"
 futures-util = "0.3"
 regex = "1"
 zip = "8.1"
+flate2 = "1"
 tauri-plugin-window-state = "2.4.1"
 tauri-plugin-process = "2"
 comrak = "0.50"
@@ -47,6 +48,11 @@ rusqlite = { version = "0.33", features = ["bundled"] }
 sha2 = "0.10"
 urlencoding = "2"
 async-trait = "0.1"
+async-imap = { version = "0.9", default-features = false, features = ["runtime-tokio"] }
+native-tls = "0.2"
+tokio-native-tls = "0.3"
+mailparse = "0.14"
+html2text = "0.12"
 aidocplus-manager-rust = { path = "../../../packages/manager-rust" }
 
 # 本地开发构建：快速编译，重在测试

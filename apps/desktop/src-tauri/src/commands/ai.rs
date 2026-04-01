@@ -58,7 +58,10 @@ fn build_ai_client(
         }
     }
 
-    builder.build().unwrap_or_else(|_| reqwest::Client::new())
+    builder.build().unwrap_or_else(|e| {
+        eprintln!("[ai] HTTP 客户端构建失败，使用默认客户端: {}", e);
+        reqwest::Client::new()
+    })
 }
 
 /// 创建带超时配置的 HTTP 客户端（非流式）
@@ -73,11 +76,6 @@ fn ai_stream_client_with_opts(proxy_url: Option<&str>, connect_secs: Option<u64>
     let ct = connect_secs.filter(|&s| s > 0).map(Duration::from_secs).unwrap_or(CONNECT_TIMEOUT);
     let rt = request_secs.filter(|&s| s > 0).map(Duration::from_secs).unwrap_or(STREAM_TIMEOUT);
     build_ai_client(ct, rt, proxy_url)
-}
-
-/// 向后兼容：无额外配置的流式客户端（用于内部辅助函数如 stream_openai_responses）
-fn ai_stream_client() -> reqwest::Client {
-    build_ai_client(CONNECT_TIMEOUT, STREAM_TIMEOUT, None)
 }
 
 #[tauri::command]
@@ -143,12 +141,12 @@ pub async fn chat(
 
     // OpenAI + 联网搜索 → Responses API（非流式）
     if config.provider == "openai" && web_search {
-        return call_openai_responses(&config, &client, &messages, max_tokens).await;
+        return call_openai_responses(&config, &client, &messages, max_tokens, temperature).await;
     }
 
     // Anthropic + 联网搜索 → Anthropic Messages API（非流式）
     if config.provider == "anthropic" && web_search {
-        return call_anthropic_with_search(&config, &client, &messages, max_tokens).await;
+        return call_anthropic_with_search(&config, &client, &messages, max_tokens, temperature).await;
     }
 
     // 合并多个 system 消息为一个（部分 provider 如 MiniMax 不支持多 system 消息）
@@ -177,7 +175,6 @@ pub async fn chat(
 
     let response = request_builder
         .header("Content-Type", "application/json")
-        .timeout(Duration::from_secs(120))
         .send()
         .await
         .map_err(|e| AppError::AiError(friendly_reqwest_error(&e)))?;
@@ -236,6 +233,7 @@ pub async fn chat_stream(
     connect_timeout_secs: Option<u64>,
     request_timeout_secs: Option<u64>,
     max_tokens: Option<u32>,
+    temperature: Option<f64>,
 ) -> Result<String> {
     let req_id = request_id.clone().unwrap_or_default();
 
@@ -257,6 +255,7 @@ pub async fn chat_stream(
 
     let config = get_ai_config(&app, provider, api_key, model, base_url, service_id);
     let stream_max_tokens = resolve_max_tokens(max_tokens, &config);
+    let resolved_temp = temperature.unwrap_or_else(|| get_default_temperature(&config));
     let web_search = enable_web_search.unwrap_or(false);
     let use_tools = enable_tools.unwrap_or(false);
 
@@ -273,12 +272,12 @@ pub async fn chat_stream(
     // 工具调用结束后再进行带 web_search 的流式输出
     // OpenAI + 纯联网搜索（无工具）→ Responses API
     if config.provider == "openai" && web_search && !use_tools {
-        return stream_openai_responses(&config, &messages, &req_id, &window, max_tokens).await;
+        return stream_openai_responses(&config, &messages, &req_id, &window, max_tokens, proxy_url.as_deref(), connect_timeout_secs, request_timeout_secs).await;
     }
 
     // Anthropic + 纯联网搜索（无工具）→ Anthropic Messages API（原生格式）
     if config.provider == "anthropic" && web_search && !use_tools {
-        return stream_anthropic_with_search(&config, &messages, &req_id, &window, max_tokens).await;
+        return stream_anthropic_with_search(&config, &messages, &req_id, &window, max_tokens, proxy_url.as_deref(), connect_timeout_secs, request_timeout_secs).await;
     }
 
     let client = ai_stream_client_with_opts(proxy_url.as_deref(), connect_timeout_secs, request_timeout_secs);
@@ -303,7 +302,7 @@ pub async fn chat_stream(
             let mut tool_request = json!({
                 "messages": current_messages,
                 "model": config.get_default_model(),
-                "temperature": get_default_temperature(&config),
+                "temperature": resolved_temp,
                 "stream": true,
                 "tools": tool_defs
             });
@@ -349,16 +348,14 @@ pub async fn chat_stream(
                 };
 
             if !got_tool_calls {
-                // 模型本轮直接输出正文（无 tool_calls）：累积内容写入对话，避免仅含 tool 轮时丢弃流式正文
+                // 模型本轮直接输出正文（无 tool_calls）
                 if let Some(text) = early_assistant_text {
                     if !assistant_tool_msg.is_null() {
                         current_messages.push(assistant_tool_msg);
                     }
-                    // 从未进入工具循环时，已是完整答复，直接返回；已调用过工具则继续走两阶段后的最终流（联网等）
-                    if !tools_were_called {
-                        return Ok(text);
-                    }
-                    break;
+                    // 无论是否之前调用过工具，模型本轮已给出最终回复，直接返回
+                    // （tools_were_called=true 说明工具调用阶段已结束，本轮是 AI 的最终总结）
+                    return Ok(text);
                 }
                 break;
             }
@@ -401,28 +398,22 @@ pub async fn chat_stream(
         }
     }
 
-    // 两阶段：工具调用有结果时，OpenAI/Anthropic 走 Chat Completions（而非 Responses/Messages API）
-    // 因为 current_messages 中已含 tool 角色消息，只有 Chat Completions 支持这种格式
-    if tools_were_called && web_search {
-        if config.provider == "openai" || config.provider == "anthropic" {
-            // 保持在 Chat Completions 路径，注入 web_search 参数
-        }
-    } else if !use_tools {
-        // 纯联网搜索（无工具）已在上方提前返回（openai/anthropic），
-        // 这里处理其他 provider 的联网搜索
-    }
-
-    // 最终流式输出
+    // 最终流式输出（两阶段策略说明：
+    // 工具调用有结果时，OpenAI/Anthropic 走 Chat Completions 而非 Responses/Messages API，
+    // 因为 current_messages 中含 tool 角色消息，只有 Chat Completions 支持这种格式）
     let mut request_body = json!({
         "messages": current_messages,
         "model": config.get_default_model(),
-        "temperature": get_default_temperature(&config),
+        "temperature": resolved_temp,
         "stream": true
     });
     inject_max_tokens(&mut request_body, stream_max_tokens);
 
     // 联网搜索：根据 provider 注入正确的参数格式
-    if web_search {
+    // 注意：当 tools_were_called=true 时，current_messages 中含 role:"tool" 消息，
+    // 此时不能再覆盖 tools 字段为联网搜索工具（会导致 provider 报错），
+    // 联网搜索需求已通过两阶段策略中的 user prompt 引导实现
+    if web_search && !tools_were_called {
         inject_web_search_params(&mut request_body, &config);
     }
 
@@ -514,6 +505,7 @@ pub async fn generate_content_stream(
     connect_timeout_secs: Option<u64>,
     request_timeout_secs: Option<u64>,
     max_tokens: Option<u32>,
+    temperature: Option<f64>,
 ) -> Result<String> {
     let user_prompt = if current_content.is_empty() {
         author_notes.clone()
@@ -534,11 +526,10 @@ pub async fn generate_content_stream(
         });
     }
 
-    // Add conversation history if provided (exclude the last message as it will be the current user prompt)
+    // Add conversation history if provided
+    // Note: history contains prior assistant/user turns; the current user prompt is added separately below
     if let Some(history) = conversation_history {
-        // Take all but the last message if there's history, since the current user message will be added
-        let history_len = history.len().saturating_sub(1);
-        messages.extend_from_slice(&history[..history_len]);
+        messages.extend(history);
     }
 
     // Add current user message
@@ -567,6 +558,7 @@ pub async fn generate_content_stream(
         connect_timeout_secs,
         request_timeout_secs,
         max_tokens,
+        temperature,
     )
     .await
 }
@@ -621,6 +613,7 @@ async fn call_openai_responses(
     client: &reqwest::Client,
     messages: &[ChatMessage],
     max_tokens: Option<u32>,
+    temperature: Option<f64>,
 ) -> Result<String> {
     let url = format!("{}/responses", config.get_base_url());
 
@@ -629,11 +622,14 @@ async fn call_openai_responses(
     let mut request_body = json!({
         "model": config.get_default_model(),
         "input": input,
-        "tools": [{ "type": "web_search" }]
+        "tools": [{ "type": "web_search" }],
+        "temperature": temperature.unwrap_or_else(|| get_default_temperature(config))
     });
 
-    let resolved = resolve_max_tokens(max_tokens, config);
-    inject_max_tokens(&mut request_body, resolved);
+    // Responses API 使用 max_output_tokens 而非 max_tokens
+    if let Some(n) = resolve_max_tokens(max_tokens, config) {
+        request_body["max_output_tokens"] = json!(n);
+    }
 
     let req_builder = config.apply_auth(
         client.post(&url)
@@ -642,7 +638,6 @@ async fn call_openai_responses(
     );
 
     let response = req_builder
-        .timeout(Duration::from_secs(120))
         .send()
         .await
         .map_err(|e| AppError::AiError(friendly_reqwest_error(&e)))?;
@@ -670,19 +665,21 @@ async fn call_anthropic_with_search(
     client: &reqwest::Client,
     messages: &[ChatMessage],
     max_tokens: Option<u32>,
+    temperature: Option<f64>,
 ) -> Result<String> {
     let url = format!("{}/messages", config.get_base_url());
 
-    let mut system_content = String::new();
+    let mut system_parts: Vec<String> = Vec::new();
     let mut api_messages: Vec<serde_json::Value> = Vec::new();
 
     for msg in messages {
         if msg.role == "system" {
-            system_content = msg.content.clone();
+            system_parts.push(msg.content.clone());
         } else {
             api_messages.push(message_to_json(msg, "anthropic"));
         }
     }
+    let system_content = system_parts.join("\n\n");
 
     let mut request_body = json!({
         "model": config.get_default_model(),
@@ -691,7 +688,8 @@ async fn call_anthropic_with_search(
             "type": "web_search_20250305",
             "name": "web_search",
             "max_uses": 5
-        }]
+        }],
+        "temperature": temperature.unwrap_or_else(|| get_default_temperature(config))
     });
     inject_max_tokens(&mut request_body, resolve_max_tokens(max_tokens, config));
 
@@ -708,7 +706,6 @@ async fn call_anthropic_with_search(
     );
 
     let response = req_builder
-        .timeout(Duration::from_secs(120))
         .send()
         .await
         .map_err(|e| AppError::AiError(friendly_reqwest_error(&e)))?;
@@ -753,7 +750,7 @@ async fn for_each_sse_event<F>(
     mut on_event: F,
 ) -> Result<()>
 where
-    F: FnMut(SseEvent<'_>),
+    F: FnMut(SseEvent<'_>) + Send,
 {
     use futures_util::StreamExt;
     let mut stream = response.bytes_stream();
@@ -782,7 +779,8 @@ where
                 continue;
             }
 
-            if let Some(data) = line_str.strip_prefix("data: ") {
+            let data = line_str.strip_prefix("data: ").or_else(|| line_str.strip_prefix("data:"));
+            if let Some(data) = data {
                 if data == "[DONE]" {
                     on_event(SseEvent::Done);
                     continue;
@@ -808,131 +806,113 @@ async fn collect_stream_tool_calls(
     req_id: &str,
     window: &tauri::Window,
 ) -> Result<(Vec<tools::ToolCall>, serde_json::Value, bool, Option<String>)> {
-    use futures_util::StreamExt;
-    let mut stream = response.bytes_stream();
-    let mut buffer = Vec::new();
-
     // 累积 tool_calls 的各字段（流式下是分块到来的）
-    let mut tool_calls_map: std::collections::BTreeMap<usize, serde_json::Value> = std::collections::BTreeMap::new();
-    let mut finish_reason = String::new();
-    let mut done = false;
+        // 使用 Mutex/AtomicBool 替代 RefCell/Cell，确保 Send 安全
+    let tool_calls_map: std::sync::Mutex<std::collections::BTreeMap<usize, serde_json::Value>> = std::sync::Mutex::new(std::collections::BTreeMap::new());
+    let finish_reason: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+    let assistant_api_text: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+    let in_reasoning: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
-    // 与 stream_sse_chat_completions 一致：正文 + reasoning_content（写入 API 与前端 chunk）
-    let mut assistant_api_text = String::new();
-    let mut in_reasoning = false;
+    let req_id_owned = req_id.to_string();
 
-    let flush_reasoning_close = |in_r: &mut bool, api: &mut String, w: &tauri::Window| {
-        if *in_r {
-            let _ = w.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": "</think>" }));
-            api.push_str("</think>");
-            *in_r = false;
+    let think_tag = "\u{1f4ad}"; // 💭
+
+    let flush_reasoning_close = || {
+        if in_reasoning.load(std::sync::atomic::Ordering::Relaxed) {
+            let _ = window.emit("ai:stream:chunk", json!({ "request_id": &req_id_owned, "content": think_tag }));
+            assistant_api_text.lock().unwrap().push_str(think_tag);
+            in_reasoning.store(false, std::sync::atomic::Ordering::Relaxed);
         }
     };
 
-    while !done {
-        let chunk_result = match stream.next().await {
-            Some(r) => r,
-            None => break,
-        };
-        if is_stream_cancelled(req_id) { break; }
+    for_each_sse_event(response, req_id, |event| {
+        match event {
+            SseEvent::Done => return,
+            SseEvent::Data(json_val) => {
+                let choice = json_val.get("choices").and_then(|c| c.get(0));
 
-        let chunk = chunk_result
-            .map_err(|e| AppError::AiError(friendly_reqwest_error(&e)))?;
+                if let Some(fr) = choice.and_then(|c| c.get("finish_reason")).and_then(|f| f.as_str()) {
+                    if !fr.is_empty() && fr != "null" {
+                        *finish_reason.lock().unwrap() = fr.to_string();
+                    }
+                }
 
-        if buffer.len() + chunk.len() > MAX_BUFFER_SIZE {
-            return Err(AppError::AiError("Response too large".to_string()));
-        }
-        buffer.extend_from_slice(&chunk);
-
-        while let Some(pos) = buffer.iter().position(|&b| b == b'\n') {
-            let line_bytes: Vec<u8> = buffer.drain(..=pos).collect();
-            let line_str = String::from_utf8_lossy(&line_bytes);
-            let line_str = line_str.trim_end_matches('\n').trim_end_matches('\r');
-
-            if let Some(data) = line_str.strip_prefix("data: ") {
-                if data == "[DONE]" { done = true; break; }
-
-                if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(data) {
-                    let choice = json_val.get("choices").and_then(|c| c.get(0));
-
-                    if let Some(fr) = choice.and_then(|c| c.get("finish_reason")).and_then(|f| f.as_str()) {
-                        if !fr.is_empty() && fr != "null" {
-                            finish_reason = fr.to_string();
+                if let Some(delta) = choice.and_then(|c| c.get("delta")) {
+                    // reasoning_content（DeepSeek/Qwen3/GLM-5 等）
+                    if let Some(reasoning) = delta.get("reasoning_content").and_then(|r| r.as_str()) {
+                        if !reasoning.is_empty() {
+                            if !in_reasoning.load(std::sync::atomic::Ordering::Relaxed) {
+                                let _ = window.emit("ai:stream:chunk", json!({ "request_id": &req_id_owned, "content": think_tag }));
+                                assistant_api_text.lock().unwrap().push_str(think_tag);
+                                in_reasoning.store(true, std::sync::atomic::Ordering::Relaxed);
+                            }
+                            assistant_api_text.lock().unwrap().push_str(reasoning);
+                            let _ = window.emit("ai:stream:chunk", json!({ "request_id": &req_id_owned, "content": reasoning }));
                         }
                     }
 
-                    if let Some(delta) = choice.and_then(|c| c.get("delta")) {
-                        if let Some(reasoning) = delta.get("reasoning_content").and_then(|r| r.as_str()) {
-                            if !reasoning.is_empty() {
-                                if !in_reasoning {
-                                    let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": "<think>" }));
-                                    assistant_api_text.push_str("<think>");
-                                    in_reasoning = true;
-                                }
-                                assistant_api_text.push_str(reasoning);
-                                let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": reasoning }));
-                            }
+                    // 正文
+                    if let Some(content) = delta.get("content").and_then(|c| c.as_str()) {
+                        if !content.is_empty() {
+                            flush_reasoning_close();
+                            assistant_api_text.lock().unwrap().push_str(content);
+                            let _ = window.emit("ai:stream:chunk", json!({ "request_id": &req_id_owned, "content": content }));
                         }
+                    }
 
-                        if let Some(content) = delta.get("content").and_then(|c| c.as_str()) {
-                            if !content.is_empty() {
-                                flush_reasoning_close(&mut in_reasoning, &mut assistant_api_text, window);
-                                assistant_api_text.push_str(content);
-                                let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": content }));
+                    // tool_calls
+                    if let Some(tcs) = delta.get("tool_calls").and_then(|tc| tc.as_array()) {
+                        for tc_delta in tcs {
+                            let idx = tc_delta.get("index")
+                                .and_then(|i| i.as_u64())
+                                .unwrap_or(0) as usize;
+
+                            let mut map_guard = tool_calls_map.lock().unwrap();
+                            let entry = map_guard.entry(idx).or_insert_with(|| json!({
+                                "id": "",
+                                "type": "function",
+                                "function": { "name": "", "arguments": "" }
+                            }));
+
+                            if let Some(id) = tc_delta.get("id").and_then(|v| v.as_str()) {
+                                if !id.is_empty() {
+                                    entry["id"] = json!(id);
+                                }
                             }
-                        }
-
-                        if let Some(tcs) = delta.get("tool_calls").and_then(|tc| tc.as_array()) {
-                            for tc_delta in tcs {
-                                let idx = tc_delta.get("index")
-                                    .and_then(|i| i.as_u64())
-                                    .unwrap_or(0) as usize;
-
-                                let entry = tool_calls_map.entry(idx).or_insert_with(|| json!({
-                                    "id": "",
-                                    "type": "function",
-                                    "function": { "name": "", "arguments": "" }
-                                }));
-
-                                if let Some(id) = tc_delta.get("id").and_then(|v| v.as_str()) {
-                                    if !id.is_empty() {
-                                        entry["id"] = json!(id);
-                                    }
+                            if let Some(name) = tc_delta.get("function").and_then(|f| f.get("name")).and_then(|n| n.as_str()) {
+                                if !name.is_empty() {
+                                    let cur = entry["function"]["name"].as_str().unwrap_or("").to_string();
+                                    entry["function"]["name"] = json!(cur + name);
                                 }
-                                if let Some(name) = tc_delta.get("function").and_then(|f| f.get("name")).and_then(|n| n.as_str()) {
-                                    if !name.is_empty() {
-                                        let cur = entry["function"]["name"].as_str().unwrap_or("").to_string();
-                                        entry["function"]["name"] = json!(cur + name);
-                                    }
-                                }
-                                if let Some(args) = tc_delta.get("function").and_then(|f| f.get("arguments")).and_then(|a| a.as_str()) {
-                                    let cur = entry["function"]["arguments"].as_str().unwrap_or("").to_string();
-                                    entry["function"]["arguments"] = json!(cur + args);
-                                }
+                            }
+                            if let Some(args) = tc_delta.get("function").and_then(|f| f.get("arguments")).and_then(|a| a.as_str()) {
+                                let cur = entry["function"]["arguments"].as_str().unwrap_or("").to_string();
+                                entry["function"]["arguments"] = json!(cur + args);
                             }
                         }
                     }
                 }
             }
         }
-    }
+    }).await?;
 
-    flush_reasoning_close(&mut in_reasoning, &mut assistant_api_text, window);
+    flush_reasoning_close();
 
-    let got_tool_calls = finish_reason == "tool_calls" || !tool_calls_map.is_empty();
+    let got_tool_calls = finish_reason.lock().unwrap().as_str() == "tool_calls" || !tool_calls_map.lock().unwrap().is_empty();
+    let api_text = assistant_api_text.into_inner().unwrap();
 
     if !got_tool_calls {
-        let early = if assistant_api_text.trim().is_empty() {
+        let early = if api_text.trim().is_empty() {
             None
         } else {
-            Some(assistant_api_text.clone())
+            Some(api_text.clone())
         };
-        let msg = if assistant_api_text.trim().is_empty() {
+        let msg = if api_text.trim().is_empty() {
             json!(null)
         } else {
             json!({
                 "role": "assistant",
-                "content": assistant_api_text
+                "content": api_text
             })
         };
         return Ok((vec![], msg, false, early));
@@ -941,7 +921,7 @@ async fn collect_stream_tool_calls(
     let mut tool_calls: Vec<tools::ToolCall> = Vec::new();
     let mut tool_calls_json: Vec<serde_json::Value> = Vec::new();
 
-    for (_, tc_val) in &tool_calls_map {
+    for (_, tc_val) in tool_calls_map.into_inner().unwrap() {
         tool_calls_json.push(tc_val.clone());
         match serde_json::from_value::<tools::ToolCall>(tc_val.clone()) {
             Ok(tc) => tool_calls.push(tc),
@@ -949,10 +929,10 @@ async fn collect_stream_tool_calls(
         }
     }
 
-    let content_field: serde_json::Value = if assistant_api_text.trim().is_empty() {
+    let content_field: serde_json::Value = if api_text.trim().is_empty() {
         serde_json::Value::Null
     } else {
-        json!(assistant_api_text)
+        json!(api_text)
     };
 
     let assistant_msg = json!({
@@ -963,6 +943,7 @@ async fn collect_stream_tool_calls(
 
     Ok((tool_calls, assistant_msg, true, None))
 }
+
 
 /// 通用 SSE 流式解析（OpenAI Chat Completions 格式）
 /// 解析 choices[0].delta.content 和 choices[0].delta.reasoning_content
@@ -1078,10 +1059,11 @@ async fn stream_sse_chat_completions(
         }
     }).await?;
 
-    // 安全关闭：如果流结束时仍在 reasoning 状态
+    // 安全关闭：如果流结束时仍在 reasoning 状态（SSE 流异常断开未触发 Done handler）
     if in_reasoning {
-        let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content":"" }));
-        full_content.push_str("");
+        let reasoning_end = "\n\n";
+        let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": reasoning_end }));
+        full_content.push_str(reasoning_end);
     }
 
     // 安全 flush：确保 pending_buf 中残留内容全部输出
@@ -1106,8 +1088,11 @@ async fn stream_openai_responses(
     req_id: &str,
     window: &tauri::Window,
     max_tokens: Option<u32>,
+    proxy_url: Option<&str>,
+    connect_timeout_secs: Option<u64>,
+    request_timeout_secs: Option<u64>,
 ) -> Result<String> {
-    let client = ai_stream_client();
+    let client = ai_stream_client_with_opts(proxy_url, connect_timeout_secs, request_timeout_secs);
     let base_url = config.get_base_url();
     let url = format!("{}/responses", base_url);
 
@@ -1120,7 +1105,10 @@ async fn stream_openai_responses(
         "tools": [{ "type": "web_search" }],
         "stream": true
     });
-    inject_max_tokens(&mut request_body, resolve_max_tokens(max_tokens, config));
+    // Responses API 使用 max_output_tokens 而非 max_tokens
+    if let Some(n) = resolve_max_tokens(max_tokens, config) {
+        request_body["max_output_tokens"] = json!(n);
+    }
 
     let req_builder = config.apply_auth(
         client.post(&url)
@@ -1143,6 +1131,7 @@ async fn stream_openai_responses(
 
     // Responses API SSE 事件格式与 Chat Completions 不同
     let mut full_content = String::new();
+    let in_reasoning = std::sync::atomic::AtomicBool::new(false);
 
     for_each_sse_event(response, req_id, |event| {
         if let SseEvent::Data(json_val) = event {
@@ -1151,6 +1140,13 @@ async fn stream_openai_responses(
             match event_type {
                 // 文本增量输出
                 "response.output_text.delta" => {
+                    // 从推理切换到正文时关闭 💭 标记
+                    if in_reasoning.load(std::sync::atomic::Ordering::Relaxed) {
+                        let close = "💭";
+                        full_content.push_str(close);
+                        let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": close }));
+                        in_reasoning.store(false, std::sync::atomic::Ordering::Relaxed);
+                    }
                     if let Some(delta) = json_val.get("delta").and_then(|d| d.as_str()) {
                         if !delta.is_empty() {
                             full_content.push_str(delta);
@@ -1158,11 +1154,26 @@ async fn stream_openai_responses(
                         }
                     }
                 }
-                // 推理内容增量（reasoning 模型）
+                // 推理内容增量（reasoning 模型如 o3/o4-mini，默认产生）
+                "response.reasoning.delta" => {
+                    if let Some(delta) = json_val.get("delta").and_then(|d| d.as_str()) {
+                        if !delta.is_empty() {
+                            if !in_reasoning.load(std::sync::atomic::Ordering::Relaxed) {
+                                let open = "💭";
+                                full_content.push_str(open);
+                                let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": open }));
+                                in_reasoning.store(true, std::sync::atomic::Ordering::Relaxed);
+                            }
+                            full_content.push_str(delta);
+                            let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": delta }));
+                        }
+                    }
+                }
+                // 推理摘要增量（需要请求中设置 reasoning.summary 参数才产生）
                 "response.reasoning_summary_text.delta" => {
                     if let Some(delta) = json_val.get("delta").and_then(|d| d.as_str()) {
                         if !delta.is_empty() {
-                            let think_content = format!("<think>{}</think>", delta);
+                            let think_content = format!("💭{}😎", delta);
                             full_content.push_str(&think_content);
                             let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": think_content }));
                         }
@@ -1172,6 +1183,11 @@ async fn stream_openai_responses(
             }
         }
     }).await?;
+
+    // 流结束时关闭 reasoning 标记
+    if in_reasoning.load(std::sync::atomic::Ordering::Relaxed) {
+        full_content.push_str("💭");
+    }
 
     Ok(full_content)
 }
@@ -1183,22 +1199,26 @@ async fn stream_anthropic_with_search(
     req_id: &str,
     window: &tauri::Window,
     max_tokens: Option<u32>,
+    proxy_url: Option<&str>,
+    connect_timeout_secs: Option<u64>,
+    request_timeout_secs: Option<u64>,
 ) -> Result<String> {
-    let client = ai_stream_client();
+    let client = ai_stream_client_with_opts(proxy_url, connect_timeout_secs, request_timeout_secs);
     let base_url = config.get_base_url();
     let url = format!("{}/messages", base_url);
 
     // 分离 system 消息和对话消息（Anthropic 格式要求 system 在顶层）
-    let mut system_content = String::new();
+    let mut system_parts: Vec<String> = Vec::new();
     let mut api_messages: Vec<serde_json::Value> = Vec::new();
 
     for msg in messages {
         if msg.role == "system" {
-            system_content = msg.content.clone();
+            system_parts.push(msg.content.clone());
         } else {
             api_messages.push(message_to_json(msg, "anthropic"));
         }
     }
+    let system_content = system_parts.join("\n\n");
 
     let mut request_body = json!({
         "model": config.get_default_model(),

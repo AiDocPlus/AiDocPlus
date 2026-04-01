@@ -6,20 +6,14 @@
  * - 分析风格画像
  * - 展示风格画像详情
  */
-import { useState, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Plus, Trash2, Upload, Sparkles, FileText, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import { Trash2, Upload, Sparkles, FileText, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import type { NovelDocumentContent, StyleCorpus, StyleProfile } from '../types';
-import {
-  computeLocalStyleStats,
-  buildStyleInjectionPrompt,
-  chunkText,
-  type LocalStyleStats,
-} from '../styleProfileGenerator';
+import { chunkText } from '../styleProfileGenerator';
 
 interface StyleLearningPanelProps {
   novel: NovelDocumentContent;
@@ -35,7 +29,6 @@ export default function StyleLearningPanel({
   onNovelChange,
   onAnalyzeStyle,
 }: StyleLearningPanelProps) {
-  const { t } = useTranslation();
   const [corpora, setCorpora] = useState<StyleCorpus[]>([]);
   const [loading, setLoading] = useState(false);
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
@@ -111,6 +104,7 @@ export default function StyleLearningPanel({
         files: fileList.map((f, i) => ({
           id: `file-${i}`,
           fileName: f.fileName,
+          chunks: [],
           wordCount: f.content.replace(/\s/g, '').length,
           importedAt: Date.now(),
         })),

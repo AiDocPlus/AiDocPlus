@@ -57,6 +57,8 @@ pub fn save_doc_template_from_document(
     includeAiContent: bool,
     includePluginData: bool,
 ) -> Result<DocTemplateManifest> {
+    crate::security::validate_id(&projectId, "projectId")?;
+    crate::security::validate_id(&documentId, "documentId")?;
     // 加载文档
     let doc_path = state.get_document_path(&projectId, &documentId);
     if !doc_path.exists() {
@@ -104,6 +106,7 @@ pub fn create_document_from_doc_template(
     title: String,
     author: String,
 ) -> Result<Document> {
+    crate::security::validate_id(&projectId, "projectId")?;
     // 从合并列表中查找模板 manifest
     let all_templates = template::list_doc_templates();
     let manifest = all_templates.iter().find(|t| t.id == templateId)

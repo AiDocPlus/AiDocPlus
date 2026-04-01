@@ -99,7 +99,7 @@ import {
 const VersionHistoryPanel = lazy(() =>
   import('@/components/version/VersionHistoryPanel').then((m) => ({ default: m.VersionHistoryPanel })),
 );
-import { TOOLBAR_CLASS, STATUS_BAR_CLASS, TOOLBAR_ICON } from '../_shared/styles';
+import { STATUS_BAR_CLASS, TOOLBAR_ICON } from '../_shared/styles';
 
 /** 主工具栏图标按钮（与长篇小说等文档一致：仅图标 + title） */
 const CALC_TB_ICON = 'h-7 w-7 shrink-0 p-0';
@@ -165,7 +165,7 @@ function SheetTabs({
   };
 
   return (
-    <div className="flex items-center gap-1 px-2 py-1 bg-muted/30 border-b overflow-x-auto">
+    <div className="flex items-center gap-1 px-2 py-1 bg-muted/30 border-b overflow-x-auto scrollbar-hide">
       {sheets.map((sheet) => (
         <div
           key={sheet.id}
@@ -304,7 +304,7 @@ class CalculatorWorkspaceErrorBoundary extends Component<
 // 主组件
 // ============================================================
 
-function CalculatorWorkspaceMain({ document: doc, host }: DocTypeEditorProps) {
+function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: DocTypeEditorProps) {
   const { t, i18n } = useTranslation();
   const mod = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘' : 'Ctrl+';
   const isEn = i18n.language === 'en';
@@ -409,6 +409,13 @@ function CalculatorWorkspaceMain({ document: doc, host }: DocTypeEditorProps) {
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
     }
+  }, []);
+
+  // ── 组件卸载时清理 timer ──
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
   }, []);
 
   const handleExplicitSave = useCallback(async () => {
@@ -1161,7 +1168,7 @@ function CalculatorWorkspaceMain({ document: doc, host }: DocTypeEditorProps) {
       {/* 中栏：与长篇小说相同 — 工具栏 + Sheet + 主编辑 + 状态栏 */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
       {/* 工具栏 */}
-      <div className="flex items-center gap-1 px-2 py-1 border-b flex-shrink-0 bg-card overflow-x-auto min-w-0">
+      <div className="flex items-center gap-1 px-2 py-1 border-b flex-shrink-0 bg-card overflow-x-auto scrollbar-hide min-w-0">
         <Calculator className={cn(TOOLBAR_ICON, 'text-primary shrink-0')} />
         <span className="text-sm font-medium truncate">{doc.title}</span>
 
@@ -1823,6 +1830,8 @@ function CalculatorWorkspaceMain({ document: doc, host }: DocTypeEditorProps) {
             <CalculatorAISidebar
               key={doc.id}
               document={doc}
+              documentId={documentId}
+              tabId={tabId}
               host={host}
               calcDoc={calcDoc}
               activeSheet={activeSheet}

@@ -5,9 +5,9 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Calculator, DollarSign, Calendar, Percent, Heart, BarChart3, TrendingUp,
+  Calculator,
   Search, Star, X, Plus, Download, Upload, Edit2, Trash2, Copy,
-  MoreHorizontal, FileJson, Check
+  MoreHorizontal
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -1261,7 +1261,7 @@ const STORAGE_KEY_FAVORITES = 'calculator-template-favorites';
 // ============================================================
 
 function DynamicIcon({ name, className }: { name: string; className?: string }) {
-  const IconComponent = (LucideIcons as Record<string, React.ComponentType<{ className?: string; iconNode?: any }>>)[name];
+  const IconComponent = (LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string; iconNode?: any }>>)[name];
   if (!IconComponent) return <Calculator className={className} />;
   return <IconComponent className={className} />;
 }

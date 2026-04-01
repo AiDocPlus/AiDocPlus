@@ -9,7 +9,7 @@ import { useState, useCallback } from 'react';
 import {
   BookText, ListTree, Users, MapPin, Eye, Globe, Lightbulb,
   Network, Shield, Calendar, Sparkles, PanelRightClose, PanelRightOpen, Target, ShieldCheck, GitBranch,
-  Plus, Trash2, Palette, Wand2,
+  Plus, Trash2, Palette,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -30,10 +30,9 @@ import MaterialPanel from './settings/MaterialPanel';
 import GoalPanel from './settings/GoalPanel';
 import StyleLearningPanel from './settings/StyleLearningPanel';
 import SettingsAIPanel from './settings/SettingsAIPanel';
+import type { SettingsTab } from './settings/SettingsAIPanel';
 import { checkConsistency } from './novelAnalysis';
 import { DIALOG_STYLE } from './constants';
-
-type SettingsTab = 'synopsis' | 'outline' | 'characters' | 'relations' | 'locations' | 'factions' | 'foreshadowing' | 'timeline' | 'worldview' | 'materials' | 'goals' | 'plotlines' | 'check' | 'style';
 
 const TABS: { key: SettingsTab; icon: typeof BookText; label: string }[] = [
   { key: 'synopsis', icon: BookText, label: '梗概' },
@@ -74,7 +73,7 @@ export default function NovelSettingsDialog({
   }, [novel, onNovelChange]);
 
   // 风格分析回调：调用 AI 分析文本风格
-  const handleAnalyzeStyle = useCallback(async (corpusId: string, text: string): Promise<StyleProfile | null> => {
+  const handleAnalyzeStyle = useCallback(async (_corpusId: string, text: string): Promise<StyleProfile | null> => {
     try {
       const STYLE_ANALYSIS_PROMPT = `你是一位专业的文学风格分析师。请分析以下文本的写作风格，提取可供模仿的风格特征。
 
@@ -151,7 +150,7 @@ ${text.slice(0, 15000)}
         <DialogTitle className="sr-only">设定集</DialogTitle>
 
         {/* Tab 栏 */}
-        <div className="flex items-center border-b px-2 py-1 flex-shrink-0 overflow-x-auto">
+        <div className="flex items-center border-b px-2 py-1 flex-shrink-0 overflow-x-auto scrollbar-hide">
           <Sparkles className="h-4 w-4 text-amber-500 mr-2 flex-shrink-0" />
           <span className="text-sm font-medium mr-3 flex-shrink-0">设定集</span>
           {TABS.map(tab => {

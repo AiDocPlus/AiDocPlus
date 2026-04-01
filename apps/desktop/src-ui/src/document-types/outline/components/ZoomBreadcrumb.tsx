@@ -29,7 +29,7 @@ export function ZoomBreadcrumb({
   if (items.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-0.5 px-2 py-1 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-800/50 text-xs overflow-x-auto shrink-0">
+    <div className="flex items-center gap-0.5 px-2 py-1 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-800/50 text-xs overflow-x-auto scrollbar-hide shrink-0">
       <ZoomIn className="h-3.5 w-3.5 text-blue-500 shrink-0" />
       <span className="text-blue-600 dark:text-blue-400 font-medium shrink-0 mr-1">
         {t('outline.zoom.focusMode', { defaultValue: '聚焦' })}

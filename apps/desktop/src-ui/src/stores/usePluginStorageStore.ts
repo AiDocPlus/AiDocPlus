@@ -41,7 +41,13 @@ const tauriPluginRawStorage: {
   },
   removeItem: async (name: string): Promise<void> => {
     try {
-      await invoke('save_plugin_storage', { json: '{}' });
+      // 先读取当前数据，只删除当前 store 的 key，而非清空全部数据
+      const current = await invoke<string | null>('load_plugin_storage');
+      if (current) {
+        const data = JSON.parse(current);
+        delete data[name];
+        await invoke('save_plugin_storage', { json: JSON.stringify(data) });
+      }
     } catch {
       localStorage.removeItem(name);
     }

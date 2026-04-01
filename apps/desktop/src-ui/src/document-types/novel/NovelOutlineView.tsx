@@ -8,7 +8,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { Circle, CheckCircle2, PenLine, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/i18n';
-import type { NovelDocumentContent, NovelChapter, NovelCharacter, NovelLocation } from './types';
+import type { NovelDocumentContent, NovelChapter, NovelCharacter } from './types';
 import {
   updateChapterMeta, updateChapterSummary, renameChapter, updateChapterStatus,
   getChapterWordCount, getSceneWordCount, renameScene, updateSceneMeta,
@@ -24,7 +24,6 @@ interface NovelOutlineViewProps {
   onSelectChapter: (chapterId: string) => void;
   onSelectScene?: (chapterId: string, sceneId: string) => void;
   characters: NovelCharacter[];
-  locations: NovelLocation[];
 }
 
 interface OutlineRow {

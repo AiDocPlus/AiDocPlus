@@ -54,7 +54,10 @@ pub fn open_resource_manager(
         let encoded = dir.to_string_lossy().to_string()
             .replace('%', "%25")
             .replace(' ', "%20")
-            .replace('#', "%23");
+            .replace('#', "%23")
+            .replace('&', "%26")
+            .replace('?', "%3F")
+            .replace('=', "%3D");
         url_str.push_str(&format!("&data-dir={}", encoded));
     }
 
@@ -307,6 +310,7 @@ pub struct SaveCustomPromptTemplateRequest {
 
 #[tauri::command]
 pub fn save_custom_prompt_template(template: SaveCustomPromptTemplateRequest) -> crate::error::Result<()> {
+    crate::security::validate_id(&template.id, "template.id")?;
     let mut custom = read_custom_templates();
 
     let entry = CustomTemplateEntry {
@@ -330,6 +334,7 @@ pub fn save_custom_prompt_template(template: SaveCustomPromptTemplateRequest) ->
 
 #[tauri::command]
 pub fn delete_custom_prompt_template(id: String) -> crate::error::Result<()> {
+    crate::security::validate_id(&id, "template.id")?;
     let mut custom = read_custom_templates();
     let before = custom.templates.len();
     custom.templates.retain(|t| t.id != id);
@@ -359,9 +364,14 @@ pub fn export_custom_prompt_templates(output_path: String) -> crate::error::Resu
         return Err(AppError::ValidationError("没有自定义模板可导出".to_string()));
     }
 
+    // 路径安全：限制输出路径在允许的目录内
+    let safe_path = crate::security::validate_path_allowed(
+        std::path::Path::new(&output_path), "export_path"
+    )?;
+
     let json_str = serde_json::to_string_pretty(&custom)
         .context("序列化失败")?;
-    crate::config::atomic_write(&std::path::PathBuf::from(&output_path), &json_str)?;
+    crate::config::atomic_write(&safe_path, &json_str)?;
 
     Ok(format!("已导出 {} 个自定义模板", custom.templates.len()))
 }
@@ -370,7 +380,13 @@ pub fn export_custom_prompt_templates(output_path: String) -> crate::error::Resu
 #[tauri::command]
 pub fn import_custom_prompt_templates(json_path: String) -> crate::error::Result<PromptTemplateImportResult> {
     use crate::error::{AppError, ResultExt};
-    let json_str = std::fs::read_to_string(&json_path)
+
+    // 路径安全：限制输入路径在允许的目录内
+    let safe_path = crate::security::validate_path_allowed(
+        std::path::Path::new(&json_path), "import_path"
+    )?;
+
+    let json_str = std::fs::read_to_string(&safe_path)
         .context("读取文件失败")?;
     let imported_file: CustomTemplatesFile = serde_json::from_str(&json_str)
         .context_as("解析 JSON 失败", AppError::ImportFailed)?;

@@ -97,6 +97,16 @@ export function useSendQueue(options: UseSendQueueOptions) {
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
+  // 组件卸载标志，防止卸载后 setTimeout 回调触发状态更新
+  const unmountedRef = useRef(false);
+  useEffect(() => {
+    unmountedRef.current = false;
+    return () => {
+      unmountedRef.current = true;
+      processingRef.current = false;
+    };
+  }, []);
+
   // 持久化去抖定时器
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -114,6 +124,7 @@ export function useSendQueue(options: UseSendQueueOptions) {
   }, []);
 
   const processNext = useCallback(async () => {
+    if (unmountedRef.current) return;
     if (processingRef.current) return;
 
     const now = Date.now();
@@ -231,9 +242,9 @@ export function useSendQueue(options: UseSendQueueOptions) {
       const errMsg = formatBackendError(err);
       const failedAccountId = sendItem.accountId || accountId;
 
-      // 通知账户健康变化（如果有高级模式）
+      // 通知账户健康变化（发送失败，标记为冷却状态）
       opts.onAccountHealthChanged?.(failedAccountId, {
-        status: 'ok', consecutiveErrors: 0, lastError: errMsg, lastErrorAt: Date.now(),
+        status: 'cooldown', consecutiveErrors: 1, lastError: errMsg, lastErrorAt: Date.now(),
       });
 
       if (next.retryCount < next.maxRetries) {

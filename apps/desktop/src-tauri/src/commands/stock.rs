@@ -1865,21 +1865,8 @@ pub async fn execute_stock_tool(tool_call: &ToolCall) -> ToolResult {
             stock_hsgt_shenzhen(start_date.to_string(), end_date.to_string()).await
                 .map(|v| v.to_string()).unwrap_or_else(|e| json!({ "error": e }).to_string())
         }
-        "tushare_token_check" => {
-            tushare_token_check().await
-                .map(|v| v.to_string()).unwrap_or_else(|e| json!({ "error": e }).to_string())
-        }
-        "store_tushare_credential" => {
-            let token = args_parsed.get("token").and_then(|v| v.as_str()).unwrap_or("");
-            store_tushare_credential(token.to_string())
-                .map(|s| json!({ "success": true, "message": s }).to_string())
-                .map(|v| v.to_string()).unwrap_or_else(|e| json!({ "error": e }).to_string())
-        }
-        "delete_tushare_credential" => {
-            delete_tushare_credential()
-                .map(|s| json!({ "success": true, "message": s }).to_string())
-                .map(|v| v.to_string()).unwrap_or_else(|e| json!({ "error": e }).to_string())
-        }
+        // 凭证管理操作（tushare_token_check / store_tushare_credential / delete_tushare_credential）
+        // 不暴露给 AI Function Calling，仅通过 Tauri command 直接调用，防止 AI 窃取/篡改用户凭证
         _ => json!({ "error": format!("未知股票工具: {}", tool_call.function.name) }).to_string(),
     };
 

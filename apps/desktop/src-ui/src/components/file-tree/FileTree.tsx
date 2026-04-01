@@ -403,7 +403,7 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
       if (doc) {
         // 确保文档所在项目展开
         setExpandedProjects(prev => new Set([...prev, doc.projectId]));
-        handleStartRename(doc.projectId, doc.id, doc.title);
+        handleStartRename(doc.id, doc.title);
       }
     };
     window.addEventListener('menu-rename-project', handleRenameProject);
@@ -484,7 +484,8 @@ export function FileTree({ sidebarOpen }: FileTreeProps) {
         await createDocument(currentProject.id, title, 'Imported');
 
         // Find the newly created document and update its content
-        const newDoc = documents.find(d => d.projectId === currentProject.id && d.title === title);
+        // 使用 getState() 获取最新数据，避免闭包中 documents 过时
+        const newDoc = useAppStore.getState().documents.find(d => d.projectId === currentProject.id && d.title === title);
         if (newDoc) {
           // We need to save the document with the imported content
           await invoke('save_document', {

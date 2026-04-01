@@ -454,7 +454,10 @@ export function EmailPluginPanel(_props: PluginPanelProps) {
 
   const handleRenameDraft = useCallback((id: string, newName: string) => {
     const updated = drafts.map(d => d.id === id ? { ...d, name: newName, updatedAt: Date.now() } : d);
-    dispatch({ type: 'SAVE_DRAFT', draft: updated.find(d => d.id === id)! });
+    const target = updated.find(d => d.id === id);
+    if (target) {
+      dispatch({ type: 'SAVE_DRAFT', draft: target });
+    }
     saveToStorage({ drafts: updated });
     showStatus(t('draftRenamed'));
   }, [drafts, saveToStorage, showStatus, t]);
@@ -648,20 +651,20 @@ export function EmailPluginPanel(_props: PluginPanelProps) {
     if (!tauri) return;
     const eventModule = tauri.event as { listen?: (event: string, handler: (e: { payload: { paths?: string[]; position?: unknown; type: string } }) => void) => Promise<() => void> } | undefined;
     if (!eventModule?.listen) return;
-    let unlisten: (() => void) | null = null;
-    eventModule.listen('tauri://drag-drop', (e) => {
-      const payload = e.payload;
-      if (payload.paths && payload.paths.length > 0) {
-        setIsDragOver(false);
-        addFilesAsAttachments(payload.paths);
-      }
-    }).then(fn => { unlisten = fn; });
-    // 拖拽进入/离开视觉反馈
-    let unlistenOver: (() => void) | null = null;
-    let unlistenLeave: (() => void) | null = null;
-    eventModule.listen('tauri://drag-over', () => { setIsDragOver(true); }).then(fn => { unlistenOver = fn; });
-    eventModule.listen('tauri://drag-leave', () => { setIsDragOver(false); }).then(fn => { unlistenLeave = fn; });
-    return () => { unlisten?.(); unlistenOver?.(); unlistenLeave?.(); };
+    // 保存所有 listen 返回的 Promise，在 cleanup 中统一安全调用 unlisten
+    const unlistenPromises = [
+      eventModule.listen('tauri://drag-drop', (e) => {
+        const payload = e.payload;
+        if (payload.paths && payload.paths.length > 0) {
+          setIsDragOver(false);
+          addFilesAsAttachments(payload.paths);
+        }
+      }),
+      // 拖拽进入/离开视觉反馈
+      eventModule.listen('tauri://drag-over', () => { setIsDragOver(true); }),
+      eventModule.listen('tauri://drag-leave', () => { setIsDragOver(false); }),
+    ];
+    return () => { unlistenPromises.forEach(p => p.then(fn => fn()).catch(() => {})); };
   }, [addFilesAsAttachments]);
 
   // ── 收件人联系人模糊搜索 ──

@@ -7,14 +7,12 @@
  * - 一键修订（本地规则 + AI 辅助）
  */
 import { useState, useMemo, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
 import {
-  Sparkles, AlertTriangle, Check, RefreshCw, ChevronDown, ChevronRight,
+  Sparkles, AlertTriangle, RefreshCw, ChevronDown, ChevronRight,
   FileText, BookOpen, Wand2, Loader2, AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import type { DocTypeHostAPI } from '@/doctype-sdk/types';
 import type { NovelDocumentContent } from '../types';
@@ -25,7 +23,6 @@ import {
   buildAntiAIFlavorPrompt,
   quickAntiAIFlavor,
   type AIFlavorDetectionResult,
-  type AIFlavorIssue,
 } from '../antiAIflavor';
 
 interface NovelAntiAIPanelProps {
@@ -41,7 +38,6 @@ export default function NovelAntiAIPanel({
   onNovelChange,
   host,
 }: NovelAntiAIPanelProps) {
-  const { t } = useTranslation();
   const [mode, setMode] = useState<'chapter' | 'novel'>('chapter');
   const [analyzing, setAnalyzing] = useState(false);
   const [revising, setRevising] = useState(false);
@@ -273,10 +269,12 @@ export default function NovelAntiAIPanel({
                       {detection.score}
                     </span>
                   </div>
-                  <Progress
-                    value={100 - detection.score}
-                    className="h-2"
-                  />
+                  <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={cn('h-full rounded-full transition-all', getScoreBg(detection.score))}
+                      style={{ width: `${100 - detection.score}%` }}
+                    />
+                  </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     {detection.score >= 70 ? 'AI 痕迹明显，建议修订' :
                      detection.score >= 40 ? '存在部分 AI 味，可选择性优化' :
@@ -459,10 +457,12 @@ export default function NovelAntiAIPanel({
                       {novelAnalysis.globalScore}
                     </span>
                   </div>
-                  <Progress
-                    value={100 - novelAnalysis.globalScore}
-                    className="h-2"
-                  />
+                  <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={cn('h-full rounded-full transition-all', getScoreBg(novelAnalysis.globalScore))}
+                      style={{ width: `${100 - novelAnalysis.globalScore}%` }}
+                    />
+                  </div>
                 </div>
 
                 {/* AI 味热点章节 */}

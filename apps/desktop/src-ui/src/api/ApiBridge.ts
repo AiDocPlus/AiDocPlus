@@ -55,16 +55,16 @@ export async function initApiBridge(): Promise<void> {
   // 监听 API Server 就绪事件
   await listen<ApiServerInfo>('api-server:ready', async (event) => {
     apiServerPort = event.payload.port;
-    console.log(`[ApiBridge] API Server 就绪，端口: ${apiServerPort}`);
+    console.info(`[ApiBridge] API Server ready, port: ${apiServerPort}`);
 
     // IM Bot 自动启动：延迟导入 settings store 避免循环依赖
     try {
       const { useSettingsStore } = await import('../stores/useSettingsStore');
       const { autoStart } = useSettingsStore.getState().imBot;
       if (autoStart) {
-        console.log('[ApiBridge] IM Bot 自动启动中...');
+        console.info('[ApiBridge] IM Bot auto-starting...');
         await invoke('start_imbot');
-        console.log('[ApiBridge] IM Bot 自动启动成功');
+        console.info('[ApiBridge] IM Bot started');
       }
     } catch (e) {
       console.error('[ApiBridge] IM Bot 自动启动失败:', e);
@@ -100,7 +100,7 @@ export async function initApiBridge(): Promise<void> {
   // 监听外部（API/IM Bot）创建或保存文档后的通知，自动刷新前端文档列表
   await listen<{ action: string; projectId: string; documentId: string }>('document:external-change', async (event) => {
     const { action, projectId } = event.payload;
-    console.log(`[ApiBridge] 收到外部文档变更: ${action}, projectId=${projectId}`);
+    console.info(`[ApiBridge] External document change: ${action}, projectId=${projectId}`);
     try {
       const { useAppStore } = await import('../stores/useAppStore');
       const state = useAppStore.getState();
@@ -108,14 +108,14 @@ export async function initApiBridge(): Promise<void> {
       const currentProjectId = state.currentProject?.id;
       if (currentProjectId && currentProjectId === projectId) {
         await state.loadDocuments(projectId);
-        console.log(`[ApiBridge] 已刷新项目 ${projectId} 的文档列表`);
+        console.info(`[ApiBridge] Refreshed documents for project ${projectId}`);
       }
     } catch (e) {
       console.error('[ApiBridge] 刷新文档列表失败:', e);
     }
   });
 
-  console.log('[ApiBridge] 已初始化');
+  console.info('[ApiBridge] Initialized');
 }
 
 /**

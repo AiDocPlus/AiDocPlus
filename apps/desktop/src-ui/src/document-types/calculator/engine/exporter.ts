@@ -2,7 +2,7 @@
  * exporter.ts — 计算结果导出模块
  * 支持 CSV、TXT、JSON 格式导出
  */
-import type { CalculatorDocumentContent, CalculatorSheet, CalculatorLine } from '../types';
+import type { CalculatorDocumentContent } from '../types';
 import { formatExpressionOperatorsForDisplay } from '../calculatorInputNormalize';
 
 function expressionForExport(expr: string, doc: CalculatorDocumentContent): string {

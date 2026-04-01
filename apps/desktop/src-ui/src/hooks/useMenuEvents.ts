@@ -91,33 +91,7 @@ export function useMenuEvents(onSettingsOpen: () => void) {
           onSettingsOpen();
           break;
 
-        // ── 编辑菜单：基础操作（原 PredefinedMenuItem 改为自定义菜单项后需前端处理） ──
-        case 'undo':
-          document.execCommand('undo');
-          break;
-        case 'redo':
-          document.execCommand('redo');
-          break;
-        case 'cut':
-          document.execCommand('cut');
-          break;
-        case 'copy':
-          document.execCommand('copy');
-          break;
-        case 'paste':
-          navigator.clipboard.readText().then(text => {
-            const el = document.activeElement;
-            if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-              const start = el.selectionStart ?? 0;
-              const end = el.selectionEnd ?? 0;
-              el.setRangeText(text, start, end, 'end');
-              el.dispatchEvent(new Event('input', { bubbles: true }));
-            } else {
-              // CodeMirror 或其他：转发给编辑器处理
-              window.dispatchEvent(new CustomEvent('editor-menu-action', { detail: 'paste' }));
-            }
-          }).catch(() => {});
-          break;
+        // ── 编辑菜单：undo/redo/cut/copy/paste/select_all 已改为 PredefinedMenuItem，由系统原生处理 ──
         case 'paste_plain':
           navigator.clipboard.readText().then(text => {
             const el = document.activeElement;
@@ -130,9 +104,6 @@ export function useMenuEvents(onSettingsOpen: () => void) {
               window.dispatchEvent(new CustomEvent('editor-menu-action', { detail: 'paste_plain' }));
             }
           }).catch(() => {});
-          break;
-        case 'select_all':
-          document.execCommand('selectAll');
           break;
         case 'find':
           window.dispatchEvent(new CustomEvent('open-search'));
@@ -210,6 +181,11 @@ export function useMenuEvents(onSettingsOpen: () => void) {
           break;
         case 'tools_ebook_reader':
           await message(i18n.t('menu.featureComingSoon', { defaultValue: '功能开发中，敬请期待' }), { title: i18n.t('menu.ebookReader', { defaultValue: '电子书阅读器' }), kind: 'info' });
+          break;
+        case 'tools_mail_client':
+          invoke('open_mail_client').catch((err) => {
+            console.error('[MenuEvents] 打开邮件客户端失败:', err);
+          });
           break;
 
         // ── 模板菜单 ──

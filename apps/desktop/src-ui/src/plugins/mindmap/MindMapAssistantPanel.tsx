@@ -10,8 +10,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { usePluginHost, useThinkingContent } from '../_framework/PluginHostAPI';
 import { formatBackendError } from '@/lib/backendError';
-import { useSettingsStore, getAIInvokeParamsForService } from '@/stores/useSettingsStore';
-import { getProviderConfig, getActiveService, type AIProvider } from '@aidocplus/shared-types';
+import { getProviderConfig, type AIProvider } from '@aidocplus/shared-types';
 import type { PluginAssistantPanelProps } from '../types';
 import {
   type AssistantMessage,
@@ -45,7 +44,6 @@ import type { QuickActionStore, QuickActionItem } from './quickActionDefs';
 import { QuickActionManagerDialog } from './dialogs/QuickActionManagerDialog';
 import { QuickActionCommandPalette } from './QuickActionCommandPalette';
 import { parseThinkTags } from '@/utils/thinkTagParser';
-import { resolveTheme } from '@/components/chat/ChatMessage';
 import { CollapsibleThinkingBlock } from '@/document-types/_shared/CollapsibleThinkingBlock';
 import { getInputSuggestions, getPhaseIndicator, getInputPlaceholder, autoContextMode } from './assistantSuggestions';
 
@@ -123,20 +121,19 @@ export function MindMapAssistantPanel({
   const thinkingContent = useThinkingContent();
 
   // ── AI 服务选择 ──
-  const settingsStore = useSettingsStore();
-  const enabledServices = settingsStore.ai.services.filter(s => s.enabled);
+  const enabledServices = host.ai.listServices();
   const [selectedServiceId, setSelectedServiceId] = useState<string>(() => {
     return host.storage.get<string>('_mindmap_assistant_service_id') || '';
   });
 
   const effectiveService = selectedServiceId
-    ? enabledServices.find(s => s.id === selectedServiceId) || getActiveService(settingsStore.ai)
-    : getActiveService(settingsStore.ai);
+    ? enabledServices.find(s => s.id === selectedServiceId) || enabledServices[0]
+    : enabledServices[0];
 
-  const aiParams = getAIInvokeParamsForService(selectedServiceId || undefined);
-  const aiAvailable = !!(aiParams.provider && aiParams.apiKey && aiParams.model);
+  const aiParams = host.ai.getServiceParams(selectedServiceId || '');
+  const aiAvailable = !!(aiParams && aiParams.provider && aiParams.apiKey && aiParams.model);
   const providerCaps = (() => {
-    if (!aiParams.provider) return { webSearch: false, thinking: false };
+    if (!aiParams?.provider) return { webSearch: false, thinking: false };
     const cfg = getProviderConfig(aiParams.provider as AIProvider);
     return cfg?.capabilities || { webSearch: false, thinking: false };
   })();
@@ -688,7 +685,7 @@ export function MindMapAssistantPanel({
       </div>
 
       {/* ── 快捷操作栏 ── */}
-      <div className="flex items-center gap-1 px-2.5 py-1 border-b bg-muted/20 flex-shrink-0 overflow-x-auto">
+      <div className="flex items-center gap-1 px-2.5 py-1 border-b bg-muted/20 flex-shrink-0 overflow-x-auto scrollbar-hide">
         <Button variant="outline" size="sm" className="h-6 text-xs gap-1 shrink-0" onClick={() => setQaPaletteOpen(true)} title="快捷操作 (⌘K)">
           <Zap className="h-3 w-3" />快捷操作
         </Button>
@@ -811,7 +808,7 @@ export function MindMapAssistantPanel({
                         <CollapsibleThinkingBlock
                           thinking={parsed.thinking}
                           isThinking={false}
-                          theme={resolveTheme()}
+                          theme={host.ui.getTheme()}
                         />
                       )}
                       <MarkdownPreview content={parsed.content || msg.content} className="text-sm" />
@@ -862,7 +859,7 @@ export function MindMapAssistantPanel({
                 <CollapsibleThinkingBlock
                   thinking={streamParsed.thinking}
                   isThinking={streamParsed.isThinking}
-                  theme={resolveTheme()}
+                  theme={host.ui.getTheme()}
                 />
               )}
               {streamParsed.content && (

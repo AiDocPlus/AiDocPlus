@@ -27,9 +27,9 @@ export const DEFAULT_APPEARANCE: EditorAppearance = {
 };
 
 const FONT_OPTIONS = [
-  { value: 'songti' as const, label: '宋体', css: "'宋体', 'SimSun', serif" },
-  { value: 'kaiti' as const, label: '楷体', css: "'楷体', 'KaiTi', serif" },
-  { value: 'fangsong' as const, label: '仿宋', css: "'仿宋', 'FangSong', serif" },
+  { value: 'songti' as const, label: '宋体', css: "'Songti SC', 'SimSun', 'STSong', serif" },
+  { value: 'kaiti' as const, label: '楷体', css: "'Kaiti SC', 'STKaiti', 'KaiTi', serif" },
+  { value: 'fangsong' as const, label: '仿宋', css: "'STFangsong', 'FangSong', serif" },
 ];
 
 const BG_PRESETS = [

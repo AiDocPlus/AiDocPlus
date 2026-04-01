@@ -99,10 +99,67 @@ pub fn pandoc_export(
     title: Option<String>,
 ) -> crate::error::Result<String> {
     use crate::error::{AppError, ResultExt};
-    // 确保输出目录存在
-    if let Some(parent) = std::path::Path::new(&outputPath).parent() {
+
+    // 安全检查：验证输出路径在允许的目录内（用户主目录、AiDocPlus 数据目录、临时目录）
+    let output_path = std::path::Path::new(&outputPath);
+    if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent).context("创建输出目录失败")?;
     }
+    let canonical_output = output_path.canonicalize()
+        .map_err(|e| AppError::ValidationError(format!("输出路径无效: {}", e)))?;
+    let mut is_output_allowed = false;
+    // 检查是否在 AiDocPlus 数据目录下
+    let data_root = crate::config::current_data_root();
+    if let Ok(root) = data_root.canonicalize() {
+        if canonical_output.starts_with(&root) { is_output_allowed = true; }
+    }
+    // 检查是否在用户主目录下
+    if !is_output_allowed {
+        if let Some(home) = dirs::home_dir() {
+            if let Ok(home_c) = home.canonicalize() {
+                if canonical_output.starts_with(&home_c) { is_output_allowed = true; }
+            }
+        }
+    }
+    // 检查是否在临时目录下
+    if !is_output_allowed {
+        if let Ok(tmp) = std::env::temp_dir().canonicalize() {
+            if canonical_output.starts_with(&tmp) { is_output_allowed = true; }
+        }
+    }
+    if !is_output_allowed {
+        return Err(AppError::SecurityError(
+            "安全限制：导出路径不在允许的目录内（用户主目录/AiDocPlus/临时目录）".to_string()
+        ));
+    }
+
+    // Pandoc 安全参数白名单（只允许已知的非危险参数）
+    let safe_args_whitelist: &[&str] = &[
+        "-V",           // 变量设置（metadata variable）
+        "--metadata",   // 元数据
+        "-s",           // 独立文档
+        "--standalone",
+        "-S",           // 独立文档（旧写法）
+        "--smart",
+        "--css",        // CSS 样式
+        "--toc",        // 目录
+        "--toc-depth",  // 目录深度
+        "--highlight-style", // 代码高亮
+        "--reference-doc",   // 参考文档模板
+        "-N",           // 章节编号
+        "--number-sections",
+        "--wrap",       // 自动换行
+        "--columns",    // 列宽
+        "-f",           // 输入格式
+        "-t",           // 输出格式
+        "--pdf-engine", // PDF 引擎
+        "-o",           // 输出文件
+        "--resource-path", // 资源路径
+        "--extract-media", // 提取媒体
+        "--self-contained", // 自包含
+        "--embed-resources", // 嵌入资源
+        "--data-dir",   // 数据目录
+    ];
 
     // 创建临时 Markdown 文件
     let temp_dir = std::env::temp_dir().join("aidocplus_pandoc");
@@ -124,19 +181,56 @@ pub fn pandoc_export(
         }
     }
 
-    // 添加额外参数
+    // 添加额外参数（白名单过滤）
     if let Some(args) = &extraArgs {
         for arg in args {
             let trimmed = arg.trim();
-            if !trimmed.is_empty() {
-                // 处理 -V key=value 格式（两个参数）
-                if trimmed.starts_with("-V ") || trimmed.starts_with("-V\t") {
-                    cmd.arg("-V");
-                    cmd.arg(trimmed[3..].trim());
+            if trimmed.is_empty() { continue; }
+
+            // 处理 -V key=value 格式（两个参数合并为一个）
+            if trimmed.starts_with("-V ") || trimmed.starts_with("-V\t") {
+                cmd.arg("-V");
+                cmd.arg(trimmed[3..].trim());
+                continue;
+            }
+
+            // 白名单检查：提取参数名（第一个单词，去掉 -- 或 - 前缀）
+            let arg_name = trimmed.split_whitespace().next().unwrap_or(trimmed);
+            let clean_name = arg_name
+                .strip_prefix("--")
+                .or_else(|| arg_name.strip_prefix("-"))
+                .unwrap_or(arg_name);
+
+            if safe_args_whitelist.iter().any(|&safe| {
+                safe == arg_name || safe == clean_name
+                    || safe.starts_with('-') && arg_name == safe
+            }) {
+                // 对于需要取值的参数（如 --metadata、--css 等），拆分参数和值
+                let needs_value = [
+                    "--metadata", "-V", "--css", "--toc-depth", "--highlight-style",
+                    "--reference-doc", "--columns", "--pdf-engine", "--resource-path",
+                    "--extract-media", "--data-dir", "-f", "-t",
+                ];
+                if needs_value.iter().any(|&n| arg_name == n) {
+                    // 参数和值已合并在一起（如 "--css style.css"），需要拆分
+                    if let Some(eq_pos) = trimmed.find('=') {
+                        cmd.arg(&trimmed[..eq_pos]);
+                        cmd.arg(trimmed[eq_pos + 1..].trim());
+                    } else {
+                        // 按空格拆分第一个单词作为参数名，其余作为值
+                        let parts: Vec<&str> = trimmed.splitn(2, char::is_whitespace).collect();
+                        if parts.len() == 2 {
+                            cmd.arg(parts[0]);
+                            cmd.arg(parts[1].trim());
+                        } else {
+                            cmd.arg(trimmed);
+                        }
+                    }
                 } else {
                     cmd.arg(trimmed);
                 }
             }
+            // 不在白名单的参数被静默忽略（安全策略）
         }
     }
 

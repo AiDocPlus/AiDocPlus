@@ -62,9 +62,61 @@ pub async fn run_script_stream(
     let timeout_secs = timeoutSecs.unwrap_or(30);
     let start = std::time::Instant::now();
 
+    // 安全检查：验证解释器路径，只允许 Python 和 Node.js
+    let interpreter_path = std::path::PathBuf::from(&interpreter);
+    let canonical_interpreter = interpreter_path.canonicalize()
+        .map_err(|e| AppError::ValidationError(format!("解释器路径无效: {}", e)))?;
+    let is_allowed_interpreter = {
+        let mut allowed = false;
+        // 检查是否是系统检测到的 Python 解释器
+        if let Some(py) = super::python::find_python(None) {
+            if let Ok(py_path) = std::path::PathBuf::from(&py).canonicalize() {
+                if canonical_interpreter == py_path { allowed = true; }
+            }
+        }
+        // 检查是否是系统检测到的 Node.js 解释器
+        if let Some(node) = super::nodejs::find_node(None) {
+            if let Ok(node_path) = std::path::PathBuf::from(&node).canonicalize() {
+                if canonical_interpreter == node_path { allowed = true; }
+            }
+        }
+        // 严格匹配解释器文件名（不允许 python3-malicious 等变体）
+        let exe_name = canonical_interpreter
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+        let allowed_names = [
+            "python", "python3", "python3.10", "python3.11", "python3.12", "python3.13",
+            "python3.14", "py", "node", "nodejs",
+        ];
+        if allowed_names.contains(&exe_name.as_str()) {
+            allowed = true;
+        }
+        allowed
+    };
+    if !is_allowed_interpreter {
+        return Err(AppError::SecurityError(format!(
+            "安全限制：不允许使用此解释器 '{}'，仅支持 Python 和 Node.js", interpreter
+        )));
+    }
+
+    // 使用规范化后的解释器路径（防止 PATH 劫持）
+    let safe_interpreter = canonical_interpreter.to_string_lossy().to_string();
+
+    // 安全检查：验证脚本路径在允许的目录内（防止任意文件执行）
+    let safe_script_path = crate::security::validate_path_allowed(
+        std::path::Path::new(&scriptPath), "scriptPath"
+    )?;
+
+    // 安全检查：验证 cwd 在允许的目录内
+    if let Some(ref dir) = cwd {
+        crate::security::validate_path_allowed(std::path::Path::new(dir), "cwd")?;
+    }
+
     // Build the tokio async command
-    let mut cmd = TokioCommand::new(&interpreter);
-    cmd.arg(&scriptPath);
+    let mut cmd = TokioCommand::new(&safe_interpreter);
+    cmd.arg(&safe_script_path);
 
     if let Some(ref extra_args) = args {
         for a in extra_args {
@@ -72,9 +124,18 @@ pub async fn run_script_stream(
         }
     }
 
-    // Set environment variables
+    // Set environment variables（过滤危险键）
+    const DANGEROUS_ENV_KEYS: &[&str] = &[
+        "LD_PRELOAD", "DYLD_INSERT_LIBRARIES", "DYLD_FRAMEWORK_PATH",
+        "DYLD_LIBRARY_PATH", "NODE_OPTIONS", "ELECTRON_RUN_AS_NODE",
+        "PYTHONSTARTUP", "PYTHONPATH", "NODE_PATH",
+        "RUST_LOG", "RUST_BACKTRACE",
+    ];
     if let Some(ref vars) = envVars {
         for (k, v) in vars {
+            if DANGEROUS_ENV_KEYS.contains(&k.as_str()) {
+                continue; // 跳过危险环境变量，防止代码注入和路径劫持
+            }
             cmd.env(k, v);
         }
     }
@@ -83,6 +144,10 @@ pub async fn run_script_stream(
     if let Some((port, token)) = crate::api_server::get_api_connection_info() {
         cmd.env("AIDOCPLUS_API_PORT", port.to_string());
         cmd.env("AIDOCPLUS_API_TOKEN", &token);
+        // 注入 Script 级别身份签名（token 前 16 字符），用于 API Server 身份验证
+        if token.len() >= 16 {
+            cmd.env("AIDOCPLUS_SCRIPT_SIGNATURE", &token[..16]);
+        }
         // 注入 SDK 路径到 PYTHONPATH，使 import aidocplus 可用
         if let Some(sdk_path) = crate::api_server::get_python_sdk_path() {
             let existing = std::env::var("PYTHONPATH").unwrap_or_default();
@@ -105,12 +170,11 @@ pub async fn run_script_stream(
         }
     }
 
-    // Set working directory
+    // Set working directory（使用 canonicalized 路径）
     if let Some(ref dir) = cwd {
         cmd.current_dir(dir);
     } else {
-        let script = std::path::PathBuf::from(&scriptPath);
-        if let Some(parent) = script.parent() {
+        if let Some(parent) = safe_script_path.parent() {
             if parent.exists() {
                 cmd.current_dir(parent);
             }

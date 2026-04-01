@@ -139,6 +139,22 @@ pub fn get_data_root_path(state: State<'_, AppState>) -> Result<String> {
 #[tauri::command]
 pub fn change_data_root(state: State<'_, AppState>, newPath: String) -> Result<()> {
     let new_root = PathBuf::from(&newPath);
+
+    // 安全限制：数据目录必须在用户 home 目录下（防止写入系统目录）
+    if let Some(home) = dirs::home_dir() {
+        let canonical_new = if new_root.exists() {
+            new_root.canonicalize().unwrap_or(new_root.clone())
+        } else {
+            new_root.clone()
+        };
+        let canonical_home = home.canonicalize().unwrap_or(home);
+        if !canonical_new.starts_with(&canonical_home) {
+            return Err(AppError::SecurityError(
+                "安全限制：数据目录必须在用户主目录下".to_string()
+            ));
+        }
+    }
+
     if !new_root.exists() {
         fs::create_dir_all(&new_root).context("创建目录失败")?;
     }
@@ -153,6 +169,21 @@ pub fn change_data_root(state: State<'_, AppState>, newPath: String) -> Result<(
 pub fn migrate_data_to_new_root(state: State<'_, AppState>, newPath: String) -> Result<String> {
     let old_root = state.data_root();
     let new_root = PathBuf::from(&newPath);
+
+    // 安全限制：目标目录必须在用户 home 目录下
+    if let Some(home) = dirs::home_dir() {
+        let canonical_new = if new_root.exists() {
+            new_root.canonicalize().unwrap_or(new_root.clone())
+        } else {
+            new_root.clone()
+        };
+        let canonical_home = home.canonicalize().unwrap_or(home);
+        if !canonical_new.starts_with(&canonical_home) {
+            return Err(AppError::SecurityError(
+                "安全限制：数据目录必须在用户主目录下".to_string()
+            ));
+        }
+    }
 
     if old_root == new_root {
         return Err(AppError::ValidationError("新旧数据目录相同，无需迁移".to_string()));

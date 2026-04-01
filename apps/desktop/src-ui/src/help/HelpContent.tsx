@@ -12,6 +12,16 @@ interface HelpContentProps {
   doc: HelpDoc | null;
 }
 
+/** HTML 特殊字符转义，防止 XSS */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 /** 简单 Markdown → HTML 转换 */
 export function markdownToHtml(md: string): string {
   let html = md;
@@ -21,8 +31,8 @@ export function markdownToHtml(md: string): string {
     return `<pre><code>${escapeHtml(code.trim())}</code></pre>`;
   });
 
-  // 行内代码
-  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // 行内代码（先处理行内代码，避免后续替换影响代码内容）
+  html = html.replace(/`([^`]+)`/g, (_m, code) => `<code>${escapeHtml(code)}</code>`);
 
   // 表格
   html = html.replace(
@@ -33,11 +43,11 @@ export function markdownToHtml(md: string): string {
         row.split('|').filter((c: string) => c.trim())
       );
       let table = '<table><thead><tr>';
-      headers.forEach((h: string) => { table += `<th>${h.trim()}</th>`; });
+      headers.forEach((h: string) => { table += `<th>${escapeHtml(h.trim())}</th>`; });
       table += '</tr></thead><tbody>';
       rows.forEach((row: string[]) => {
         table += '<tr>';
-        row.forEach((cell: string) => { table += `<td>${cell.trim()}</td>`; });
+        row.forEach((cell: string) => { table += `<td>${escapeHtml(cell.trim())}</td>`; });
         table += '</tr>';
       });
       table += '</tbody></table>';
@@ -46,47 +56,42 @@ export function markdownToHtml(md: string): string {
   );
 
   // 标题
-  html = html.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
-  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  html = html.replace(/^#### (.+)$/gm, (_m, t) => `<h4>${escapeHtml(t)}</h4>`);
+  html = html.replace(/^### (.+)$/gm, (_m, t) => `<h3>${escapeHtml(t)}</h3>`);
+  html = html.replace(/^## (.+)$/gm, (_m, t) => `<h2>${escapeHtml(t)}</h2>`);
+  html = html.replace(/^# (.+)$/gm, (_m, t) => `<h1>${escapeHtml(t)}</h1>`);
 
   // 引用块
-  html = html.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+  html = html.replace(/^> (.+)$/gm, (_m, t) => `<blockquote>${escapeHtml(t)}</blockquote>`);
   // 合并连续的引用块
   html = html.replace(/<\/blockquote>\n<blockquote>/g, '\n');
 
   // 粗体和斜体
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  html = html.replace(/\*\*(.+?)\*\*/g, (_m, t) => `<strong>${escapeHtml(t)}</strong>`);
+  html = html.replace(/\*(.+?)\*/g, (_m, t) => `<em>${escapeHtml(t)}</em>`);
 
-  // 链接
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+  // 链接（文本和 URL 都需要转义）
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, text, url) => {
+    return `<a href="${escapeHtml(url)}">${escapeHtml(text)}</a>`;
+  });
 
   // 分隔线
   html = html.replace(/^---+$/gm, '<hr />');
 
   // 无序列表
-  html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/^- (.+)$/gm, (_m, t) => `<li>${escapeHtml(t)}</li>`);
   html = html.replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
 
   // 有序列表
-  html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/^\d+\. (.+)$/gm, (_m, t) => `<li>${escapeHtml(t)}</li>`);
 
   // 段落：非 HTML 标签开头的行包装为 <p>
-  html = html.replace(/^(?!<[a-z/])((?!^\s*$).+)$/gm, '<p>$1</p>');
+  html = html.replace(/^(?!<[a-z/])((?!^\s*$).+)$/gm, (_m, t) => `<p>${escapeHtml(t)}</p>`);
 
   // 清理多余空行
   html = html.replace(/\n{3,}/g, '\n\n');
 
   return html;
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
 }
 
 export function HelpContent({ doc }: HelpContentProps) {

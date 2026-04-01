@@ -5,14 +5,13 @@
  * 标准格式导入导出，兼容 Workflowy、Dynalist、幕布
  */
 
-import type { Outline, OutlineDocumentContent, OutlineNode, RichTextContent } from '../types';
+import type { Outline, OutlineDocumentContent, OutlineNode } from '../types';
 import {
   createDefaultSettings,
   createRichTextFromPlain,
   extractTagsFromText,
   extractMentionsFromText,
   generateId,
-  getPlainTextFromContent,
   normalizeOutlineHeadingLevel,
 } from '../types';
 

@@ -54,6 +54,7 @@ use commands::{
     novel::*,
     stock::*,
     sync::*,
+    mail_client::*,
 };
 use commands::tts::TtsState;
 use commands::script_runner::RunningScriptState;
@@ -62,7 +63,7 @@ use commands::sync::SyncState;
 use aidocplus_manager_rust::commands::DataDirState;
 use tauri::{Manager, Emitter, Listener};
 use tauri::menu::{
-    MenuBuilder, SubmenuBuilder, MenuItem,
+    MenuBuilder, SubmenuBuilder, MenuItem, PredefinedMenuItem,
 };
 
 fn main() {
@@ -283,14 +284,14 @@ fn main() {
                 .build()?;
 
             let edit_menu = SubmenuBuilder::new(handle, t.edit)
-                .item(&MenuItem::with_id(handle, "undo", t.undo, true, Some("CmdOrCtrl+Z"))?)
-                .item(&MenuItem::with_id(handle, "redo", t.redo, true, Some("CmdOrCtrl+Shift+Z"))?)
+                .item(&PredefinedMenuItem::undo(handle, Some(t.undo))?)
+                .item(&PredefinedMenuItem::redo(handle, Some(t.redo))?)
                 .separator()
-                .item(&MenuItem::with_id(handle, "cut", t.cut, true, Some("CmdOrCtrl+X"))?)
-                .item(&MenuItem::with_id(handle, "copy", t.copy, true, Some("CmdOrCtrl+C"))?)
-                .item(&MenuItem::with_id(handle, "paste", t.paste, true, Some("CmdOrCtrl+V"))?)
+                .item(&PredefinedMenuItem::cut(handle, Some(t.cut))?)
+                .item(&PredefinedMenuItem::copy(handle, Some(t.copy))?)
+                .item(&PredefinedMenuItem::paste(handle, Some(t.paste))?)
                 .item(&MenuItem::with_id(handle, "paste_plain", t.paste_plain, true, Some("CmdOrCtrl+Shift+V"))?)
-                .item(&MenuItem::with_id(handle, "select_all", t.select_all, true, Some("CmdOrCtrl+A"))?)
+                .item(&PredefinedMenuItem::select_all(handle, Some(t.select_all))?)
                 .separator()
                 .item(&MenuItem::with_id(handle, "find", t.find, true, Some("CmdOrCtrl+F"))?)
                 .item(&MenuItem::with_id(handle, "find_replace", t.find_replace, true, None::<&str>)?)
@@ -347,6 +348,14 @@ fn main() {
                     true,
                     None::<&str>,
                 )?)
+                .separator()
+                .item(&MenuItem::with_id(
+                    handle,
+                    "tools_mail_client",
+                    t.tools_mail_client,
+                    true,
+                    None::<&str>,
+                )?)
                 .build()?;
 
             // 帮助菜单
@@ -387,6 +396,9 @@ fn main() {
                     }
                     "tools_ebook_reader" => {
                         let _ = commands::ebook_reader::open_ebook_reader(app_handle.clone());
+                    }
+                    "tools_mail_client" => {
+                        let _ = commands::mail_client::open_mail_client(app_handle.clone());
                     }
                     // 其他事件转发到前端
                     _ => {
@@ -552,6 +564,15 @@ fn main() {
             store_email_credential,
             delete_email_credential,
 
+            // IMAP commands (Phase 6)
+            commands::imap::imap_list_mailboxes,
+            commands::imap::imap_fetch_inbox,
+            commands::imap::imap_fetch_email,
+            commands::imap::imap_mark_read,
+            commands::imap::imap_delete_email,
+            commands::imap::imap_search,
+            commands::imap::imap_get_status,
+
             // AI Credential commands (keyring)
             store_ai_credential,
             get_ai_credential,
@@ -673,6 +694,7 @@ fn main() {
             import_ebook,
             delete_ebook,
             toggle_ebook_starred,
+            update_ebook_metadata,
             rename_ebook,
             move_ebook,
             read_ebook_file,
@@ -684,6 +706,10 @@ fn main() {
             open_ebook_reader,
             export_ebook,
             move_category,
+
+            // 批注
+            save_annotations,
+            load_annotations,
 
             // 小说写作
             load_novel_settings,
@@ -741,6 +767,9 @@ fn main() {
             stock_money_supply_bal,
             stock_concept_detail,
             stock_hsgt_shenzhen,
+
+            // 邮件客户端
+            open_mail_client,
 
             // 云同步
             configure_sync,

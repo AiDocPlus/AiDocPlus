@@ -2,6 +2,24 @@
 
 所有重要变更记录在此文件中。
 
+## [0.3.13] — 2026-04-02
+
+### 修复
+- **SSE 解析兼容性** — 支持 `data:` 无空格变体（SSE 规范允许），修复部分 Provider 流式响应解析失败
+- **OpenAI Responses API reasoning 标记** — `response.reasoning.delta` 事件添加 💭 标记，推理/正文切换时正确开关标记
+- **非流式联网搜索 temperature** — `call_openai_responses` 和 `call_anthropic_with_search` 传递 temperature 参数
+- **MiniMax 默认模型更新** — `MiniMax-M2.5` → `MiniMax-M2.7`
+- **temperature 参数传递** — `chat_stream` 和 `generate_content_stream` 正确传递 temperature 到后端
+- **web_search 参数防护** — 联网搜索开关关闭时不覆盖 tools 参数
+- **reasoning 安全关闭** — 深度思考结束后确保关闭 💭 标记
+- **Anthropic system 消息** — 非流式 Anthropic 调用正确提取 system 消息
+- **代理配置** — AI 流式请求正确传递 proxy_url
+- **Token 估算** — 图片 token 估算支持，滑动窗口截断计算图片 token
+
+### 改进
+- **SSE 解析重构** — `collect_stream_tool_calls` 重构为使用通用 `for_each_sse_event`，消除 ~160 行重复代码
+- **Send 安全** — 所有 async 闭包使用 `AtomicBool`/`Mutex` 替代 `Cell`/`RefCell`，确保 Tauri 命令线程安全
+
 ## [0.3.10] — 2026-03-20
 
 ### 改进

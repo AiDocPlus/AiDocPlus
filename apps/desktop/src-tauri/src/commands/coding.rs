@@ -20,14 +20,23 @@ fn ensure_scripts_dir() -> crate::error::Result<()> {
     fs::create_dir_all(&dir).map_err(|e| crate::error::AppError::Internal(format!("创建脚本目录失败: {}", e)))
 }
 
-/// 解析文件路径：相对路径基于 CodingScripts 目录，绝对路径直接使用
-fn resolve_path(file_path: &str) -> PathBuf {
+/// 解析文件路径：仅允许相对路径，基于 CodingScripts 目录
+fn resolve_path(file_path: &str) -> crate::error::Result<PathBuf> {
     let p = PathBuf::from(file_path);
     if p.is_absolute() {
-        p
-    } else {
-        coding_scripts_dir().join(file_path)
+        return Err(crate::error::AppError::SecurityError(
+            "安全限制：只允许相对路径".to_string()
+        ));
     }
+    // 拒绝包含 .. 的路径组件
+    for component in p.components() {
+        if let std::path::Component::ParentDir = component {
+            return Err(crate::error::AppError::SecurityError(
+                "安全限制：路径中不允许包含 ..".to_string()
+            ));
+        }
+    }
+    Ok(coding_scripts_dir().join(file_path))
 }
 
 // ── 脚本文件信息 ──
@@ -110,11 +119,23 @@ pub fn read_coding_script(
     #[allow(non_snake_case)]
     filePath: String,
 ) -> crate::error::Result<String> {
-    let path = resolve_path(&filePath);
+    let path = resolve_path(&filePath)?;
     if !path.exists() {
         return Err(crate::error::AppError::Internal(format!("文件不存在: {}", filePath)));
     }
-    fs::read_to_string(&path).map_err(|e| crate::error::AppError::Internal(format!("读取文件失败: {}", e)))
+
+    // 安全检查：解析后的路径必须在 CodingScripts 目录下
+    let canonical = path.canonicalize()
+        .map_err(|e| crate::error::AppError::ValidationError(format!("路径无效: {}", e)))?;
+    let scripts_dir = coding_scripts_dir();
+    let scripts_canonical = scripts_dir.canonicalize().unwrap_or(scripts_dir);
+    if !canonical.starts_with(&scripts_canonical) {
+        return Err(crate::error::AppError::SecurityError(
+            "安全限制：只能读取 CodingScripts 目录下的文件".to_string()
+        ));
+    }
+
+    fs::read_to_string(&canonical).map_err(|e| crate::error::AppError::Internal(format!("读取文件失败: {}", e)))
 }
 
 /// 保存脚本文件
@@ -125,7 +146,10 @@ pub fn save_coding_script(
     content: String,
 ) -> crate::error::Result<String> {
     ensure_scripts_dir()?;
-    let path = resolve_path(&filePath);
+    let path = resolve_path(&filePath)?;
+
+    // 路径安全由 resolve_path 保证（拒绝绝对路径和 ..）
+
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| crate::error::AppError::Internal(format!("创建目录失败: {}", e)))?;
     }
@@ -139,7 +163,8 @@ pub fn delete_coding_script(
     #[allow(non_snake_case)]
     filePath: String,
 ) -> crate::error::Result<()> {
-    let path = resolve_path(&filePath);
+    let path = resolve_path(&filePath)?;
+
     if path.exists() {
         fs::remove_file(&path).map_err(|e| crate::error::AppError::Internal(format!("删除文件失败: {}", e)))?;
     }
@@ -154,10 +179,11 @@ pub fn rename_coding_script(
     #[allow(non_snake_case)]
     newName: String,
 ) -> crate::error::Result<String> {
-    let old_path = resolve_path(&filePath);
+    let old_path = resolve_path(&filePath)?;
     if !old_path.exists() {
         return Err(crate::error::AppError::Internal(format!("文件不存在: {}", filePath)));
     }
+
     let parent = old_path.parent().ok_or_else(|| crate::error::AppError::Internal("无法获取父目录".to_string()))?;
     let new_path = parent.join(&newName);
     if new_path.exists() {
@@ -266,7 +292,8 @@ pub fn create_coding_folder(
     folderPath: String,
 ) -> crate::error::Result<()> {
     ensure_scripts_dir()?;
-    let path = resolve_path(&folderPath);
+    let path = resolve_path(&folderPath)?;
+
     fs::create_dir_all(&path).map_err(|e| crate::error::AppError::Internal(format!("创建文件夹失败: {}", e)))
 }
 
@@ -276,9 +303,10 @@ pub fn delete_coding_folder(
     #[allow(non_snake_case)]
     folderPath: String,
 ) -> crate::error::Result<()> {
-    let path = resolve_path(&folderPath);
+    let path = resolve_path(&folderPath)?;
     if !path.exists() { return Ok(()); }
     if !path.is_dir() { return Err(crate::error::AppError::ValidationError("不是文件夹".to_string())); }
+
     fs::remove_dir_all(&path).map_err(|e| crate::error::AppError::Internal(format!("删除文件夹失败: {}", e)))
 }
 
@@ -290,10 +318,11 @@ pub fn move_coding_item(
     #[allow(non_snake_case)]
     toPath: String,
 ) -> crate::error::Result<()> {
-    let from = resolve_path(&fromPath);
-    let to = resolve_path(&toPath);
+    let from = resolve_path(&fromPath)?;
+    let to = resolve_path(&toPath)?;
     if !from.exists() { return Err(crate::error::AppError::Internal(format!("源路径不存在: {}", fromPath))); }
     if to.exists() { return Err(crate::error::AppError::ValidationError(format!("目标已存在: {}", toPath))); }
+
     if let Some(parent) = to.parent() {
         fs::create_dir_all(parent).map_err(|e| crate::error::AppError::Internal(format!("创建目录失败: {}", e)))?;
     }
@@ -349,13 +378,40 @@ pub fn search_coding_files(query: String) -> crate::error::Result<Vec<SearchResu
     Ok(results)
 }
 
-/// 读取外部文件（绝对路径）
+/// 读取外部文件（绝对路径），限制只能读取用户主目录下的文件
 #[tauri::command]
 pub fn read_external_file(path: String) -> crate::error::Result<String> {
+    use crate::error::{AppError, ResultExt};
     let p = std::path::PathBuf::from(&path);
-    if !p.exists() { return Err(crate::error::AppError::Internal(format!("文件不存在: {}", path))); }
-    if !p.is_file() { return Err(crate::error::AppError::ValidationError(format!("不是文件: {}", path))); }
-    fs::read_to_string(&p).map_err(|e| crate::error::AppError::Internal(format!("读取失败: {}", e)))
+    if !p.exists() { return Err(AppError::Internal(format!("文件不存在: {}", path))); }
+    if !p.is_file() { return Err(AppError::ValidationError(format!("不是文件: {}", path))); }
+
+    // 安全检查：canonicalize 后的路径必须在用户主目录下
+    let canonical = p.canonicalize()
+        .map_err(|e| AppError::ValidationError(format!("路径无效: {}", e)))?;
+    if let Some(home) = dirs::home_dir() {
+        let home_canonical = home.canonicalize().unwrap_or(home);
+        if !canonical.starts_with(&home_canonical) {
+            return Err(AppError::SecurityError(
+                "安全限制：只允许读取用户主目录下的文件".to_string()
+            ));
+        }
+    } else {
+        return Err(AppError::Internal("无法获取用户主目录，拒绝读取".to_string()));
+    }
+
+    // 文件大小检查：超过 50MB 拒绝
+    let metadata = fs::metadata(&canonical).context("获取文件信息失败")?;
+    let max_size: u64 = 50 * 1024 * 1024; // 50MB
+    if metadata.len() > max_size {
+        return Err(AppError::ValidationError(format!(
+            "文件过大（{} MB），最大允许读取 {} MB",
+            metadata.len() / 1024 / 1024,
+            max_size / 1024 / 1024
+        )));
+    }
+
+    fs::read_to_string(&canonical).map_err(|e| AppError::Internal(format!("读取失败: {}", e)))
 }
 
 // ── pip 包管理 ──

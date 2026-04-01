@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from 'pdfjs-dist';
-import { ZoomIn, ZoomOut, Loader2 } from 'lucide-react';
+import { ZoomIn, ZoomOut, Loader2, ChevronLeft } from 'lucide-react';
 
 // 本地加载 PDF.js Worker，不依赖 CDN（离线可用）
 GlobalWorkerOptions.workerSrc = new URL(
@@ -10,26 +10,27 @@ GlobalWorkerOptions.workerSrc = new URL(
 
 interface PdfReaderProps {
   data: Uint8Array;
+  /** 恢复上次阅读页码 */
+  initialPage?: number;
   onPageChange?: (page: number, total: number) => void;
 }
 
-// 正在渲染的页面集合，防止并发渲染同一页
-const renderingPages = new Set<number>();
-
-export function PdfReader({ data, onPageChange }: PdfReaderProps) {
+export function PdfReader({ data, initialPage, onPageChange }: PdfReaderProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const pagesWrapperRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
+  const renderingPagesRef = useRef(new Set<number>());
   const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
   const [totalPages, setTotalPages] = useState<number>(0);
-  // scale 初始为 0，表示尚未计算 fitWidth
   const [scale, setScale] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [pageInput, setPageInput] = useState('');
   const renderedScaleRef = useRef<number>(0);
   const onPageChangeRef = useRef(onPageChange);
   onPageChangeRef.current = onPageChange;
+  const initialPageRestoredRef = useRef(false);
 
   // Load PDF when data changes
   useEffect(() => {
@@ -98,17 +99,15 @@ export function PdfReader({ data, onPageChange }: PdfReaderProps) {
     pageNum: number,
     targetScale: number,
   ) => {
-    if (renderingPages.has(pageNum)) return;
+    if (renderingPagesRef.current.has(pageNum)) return;
 
-    const canvas = document.getElementById(`pdf-page-${pageNum}`) as HTMLCanvasElement | null;
+    const canvas = pagesWrapperRef.current?.querySelector<HTMLCanvasElement>(`canvas[data-page-num="${pageNum}"]`);
     if (!canvas) return;
 
-    let cancelled = false;
-    renderingPages.add(pageNum);
+    renderingPagesRef.current.add(pageNum);
 
     try {
       const page = await pdf.getPage(pageNum);
-      if (cancelled) return;
 
       const context = canvas.getContext('2d');
       if (!context) return;
@@ -124,7 +123,7 @@ export function PdfReader({ data, onPageChange }: PdfReaderProps) {
         // ignore
       }
     } finally {
-      renderingPages.delete(pageNum);
+      renderingPagesRef.current.delete(pageNum);
     }
   }, []);
 
@@ -197,6 +196,32 @@ export function PdfReader({ data, onPageChange }: PdfReaderProps) {
     return () => { observerRef.current?.disconnect(); };
   }, []);
 
+  const scrollToPage = useCallback((pageNum: number) => {
+    if (pageNum < 1 || pageNum > totalPages || !containerRef.current) return;
+    const canvas = pagesWrapperRef.current?.querySelector<HTMLElement>(`canvas[data-page-num="${pageNum}"]`);
+    if (canvas) {
+      canvas.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setCurrentPage(pageNum);
+      onPageChangeRef.current?.(pageNum, totalPages);
+    }
+  }, [totalPages]);
+
+  // 恢复上次阅读页码
+  useEffect(() => {
+    if (!pdfDoc || scale <= 0 || !initialPage || initialPage <= 1 || initialPageRestoredRef.current) return;
+    initialPageRestoredRef.current = true;
+    const timer = setTimeout(() => {
+      scrollToPage(initialPage);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [pdfDoc, scale, initialPage, scrollToPage]);
+
+  const handlePageInputSubmit = useCallback(() => {
+    const num = parseInt(pageInput, 10);
+    if (!isNaN(num)) scrollToPage(num);
+    setPageInput('');
+  }, [pageInput, scrollToPage]);
+
   if (loading || (pdfDoc && scale <= 0)) {
     return (
       <div ref={containerRef} className="flex items-center justify-center h-full">
@@ -212,9 +237,17 @@ export function PdfReader({ data, onPageChange }: PdfReaderProps) {
   return (
     <div className="flex flex-col h-full">
       <div className="reader-toolbar">
-        <span className="text-xs text-muted-foreground min-w-[70px] text-center font-medium tabular-nums">
-          {currentPage} / {totalPages}
-        </span>
+        <button onClick={() => currentPage > 1 && scrollToPage(currentPage - 1)} className="reader-renderer-btn" aria-label="Previous page" disabled={currentPage <= 1}>
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <input
+          type="text"
+          value={pageInput || String(currentPage)}
+          onChange={(e) => setPageInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') handlePageInputSubmit(); if (e.key === 'Escape') setPageInput(''); }}
+          className="w-10 text-center text-xs bg-transparent border border-border rounded px-1 py-0.5 font-mono tabular-nums focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+        <span className="text-xs text-muted-foreground">/ {totalPages}</span>
         <div className="reader-toolbar-sep" />
         <button onClick={() => setScale(s => Math.max(0.5, s - 0.2))} className="reader-renderer-btn" aria-label="Zoom out">
           <ZoomOut className="h-4 w-4" />
@@ -229,7 +262,6 @@ export function PdfReader({ data, onPageChange }: PdfReaderProps) {
           {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
             <canvas
               key={pageNum}
-              id={`pdf-page-${pageNum}`}
               data-page-num={pageNum}
               className="max-w-full shadow-sm"
             />

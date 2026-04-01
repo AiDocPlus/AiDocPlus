@@ -14,18 +14,11 @@ import type {
   NovelDocumentContent,
   NovelChapter,
   NovelVolume,
-  NovelCharacter,
-  NovelForeshadowing,
-  NovelPlotline,
-  StyleProfile,
-  ChapterCharacterState,
   NovelMemoryContext,
 } from './types';
 import {
   getChapterById,
-  getVolumeByChapterId,
   getEffectiveContent,
-  getChapterWordCount,
 } from './types';
 import { buildStyleInjectionPrompt } from './styleProfileGenerator';
 import { estimateTokens, trimToTokenBudget } from './novelContext';
@@ -326,7 +319,6 @@ export function buildMemoryContext(
     includeSettings = true,
     includeRecentChapters = true,
     recentChapterCount = 3,
-    maxTotalTokens = 8000,
   } = options;
 
   const context: NovelMemoryContext = {};

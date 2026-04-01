@@ -96,6 +96,14 @@ export function QuickCaptureWindow() {
     saveTimerRef.current = setTimeout(() => saveItems(newItems), SAVE_DEBOUNCE_MS);
   }, []);
 
+  // --- cleanup on unmount ---
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
   // --- Toast ---
   const showToast = useCallback((message: string) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);

@@ -163,7 +163,7 @@ export default function StockComparisonPanel({
       </div>
 
       {/* 指标组选择 */}
-      <div className="flex gap-1 px-3 py-2 border-b overflow-x-auto">
+      <div className="flex gap-1 px-3 py-2 border-b overflow-x-auto scrollbar-hide">
         {[
           { key: 'valuation', label: t('stockResearch.valuationMetrics', { defaultValue: '估值' }) },
           { key: 'profitability', label: t('stockResearch.profitabilityMetrics', { defaultValue: '盈利' }) },

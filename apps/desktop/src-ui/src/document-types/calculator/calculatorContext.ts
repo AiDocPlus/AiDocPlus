@@ -4,7 +4,7 @@
  * 分层构建上下文（critical / important / supplementary），
  * 支持阶段检测（blank / editing / data_ready / has_errors）和 Token 预算管理。
  */
-import type { CalculatorSheet, CalculatorLine, CalculatorVariable } from './types';
+import type { CalculatorSheet } from './types';
 import { normalizeCalculatorVariables } from './types';
 
 // ═══════════════════════════════════════════════════════════════════════════

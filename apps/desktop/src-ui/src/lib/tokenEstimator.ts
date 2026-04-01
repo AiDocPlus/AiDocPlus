@@ -37,12 +37,16 @@ export function estimateTokens(text: string): number {
  * 每条消息额外 +4 tokens（角色标记 + 格式开销）
  */
 export function estimateMessagesTokens(
-  messages: Array<{ role: string; content: string }>
+  messages: Array<{ role: string; content: string; images?: { data: string; mimeType: string }[] }>
 ): number {
   const MESSAGE_OVERHEAD = 4; // 每条消息的固定开销
+  const IMAGE_TOKEN_ESTIMATE = 170; // 保守估算每张图片的 token 开销（低分辨率~85，高分辨率~170-1105）
   let total = 0;
   for (const msg of messages) {
     total += estimateTokens(msg.content) + MESSAGE_OVERHEAD;
+    if (msg.images && msg.images.length > 0) {
+      total += msg.images.length * IMAGE_TOKEN_ESTIMATE;
+    }
   }
   // 对话级开销（reply priming）
   total += 3;
@@ -180,7 +184,7 @@ const RESERVE_FOR_RESPONSE = 4096;
 
 export interface TruncationResult {
   /** 截断后的消息（用于发送给 AI） */
-  messages: Array<{ role: string; content: string }>;
+  messages: Array<{ role: string; content: string; images?: { data: string; mimeType: string }[] }>;
   /** 原始消息总 token 数 */
   totalTokens: number;
   /** 截断后实际使用的 token 数 */
@@ -203,7 +207,7 @@ export interface TruncationResult {
  * @param options - 配置项
  */
 export function truncateMessages(
-  allMessages: Array<{ role: string; content: string }>,
+  allMessages: Array<{ role: string; content: string; images?: { data: string; mimeType: string }[] }>,
   options: {
     model?: string;
     provider?: string;
@@ -225,8 +229,9 @@ export function truncateMessages(
   const totalTokens = estimateMessagesTokens(allMessages);
 
   // 分离 system 消息和对话消息
-  const systemMessages: Array<{ role: string; content: string }> = [];
-  const conversationMessages: Array<{ role: string; content: string }> = [];
+  type Msg = { role: string; content: string; images?: { data: string; mimeType: string }[] };
+  const systemMessages: Msg[] = [];
+  const conversationMessages: Msg[] = [];
 
   for (const msg of allMessages) {
     if (msg.role === 'system') {
@@ -241,13 +246,15 @@ export function truncateMessages(
   const remainingBudget = Math.max(0, maxTokenBudget - systemTokens);
 
   // 从后往前保留消息，直到超出 token 预算或消息条数限制
-  const keptMessages: Array<{ role: string; content: string }> = [];
+  const IMAGE_TOKEN_ESTIMATE = 170;
+  const keptMessages: Msg[] = [];
   let keptTokens = 0;
   let keptCount = 0;
 
   for (let i = conversationMessages.length - 1; i >= 0; i--) {
     const msg = conversationMessages[i];
-    const msgTokens = estimateTokens(msg.content) + 4; // +4 message overhead
+    const imageTokens = (msg.images && msg.images.length > 0) ? msg.images.length * IMAGE_TOKEN_ESTIMATE : 0;
+    const msgTokens = estimateTokens(msg.content) + 4 + imageTokens;
 
     if (keptTokens + msgTokens > remainingBudget) break;
     if (keptCount >= maxMessages) break;

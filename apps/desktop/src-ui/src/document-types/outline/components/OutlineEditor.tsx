@@ -58,14 +58,9 @@ import {
   getNodeAtPath,
   getParentNode,
   getSiblingNodes,
-  updateNodeInTree,
   removeNodeFromTree,
   insertNodeAtPath,
   cloneNodeTree,
-  createEmptyNode,
-  createRichTextFromPlain,
-  getPlainTextFromContent,
-  extractTagsFromContent,
 } from '../types';
 import { useNodeOperations } from '../hooks/useNodeOperations';
 import { useOutlineKeyboard } from '../hooks/useOutlineKeyboard';
@@ -73,7 +68,7 @@ import { writeOutlineSubtreeToClipboard, parseOutlineClipboardPayload } from '..
 import { parseClipboardOutlineText } from '../converters/importParsers';
 
 import { OutlineRow } from './OutlineRow';
-import { SearchPanel, highlightSearchMatches } from './SearchPanel';
+import { SearchPanel } from './SearchPanel';
 import type { ProseMirrorNodeEditorRef } from './ProseMirrorNodeEditor';
 import type { OutlineNodeMenuHandlersPartial } from './NodeFloatingMenu';
 
@@ -247,12 +242,12 @@ export const OutlineEditor = forwardRef(function OutlineEditor(
     );
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [searchCaseSensitive, setSearchCaseSensitive] = useState(false);
-    const [searchUseRegex, setSearchUseRegex] = useState(false);
+    const [searchCaseSensitive] = useState(false);
+    const [searchUseRegex] = useState(false);
     const scrollRef = useRef<HTMLDivElement | null>(null);
 
     // 拖拽状态
-    const [dragActiveId, setDragActiveId] = useState<string | null>(null);
+    const [_dragActiveId, setDragActiveId] = useState<string | null>(null);
     const [dragOverId, setDragOverId] = useState<string | null>(null);
 
     // 节点操作
@@ -1173,7 +1168,6 @@ export const OutlineEditor = forwardRef(function OutlineEditor(
           const nodesWithoutActive = removeNodeFromTree(outline.nodes, activeId);
           const activeParentPath = activePath.slice(0, -1);
           const overParentPath = overPath.slice(0, -1);
-          const activeIndex = activePath[activePath.length - 1];
           const overIndex = overPath[overPath.length - 1];
 
           const sameParent =

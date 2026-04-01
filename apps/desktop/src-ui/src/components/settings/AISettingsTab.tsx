@@ -138,6 +138,7 @@ export function AISettingsTab({ tempAI, updateTempAI }: AISettingsTabProps) {
         apiKey: editingService.apiKey || undefined,
         model: editingService.model || undefined,
         baseUrl: editingService.baseUrl || providerConfig?.baseUrl || undefined,
+        serviceId: editingService.id || undefined,
       });
       setTestResult({ ok: true, msg: result });
       setEditingService(prev => prev ? { ...prev, lastTestOk: true } : prev);

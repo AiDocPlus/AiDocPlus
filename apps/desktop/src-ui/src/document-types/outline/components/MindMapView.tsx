@@ -14,7 +14,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { extractAllNodes, type Outline, type OutlineNode } from '../types';
-import type { SMNode } from '@/plugins/mindmap/simple-mind-map.d.ts';
+import type { SMNode } from '@/plugins/mindmap/mindmapConverter';
 import { SimpleMindMapRenderer } from '@/plugins/mindmap/SimpleMindMapRenderer';
 import type { SimpleMindMapRendererRef, MindMapLayout } from '@/plugins/mindmap/SimpleMindMapRenderer';
 
@@ -89,15 +89,15 @@ function mindMapDataToOutlineNode(
               ],
             }
           : originalNode.content,
-        completed: smNode.data?.completed ?? originalNode.completed,
-        colorHighlight: smNode.data?.color ?? originalNode.colorHighlight,
-        notePlainText: smNode.data?.note ?? originalNode.notePlainText,
+        completed: (smNode.data?.completed as boolean) ?? originalNode.completed,
+        colorHighlight: (smNode.data?.color as string | undefined) ?? originalNode.colorHighlight,
+        notePlainText: (smNode.data?.note as string | undefined) ?? originalNode.notePlainText,
         updatedAt: new Date().toISOString(),
         children: [],
       }
     : {
         id:
-          smNode.data?.id ||
+          (smNode.data?.id as string) ||
           `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         content: {
           type: 'doc',
@@ -111,9 +111,9 @@ function mindMapDataToOutlineNode(
             : [],
         },
         plainText: smNode.data?.text || '',
-        tags: smNode.data?.tags || [],
+        tags: (smNode.data?.tags as string[]) || [],
         mentions: [],
-        completed: smNode.data?.completed || false,
+        completed: (smNode.data?.completed as boolean) || false,
         expanded: true,
         headingLevel: 0,
         createdAt: new Date().toISOString(),
@@ -123,7 +123,7 @@ function mindMapDataToOutlineNode(
 
   // 递归处理子节点
   if (smNode.children && smNode.children.length > 0) {
-    node.children = smNode.children.map((child) =>
+    node.children = smNode.children.map((child: any) =>
       mindMapDataToOutlineNode(child, originalNodes)
     );
   }
@@ -177,7 +177,7 @@ export const MindMapView = forwardRef(function MindMapView(
 
         // 转换回大纲结构
         const newNodes =
-          newData.children?.map((child) =>
+          newData.children?.map((child: any) =>
             mindMapDataToOutlineNode(child, allOriginalNodes)
           ) || [];
 

@@ -27,7 +27,6 @@ import { resolveTheme } from '@/components/chat/ChatMessage';
 import { CollapsibleThinkingBlock } from '@/document-types/_shared/CollapsibleThinkingBlock';
 import { formatBackendError } from '@/lib/backendError';
 import type { DocTypeHostAPI } from '@/doctype-sdk/types';
-import type { Document } from '@aidocplus/shared-types';
 import type { NovelDocumentContent } from './types';
 import {
   detectNovelPhase, buildSmartSystemPrompt,
@@ -122,7 +121,6 @@ function getOrCreateActiveSession(storage: StorageLike): NovelAISession {
 
 export interface NovelAISidebarProps {
   host: DocTypeHostAPI;
-  document: Document;
   novel: NovelDocumentContent;
   activeChapterId: string | null;
   activeSceneId?: string | null;

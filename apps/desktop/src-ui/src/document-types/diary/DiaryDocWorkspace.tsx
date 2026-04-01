@@ -167,6 +167,15 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
     }, META_SAVE_DEBOUNCE_MS);
   }, [host.doc]);
 
+  // ── 组件卸载时清理所有 timer ──
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      if (metaSaveTimerRef.current) clearTimeout(metaSaveTimerRef.current);
+      if (saveStatusTimerRef.current) clearTimeout(saveStatusTimerRef.current);
+    };
+  }, []);
+
   const handleSave = useCallback(() => {
     setIsSaving(true);
     setSaveStatus('saving');

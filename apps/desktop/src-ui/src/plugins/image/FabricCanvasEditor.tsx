@@ -288,7 +288,7 @@ const FabricCanvasEditor = forwardRef(function FabricCanvasEditor(
     if (!active) return;
     active.clone().then((cloned: any) => {
       clipboardRef.current = cloned;
-    });
+    }).catch(() => {});
   };
 
   const pasteImpl = (fc: FabricCanvas) => {
@@ -307,7 +307,7 @@ const FabricCanvasEditor = forwardRef(function FabricCanvasEditor(
       fc.setActiveObject(cloned);
       fc.requestRenderAll();
       notifyModified();
-    });
+    }).catch(() => {});
   };
 
   const duplicateImpl = (fc: FabricCanvas) => {
@@ -323,7 +323,7 @@ const FabricCanvasEditor = forwardRef(function FabricCanvasEditor(
       }
       fc.setActiveObject(cloned);
       fc.requestRenderAll();
-    });
+    }).catch(() => {});
   };
 
   // ── 撤销/重做实现 ──
@@ -503,12 +503,16 @@ const FabricCanvasEditor = forwardRef(function FabricCanvasEditor(
     addImageFromURL: async (url) => {
       const fc = fcRef.current;
       if (!fc) return;
-      const img = await FabricImage.fromURL(url, { crossOrigin: 'anonymous' });
-      scaleImageToFit(img, fc.getWidth() * 0.6, fc.getHeight() * 0.6);
-      img.set({ left: 50, top: 50 });
-      fc.add(img);
-      fc.setActiveObject(img);
-      fc.requestRenderAll();
+      try {
+        const img = await FabricImage.fromURL(url, { crossOrigin: 'anonymous' });
+        scaleImageToFit(img, fc.getWidth() * 0.6, fc.getHeight() * 0.6);
+        img.set({ left: 50, top: 50 });
+        fc.add(img);
+        fc.setActiveObject(img);
+        fc.requestRenderAll();
+      } catch {
+        // 加载图片失败时静默忽略
+      }
     },
 
     addImageFromFile: async (file) => {
@@ -655,6 +659,8 @@ const FabricCanvasEditor = forwardRef(function FabricCanvasEditor(
             fc.add(img);
             fc.setActiveObject(img);
             fc.requestRenderAll();
+            URL.revokeObjectURL(url);
+          }).catch(() => {
             URL.revokeObjectURL(url);
           });
         }

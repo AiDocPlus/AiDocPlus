@@ -5,7 +5,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from '@/i18n';
 import {
-  Search, Star, Clock, X, Command, CornerDownLeft
+  Search, Star, Clock, Command, CornerDownLeft
 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,7 @@ import {
 
 // 动态图标组件
 function DynamicIcon({ name, className }: { name: string; className?: string }) {
-  const IconComponent = (LucideIcons as Record<string, React.ComponentType<{ className?: string; iconNode?: any }>>)[name];
+  const IconComponent = (LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string; iconNode?: any }>>)[name];
   if (!IconComponent) return <Search className={className} />;
   return <IconComponent className={className} />;
 }
@@ -300,7 +300,7 @@ export function CalculatorCommandPalette({
                     <DynamicIcon name={category.icon} className="h-3 w-3" />
                     {isEn ? category.labelEn : category.label}
                   </div>
-                  {items.map((item, idx) => {
+                  {items.map((item) => {
                     const globalIdx = filteredItems.indexOf(item);
                     return (
                       <div

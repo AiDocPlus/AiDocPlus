@@ -7,8 +7,6 @@
  * - 本文件中的 financial / equities / statistics / list 与 fnCategory 同名同义。
  * - datetime、unit、percent、professional、helper 为工作流向分类，能力仍落在目录的金融/数学/统计/列表/语法等中。
  */
-import type { LucideIcon } from 'lucide-react';
-
 // ── 类型定义 ──
 
 export interface CalculatorQuickActionCategory {

@@ -495,6 +495,10 @@ export function MarkdownEditor({
     }
 
     return () => {
+      if (docContentTimerRef.current) {
+        clearTimeout(docContentTimerRef.current);
+        docContentTimerRef.current = null;
+      }
       view.destroy();
       cmViewRef.current = null;
       if (editorRef) editorRef.current = null;

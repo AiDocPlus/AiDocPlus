@@ -199,11 +199,11 @@ export const EditorWorkspace = memo(function EditorWorkspace({ tab }: EditorWork
           style={{ width: tabChatPanelWidth }}
         >
           <Suspense fallback={<div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">加载中...</div>}>
-            {showPluginAssistant ? (
+            {showPluginAssistant && currentDoc && activePlugin ? (
               <PluginAssistantWrapper
-                key={`plugin-assistant-${activePlugin!.id}`}
-                plugin={activePlugin!}
-                document={currentDoc!}
+                key={`plugin-assistant-${activePlugin.id}`}
+                plugin={activePlugin}
+                document={currentDoc}
                 tabId={tab.id}
                 aiContent={aiContent}
               />

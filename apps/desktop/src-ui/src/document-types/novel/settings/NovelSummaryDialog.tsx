@@ -7,17 +7,15 @@
  * - 手动编辑摘要
  */
 import { useState, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
 import {
   FileText, Sparkles, RefreshCw, Check, AlertCircle, Loader2, ChevronDown, ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { cn } from '@/lib/utils';
 import type { DocTypeHostAPI } from '@/doctype-sdk/types';
-import type { NovelDocumentContent, NovelChapter, NovelVolume } from '../types';
-import { getChapterWordCount, getEffectiveContent } from '../types';
+import type { NovelDocumentContent } from '../types';
+import { getChapterWordCount } from '../types';
 import { buildChapterSummaryPrompt, parseChapterSummaryResult } from '../novelMemory';
 import { DIALOG_STYLE } from '../constants';
 
@@ -45,7 +43,6 @@ interface ChapterSummaryStatus {
 export default function NovelSummaryDialog({
   open, onOpenChange, novel, onNovelChange, host,
 }: NovelSummaryDialogProps) {
-  const { t } = useTranslation();
   const [expandedVolumes, setExpandedVolumes] = useState<Set<string>>(new Set());
   const [generatingIds, setGeneratingIds] = useState<Set<string>>(new Set());
   const [editingId, setEditingId] = useState<string | null>(null);

@@ -6,12 +6,10 @@
 
 import type { Outline, OutlineHeadingLevel, OutlineNode, RichTextContent } from '../types';
 import {
-  createEmptyNode,
   createRichTextFromPlain,
   extractTagsFromText,
   extractMentionsFromText,
   generateId,
-  getPlainTextFromContent,
 } from '../types';
 
 /**
@@ -334,7 +332,7 @@ export function nodeContentToMarkdown(content: RichTextContent): string {
                     text = `~~${text}~~`;
                     break;
                   case 'highlight':
-                  case 'colorHighlight':
+                  case 'colorHighlight' as string:
                     text = `==${text}==`;
                     break;
                 }

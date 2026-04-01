@@ -512,7 +512,7 @@ function ListTabs({
   };
 
   return (
-    <div className="flex items-center gap-1 px-2 py-1 border-b bg-muted/30 overflow-x-auto">
+    <div className="flex items-center gap-1 px-2 py-1 border-b bg-muted/30 overflow-x-auto scrollbar-hide">
       {lists.map((list) => {
         const isActive = list.id === activeListId;
         return (
@@ -664,6 +664,11 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
   // Refs
   const taskDocRef = useRef(taskDoc);
   taskDocRef.current = taskDoc;
+
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, []);
 
   // 文档切换时重新加载（对齐 CalculatorWorkspace）
   useEffect(() => {

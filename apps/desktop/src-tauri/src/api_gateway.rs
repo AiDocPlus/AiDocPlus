@@ -271,6 +271,7 @@ async fn handle_document(action: &str, params: &Value, state: &AppState, app_han
             let project_id = params.get("projectId")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| crate::error::AppError::Internal("缺少参数 projectId".to_string()))?;
+            crate::security::validate_id(project_id, "projectId")?;
             let docs_dir = state.config().projects_dir
                 .join(project_id)
                 .join("documents");
@@ -303,6 +304,8 @@ async fn handle_document(action: &str, params: &Value, state: &AppState, app_han
             let document_id = params.get("documentId")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| crate::error::AppError::Internal("缺少参数 documentId".to_string()))?;
+            crate::security::validate_id(project_id, "projectId")?;
+            crate::security::validate_id(document_id, "documentId")?;
             let doc_path = state.get_document_path(project_id, document_id);
             if !doc_path.exists() {
                 return Err(crate::error::AppError::Internal(format!("文档不存在: {}", document_id)));
@@ -317,6 +320,7 @@ async fn handle_document(action: &str, params: &Value, state: &AppState, app_han
             let project_id = params.get("projectId")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| crate::error::AppError::Internal("缺少参数 projectId".to_string()))?;
+            crate::security::validate_id(project_id, "projectId")?;
             let title = params.get("title")
                 .and_then(|v| v.as_str())
                 .unwrap_or("未命名文档");
@@ -347,6 +351,8 @@ async fn handle_document(action: &str, params: &Value, state: &AppState, app_han
             let document_id = params.get("documentId")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| crate::error::AppError::Internal("缺少参数 documentId".to_string()))?;
+            crate::security::validate_id(project_id, "projectId")?;
+            crate::security::validate_id(document_id, "documentId")?;
             let doc_path = state.get_document_path(project_id, document_id);
             if !doc_path.exists() {
                 return Err(crate::error::AppError::Internal(format!("文档不存在: {}", document_id)));
@@ -430,6 +436,7 @@ async fn handle_search(action: &str, params: &Value, state: &AppState) -> Handle
 
             // 获取要搜索的项目列表
             let project_ids: Vec<String> = if let Some(pid) = project_id {
+                crate::security::validate_id(pid, "projectId")?;
                 vec![pid.to_string()]
             } else {
                 std::fs::read_dir(projects_dir)
@@ -543,6 +550,8 @@ async fn handle_export(action: &str, params: &Value, state: &AppState) -> Handle
         params.get("projectId").and_then(|v| v.as_str()),
         params.get("documentId").and_then(|v| v.as_str()),
     ) {
+        crate::security::validate_id(project_id, "projectId")?;
+        crate::security::validate_id(doc_id, "documentId")?;
         let doc_path = state.get_document_path(project_id, doc_id);
         if !doc_path.exists() {
             return Err(crate::error::AppError::Internal(format!("文档未找到: {}", doc_id)));

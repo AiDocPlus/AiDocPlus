@@ -78,12 +78,6 @@ export default function EssayPreview({ essay, content, className }: EssayPreview
     // 对文本中的修辞片段进行标注
     // 按文本长度降序排列，优先匹配长的
     const sorted = [...annotations].sort((a, b) => b.text.length - a.text.length);
-    const processed = new Set<string>();
-
-    for (const ann of sorted) {
-      if (processed.has(ann.text)) continue;
-      processed.add(ann.text);
-    }
 
     // 简单线性扫描替换
     const fragments: { text: string; rhetoric?: typeof annotations[0] }[] = [];

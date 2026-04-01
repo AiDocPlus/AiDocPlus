@@ -52,7 +52,7 @@ interface ExportSettings {
 
 interface EssayExportPanelProps {
   essay: EssayDocumentContent;
-  onCreateSnapshot: (title: string) => Promise<void>;
+  onCreateSnapshot: (title: string, description?: string, tags?: string[]) => Promise<void>;
   onRestoreSnapshot: (snapshotId: string) => Promise<void>;
   onDeleteSnapshot: (snapshotId: string) => Promise<void>;
   onExportDocument: (format: string, settings: ExportSettings) => Promise<void>;
@@ -144,7 +144,11 @@ export default function EssayExportPanel({
   // 创建快照
   const handleCreateSnapshot = async () => {
     if (!newSnapshotTitle.trim()) return;
-    await onCreateSnapshot(newSnapshotTitle.trim());
+    await onCreateSnapshot(
+      newSnapshotTitle.trim(),
+      newSnapshotDescription.trim() || undefined,
+      newSnapshotTags.trim() ? newSnapshotTags.trim().split(/[,，]/).map(t => t.trim()).filter(Boolean) : undefined,
+    );
     setShowSnapshotDialog(false);
     setNewSnapshotTitle('');
     setNewSnapshotDescription('');

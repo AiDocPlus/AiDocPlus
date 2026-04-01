@@ -146,9 +146,18 @@ export function CodingPanel() {
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [statusIsError, setStatusIsError] = useState(false);
 
+  // ── 状态栏计时器（组件卸载时清除，防止内存泄漏） ──
+  const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const showStatus = useCallback((msg: string, isError = false) => {
     setStatusMsg(msg); setStatusIsError(isError);
-    setTimeout(() => setStatusMsg(null), 4000);
+    if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
+    statusTimerRef.current = setTimeout(() => setStatusMsg(null), 4000);
+  }, []);
+
+  // 组件卸载时清除状态栏计时器
+  useEffect(() => {
+    return () => { if (statusTimerRef.current) clearTimeout(statusTimerRef.current); };
   }, []);
 
   // ── 脚本运行（委托给 hook） ──
@@ -366,7 +375,18 @@ export function CodingPanel() {
       } catch { /* 静默失败 */ }
     }, 1500);
   }, [saveFile]);
-  useEffect(() => { return () => { if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); }; }, []);
+  // 组件卸载时 flush 未保存的 dirty 标签页
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        const dirtyTab = tabs.find(t => t.dirty);
+        if (dirtyTab) {
+          saveFile(dirtyTab.id).catch(() => {});
+        }
+      }
+    };
+  }, [tabs, saveFile]);
 
   // ── 收藏 ──
   const handleToggleFavorite = useCallback(() => {
@@ -507,7 +527,7 @@ export function CodingPanel() {
         }
       }
     });
-    return () => { unlisten.then(fn => fn()); };
+    return () => { unlisten.then(fn => fn()).catch(() => {}); };
   }, [tabs, setActiveTab, addTab, updateTab]);
 
   // ── AI 助手上下文数据 ──
@@ -817,7 +837,7 @@ export function CodingPanel() {
       )}
 
       {/* ═══ 标签栏（DnD可拖拽排序） ═══ */}
-      <div className="flex-shrink-0 flex items-center bg-muted/30 border-b overflow-x-auto">
+      <div className="flex-shrink-0 flex items-center bg-muted/30 border-b overflow-x-auto scrollbar-hide">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={tabs.map(t => t.id)} strategy={horizontalListSortingStrategy}>
             {tabs.map(tab => (
@@ -864,7 +884,7 @@ export function CodingPanel() {
         <div className="flex-1 min-w-0 relative overflow-hidden cm-font-override">
         {/* 面包屑导航 */}
         {activeTab && activeTab.filePath && (
-          <div className="flex items-center gap-0.5 px-2 py-0.5 border-b bg-muted/20 text-[11px] text-muted-foreground overflow-x-auto flex-shrink-0">
+          <div className="flex items-center gap-0.5 px-2 py-0.5 border-b bg-muted/20 text-[11px] text-muted-foreground overflow-x-auto scrollbar-hide flex-shrink-0">
             <FolderOpen className="h-3 w-3 opacity-50 flex-shrink-0" />
             {activeTab.filePath.split(/[/\\]/).map((seg, i, arr) => (
               <span key={i} className="flex items-center gap-0.5">

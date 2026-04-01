@@ -217,7 +217,7 @@ export function QuickActionCommandPalette({
         </div>
 
         {/* Tab 栏 */}
-        <div className="flex items-center gap-1 px-3 py-1.5 border-b overflow-x-auto shrink-0">
+        <div className="flex items-center gap-1 px-3 py-1.5 border-b overflow-x-auto scrollbar-hide shrink-0">
           <TabButton active={activeTab === 'all'} onClick={() => { setActiveTab('all'); setSelectedIndex(0); }}>
             全部
           </TabButton>

@@ -166,10 +166,11 @@ export function XlsxViewer({ filePath, fileName, onError }: XlsxViewerProps) {
       return;
     }
 
+    const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
     printWindow.document.write(`
       <html>
         <head>
-          <title>打印 - ${fileName} - ${activeSheet}</title>
+          <title>打印 - ${esc(fileName)} - ${esc(activeSheet)}</title>
           <style>
             body { margin: 20px; font-family: Arial, sans-serif; }
             table { border-collapse: collapse; width: 100%; }
@@ -179,7 +180,7 @@ export function XlsxViewer({ filePath, fileName, onError }: XlsxViewerProps) {
           </style>
         </head>
         <body>
-          <h3 style="margin-bottom: 10px;">${fileName} - ${activeSheet} (第 ${rowRange.start}-${rowRange.end} 行)</h3>
+          <h3 style="margin-bottom: 10px;">${esc(fileName)} - ${esc(activeSheet)} (第 ${rowRange.start}-${rowRange.end} 行)</h3>
           ${tableRef.current.outerHTML}
         </body>
       </html>

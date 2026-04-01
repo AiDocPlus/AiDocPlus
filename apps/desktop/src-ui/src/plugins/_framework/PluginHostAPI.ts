@@ -136,6 +136,10 @@ export interface AIAPI {
   truncateContent(text: string): string;
   /** 获取最近一次 AI 调用中的思考内容（<think> 标签内文本） */
   getLastThinking(): string;
+  /** 列出已启用的 AI 服务（用于 UI 下拉选择） */
+  listServices(): Array<{ id: string; name: string; provider: string; model: string }>;
+  /** 获取指定服务的连接参数（用于直接调用 AI 接口），字段可能为 undefined 表示未配置 */
+  getServiceParams(serviceId: string): { provider?: string; apiKey?: string; baseUrl?: string; model?: string; serviceId?: string; proxyUrl?: string; connectTimeoutSecs?: number; requestTimeoutSecs?: number } | null;
 }
 
 /** 插件独立存储 API（按 pluginId 命名空间隔离） */
@@ -367,6 +371,23 @@ export function createPluginEventBus(): PluginEventBus {
   };
 }
 
+/** 全局事件总线单例 */
+let globalEventBus: PluginEventBus | null = null;
+function getGlobalEventBus(): PluginEventBus {
+  if (!globalEventBus) {
+    globalEventBus = createPluginEventBus();
+  }
+  return globalEventBus;
+}
+
+/**
+ * 发送插件事件（供主程序内部使用）
+ * 插件通过 host.events.on() 监听这些事件
+ */
+export function emitPluginEvent<E extends PluginEvent>(event: E, data: PluginEventDataMap[E]): void {
+  getGlobalEventBus().emit(event, data);
+}
+
 export interface CreatePluginHostAPIOptions {
   pluginId: string;
   /** 当前文档（引用，由调用方保持最新） */
@@ -398,6 +419,10 @@ export interface CreatePluginHostAPIOptions {
 
 export function createPluginHostAPI(opts: CreatePluginHostAPIOptions): PluginHostAPI {
   const { pluginId } = opts;
+
+  // ── 全局事件总线单例 ──
+  // 如果调用方未提供 eventBus，使用全局单例，确保 host.events 可用
+  const eventBus = opts.eventBus || getGlobalEventBus();
 
   // ── Content API ──
   const content: ContentAPI = {
@@ -463,8 +488,8 @@ export function createPluginHostAPI(opts: CreatePluginHostAPIOptions): PluginHos
       let unlisten: (() => void) | null = null;
 
       try {
-        // 设置流式事件监听
-        unlisten = await listen<{ request_id: string; content: string }>('ai:stream:chunk', (event) => {
+        // 设置流式事件监听（先启动注册，不 await，确保 finally 可清理）
+        const unlistenPromise = listen<{ request_id: string; content: string }>('ai:stream:chunk', (event) => {
           // 检查是否已取消
           if (options?.signal?.aborted) return;
           // 只处理当前请求的事件
@@ -491,13 +516,16 @@ export function createPluginHostAPI(opts: CreatePluginHostAPIOptions): PluginHos
           }
         });
 
+        // 等待监听注册完成
+        unlisten = await unlistenPromise;
+
         // 如果在设置监听期间已取消
         if (options?.signal?.aborted) {
           throw new Error('Request aborted');
         }
 
         // 调用后端流式接口
-        await invoke<string>('chat_stream', {
+        const serverFull = await invoke<string>('chat_stream', {
           messages,
           ...aiParams,
           ...(maxTok != null ? { maxTokens: maxTok } : {}),
@@ -506,8 +534,20 @@ export function createPluginHostAPI(opts: CreatePluginHostAPIOptions): PluginHos
           requestId,
         });
 
-        // 最终解析
-        const finalParsed = parseThinkTags(rawAccumulated);
+        // AbortSignal 取消时通知后端停止流
+        if (options?.signal) {
+          const onAbort = () => {
+            invoke('stop_ai_stream', { requestId }).catch(() => {});
+          };
+          options.signal.addEventListener('abort', onAbort, { once: true });
+          // 如果在 invoke 期间已取消，立即通知后端
+          if (options.signal.aborted) {
+            invoke('stop_ai_stream', { requestId }).catch(() => {});
+          }
+        }
+
+        // 优先使用服务端完整累积结果，防止最后 chunk 丢失
+        const finalParsed = parseThinkTags(serverFull || rawAccumulated);
         lastThinking = finalParsed.thinking;
         if (finalParsed.thinking) {
           opts.onThinkingUpdate?.(finalParsed.thinking);
@@ -531,6 +571,22 @@ export function createPluginHostAPI(opts: CreatePluginHostAPIOptions): PluginHos
       return text;
     },
     getLastThinking: () => lastThinking,
+    listServices: () => {
+      const { services } = useSettingsStore.getState().ai;
+      return services
+        .filter(s => s.enabled)
+        .map(s => ({ id: s.id, name: s.name || s.provider, provider: s.provider, model: s.model }));
+    },
+    getServiceParams: (serviceId: string) => {
+      const params = getAIInvokeParamsForService(serviceId);
+      if (!params?.provider || !params?.apiKey || !params?.model) return null;
+      return {
+        provider: params.provider,
+        apiKey: params.apiKey,
+        baseUrl: params.baseUrl,
+        model: params.model,
+      };
+    },
   };
 
   // ── Storage API ──
@@ -640,18 +696,10 @@ export function createPluginHostAPI(opts: CreatePluginHostAPIOptions): PluginHos
   };
 
   // ── Events API ──
-  // 如果提供了 eventBus，使用它；否则创建一个空实现
-  const eventBus = opts.eventBus;
-  const events: EventsAPI = eventBus
-    ? {
-        on: (event, callback) => eventBus.on(event, callback),
-        off: (event, callback) => eventBus.off(event, callback),
-      }
-    : {
-        // 无事件总线时的空实现
-        on: () => () => { },
-        off: () => { },
-      };
+  const events: EventsAPI = {
+    on: (event, callback) => eventBus.on(event, callback),
+    off: (event, callback) => eventBus.off(event, callback),
+  };
 
   return {
     apiVersion: 1,

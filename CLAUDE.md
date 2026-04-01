@@ -4,15 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Communication Language
 
-**始终用中文与用户对话。** Always communicate with the user in Chinese.
+**始终用中文与用户对话。**
 
 ## Project Overview
 
-**AiDocPlus** 是一个基于 Tauri 2.x 和 React 19 构建的跨平台 AI 文档桌面编辑器。
+**AiDocPlus** 是一个跨平台 AI 文档桌面编辑器。
 
 官网：https://aidocplus.com
 
 ### 项目类型
+
 - **桌面应用程序**（使用 Tauri 2.x）
 - **全栈应用**（Rust 后端 + React 前端）
 - **Monorepo**（使用 Turborepo 管理多个包）
@@ -20,6 +21,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### 技术栈
 
 #### 后端（Rust）
+
 - **框架**: Tauri 2.x
 - **主要功能**:
   - 文件系统操作
@@ -30,6 +32,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - 文件导入（txt、md、docx 等）
 
 #### 前端（React）
+
 - **框架**: React 19
 - **语言**: TypeScript 5.9+
 - **状态管理**: Zustand（持久化到 localStorage）
@@ -39,6 +42,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **国际化**: i18next
 
 #### 项目结构
+
 ```
 AiDocPlus/
 ├── apps/
@@ -114,6 +118,7 @@ AiDocPlus/
 ```
 
 ### 核心功能
+
 - **多标签页编辑**：支持同时打开多个文档，每个标签页独立的面板状态
 - **五大工作区**：生成区（编辑器 + AI 侧边栏）、内容区（内容生成类插件）、合并区（多来源整合）、功能区（功能类插件）、编程区（代码编辑与执行）
 - **项目和文档管理**：多项目支持，文档 CRUD
@@ -128,12 +133,12 @@ AiDocPlus/
 - **插件系统**：28 个插件，自注册 + 自动发现 + manifest 驱动
 - **资源数据**：提示词模板、AI 提供商、文档模板等资源数据在 `resources/` 目录，通过 `build-resources.sh` 生成 TypeScript 文件和 bundled-resources
 - **文档标签与收藏**：文档可添加自定义标签，支持收藏（星标），文件树按标签筛选/按收藏筛选，编辑器工具栏内联标签编辑器（TagEditor）
-- **长篇小说写作**（规划中）：设定集系统（世界观/人物/地点/势力/时间线）、章节层级（卷→章 + 拖拽排序）、大纲系统、AI 四层记忆写作引擎、作家风格学习（导入作品→风格分析→RAG 检索→写作注入）、伏笔追踪、写作仪表盘、全书导出 + EPUB
+- **长篇小说写作**：设定集系统（世界观/人物/地点/势力/时间线）、章节层级（卷→章 + 拖拽排序）、大纲系统、AI 四层记忆写作引擎、作家风格学习（导入作品→风格分析→RAG 检索→写作注入）、伏笔追踪、写作仪表盘、全书导出 + EPUB
 - **编程区**：独立的多语言代码编辑与执行环境（Python/JavaScript/TypeScript/HTML 等），集成文件树、AI 助手、自动化运行、pip 包管理
 - **功能区**：功能类插件工作区（格式转换、OCR、代码工具等），独立于内容生成类插件
 - **开放 API**：HTTP API Server + JSON-RPC 网关（11 个命名空间 30+ 操作），MCP Server（23 个工具），Python / JS SDK
 - **脚本自动化**：编程区运行脚本时自动注入 API 连接参数，零配置调用 AiDocPlus 全部功能
-- **文档类型系统**：16 种内置文档类型，每种类型有专属编辑器和 AI 侧栏，基于 DocType SDK 统一架构
+- **文档类型系统**：10 种内置文档类型，每种类型有专属编辑器和 AI 侧栏，基于 DocType SDK 统一架构
 
 ## 文档类型系统
 
@@ -147,18 +152,18 @@ AiDocPlus/
 
 ### 10 种内置文档类型
 
-| 类型 ID | 名称 | 布局模式 | 编辑器 / 工作区 | AI 侧栏 |
-|---------|------|---------|----------------|---------|
-| `normal` | 通用文档 | standard | EditorPanel（主程序） | ChatPanel（主程序） |
-| `study-notes` | 学习体会 | standard | DocTypeEditorBase 包装 | StudyNotesAISidebar |
-| `novel` | 长篇小说 | full | NovelDocWorkspace（三栏） | NovelAISidebar |
-| `translation` | 中英翻译 | standard | TranslationWorkspace（双栏） | TranslationAISidebar |
-| `diary` | 日记 | full | DiaryDocWorkspace | DiaryAISidebar |
-| `essay` | 散文写作 | full | EssayDocWorkspace | EssayAISidebar |
-| `stock-research` | 股票研究 | full | StockResearchWorkspace | StockResearchAISidebar |
-| `imitative-writing` | 仿写练习 | full | ImitativeWritingWorkspace | ImitativeWritingAISidebar |
-| `calculator` | 计算文档 | full | CalculatorWorkspace | CalculatorAISidebar |
-| `task-list` | 任务清单 | full | TaskListWorkspace | TaskListAISidebar |
+| 类型 ID               | 名称     | 布局模式 | 编辑器 / 工作区              | AI 侧栏                   |
+| --------------------- | -------- | -------- | ---------------------------- | ------------------------- |
+| `normal`            | 通用文档 | standard | EditorPanel（主程序）        | ChatPanel（主程序）       |
+| `study-notes`       | 学习体会 | standard | DocTypeEditorBase 包装       | StudyNotesAISidebar       |
+| `novel`             | 长篇小说 | full     | NovelDocWorkspace（三栏）    | NovelAISidebar            |
+| `translation`       | 中英翻译 | standard | TranslationWorkspace（双栏） | TranslationAISidebar      |
+| `diary`             | 日记     | full     | DiaryDocWorkspace            | DiaryAISidebar            |
+| `essay`             | 散文写作 | full     | EssayDocWorkspace            | EssayAISidebar            |
+| `stock-research`    | 股票研究 | full     | StockResearchWorkspace       | StockResearchAISidebar    |
+| `imitative-writing` | 仿写练习 | full     | ImitativeWritingWorkspace    | ImitativeWritingAISidebar |
+| `calculator`        | 计算文档 | full     | CalculatorWorkspace          | CalculatorAISidebar       |
+| `task-list`         | 任务清单 | full     | TaskListWorkspace            | TaskListAISidebar         |
 
 ### 共享基础组件
 
@@ -169,15 +174,15 @@ AiDocPlus/
 
 ### Design Tokens（UI 规范）
 
-| Token | 值 | 用途 |
-|-------|-----|------|
-| 快捷按钮 | `h-7 text-xs px-2 gap-1` | 所有文档类型快捷操作 |
-| 消息气泡 | `rounded-lg p-3 text-sm` | AI 侧栏消息 |
-| 用户消息 | `bg-primary/10 ml-8` | 用户消息偏右 |
-| AI 消息 | `bg-muted mr-2` + MarkdownPreview | AI 回复偏左 |
-| 状态栏 | `px-3 py-1 border-t text-xs text-muted-foreground bg-card` | 编辑器底部 |
-| 工具栏 | `px-3 py-1.5 border-b bg-card` | 编辑器顶部 |
-| 输入框 | `text-sm px-3 py-2 border rounded-md` | AI 侧栏输入 |
+| Token    | 值                                                           | 用途                 |
+| -------- | ------------------------------------------------------------ | -------------------- |
+| 快捷按钮 | `h-7 text-xs px-2 gap-1`                                   | 所有文档类型快捷操作 |
+| 消息气泡 | `rounded-lg p-3 text-sm`                                   | AI 侧栏消息          |
+| 用户消息 | `bg-primary/10 ml-8`                                       | 用户消息偏右         |
+| AI 消息  | `bg-muted mr-2` + MarkdownPreview                          | AI 回复偏左          |
+| 状态栏   | `px-3 py-1 border-t text-xs text-muted-foreground bg-card` | 编辑器底部           |
+| 工具栏   | `px-3 py-1.5 border-b bg-card`                             | 编辑器顶部           |
+| 输入框   | `text-sm px-3 py-2 border rounded-md`                      | AI 侧栏输入          |
 
 ### 新建文档类型的标准流程
 
@@ -191,6 +196,7 @@ AiDocPlus/
 ### 运行命令
 
 #### 首次设置
+
 ```bash
 # 构建资源（生成 TypeScript 类型 + bundled-resources）
 bash scripts/build-resources.sh
@@ -200,13 +206,16 @@ pnpm install
 ```
 
 #### 开发模式
+
 ```bash
 cd apps/desktop
 pnpm tauri dev
 ```
+
 Tauri dev 模式下修改 Rust 文件会自动重新编译并重启后端，前端由 Vite 热更新。
 
 #### 发布构建
+
 ```bash
 bash scripts/build-resources.sh
 cd apps/desktop
@@ -214,12 +223,14 @@ pnpm tauri build
 ```
 
 #### 其他命令
+
 ```bash
 pnpm lint       # 代码检查
 pnpm clean      # 清理构建缓存
 ```
 
 ### 前置要求
+
 - Node.js >= 18.0.0
 - pnpm >= 9.0.0
 - Rust（用于构建 Tauri 后端）
@@ -230,15 +241,16 @@ pnpm clean      # 清理构建缓存
 
 资源数据在仓库的 `resources/` 目录中，通过 `scripts/build-resources.sh` 构建。
 
-| 资源目录 | 说明 | 数量 |
-|------|------|----------|
+| 资源目录                        | 说明                        | 数量                   |
+| ------------------------------- | --------------------------- | ---------------------- |
 | `resources/prompt-templates/` | 提示词模板（JSON 文件模式） | 1481 个模板（53 分类） |
-| `resources/ai-providers/` | AI 服务提供商配置 | 13 个提供商 |
-| `resources/doc-templates/` | PPT 主题 + 文档模板分类 | 8 主题 + 8 分类 |
+| `resources/ai-providers/`     | AI 服务提供商配置           | 13 个提供商            |
+| `resources/doc-templates/`    | 文档模板分类                | 8 分类                 |
 
 > **注**：资源管理器已合并到主程序，通过 Tauri 多窗口机制在独立窗口中运行。`manager-rust`、`manager-shared`、`manager-ui` 三个包在 `packages/` 目录。
 
 每个资源目录的结构：
+
 ```
 resources/{resource}/
 ├── data/                    # 资源数据
@@ -254,6 +266,7 @@ resources/{resource}/
 ```
 
 **例外：提示词模板使用 JSON 文件模式**（非目录模式）：
+
 ```
 resources/prompt-templates/
 ├── data/                    # 每个分类一个 JSON 文件
@@ -271,6 +284,7 @@ resources/prompt-templates/
 **构建脚本**：`scripts/build-resources.sh`
 
 一键构建所有资源数据（提示词模板、AI 提供商、文档模板）：
+
 1. **build.py** — 扫描 `resources/{type}/data/` 目录，生成 `dist/*.generated.ts`
 2. 将 generated TS 复制到 `packages/shared-types/src/generated/`
 3. 资源数据复制到 `apps/desktop/src-tauri/bundled-resources/`
@@ -281,12 +295,12 @@ resources/prompt-templates/
 
 `packages/shared-types/src/index.ts` 从 17,349 行精简到 928 行（-95%），大量硬编码数组替换为 generated 导入：
 
-| 原始常量 | 生成文件 | 资源目录 |
-|----------|----------|----------|
-| `BUILT_IN_TEMPLATES` | `prompt-templates.generated.ts` | `resources/prompt-templates/` |
-| `TEMPLATE_CATEGORIES` | `template-categories.generated.ts` | `resources/prompt-templates/` |
-| `AI_PROVIDERS` + `getProviderConfig` | `ai-providers.generated.ts` | `resources/ai-providers/` |
-| `BUILT_IN_PPT_THEMES` + `DEFAULT_PPT_THEME` | `ppt-themes.generated.ts` | `resources/doc-templates/` |
+| 原始常量                                        | 生成文件                             | 资源目录                        |
+| ----------------------------------------------- | ------------------------------------ | ------------------------------- |
+| `BUILT_IN_TEMPLATES`                          | `prompt-templates.generated.ts`    | `resources/prompt-templates/` |
+| `TEMPLATE_CATEGORIES`                         | `template-categories.generated.ts` | `resources/prompt-templates/` |
+| `AI_PROVIDERS` + `getProviderConfig`        | `ai-providers.generated.ts`        | `resources/ai-providers/`     |
+| `BUILT_IN_PPT_THEMES` + `DEFAULT_PPT_THEME` | `ppt-themes.generated.ts`          | `resources/doc-templates/`    |
 
 ### Rust 端资源加载
 
@@ -305,14 +319,12 @@ resources/prompt-templates/
 ### 添加新资源
 
 #### 添加新 AI 提供商
+
 1. 在 `resources/ai-providers/data/{category}/{id}/` 下创建 `manifest.json`
 2. 运行 `bash scripts/build-resources.sh`
 
-#### 添加新 PPT 主题
-1. 在 `resources/doc-templates/data/ppt-theme/{id}/` 下创建 `manifest.json`
-2. 运行 `bash scripts/build-resources.sh`
-
 #### 构建验证
+
 ```bash
 # 一键构建所有资源
 bash scripts/build-resources.sh
@@ -356,10 +368,10 @@ AiDocPlus/
 
 ### 资源类型
 
-| 资源类型 | 数据目录 | 数据模式 |
-|----------|---------|----------|
-| 提示词模板 | `bundled-resources/prompt-templates/` | JSON 文件模式 |
-| 文档模板 | `bundled-resources/document-templates/` | JSON 文件模式 |
+| 资源类型   | 数据目录                                  | 数据模式      |
+| ---------- | ----------------------------------------- | ------------- |
+| 提示词模板 | `bundled-resources/prompt-templates/`   | JSON 文件模式 |
+| 文档模板   | `bundled-resources/document-templates/` | JSON 文件模式 |
 
 ## Architecture Notes
 
@@ -370,53 +382,6 @@ AiDocPlus/
 - 前端使用 `streamSessionId`（模块级变量）+ `streamAborted` 标志双重保护
 - `stopAiStreaming()` 同时：递增 sessionId、移除事件监听、通知后端中断 HTTP 流
 - 聊天和内容生成共用同一套流式机制和停止逻辑
-
-### 长篇小说写作系统架构（规划中）
-
-> **最高优先级突破口**。详见 `IMPROVEMENT-PLAN.md` §19~§21。
-
-#### 数据模型扩展
-
-- `Project.isNovel?: boolean` — 小说项目标记
-- `Document` 新增可选字段：`parentId`（卷→章层级）、`sortOrder`（拖拽排序）、`documentType`（volume/chapter/appendix/normal）、`chapterOutline`（章节大纲）
-- 设定集独立存储：`~/AiDocPlus/Projects/{projectId}/novel-settings.json`
-- 风格素材库独立存储：`~/AiDocPlus/StyleCorpus/{corpusId}/`
-
-#### 核心类型（`packages/shared-types/src/index.ts` 新增）
-
-- **NovelSettings**：genre / era / style / synopsis / worldView / outlineGlobal + characters[] / locations[] / factions[] / customEntries[] / timeline[]
-- **NovelCharacter**：name / aliases / role / description / relationships / tags / avatar
-- **StyleCorpus**：name / authorName / files[] / totalWords / totalChunks / indexedAt / styleProfile
-- **StyleProfile**：summary / sentenceStyle / rhythm / vocabulary / dialogue / narrative / atmosphere / signature / rawAnalysis / analyzedAt
-- **NovelForeshadowing**：content / chapterId / position / status / resolvedChapterId / note
-
-#### 四层记忆架构（AI 续写时注入 System Prompt）
-
-```
-Layer 0: 风格画像 + 风格示例（~800-1500 token，若已配置风格学习）
-Layer 1: 设定集摘要（~1000-2000 token）
-Layer 2: 近章摘要（~1500 token，滑动窗口 3-5 章）
-Layer 3: 当前章节上下文（~2000-4000 token）
-总计 ~5800-9500 token
-```
-
-#### 关键新文件
-
-| 文件 | 作用 |
-|------|------|
-| `src-ui/src/components/novel/` | 小说写作 UI 组件目录 |
-| `src-ui/src/stores/useNovelStore.ts` | 小说设定 + 写作统计状态管理 |
-| `src-ui/src/components/novel/novelContext.ts` | 小说上下文引擎（buildNovelWritingContext / generateChapterSummary） |
-| `src-ui/src/components/novel/StyleLearningPanel.tsx` | 风格学习面板（素材导入 + 分析 + 画像展示） |
-| `src-tauri/src/commands/novel.rs` | Rust 后端（设定集 CRUD / 章节排序 / 摘要生成） |
-| `src-tauri/src/commands/style.rs` | Rust 后端（风格素材导入 / 分块 / 向量化 / 检索） |
-| `src-tauri/src/knowledge.rs` | RAG 知识库核心（向量存储 / Embedding / 检索） |
-
-#### 风格学习系统
-
-- **风格分析**：导入作品 → 文本分块（~500 token/块）→ 向量化（Embedding API + SQLite + sqlite-vss）→ 抽样分析（20-30 段）→ AI 生成 StyleProfile
-- **写作注入（双管齐下）**：长期记忆（风格画像注入 System Prompt）+ 短期参考（RAG 检索风格相似片段作为 few-shot 示例）
-- **场景匹配**：检测当前写作场景（对话/描写/打斗/心理），检索同类型段落作为示例
 
 ### 提示词模板架构（JSON 文件模式）
 
@@ -442,11 +407,11 @@ Layer 3: 当前章节上下文（~2000-4000 token）
 
 #### 关键文件
 
-| 文件 | 作用 |
-|------|------|
-| `src-tauri/src/commands/resource.rs` | `list_prompt_templates()` 读取分类 JSON + custom.json；`list_prompt_template_categories()` 按 order 排序；自定义模板 CRUD |
-| `src-ui/src/stores/useTemplatesStore.ts` | `loadBuiltInTemplates()` + `loadBuiltInCategories()` 运行时加载；自定义模板异步保存到 Rust 后端 |
-| `src-ui/src/components/templates/PromptTemplates.tsx` | 对话框打开时刷新；窗口获得焦点时自动重新加载（管理器修改后切回即时生效）；预览面板随 `allTemplates` 变化自动同步 |
+| 文件                                                    | 作用                                                                                                                          |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `src-tauri/src/commands/resource.rs`                  | `list_prompt_templates()` 读取分类 JSON + custom.json；`list_prompt_template_categories()` 按 order 排序；自定义模板 CRUD |
+| `src-ui/src/stores/useTemplatesStore.ts`              | `loadBuiltInTemplates()` + `loadBuiltInCategories()` 运行时加载；自定义模板异步保存到 Rust 后端                           |
+| `src-ui/src/components/templates/PromptTemplates.tsx` | 对话框打开时刷新；窗口获得焦点时自动重新加载（管理器修改后切回即时生效）；预览面板随 `allTemplates` 变化自动同步            |
 
 #### 加载优先级
 
@@ -473,13 +438,13 @@ Layer 3: 当前章节上下文（~2000-4000 token）
 
 #### 操作位置判断（强制）
 
-| 用户需求 | 操作位置 | 说明 |
-|----------|----------|------|
-| 创建新插件 | `src/plugins/{name}/` | 在 Monorepo 中直接创建 |
-| 修改某个插件功能/UI/bug | `src/plugins/{name}/` | 在 Monorepo 中直接修改 |
-| 修改插件 SDK/框架 | `src/plugins/_framework/` | 主程序构建者角色 |
-| 修改插件加载/注册机制 | `src/plugins/loader.ts` 等 | 主程序构建者角色 |
-| 修改 PluginHostAPI | `src/plugins/_framework/PluginHostAPI.ts` | 主程序构建者角色 |
+| 用户需求                | 操作位置                                    | 说明                   |
+| ----------------------- | ------------------------------------------- | ---------------------- |
+| 创建新插件              | `src/plugins/{name}/`                     | 在 Monorepo 中直接创建 |
+| 修改某个插件功能/UI/bug | `src/plugins/{name}/`                     | 在 Monorepo 中直接修改 |
+| 修改插件 SDK/框架       | `src/plugins/_framework/`                 | 主程序构建者角色       |
+| 修改插件加载/注册机制   | `src/plugins/loader.ts` 等                | 主程序构建者角色       |
+| 修改 PluginHostAPI      | `src/plugins/_framework/PluginHostAPI.ts` | 主程序构建者角色       |
 
 #### 双角色原则（强制）
 
@@ -493,6 +458,7 @@ Layer 3: 当前章节上下文（~2000-4000 token）
 #### `src/plugins/` 目录说明
 
 `src/plugins/` 包含：
+
 - `_framework/` — 插件框架 SDK
 - `types.ts`、`pluginStore.ts`、`i18n-loader.ts`、`constants.ts`、`loader.ts`、`registry.ts`、`fragments.ts`
 - `PluginToolArea.tsx`、`PluginManagerPanel.tsx`、`PluginMenu.tsx`
@@ -511,10 +477,10 @@ Layer 3: 当前章节上下文（~2000-4000 token）
 
 #### 两大类别
 
-| 大类 | majorCategory | 说明 | 数据特征 |
-|------|--------------|------|----------|
-| **内容生成类** | `content-generation` | 基于文档内容 AI 生成新内容 | 生成结果保存在 `document.pluginData`，设置独立存储 |
-| **功能执行类** | `functional` | 独立于文档的工具功能 | 所有数据独立存储（`usePluginStorageStore`），不写入文档 |
+| 大类                 | majorCategory          | 说明                       | 数据特征                                                  |
+| -------------------- | ---------------------- | -------------------------- | --------------------------------------------------------- |
+| **内容生成类** | `content-generation` | 基于文档内容 AI 生成新内容 | 生成结果保存在 `document.pluginData`，设置独立存储      |
+| **功能执行类** | `functional`         | 独立于文档的工具功能       | 所有数据独立存储（`usePluginStorageStore`），不写入文档 |
 
 **自描述文档**：`enabledPlugins` 包含两类插件（文档声明需要哪些插件），`pluginData` 仅含生成类输出。
 
@@ -597,17 +563,17 @@ const ALLOWED_PLUGIN_COMMANDS = new Set([
 
 插件可通过 `host.events.on()` 监听主程序事件：
 
-| 事件 | 数据 |
-|------|------|
-| `document:saved` | `{ documentId: string }` |
-| `document:changed` | `{ documentId: string, content: string }` |
-| `document:switched` | `{ previousId: string \| null, currentId: string }` |
-| `theme:changed` | `{ theme: 'light' \| 'dark' }` |
-| `locale:changed` | `{ locale: string }` |
-| `ai:generation-started` | `{ documentId: string, type: 'chat' \| 'content' }` |
+| 事件                        | 数据                                                 |
+| --------------------------- | ---------------------------------------------------- |
+| `document:saved`          | `{ documentId: string }`                           |
+| `document:changed`        | `{ documentId: string, content: string }`          |
+| `document:switched`       | `{ previousId: string \| null, currentId: string }` |
+| `theme:changed`           | `{ theme: 'light' \| 'dark' }`                      |
+| `locale:changed`          | `{ locale: string }`                               |
+| `ai:generation-started`   | `{ documentId: string, type: 'chat' \| 'content' }` |
 | `ai:generation-completed` | `{ documentId: string, type: 'chat' \| 'content' }` |
-| `plugin:activated` | `{ pluginId: string }` |
-| `plugin:deactivated` | `{ pluginId: string }` |
+| `plugin:activated`        | `{ pluginId: string }`                             |
+| `plugin:deactivated`      | `{ pluginId: string }`                             |
 
 #### 生命周期 Hook
 
@@ -638,6 +604,7 @@ if (isFunctionalPlugin(plugin)) {
 ```
 
 #### 核心设计
+
 - **Manifest 驱动**：每个插件自带 `manifest.json`，前端通过 `sync_plugin_manifests` 同步到后端 `~/AiDocPlus/Plugins/{uuid}/manifest.json`
 - **Manifest 字段**：`id`（UUID）、`name`、`version`、`description`、`icon`、`majorCategory`、`subCategory`、`tags` 等
 - **自注册**：`pluginStore.ts` 提供 `registerPlugin()` API，各插件 `index.ts` 在 import 时调用
@@ -646,6 +613,7 @@ if (isFunctionalPlugin(plugin)) {
 - **分类常量**：`PLUGIN_MAJOR_CATEGORIES`（大类）和 `PLUGIN_SUB_CATEGORIES`（子类），定义在 `plugins/constants.ts`
 
 #### 插件接口（`plugins/types.ts`）
+
 ```typescript
 interface DocumentPlugin {
   id: string;                    // 唯一标识（UUID）
@@ -660,21 +628,25 @@ interface DocumentPlugin {
 ```
 
 #### 后端插件管理
+
 - **`src-tauri/src/plugin.rs`**：`PluginManifest` 结构体（含 `major_category`/`sub_category`）、manifest 同步、列表查询、启用/禁用
 - **IPC 命令**：`list_plugins`（返回 manifest 列表）、`set_plugin_enabled`（切换启用状态）、`sync_plugin_manifests`（前端 manifest 同步到磁盘）
 - 应用启动时调用 `ensure_plugins_dir()` 确保插件目录存在（不再硬编码任何插件）
 
 #### 前端插件注册
+
 - **`pluginStore.ts`**：`PLUGIN_MAP`（Map 实例）+ `registerPlugin()` API，零依赖底层模块
 - **`loader.ts`**：`import.meta.glob` 自动发现所有插件 `index.ts` 和 `manifest.json`，提供 `syncManifestsToBackend()`
 - **`registry.ts`**：导入 `loader`（触发自注册），提供 `buildPluginList(manifests)`、`getPlugins()`、`getPluginById(id)` 等查询 API
 - 每个插件的 `index.ts` 从 `pluginStore` 导入 `registerPlugin`，在模块加载时自动注册
 
 #### Store 集成
+
 - **`stores/useAppStore.ts`**：`pluginManifests`、`loadPlugins()`、`updatePluginData()`
 - **`stores/usePluginStorageStore.ts`**：插件独立持久化存储（Zustand persist → localStorage），按 pluginId 命名空间隔离，所有插件均可使用
 
 #### UI 工作流程
+
 1. 工具栏 🧩 插件按钮（toggle）→ 切换编辑器/插件视图（互斥显示）
 2. 插件区域顶部为标签栏，列出所有已启用插件（两类都显示），点击切换
 3. `PluginToolArea` 中的 `PluginHostProvider` 为每个插件注入 `PluginHostAPI` Context
@@ -686,6 +658,7 @@ interface DocumentPlugin {
 在 Monorepo 的 `apps/desktop/src-ui/src/plugins/{name}/` 下直接创建（零改动核心代码，`loader.ts` 自动发现）。
 
 **步骤**：
+
 1. 创建 `manifest.json`（UUID、名称、`majorCategory`、`subCategory`）
 2. 创建 `index.ts`：定义 `DocumentPlugin`，调用 `registerPlugin()` 自注册
 3. 实现 `{Name}PluginPanel.tsx` 面板组件
@@ -733,6 +706,7 @@ interface DocumentPlugin {
 - 数据通过 `usePluginHost().storage` 独立持久化，不使用 `onPluginDataChange`
 
 #### 框架组件位置（`plugins/_framework/`）
+
 - `PluginPanelLayout.tsx` — 内容生成类统一布局模板
 - `ToolPluginLayout.tsx` — 功能执行类统一布局
 - `PluginHostAPI.ts` — PluginHostAPI 类型 + Context + `usePluginHost()` hook + 工厂函数
@@ -750,10 +724,10 @@ interface DocumentPlugin {
 
 新插件必须对照标杆插件进行专业化设计。标杆插件代表两类插件的最佳实践：
 
-| 类别 | 标杆插件 | 关键特征 |
-|------|----------|----------|
+| 类别                 | 标杆插件                 | 关键特征                                                                     |
+| -------------------- | ------------------------ | ---------------------------------------------------------------------------- |
 | **内容生成类** | `table/`、`mindmap/` | 自定义 AI 助手面板、智能上下文引擎、快捷操作系统、直接操作引擎、领域类型定义 |
-| **功能执行类** | `email/` | 自定义 AI 助手面板、业务引擎、状态管理（reducer）、多弹窗系统、领域工具函数 |
+| **功能执行类** | `email/`               | 自定义 AI 助手面板、业务引擎、状态管理（reducer）、多弹窗系统、领域工具函数  |
 
 ##### 内容生成类标杆文件结构（对照 `table/` 和 `mindmap/`）
 
@@ -825,6 +799,7 @@ plugins/{name}/
 分类以各插件 `manifest.json` 的 `majorCategory` 为准（`content-generation` / `functional`）。下列为目录名与职责摘要；**不含** `plugins/_framework/`（SDK 框架）。
 
 **内容生成类（10 个，`majorCategory: content-generation`）** — 典型使用 `PluginPanelLayout`：
+
 - **表格**（`plugins/table/`）：AI 生成表格，FortuneSheet 编辑，Excel/CSV/JSON 导出 — **⭐ 标杆**
 - **思维导图**（`plugins/mindmap/`）：AI 生成思维导图，多视图（导图/大纲/源码）— **⭐ 标杆**
 - **Mermaid**（`plugins/mermaid/`）：AI 生成 Mermaid 图表与导出
@@ -834,6 +809,7 @@ plugins/{name}/
 - **内容提取**（`plugins/extract/`）：从文档提取结构化信息
 
 **功能执行类（18 个，`majorCategory: functional`）** — 典型使用 `ToolPluginLayout` + `usePluginHost()`（部分面板实现因功能差异可自定义布局）：
+
 - **邮件**（`plugins/email/`）：AI 辅助撰写 + SMTP — **⭐ 标杆**
 - **摘要**（`plugins/summary/`）、**PPT**（`plugins/ppt/`）、**测验**（`plugins/quiz/`）、**教案**（`plugins/lessonplan/`）
 - **时间线**（`plugins/timeline/`）、**审阅**（`plugins/review/`）、**写作统计**（`plugins/writing-stats/`）
@@ -848,14 +824,14 @@ plugins/{name}/
 
 #### 文件结构
 
-| 文件 | 作用 |
-|------|------|
-| `apps/desktop/src-ui/src/components/coding/CodingPanel.tsx` | 主面板（~1900 行）：工具栏、标签栏（DnD 拖拽排序）、CodeMirror 编辑器、输出区、设置面板、命令面板、面包屑导航、运行历史 |
-| `apps/desktop/src-ui/src/components/coding/CodingFileTree.tsx` | 文件树侧边栏（~416 行）：递归树形展示、收藏标记、文件大小显示、右键菜单（新建/重命名/删除/收藏）、全局内容搜索、3 秒轮询刷新 |
+| 文件                                                                   | 作用                                                                                                                             |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/desktop/src-ui/src/components/coding/CodingPanel.tsx`          | 主面板（~1900 行）：工具栏、标签栏（DnD 拖拽排序）、CodeMirror 编辑器、输出区、设置面板、命令面板、面包屑导航、运行历史          |
+| `apps/desktop/src-ui/src/components/coding/CodingFileTree.tsx`       | 文件树侧边栏（~416 行）：递归树形展示、收藏标记、文件大小显示、右键菜单（新建/重命名/删除/收藏）、全局内容搜索、3 秒轮询刷新     |
 | `apps/desktop/src-ui/src/components/coding/CodingAssistantPanel.tsx` | AI 助手面板（~635 行）：快捷操作（修正/解释/优化/安装依赖/生成文档/测试）、上下文感知对话、代码块应用、Diff 预览、系统提示词编辑 |
-| `apps/desktop/src-ui/src/components/coding/codingAI.ts` | AI 自动化引擎（~549 行）：自动运行循环（生成→运行→检测→pip install→AI 修正→重试）、流式对话、代码块提取、LCS Diff |
-| `apps/desktop/src-ui/src/stores/useCodingStore.ts` | 状态管理（~448 行）：标签页、收藏、设置、运行历史、最近文件，Zustand 手动持久化（debounce 500ms → Rust `save_coding_state`） |
-| `apps/desktop/src-tauri/src/commands/coding.rs` | Rust 后端（~428 行）：文件 CRUD、递归文件树、全局搜索、外部文件读取、pip 包管理、状态持久化 |
+| `apps/desktop/src-ui/src/components/coding/codingAI.ts`              | AI 自动化引擎（~549 行）：自动运行循环（生成→运行→检测→pip install→AI 修正→重试）、流式对话、代码块提取、LCS Diff           |
+| `apps/desktop/src-ui/src/stores/useCodingStore.ts`                   | 状态管理（~448 行）：标签页、收藏、设置、运行历史、最近文件，Zustand 手动持久化（debounce 500ms → Rust `save_coding_state`）  |
+| `apps/desktop/src-tauri/src/commands/coding.rs`                      | Rust 后端（~428 行）：文件 CRUD、递归文件树、全局搜索、外部文件读取、pip 包管理、状态持久化                                      |
 
 #### UI 布局
 
@@ -880,23 +856,23 @@ plugins/{name}/
 
 #### Rust 后端命令（`commands/coding.rs`）
 
-| 命令 | 功能 |
-|------|------|
-| `get_coding_scripts_dir` | 获取脚本目录 `~/AiDocPlus/CodingScripts/` |
-| `list_coding_scripts` | 列出根目录下所有支持格式的脚本文件 |
-| `list_coding_file_tree` | 递归列出文件树（目录在前、文件在后，按名称排序） |
-| `read_coding_script` | 读取文件（支持相对路径和绝对路径） |
-| `save_coding_script` | 保存文件（自动创建父目录） |
-| `delete_coding_script` | 删除文件 |
-| `rename_coding_script` | 重命名文件 |
-| `create_coding_folder` | 创建子文件夹 |
-| `delete_coding_folder` | 删除文件夹（递归） |
-| `move_coding_item` | 移动/重命名文件或文件夹 |
-| `search_coding_files` | 全局内容搜索（递归、不区分大小写、最多 200 条） |
-| `read_external_file` | 读取外部绝对路径文件（拖放打开用） |
+| 命令                                          | 功能                                                           |
+| --------------------------------------------- | -------------------------------------------------------------- |
+| `get_coding_scripts_dir`                    | 获取脚本目录 `~/AiDocPlus/CodingScripts/`                    |
+| `list_coding_scripts`                       | 列出根目录下所有支持格式的脚本文件                             |
+| `list_coding_file_tree`                     | 递归列出文件树（目录在前、文件在后，按名称排序）               |
+| `read_coding_script`                        | 读取文件（支持相对路径和绝对路径）                             |
+| `save_coding_script`                        | 保存文件（自动创建父目录）                                     |
+| `delete_coding_script`                      | 删除文件                                                       |
+| `rename_coding_script`                      | 重命名文件                                                     |
+| `create_coding_folder`                      | 创建子文件夹                                                   |
+| `delete_coding_folder`                      | 删除文件夹（递归）                                             |
+| `move_coding_item`                          | 移动/重命名文件或文件夹                                        |
+| `search_coding_files`                       | 全局内容搜索（递归、不区分大小写、最多 200 条）                |
+| `read_external_file`                        | 读取外部绝对路径文件（拖放打开用）                             |
 | `load_coding_state` / `save_coding_state` | 状态持久化（`~/AiDocPlus/CodingScripts/.coding-state.json`） |
-| `pip_install` | 使用 pip 安装 Python 包 |
-| `pip_list` | 列出已安装的 pip 包 |
+| `pip_install`                               | 使用 pip 安装 Python 包                                        |
+| `pip_list`                                  | 列出已安装的 pip 包                                            |
 
 支持的文件格式：`py, html, htm, js, jsx, ts, tsx, json, md, css, txt, xml, yaml, yml, toml, sh, sql`
 
@@ -918,16 +894,17 @@ plugins/{name}/
 **三层解决方案**：
 
 1. **Rust 端 — async + `spawn_blocking`**：
+
    - `check_python` / `discover_pythons`（`commands/python.rs`）— 同步逻辑提取为 `_sync` 内部函数，Tauri 命令改为 `async`，通过 `tokio::task::spawn_blocking` 调用
    - `check_nodejs`（`commands/nodejs.rs`）— 同上
    - 效果：子进程执行在 tokio 阻塞线程池，不占用 Tauri 异步线程，UI 不卡顿
-
 2. **前端 Store — 缓存 + 持久化**：
+
    - `useCodingStore` 新增 `pythonInfo` / `nodeInfo`（`RuntimeCheckResult | null`）、`pythonDetecting` / `nodeDetecting` 状态
    - `detectPython(force?)` / `detectNode(force?)` action：无缓存时异步检测，检测结果写入 Store 并持久化到磁盘
    - `init()` 从持久化状态恢复缓存，后续打开编程区时直接读取缓存，零延迟
-
 3. **前端 CodingPanel — 缓存读取 + 懒加载**：
+
    - `pythonInfo` / `nodeInfo` 从 Store 读取（不再用 `useState`）
    - 组件挂载时调用 `store.detectPython()` / `store.detectNode()`，有缓存时直接跳过
    - 用户修改 `customPythonPath` / `customNodePath` 时强制重新检测
@@ -936,6 +913,7 @@ plugins/{name}/
 #### AI 自动化引擎（`codingAI.ts`）
 
 **自动运行循环**（`aiAutoRun`）：
+
 1. AI 生成代码（流式，使用 `chat_stream` 命令）
 2. 保存到文件 → 运行脚本（`run_python_script` / `run_node_script`）
 3. 成功 → 结束；超时 → 报错结束
@@ -944,6 +922,7 @@ plugins/{name}/
 6. 最多重试 3 次
 
 **对话式 AI 助手**：
+
 - `chatWithAssistant()` — 流式对话，供 `CodingAssistantPanel` 调用
 - `buildContextMessages()` — 构建上下文感知消息（注入当前代码、运行输出、错误、选中片段）
 - 三种模式：`chat`（对话）、`code`（直接输出代码）、`plan`（分步计划）
@@ -1032,28 +1011,28 @@ curl / 脚本 ─┘                   └─ api_gateway.rs（JSON-RPC 路由�
 
 #### HTTP 端点
 
-| 端点 | 方法 | 认证 | 说明 |
-|------|------|------|------|
-| `/api/v1/status` | GET | 无 | 运行状态 |
-| `/api/v1/schema` | GET | 无 | API 自描述（所有命名空间和操作） |
-| `/api/v1/call` | POST | Bearer Token | JSON-RPC 统一入口 |
+| 端点               | 方法 | 认证         | 说明                             |
+| ------------------ | ---- | ------------ | -------------------------------- |
+| `/api/v1/status` | GET  | 无           | 运行状态                         |
+| `/api/v1/schema` | GET  | 无           | API 自描述（所有命名空间和操作） |
+| `/api/v1/call`   | POST | Bearer Token | JSON-RPC 统一入口                |
 
 #### API 命名空间（`api_gateway.rs`）
 
-| 命名空间 | 操作 | 说明 |
-|----------|------|------|
-| `app` | `status`, `getActiveDocument`, `getSelectedText`, `getActiveProjectId` | 程序状态 |
-| `document` | `list`, `get`, `create`, `save` | 文档 CRUD |
-| `project` | `list` | 项目列表 |
-| `search` | `documents` | 文档搜索 |
-| `ai` | `chat`, `generate` | AI 对话/生成（支持 `system_prompt`、`temperature`、`max_tokens`） |
-| `export` | `markdown`, `html`, `docx`, `pdf`, `txt` | 多格式导出 |
-| `template` | `list`, `getContent` | 提示词模板 |
-| `plugin` | `list`, `storage.get`, `storage.set` | 插件管理 |
-| `file` | `read`, `write`, `metadata` | 文件操作（限 `~/AiDocPlus/` 下） |
-| `script` | `listFiles` | 脚本列表 |
-| `tts` | `speak`, `stop`, `listVoices` | 语音朗读（占位） |
-| `email` | `send`, `testConnection` | 邮件（占位） |
+| 命名空间     | 操作                                                                           | 说明                                                                    |
+| ------------ | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| `app`      | `status`, `getActiveDocument`, `getSelectedText`, `getActiveProjectId` | 程序状态                                                                |
+| `document` | `list`, `get`, `create`, `save`                                        | 文档 CRUD                                                               |
+| `project`  | `list`                                                                       | 项目列表                                                                |
+| `search`   | `documents`                                                                  | 文档搜索                                                                |
+| `ai`       | `chat`, `generate`                                                         | AI 对话/生成（支持 `system_prompt`、`temperature`、`max_tokens`） |
+| `export`   | `markdown`, `html`, `docx`, `pdf`, `txt`                             | 多格式导出                                                              |
+| `template` | `list`, `getContent`                                                       | 提示词模板                                                              |
+| `plugin`   | `list`, `storage.get`, `storage.set`                                     | 插件管理                                                                |
+| `file`     | `read`, `write`, `metadata`                                              | 文件操作（限 `~/AiDocPlus/` 下）                                      |
+| `script`   | `listFiles`                                                                  | 脚本列表                                                                |
+| `tts`      | `speak`, `stop`, `listVoices`                                            | 语音朗读（占位）                                                        |
+| `email`    | `send`, `testConnection`                                                   | 邮件（占位）                                                            |
 
 #### 连接信息（`~/.aidocplus/api.json`）
 
@@ -1081,6 +1060,7 @@ Model Context Protocol Server，23 个工具，供 Claude Desktop / Cursor 等 A
 #### 编程区自动化
 
 脚本运行器（`commands/script_runner.rs`）自动注入环境变量：
+
 - `AIDOCPLUS_API_PORT` / `AIDOCPLUS_API_TOKEN` — API 连接参数
 - `PYTHONPATH` — 追加 Python SDK 路径，使 `import aidocplus` 可用
 - `NODE_PATH` — 追加 JS SDK 路径，使 `require('aidocplus')` 可用
@@ -1183,18 +1163,18 @@ message: i18n.t('editor.lint.emptyLinkUrl', { defaultValue: '空链接：URL 为
 
 #### 翻译 key 命名空间约定
 
-| 命名空间 | 用途 | 示例 |
-|----------|------|------|
-| `common` | 通用文字（保存、取消、删除等） | `common.save`, `common.loading` |
-| `menu` | 菜单和对话框操作 | `menu.exportProject`, `menu.deleteConfirm` |
-| `editor` | 编辑器相关 | `editor.lint.emptyLinkUrl`, `editor.clickToOpen` |
-| `fileTree` | 文件树 | `fileTree.newProject`, `fileTree.noDocuments` |
-| `chat` | AI 聊天面板 | `chat.send`, `chat.stopGenerating` |
-| `settings` | 设置面板 | `settings.general`, `settings.templateManager.title` |
-| `store` | Store 错误消息和内部标签 | `store.exportProjectFailed` |
-| `tabs` | 标签页 | `tabs.close`, `tabs.closeOthers` |
-| `version` | 版本历史 | `version.create`, `version.restoreToThis` |
-| `templates` | 模板分类 | `templates.categoryReport` |
+| 命名空间      | 用途                           | 示例                                                     |
+| ------------- | ------------------------------ | -------------------------------------------------------- |
+| `common`    | 通用文字（保存、取消、删除等） | `common.save`, `common.loading`                      |
+| `menu`      | 菜单和对话框操作               | `menu.exportProject`, `menu.deleteConfirm`           |
+| `editor`    | 编辑器相关                     | `editor.lint.emptyLinkUrl`, `editor.clickToOpen`     |
+| `fileTree`  | 文件树                         | `fileTree.newProject`, `fileTree.noDocuments`        |
+| `chat`      | AI 聊天面板                    | `chat.send`, `chat.stopGenerating`                   |
+| `settings`  | 设置面板                       | `settings.general`, `settings.templateManager.title` |
+| `store`     | Store 错误消息和内部标签       | `store.exportProjectFailed`                            |
+| `tabs`      | 标签页                         | `tabs.close`, `tabs.closeOthers`                     |
+| `version`   | 版本历史                       | `version.create`, `version.restoreToThis`            |
+| `templates` | 模板分类                       | `templates.categoryReport`                             |
 
 #### 不需要国际化的内容
 
@@ -1245,10 +1225,10 @@ cjk = re.compile(r'[\u4e00-\u9fff]')
 
 **核心规则：先构建本地 macOS 版本，成功后再上传并构建 Windows 版本。**
 
-| 平台 | 构建方式 | 目标 | 产物 |
-|------|----------|------|------|
-| macOS (Apple Silicon) | **本地构建** | `aarch64-apple-darwin` | `.dmg` |
-| Windows x64 | **GitHub Actions 远端构建** | `x86_64-pc-windows-msvc` | `.exe` (NSIS) |
+| 平台                  | 构建方式                          | 目标                       | 产物            |
+| --------------------- | --------------------------------- | -------------------------- | --------------- |
+| macOS (Apple Silicon) | **本地构建**                | `aarch64-apple-darwin`   | `.dmg`        |
+| Windows x64           | **GitHub Actions 远端构建** | `x86_64-pc-windows-msvc` | `.exe` (NSIS) |
 
 ### Cargo Profile 优化
 
@@ -1260,11 +1240,13 @@ cjk = re.compile(r'[\u4e00-\u9fff]')
 **注意**：ResourceManager 的 release profile 必须与主程序保持一致（`lto = "thin"`），否则共享 target 目录时会因 LTO 配置不同导致重新编译。
 
 本地测试构建用 `--debug` 加速：
+
 ```bash
 cd apps/desktop && pnpm tauri build --debug --target aarch64-apple-darwin
 ```
 
 正式发布构建（release profile）：
+
 ```bash
 cd apps/desktop && pnpm tauri build --target aarch64-apple-darwin
 ```
@@ -1298,10 +1280,12 @@ gh run list --workflow=build.yml --limit 1
 **仅构建 Windows x64**，macOS 由本地构建。
 
 **触发条件**：
+
 - 推送 `v*` 格式的 tag
 - 手动触发（`workflow_dispatch`）
 
 **CI 构建流程**：
+
 1. Checkout Monorepo
 2. 安装工具链（Python 3、Node.js 20、pnpm 10、Rust stable）
 3. 构建资源：`bash scripts/build-resources.sh`
@@ -1309,6 +1293,7 @@ gh run list --workflow=build.yml --limit 1
 5. 自动创建 Draft Release 并上传安装包
 
 **环境变量**：
+
 ```yaml
 env:
   PYTHONIOENCODING: utf-8
@@ -1330,12 +1315,14 @@ env:
 所有 Rust 后端和 TypeScript 前端代码必须遵守以下规范，确保在 macOS、Windows 上正确运行：
 
 #### Rust 路径处理
+
 1. **必须使用 `PathBuf::join()`**：禁止用 `format!("{}/{}", dir, name)` 拼接文件路径，`join()` 会自动使用平台正确的分隔符
 2. **bundled-resources 查找**：优先使用 Tauri `app.path().resource_dir()`（跨平台正确解析），回退到 exe 向上遍历
 3. **平台分支**：使用 `#[cfg(target_os = "...")]` 处理平台差异（如进程启动、文件打开方式）
 4. **路径转字符串**：使用 `path.display()` 用于日志，`path.to_string_lossy()` 用于传递给前端
 
 #### TypeScript 路径处理
+
 1. **禁止硬编码 `/` 作为路径分隔符**：Windows 路径使用 `\`，正则表达式必须同时匹配 `/` 和 `\`
    - 错误：`path.replace(/\/[^/]+\/?$/, '')`
    - 正确：`path.replace(/[/\\][^/\\]+[/\\]?$/, '')`
@@ -1344,6 +1331,7 @@ env:
 3. **前端尽量不做路径操作**：复杂路径逻辑应放在 Rust 后端，前端只传递和显示路径字符串
 
 #### 字体
+
 1. **中文字体必须提供跨平台 fallback 链**：
    - 宋体：`"Songti SC", "SimSun", "STSong", serif`（macOS → Windows → 备选）
    - 黑体：`"PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif`
@@ -1351,6 +1339,7 @@ env:
 2. **禁止单独使用中文字体名**（如 `'宋体'`），必须包含 fallback
 
 #### 资源管理器
+
 - 资源管理器已合并到主程序，通过 Tauri 多窗口机制在独立窗口中运行
 - 不再需要独立的平台特定启动逻辑（无 `.app`、`.exe` 子进程）
 - `open_resource_manager` 命令创建 WebviewWindow 加载 `manager.html`

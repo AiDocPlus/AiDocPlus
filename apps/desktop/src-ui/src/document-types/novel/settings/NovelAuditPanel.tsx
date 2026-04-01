@@ -6,19 +6,17 @@
  * - 本地规则检查（快速）+ AI 深度检查
  * - 问题列表和修复建议
  */
-import { useState, useMemo, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useState, useCallback } from 'react';
 import {
-  ShieldCheck, AlertTriangle, Check, ChevronDown, ChevronRight,
-  RefreshCw, Sparkles, Loader2, AlertCircle, ChevronLeft, ChevronRight as ChevronRightIcon,
+  ShieldCheck, Check, ChevronDown, ChevronRight,
+  RefreshCw, Loader2, AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import type { DocTypeHostAPI } from '@/doctype-sdk/types';
 import type { NovelDocumentContent } from '../types';
 import {
-  runLocalAudit,
+  generateLocalAuditReport,
   buildAIAuditPrompt,
   type AuditReport,
   type AuditIssue,
@@ -26,21 +24,16 @@ import {
 
 interface NovelAuditPanelProps {
   novel: NovelDocumentContent;
-  activeChapterId: string | null;
   host: DocTypeHostAPI;
 }
 
 export default function NovelAuditPanel({
   novel,
-  activeChapterId,
   host,
 }: NovelAuditPanelProps) {
-  const { t } = useTranslation();
-  const [auditMode, setAuditMode] = useState<'local' | 'ai'>('local');
   const [auditing, setAuditing] = useState(false);
   const [report, setReport] = useState<AuditReport | null>(null);
   const [aiCategory, setAiCategory] = useState<string | null>(null);
-  const [aiIssues, setAiIssues] = useState<AuditIssue[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['character']));
 
@@ -51,7 +44,7 @@ export default function NovelAuditPanel({
     setReport(null);
 
     try {
-      const result = runLocalAudit(novel);
+      const result = generateLocalAuditReport(novel);
       setReport(result);
     } catch (e) {
       setError(e instanceof Error ? e.message : '审计失败');
@@ -81,32 +74,35 @@ export default function NovelAuditPanel({
         if (match) {
           issues.push({
             id: `ai-${Date.now()}-${issues.length}`,
+            dimensionId: match[1].trim(),
             category: category as any,
-            dimension: match[1].trim(),
             severity: match[2].includes('严重') ? 'error' : match[2].includes('警告') ? 'warning' : 'info',
+            title: match[1].trim(),
             description: match[3].trim(),
-            location: '',
             suggestion: '',
           });
         }
       }
 
-      setAiIssues(issues);
-
       // 合并到报告中
       if (report) {
+        const prevCategoryIssues = (report.byCategory as Record<string, AuditIssue[]>)[category] || [];
+        const newErrors = [...report.bySeverity.errors, ...issues.filter(i => i.severity === 'error')];
+        const newWarnings = [...report.bySeverity.warnings, ...issues.filter(i => i.severity === 'warning')];
+        const newInfos = [...report.bySeverity.infos, ...issues.filter(i => i.severity === 'info')];
+
         setReport({
           ...report,
-          issues: [...report.issues, ...issues],
+          totalIssues: report.totalIssues + issues.length,
+          allIssues: [...report.allIssues, ...issues],
           byCategory: {
             ...report.byCategory,
-            [category]: [...(report.byCategory[category] || []), ...issues],
-          },
+            [category]: [...prevCategoryIssues, ...issues],
+          } as any,
           bySeverity: {
-            ...report.bySeverity,
-            errors: report.bySeverity.errors + issues.filter(i => i.severity === 'error').length,
-            warnings: report.bySeverity.warnings + issues.filter(i => i.severity === 'warning').length,
-            infos: report.bySeverity.infos + issues.filter(i => i.severity === 'info').length,
+            errors: newErrors,
+            warnings: newWarnings,
+            infos: newInfos,
           },
         });
       }
@@ -209,22 +205,22 @@ export default function NovelAuditPanel({
                 <span className={cn(
                   'text-lg font-bold',
                   report.totalIssues === 0 ? 'text-green-500' :
-                  report.bySeverity.errors > 0 ? 'text-red-500' : 'text-amber-500'
+                  report.bySeverity.errors.length > 0 ? 'text-red-500' : 'text-amber-500'
                 )}>
                   {report.totalIssues === 0 ? '通过' : `${report.totalIssues} 个问题`}
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-2 text-center text-xs">
                 <div className="rounded bg-red-500/10 p-1.5">
-                  <div className="font-bold text-red-500">{report.bySeverity.errors}</div>
+                  <div className="font-bold text-red-500">{report.bySeverity.errors.length}</div>
                   <div className="text-muted-foreground">错误</div>
                 </div>
                 <div className="rounded bg-amber-500/10 p-1.5">
-                  <div className="font-bold text-amber-500">{report.bySeverity.warnings}</div>
+                  <div className="font-bold text-amber-500">{report.bySeverity.warnings.length}</div>
                   <div className="text-muted-foreground">警告</div>
                 </div>
                 <div className="rounded bg-blue-500/10 p-1.5">
-                  <div className="font-bold text-blue-500">{report.bySeverity.infos}</div>
+                  <div className="font-bold text-blue-500">{report.bySeverity.infos.length}</div>
                   <div className="text-muted-foreground">提示</div>
                 </div>
               </div>
@@ -277,13 +273,13 @@ export default function NovelAuditPanel({
                                 {severityLabels[issue.severity]}
                               </span>
                               <div className="flex-1 min-w-0">
-                                <div className="text-xs font-medium">{issue.dimension}</div>
+                                <div className="text-xs font-medium">{issue.dimensionId}</div>
                                 <div className="text-xs text-muted-foreground line-clamp-2">
                                   {issue.description}
                                 </div>
-                                {issue.location && (
+                                {issue.chapterTitle && (
                                   <div className="text-[10px] text-muted-foreground mt-0.5">
-                                    位置：{issue.location}
+                                    位置：{issue.chapterTitle}
                                   </div>
                                 )}
                               </div>

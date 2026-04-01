@@ -237,7 +237,7 @@ export function EditorToolbar({ cmViewRef, outlineOpen, onToggleOutline, viewMod
   const s = (key: keyof typeof tb) => tb[key] !== false;
 
   return (
-    <div className="flex items-center gap-0.5 px-1 h-6 bg-background flex-nowrap overflow-x-auto flex-shrink-0">
+    <div className="flex items-center gap-0.5 px-1 h-6 bg-background flex-nowrap overflow-x-auto scrollbar-hide flex-shrink-0">
 
       {/* ── 1. 导入 ── */}
       {s('importFile') && <ImportButton runAction={runAction} importSources={importSources} />}

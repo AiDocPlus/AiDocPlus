@@ -3,6 +3,8 @@ import { Brain } from 'lucide-react';
 import type { DocumentPlugin } from '../types';
 import { registerPluginI18n } from '../i18n-loader';
 import { registerPlugin } from '../pluginStore';
+import { mindMapDataToMarkdown } from './mindmapConverter';
+import type { SMNode } from './mindmapConverter';
 const MindMapPluginPanel = React.lazy(() => import('./MindMapPluginPanel').then(m => ({ default: m.MindMapPluginPanel })));
 const MindMapAssistantPanel = React.lazy(() => import('./MindMapAssistantPanel').then(m => ({ default: m.MindMapAssistantPanel })));
 import manifest from './manifest.json';
@@ -38,8 +40,7 @@ export const mindmapPlugin: DocumentPlugin = {
         let md = diag.markdownContent;
         if (!md?.trim() && diag.jsonData) {
           try {
-            const { mindMapDataToMarkdown } = require('./mindmapConverter');
-            md = mindMapDataToMarkdown(diag.jsonData);
+            md = mindMapDataToMarkdown(diag.jsonData as SMNode);
           } catch { /* ignore */ }
         }
         if (md?.trim()) {

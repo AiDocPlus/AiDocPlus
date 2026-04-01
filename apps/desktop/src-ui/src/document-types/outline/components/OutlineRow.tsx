@@ -23,7 +23,7 @@ import {
 
 import type { OutlineNode, RichTextContent } from '../types';
 import { outlineHeadingEditorClass } from '../outlineHeadingLevel';
-import { getPlainTextFromContent, createRichTextFromPlain } from '../types';
+import { createRichTextFromPlain } from '../types';
 import {
   ProseMirrorNodeEditor,
 } from './ProseMirrorNodeEditor';
@@ -80,7 +80,6 @@ export const OutlineRow = forwardRef(function OutlineRow(
     sortableId,
     node,
     depth,
-    isLast,
     isSelected,
     isActive,
     isCollapsed,
@@ -90,9 +89,6 @@ export const OutlineRow = forwardRef(function OutlineRow(
     showNotes,
     lineSpacing,
     enableDragAndDrop = true,
-    searchQuery = '',
-    searchCaseSensitive = false,
-    searchUseRegex = false,
     onContentChange,
     onNoteChange,
     onToggleExpand,
@@ -102,8 +98,6 @@ export const OutlineRow = forwardRef(function OutlineRow(
     onIndent,
     onOutdent,
     onAddSibling,
-    onDeleteIfEmpty,
-    onEditNote,
     onKeyDown,
     onRegisterEditor,
     nodeMenuHandlers,
@@ -242,7 +236,7 @@ export const OutlineRow = forwardRef(function OutlineRow(
 
     // 处理内容变更
     const handleContentChange = useCallback(
-      (content: RichTextContent, plainText: string, tags: string[], mentions: string[]) => {
+      (content: RichTextContent, _plainText: string, _tags: string[], _mentions: string[]) => {
         onContentChange(content);
       },
       [onContentChange]
@@ -259,32 +253,8 @@ export const OutlineRow = forwardRef(function OutlineRow(
       setIsEditingNote(false);
     }, [noteDraft, onNoteChange]);
 
-    // 富文本格式化操作
-    const toggleBold = useCallback(() => {
-      editorRef.current?.toggleBold();
-    }, []);
-
-    const toggleItalic = useCallback(() => {
-      editorRef.current?.toggleItalic();
-    }, []);
-
-    const toggleUnderline = useCallback(() => {
-      editorRef.current?.toggleUnderline();
-    }, []);
-
-    const toggleStrike = useCallback(() => {
-      editorRef.current?.toggleStrike();
-    }, []);
-
-    const setHighlight = useCallback((color: string | null) => {
-      editorRef.current?.setHighlight(color);
-    }, []);
-
-    const clearFormat = useCallback(() => {
-      editorRef.current?.clearFormat();
-    }, []);
-
-    const handleRegisterEditor = useCallback(
+    // 处理编辑器实例注册
+    const registerEditor = useCallback(
       (editor: ProseMirrorNodeEditorRef | null) => {
         editorRef.current = editor;
         onRegisterEditor?.(node.id, editor);
@@ -412,7 +382,7 @@ export const OutlineRow = forwardRef(function OutlineRow(
         <div className="flex-1 min-w-0 outline-node-content">
           {/* 富文本编辑器 */}
           <ProseMirrorNodeEditor
-            ref={handleRegisterEditor}
+            ref={registerEditor}
             content={node.content}
             isActive={isActive}
             completed={false}

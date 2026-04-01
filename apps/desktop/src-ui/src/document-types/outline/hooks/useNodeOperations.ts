@@ -18,7 +18,6 @@ import {
   createEmptyNode,
   getPlainTextFromContent,
   extractTagsFromContent,
-  generateId,
 } from '../types';
 
 export interface NodeOperations {
@@ -228,7 +227,7 @@ export function useNodeOperations(
           } else {
             newSet.delete(nodeId);
           }
-          return newSet;
+          return Array.from(newSet);
         })(),
         updatedAt: new Date().toISOString(),
       };
@@ -306,7 +305,6 @@ export function useNodeOperations(
       if (!path || path.length <= 1) return outline;
       const parentPath = path.slice(0, -1);
       const grandparentPath = parentPath.slice(0, -1);
-      const index = path[path.length - 1];
       const moved = findNode(outline.nodes, nodeId);
       if (!moved) return outline;
       const parentIndex = parentPath[parentPath.length - 1];

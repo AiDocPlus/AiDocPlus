@@ -88,6 +88,8 @@ export interface OutlineSettings {
   autoSaveInterval: number;          // 自动保存间隔（秒）
   enableRichText: boolean;           // 启用富文本编辑
   defaultHeadingLevel: 0 | 1;        // 默认新建节点标题级别
+  showWordCount?: boolean;           // 显示字数统计
+  showProgress?: boolean;            // 显示完成进度
 }
 
 /**

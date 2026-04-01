@@ -17,7 +17,7 @@ import DocTypeAIChatBase, { sendDocTypeAIMessage } from '../../_shared/DocTypeAI
 import { QUICK_ACTION_BAR, QUICK_ACTION_BTN, MSG_ACTION_BTN } from '../../_shared/styles';
 import type { DocTypeChatMsg } from '../../_shared/DocTypeChatMessage';
 
-type SettingsTab = 'synopsis' | 'outline' | 'characters' | 'relations' | 'locations' | 'factions' | 'foreshadowing' | 'timeline' | 'worldview' | 'materials' | 'goals' | 'check' | 'plotlines';
+export type SettingsTab = 'synopsis' | 'outline' | 'characters' | 'relations' | 'locations' | 'factions' | 'foreshadowing' | 'timeline' | 'worldview' | 'materials' | 'goals' | 'check' | 'plotlines' | 'style';
 
 interface SettingsAIPanelProps {
   host: DocTypeHostAPI;

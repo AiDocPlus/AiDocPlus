@@ -61,7 +61,7 @@ export default function StockDataPanel({
   return (
     <div className="flex flex-col h-full">
       {/* 标签栏 */}
-      <div className="flex items-center border-b flex-shrink-0 overflow-x-auto">
+      <div className="flex items-center border-b flex-shrink-0 overflow-x-auto scrollbar-hide">
         {tabs.map(tab => {
           const Icon = tab.icon;
           return (

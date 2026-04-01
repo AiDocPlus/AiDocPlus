@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Clock, Eye, RotateCcw, GitBranch, X, GitCompare, Trash2 } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -46,6 +46,24 @@ export function VersionHistoryPanel({ open, onClose, projectId, documentId }: Ve
   const [createBackup, setCreateBackup] = useState(true);
   const [restoreMessage, setRestoreMessage] = useState<{ ok: boolean; msg: string } | null>(null);
   const [showDiffViewer, setShowDiffViewer] = useState(false);
+  const restoreMessageTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 显示操作结果消息，自动清除，组件卸载时安全清理
+  const showRestoreMessage = useCallback((message: { ok: boolean; msg: string }, delay: number) => {
+    setRestoreMessage(message);
+    if (restoreMessageTimerRef.current) clearTimeout(restoreMessageTimerRef.current);
+    restoreMessageTimerRef.current = setTimeout(() => {
+      setRestoreMessage(null);
+      restoreMessageTimerRef.current = null;
+    }, delay);
+  }, []);
+
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+      if (restoreMessageTimerRef.current) clearTimeout(restoreMessageTimerRef.current);
+    };
+  }, []);
   const [compareVersions, setCompareVersions] = useState<{ left?: DocumentVersion; right?: DocumentVersion }>({});
 
   // Load versions when panel opens or document changes
@@ -136,12 +154,10 @@ export function VersionHistoryPanel({ open, onClose, projectId, documentId }: Ve
       setVersionToRestore(null);
 
       // Show success message inline
-      setRestoreMessage({ ok: true, msg: t('version.restored', { defaultValue: '版本恢复成功' }) });
-      setTimeout(() => setRestoreMessage(null), 3000);
+      showRestoreMessage({ ok: true, msg: t('version.restored', { defaultValue: '版本恢复成功' }) }, 3000);
     } catch (error) {
       console.error('Failed to restore version:', error);
-      setRestoreMessage({ ok: false, msg: t('errors.restoreFailed', { defaultValue: '版本恢复失败' }) });
-      setTimeout(() => setRestoreMessage(null), 5000);
+      showRestoreMessage({ ok: false, msg: t('errors.restoreFailed', { defaultValue: '版本恢复失败' }) }, 5000);
     } finally {
       setLoading(false);
     }
@@ -158,12 +174,10 @@ export function VersionHistoryPanel({ open, onClose, projectId, documentId }: Ve
         setSelectedVersionId(null);
       }
       await loadVersionsData();
-      setRestoreMessage({ ok: true, msg: t('version.deleteSuccess', { defaultValue: '版本已删除' }) });
-      setTimeout(() => setRestoreMessage(null), 3000);
+      showRestoreMessage({ ok: true, msg: t('version.deleteSuccess', { defaultValue: '版本已删除' }) }, 3000);
     } catch (error) {
       console.error('Failed to delete version:', error);
-      setRestoreMessage({ ok: false, msg: t('version.deleteFailed', { defaultValue: '删除版本失败' }) });
-      setTimeout(() => setRestoreMessage(null), 5000);
+      showRestoreMessage({ ok: false, msg: t('version.deleteFailed', { defaultValue: '删除版本失败' }) }, 5000);
     }
   };
 
@@ -175,12 +189,10 @@ export function VersionHistoryPanel({ open, onClose, projectId, documentId }: Ve
       setSelectedVersionId(null);
       setShowDeleteAllConfirm(false);
       await loadVersionsData();
-      setRestoreMessage({ ok: true, msg: t('version.deleteAllSuccess', { defaultValue: '已清除全部历史版本' }) });
-      setTimeout(() => setRestoreMessage(null), 3000);
+      showRestoreMessage({ ok: true, msg: t('version.deleteAllSuccess', { defaultValue: '已清除全部历史版本' }) }, 3000);
     } catch (error) {
       console.error('Failed to delete all versions:', error);
-      setRestoreMessage({ ok: false, msg: t('version.deleteAllFailed', { defaultValue: '清除全部版本失败' }) });
-      setTimeout(() => setRestoreMessage(null), 5000);
+      showRestoreMessage({ ok: false, msg: t('version.deleteAllFailed', { defaultValue: '清除全部版本失败' }) }, 5000);
     }
   };
 

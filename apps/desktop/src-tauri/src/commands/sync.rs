@@ -5,7 +5,6 @@ use crate::config::AppState;
 use crate::sync::types::*;
 use crate::sync::SyncManager;
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{Emitter, Manager};
 
 /// Tauri managed state 包装
@@ -25,6 +24,13 @@ pub async fn configure_sync(
     config: SyncConfig,
 ) -> Result<(), String> {
     let data_root = app_state.data_root();
+
+    // 安全检查：验证 icloud_folder 在允许的目录内（防止路径遍历）
+    if let Some(ref folder) = config.icloud_folder {
+        crate::security::validate_path_allowed(
+            std::path::Path::new(folder), "icloud_folder"
+        ).map_err(|e| e.to_string())?;
+    }
 
     // 保存配置（不强制测试连接）
     {
@@ -103,15 +109,34 @@ pub async fn load_sync_config(
 
 use std::time::Duration;
 
-static AUTO_SYNC_RUNNING: AtomicBool = AtomicBool::new(false);
+/// 保存自动同步定时器的取消标志，支持停止旧定时器
+static AUTO_SYNC_CANCEL: std::sync::OnceLock<std::sync::Mutex<Option<std::sync::Arc<std::sync::atomic::AtomicBool>>>> = std::sync::OnceLock::new();
+
+fn get_cancel_token() -> &'static std::sync::Mutex<Option<std::sync::Arc<std::sync::atomic::AtomicBool>>> {
+    AUTO_SYNC_CANCEL.get_or_init(|| std::sync::Mutex::new(None))
+}
 
 fn start_auto_sync_timer(app_handle: tauri::AppHandle, interval_secs: u64) {
     if interval_secs == 0 {
+        // 停止已有的自动同步定时器
+        if let Ok(mut guard) = get_cancel_token().lock() {
+            if let Some(token) = guard.take() {
+                token.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
         return;
     }
 
-    if AUTO_SYNC_RUNNING.swap(true, Ordering::Relaxed) {
-        return;
+    // 停止旧的定时器
+    if let Ok(mut guard) = get_cancel_token().lock() {
+        if let Some(token) = guard.take() {
+            token.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
+    let cancel_token = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    if let Ok(mut guard) = get_cancel_token().lock() {
+        *guard = Some(cancel_token.clone());
     }
 
     let handle = app_handle.clone();
@@ -121,6 +146,11 @@ fn start_auto_sync_timer(app_handle: tauri::AppHandle, interval_secs: u64) {
 
         loop {
             interval.tick().await;
+
+            // 检查是否已被取消
+            if cancel_token.load(std::sync::atomic::Ordering::Relaxed) {
+                break;
+            }
 
             let _ = handle.emit("sync:auto-sync-triggered", ());
 

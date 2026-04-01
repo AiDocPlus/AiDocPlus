@@ -11,9 +11,8 @@ import type {
   NovelDocumentContent,
   NovelChapter,
   NovelCharacter,
-  NovelForeshadowing,
 } from './types';
-import { getChapterById, getEffectiveContent, getVolumeByChapterId } from './types';
+import { getEffectiveContent } from './types';
 
 // ═══ 审计维度定义 ═══
 
@@ -225,27 +224,20 @@ function isSimilarName(a: string, b: string): boolean {
 function checkOpenForeshadowing(novel: NovelDocumentContent): AuditIssue[] {
   const issues: AuditIssue[] = [];
   const foreshadowing = novel.settings.foreshadowing;
-  const now = Date.now();
-  const oneMonthAgo = now - 30 * 24 * 60 * 60 * 1000;
 
   for (const f of foreshadowing) {
     if (f.status === 'open') {
-      const createdAt = f.createdAt || 0;
-      const age = now - createdAt;
-
-      // 超过 30 天未解决
-      if (createdAt > 0 && age > oneMonthAgo) {
-        const daysOpen = Math.floor(age / (24 * 60 * 60 * 1000));
-        issues.push({
-          id: `foreshadow-open-${f.id}`,
-          dimensionId: 'foreshadow-open',
-          category: 'foreshadowing',
-          severity: 'warning',
-          title: `长期未解伏笔：「${f.content.slice(0, 30)}...」`,
-          description: `此伏笔已悬置 ${daysOpen} 天未解决。`,
-          suggestion: '考虑在近期章节中呼应或解决此伏笔。',
-        });
-      }
+      // NovelForeshadowing 类型无 createdAt 字段，暂无法进行时间检查
+      // 仅标记未解伏笔供人工审查
+      issues.push({
+        id: `foreshadow-open-${f.id}`,
+        dimensionId: 'foreshadow-open',
+        category: 'foreshadowing',
+        severity: 'info',
+        title: `未解伏笔：「${f.content.slice(0, 30)}」`,
+        description: '此伏笔尚未解决。',
+        suggestion: '考虑在近期章节中呼应或解决此伏笔。',
+      });
     }
   }
 
@@ -629,7 +621,7 @@ export function buildAIAuditPrompt(
   const recentChapters: NovelChapter[] = [];
   for (const vol of novel.volumes) {
     for (const ch of vol.chapters) {
-      if (ch.content.length > 500) {
+      if (getEffectiveContent(ch).length > 500) {
         recentChapters.push(ch);
       }
     }

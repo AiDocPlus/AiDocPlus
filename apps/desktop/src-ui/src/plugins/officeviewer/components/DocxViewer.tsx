@@ -96,7 +96,7 @@ export function DocxViewer({ filePath, fileName, onError }: DocxViewerProps) {
     printWindow.document.write(`
       <html>
         <head>
-          <title>打印 - ${fileName}</title>
+          <title>打印 - ${fileName.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))}</title>
           <style>
             body { margin: 20px; font-family: Arial, sans-serif; }
             @media print { body { margin: 0; } }

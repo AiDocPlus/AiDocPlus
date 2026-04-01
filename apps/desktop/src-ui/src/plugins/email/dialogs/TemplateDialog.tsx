@@ -879,7 +879,7 @@ export function TemplateDialog({ open, onOpenChange, onApplyTemplate, onInsertSn
             <div className="w-[320px] flex-shrink-0 border-r flex flex-col bg-muted/20">
               {/* 片段分类筛选条 */}
               {activeTab === 'snippets' && snippetCategories.length > 0 && (
-                <div className="flex items-center gap-1 px-3 py-1.5 border-b flex-shrink-0 overflow-x-auto">
+                <div className="flex items-center gap-1 px-3 py-1.5 border-b flex-shrink-0 overflow-x-auto scrollbar-hide">
                   <button
                     onClick={() => setSnippetCategoryFilter('all')}
                     className={`px-2 py-0.5 rounded text-[11px] whitespace-nowrap transition-colors ${

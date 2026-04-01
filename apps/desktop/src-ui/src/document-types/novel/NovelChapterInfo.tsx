@@ -50,7 +50,7 @@ export default function NovelChapterInfo({
     <div className="border-t flex-shrink-0 bg-card">
       {/* 标题栏（点击展开/折叠） */}
       <div
-        className="flex items-center gap-1 px-3 py-1 cursor-pointer hover:bg-muted/30 transition-colors overflow-x-auto"
+        className="flex items-center gap-1 px-3 py-1 cursor-pointer hover:bg-muted/30 transition-colors overflow-x-auto scrollbar-hide"
         onClick={() => setExpanded(!expanded)}
       >
         {expanded ? <ChevronDown className="h-3 w-3 text-muted-foreground flex-shrink-0" /> : <ChevronUp className="h-3 w-3 text-muted-foreground flex-shrink-0" />}

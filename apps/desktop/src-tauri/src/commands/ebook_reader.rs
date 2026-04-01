@@ -4,6 +4,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
+use std::io::Read as _;
 use std::path::PathBuf;
 use std::time::UNIX_EPOCH;
 use uuid::Uuid;
@@ -40,6 +41,18 @@ pub struct EbookInfo {
     /// 是否收藏
     #[serde(default)]
     pub starred: bool,
+    /// 作者（EPUB 元数据提取）
+    #[serde(default)]
+    pub author: String,
+    /// 封面图 base64 data URI（EPUB 元数据提取）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cover_image: Option<String>,
+    /// 阅读状态：unread / reading / completed
+    #[serde(default)]
+    pub reading_status: String,
+    /// 用户自定义标签
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -133,7 +146,11 @@ fn migrate_or_create_index() -> crate::error::Result<LibraryIndex> {
                 continue;
             }
             // 跳过 library.json 自身
-            if path.file_name().map(|n| n == "library.json").unwrap_or(false) {
+            if path
+                .file_name()
+                .map(|n| n == "library.json")
+                .unwrap_or(false)
+            {
                 continue;
             }
 
@@ -183,6 +200,10 @@ fn migrate_or_create_index() -> crate::error::Result<LibraryIndex> {
                 category_id: None,
                 sort_order: books.len() as i64,
                 starred: false,
+                author: String::new(),
+                cover_image: None,
+                reading_status: String::new(),
+                tags: Vec::new(),
             });
         }
     }
@@ -239,10 +260,9 @@ pub fn import_ebook(
 
     let home = dirs::home_dir()
         .ok_or_else(|| crate::error::AppError::Internal("无法获取用户主目录".to_string()))?;
-    let home_str = home.to_string_lossy();
-    let canonical_str = canonical.to_string_lossy();
+    let home_canonical = home.canonicalize().unwrap_or(home);
 
-    if !canonical_str.starts_with(home_str.as_ref()) {
+    if !canonical.starts_with(&home_canonical) {
         return Err(crate::error::AppError::SecurityError(
             "不允许导入主目录之外的文件".to_string(),
         ));
@@ -297,7 +317,7 @@ pub fn import_ebook(
         .unwrap_or(-1);
 
     let book = EbookInfo {
-        filename: new_filename,
+        filename: new_filename.clone(),
         original_name,
         display_name,
         format: normalize_format(ext),
@@ -306,10 +326,31 @@ pub fn import_ebook(
         category_id,
         sort_order: max_sort + 1,
         starred: false,
+        author: String::new(),
+        cover_image: None,
+        reading_status: String::new(),
+        tags: Vec::new(),
     };
 
     index.books.push(book.clone());
     save_library_index(&index)?;
+
+    if ext.eq_ignore_ascii_case("epub") {
+        if let Ok(meta) = extract_epub_metadata(&dest) {
+            let mut idx = load_library_index()?;
+            if let Some(b) = idx.books.iter_mut().find(|b| b.filename == new_filename) {
+                b.author = meta.author;
+                b.cover_image = meta.cover_image;
+                if !meta.title.is_empty() {
+                    b.display_name = meta.title;
+                }
+            }
+            save_library_index(&idx)?;
+            if let Some(updated) = idx.books.iter().find(|b| b.filename == new_filename) {
+                return Ok(updated.clone());
+            }
+        }
+    }
 
     Ok(book)
 }
@@ -318,13 +359,39 @@ pub fn import_ebook(
 pub fn toggle_ebook_starred(filename: String) -> crate::error::Result<bool> {
     use crate::error::ResultExt;
     let mut index = load_library_index().context("加载电子书索引失败")?;
-    let book = index.books.iter_mut()
+    let book = index
+        .books
+        .iter_mut()
         .find(|b| b.filename == filename)
         .ok_or_else(|| crate::error::AppError::Internal("书籍未找到".to_string()))?;
     book.starred = !book.starred;
     let new_val = book.starred;
     save_library_index(&index).context("保存电子书索引失败")?;
     Ok(new_val)
+}
+
+/// 更新电子书元数据（阅读状态、标签等）
+#[tauri::command]
+pub fn update_ebook_metadata(
+    filename: String,
+    reading_status: Option<String>,
+    tags: Option<Vec<String>>,
+) -> crate::error::Result<()> {
+    use crate::error::ResultExt;
+    let mut index = load_library_index().context("加载电子书索引失败")?;
+    let book = index
+        .books
+        .iter_mut()
+        .find(|b| b.filename == filename)
+        .ok_or_else(|| crate::error::AppError::Internal("书籍未找到".to_string()))?;
+    if let Some(status) = reading_status {
+        book.reading_status = status;
+    }
+    if let Some(new_tags) = tags {
+        book.tags = new_tags;
+    }
+    save_library_index(&index).context("保存电子书索引失败")?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -361,9 +428,7 @@ pub fn rename_ebook(filename: String, new_name: String) -> crate::error::Result<
         .books
         .iter_mut()
         .find(|b| b.filename == filename)
-        .ok_or_else(|| {
-            crate::error::AppError::Internal(format!("书籍未找到: {}", filename))
-        })?;
+        .ok_or_else(|| crate::error::AppError::Internal(format!("书籍未找到: {}", filename)))?;
     book.display_name = new_name;
     save_library_index(&index)
 }
@@ -379,9 +444,7 @@ pub fn move_ebook(
         .books
         .iter_mut()
         .find(|b| b.filename == filename)
-        .ok_or_else(|| {
-            crate::error::AppError::Internal(format!("书籍未找到: {}", filename))
-        })?;
+        .ok_or_else(|| crate::error::AppError::Internal(format!("书籍未找到: {}", filename)))?;
     book.category_id = category_id;
     if let Some(so) = sort_order {
         book.sort_order = so;
@@ -422,18 +485,13 @@ pub fn rename_category(id: String, new_name: String) -> crate::error::Result<()>
         .categories
         .iter_mut()
         .find(|c| c.id == id)
-        .ok_or_else(|| {
-            crate::error::AppError::Internal(format!("分类未找到: {}", id))
-        })?;
+        .ok_or_else(|| crate::error::AppError::Internal(format!("分类未找到: {}", id)))?;
     cat.name = new_name;
     save_library_index(&index)
 }
 
 #[tauri::command]
-pub fn delete_category(
-    id: String,
-    move_books_to_parent: bool,
-) -> crate::error::Result<()> {
+pub fn delete_category(id: String, move_books_to_parent: bool) -> crate::error::Result<()> {
     let mut index = load_library_index()?;
 
     // 递归收集所有后代分类 ID
@@ -459,9 +517,7 @@ pub fn delete_category(
         }
     }
 
-    index
-        .categories
-        .retain(|c| !to_remove.contains(&c.id));
+    index.categories.retain(|c| !to_remove.contains(&c.id));
     save_library_index(&index)
 }
 
@@ -622,6 +678,31 @@ pub fn export_ebook(filename: String, dest_path: String) -> crate::error::Result
         )));
     }
 
+    // 安全检查：目标路径必须在用户主目录或临时目录下
+    let dest = std::path::Path::new(&dest_path);
+    let home = dirs::home_dir().unwrap_or_default();
+    let home_canonical = home.canonicalize().unwrap_or(home);
+    let temp_canonical = std::env::temp_dir().canonicalize().unwrap_or(std::env::temp_dir());
+    let dest_canonical = if dest.exists() {
+        dest.canonicalize().unwrap_or_else(|_| dest.to_path_buf())
+    } else if let Some(parent) = dest.parent() {
+        if parent.exists() {
+            parent.canonicalize().unwrap_or_else(|_| parent.to_path_buf())
+        } else {
+            return Err(crate::error::AppError::ValidationError(
+                "目标目录不存在".to_string(),
+            ));
+        }
+    } else {
+        dest.to_path_buf()
+    };
+
+    if !dest_canonical.starts_with(&home_canonical) && !dest_canonical.starts_with(&temp_canonical) {
+        return Err(crate::error::AppError::SecurityError(
+            "安全限制：只能导出到用户主目录或临时目录下".to_string(),
+        ));
+    }
+
     let msg = format!("导出文件失败: {}", filename);
     fs::copy(&src, &dest_path).context(&msg)?;
 
@@ -646,7 +727,10 @@ pub fn move_category(
 
     // 不能移动到自己的后代
     let descendants = descendant_category_ids(&index.categories, &category_id);
-    if new_parent_id.as_ref().map_or(false, |pid| descendants.contains(pid)) {
+    if new_parent_id
+        .as_ref()
+        .map_or(false, |pid| descendants.contains(pid))
+    {
         return Err(crate::error::AppError::ValidationError(
             "不能将分类移动到其子分类中".to_string(),
         ));
@@ -656,9 +740,7 @@ pub fn move_category(
         .categories
         .iter()
         .position(|c| c.id == category_id)
-        .ok_or_else(|| {
-            crate::error::AppError::Internal(format!("分类未找到: {}", category_id))
-        })?;
+        .ok_or_else(|| crate::error::AppError::Internal(format!("分类未找到: {}", category_id)))?;
 
     index.categories[cat_idx].parent_id = new_parent_id.clone();
 
@@ -673,6 +755,230 @@ pub fn move_category(
     index.categories[cat_idx].sort_order = max_sort + 1;
 
     save_library_index(&index).context("保存电子书索引失败")
+}
+
+// ── EPUB 元数据提取 ──
+
+struct EpubMetadata {
+    title: String,
+    author: String,
+    cover_image: Option<String>,
+}
+
+fn extract_epub_metadata(path: &PathBuf) -> crate::error::Result<EpubMetadata> {
+    let file = fs::File::open(path)
+        .map_err(|e| crate::error::AppError::Internal(format!("打开 EPUB 文件失败: {}", e)))?;
+    let mut archive = zip::ZipArchive::new(file)
+        .map_err(|e| crate::error::AppError::Internal(format!("解析 EPUB (ZIP) 失败: {}", e)))?;
+
+    let container_xml = {
+        let mut f = archive.by_name("META-INF/container.xml").map_err(|e| {
+            crate::error::AppError::Internal(format!("读取 container.xml 失败: {}", e))
+        })?;
+        let mut buf = String::new();
+        f.read_to_string(&mut buf).map_err(|e| {
+            crate::error::AppError::Internal(format!("读取 container.xml 内容失败: {}", e))
+        })?;
+        buf
+    };
+
+    let opf_path = extract_str_between(&container_xml, "full-path=\"", "\"").unwrap_or_default();
+    if opf_path.is_empty() {
+        return Ok(EpubMetadata {
+            title: String::new(),
+            author: String::new(),
+            cover_image: None,
+        });
+    }
+
+    let opf_content = {
+        let mut f = archive
+            .by_name(&opf_path)
+            .map_err(|e| crate::error::AppError::Internal(format!("读取 OPF 文件失败: {}", e)))?;
+        let mut buf = String::new();
+        f.read_to_string(&mut buf)
+            .map_err(|e| crate::error::AppError::Internal(format!("读取 OPF 内容失败: {}", e)))?;
+        buf
+    };
+
+    let title = extract_dc_tag(&opf_content, "title").unwrap_or_default();
+    let author = extract_dc_tag(&opf_content, "creator").unwrap_or_default();
+
+    let cover_image = extract_cover_image(&mut archive, &opf_content, &opf_path).ok();
+
+    Ok(EpubMetadata {
+        title,
+        author,
+        cover_image,
+    })
+}
+
+fn extract_dc_tag(xml: &str, tag_name: &str) -> Option<String> {
+    let open_tag = format!("<dc:{}>", tag_name);
+    let close_tag = format!("</dc:{}>", tag_name);
+    let start = xml.find(&open_tag)? + open_tag.len();
+    let end = xml.find(&close_tag)?;
+    let value = xml[start..end].trim().to_string();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value)
+    }
+}
+
+fn extract_str_between(s: &str, prefix: &str, suffix: &str) -> Option<String> {
+    let start = s.find(prefix)? + prefix.len();
+    let end = s.find(suffix)?;
+    Some(s[start..end].to_string())
+}
+
+fn extract_cover_image(
+    archive: &mut zip::ZipArchive<fs::File>,
+    opf_content: &str,
+    opf_path: &str,
+) -> crate::error::Result<String> {
+    let mut cover_href: Option<String> = None;
+
+    if let Some(cover_id) = extract_meta_cover(opf_content) {
+        let open_item = format!("id=\"{}\"", cover_id);
+        let end_item = "</item>";
+        if let Some(pos) = opf_content.find(&open_item) {
+            if let Some(item_end) = opf_content[pos..].find(end_item) {
+                let item_block = &opf_content[pos..pos + item_end + end_item.len()];
+                if let Some(href) = extract_str_between(item_block, "href=\"", "\"") {
+                    cover_href = Some(href);
+                }
+            }
+        }
+    }
+
+    if cover_href.is_none() {
+        if let Some(start) = opf_content.find("properties=\"cover-image\"") {
+            let search_start = if start > 200 { start - 200 } else { 0 };
+            let block = &opf_content[search_start..start];
+            if let Some(href) = extract_str_between(block, "href=\"", "\"") {
+                cover_href = Some(href);
+            }
+        }
+    }
+
+    let href = cover_href
+        .ok_or_else(|| crate::error::AppError::Internal("未找到 EPUB 封面".to_string()))?;
+
+    let mut abs_path = if opf_path.contains('/') {
+        let dir = &opf_path[..opf_path.rfind('/').ok_or_else(|| {
+            crate::error::AppError::Internal("无效的 EPUB 路径".to_string())
+        })?];
+        format!("{}/{}", dir, href)
+    } else {
+        href
+    };
+    abs_path = abs_path.replace("../", "");
+
+    let mut cover_file = archive
+        .by_name(&abs_path)
+        .map_err(|_| crate::error::AppError::Internal("读取封面文件失败".to_string()))?;
+    let mut bytes = Vec::new();
+    cover_file
+        .read_to_end(&mut bytes)
+        .map_err(|_| crate::error::AppError::Internal("读取封面数据失败".to_string()))?;
+
+    if bytes.len() > 500_000 {
+        return Err(crate::error::AppError::Internal(
+            "封面图过大，跳过".to_string(),
+        ));
+    }
+
+    let bytes = if bytes.len() > 2 && bytes[0] == 0x1F && bytes[1] == 0x8B {
+        let mut decoder = flate2::read::GzDecoder::new(&bytes[..]);
+        let mut decompressed = Vec::new();
+        decoder
+            .read_to_end(&mut decompressed)
+            .map_err(|_| crate::error::AppError::Internal("解压封面失败".to_string()))?;
+        decompressed
+    } else {
+        bytes
+    };
+
+    let mime = match &bytes[..2.min(bytes.len())] {
+        b"\xFF\xD8" => "image/jpeg",
+        b"\x89PNG" => "image/png",
+        b"GIF" => "image/gif",
+        b"BM" => "image/bmp",
+        b"RI" => "image/webp",
+        _ => "image/jpeg",
+    };
+
+    Ok(format!("data:{};base64,{}", mime, BASE64.encode(&bytes)))
+}
+
+fn extract_meta_cover(opf: &str) -> Option<String> {
+    if let Some(pos) = opf.find(r#"name="cover""#) {
+        let start = pos + r#"name="cover""#.len();
+        let rest = &opf[start..];
+        if let Some(content_start) = rest.find("content=\"") {
+            let val_start = content_start + 9;
+            let val_end = rest[val_start..].find('"')?;
+            let val = &rest[val_start..val_start + val_end];
+            if !val.is_empty() {
+                return Some(val.to_string());
+            }
+        }
+    }
+    if let Some(pos) = opf.find(r#"name='cover'"#) {
+        let start = pos + r#"name='cover'"#.len();
+        let rest = &opf[start..];
+        if let Some(content_start) = rest.find("content='") {
+            let val_start = content_start + 9;
+            let val_end = rest[val_start..].find('\'')?;
+            let val = &rest[val_start..val_start + val_end];
+            if !val.is_empty() {
+                return Some(val.to_string());
+            }
+        }
+    }
+    None
+}
+
+// ── 批注存储 ──
+
+/// 保存书籍批注（JSON 格式）
+#[tauri::command]
+pub fn save_annotations(filename: String, annotations_json: String) -> crate::error::Result<()> {
+    use crate::error::ResultExt;
+
+    // 安全检查
+    if filename.contains('/') || filename.contains('\\') || filename.contains("..") {
+        return Err(crate::error::AppError::ValidationError(
+            "文件名包含非法字符".to_string(),
+        ));
+    }
+
+    let dir = library_dir()?.join("annotations");
+    std::fs::create_dir_all(&dir).context("创建批注目录失败")?;
+
+    let path = dir.join(format!("{}.json", filename));
+    std::fs::write(&path, annotations_json).context("保存批注失败")?;
+    Ok(())
+}
+
+/// 加载书籍批注（JSON 格式）
+#[tauri::command]
+pub fn load_annotations(filename: String) -> crate::error::Result<String> {
+    use crate::error::ResultExt;
+
+    // 安全检查
+    if filename.contains('/') || filename.contains('\\') || filename.contains("..") {
+        return Err(crate::error::AppError::ValidationError(
+            "文件名包含非法字符".to_string(),
+        ));
+    }
+
+    let path = library_dir()?.join("annotations").join(format!("{}.json", filename));
+    if !path.exists() {
+        return Ok("[]".to_string());
+    }
+    std::fs::read_to_string(&path).context("读取批注失败")
 }
 
 // ── 单元测试 ──

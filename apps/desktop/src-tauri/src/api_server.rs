@@ -21,7 +21,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::RwLock;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
+use axum::http::HeaderValue;
 
 use tauri::AppHandle;
 
@@ -102,6 +103,15 @@ impl TokenState {
             0
         } else {
             (TOKEN_TTL - elapsed).as_secs()
+        }
+    }
+
+    /// 获取当前 Token 的前 n 个字符（用于编程区子进程身份验证）
+    pub fn get_token_prefix(&self, n: usize) -> Option<String> {
+        if self.current_token.len() >= n {
+            Some(self.current_token[..n].to_string())
+        } else {
+            None
         }
     }
 }
@@ -288,7 +298,14 @@ fn generate_token() -> String {
 /// 构建 axum Router
 fn build_router(state: Arc<ApiServerState>) -> Router {
     let cors = CorsLayer::new()
-        .allow_origin(Any)
+        .allow_origin(AllowOrigin::list([
+            "http://localhost".parse::<HeaderValue>().unwrap(),
+            "http://127.0.0.1".parse::<HeaderValue>().unwrap(),
+            "http://localhost:5173".parse::<HeaderValue>().unwrap(),
+            "http://127.0.0.1:5173".parse::<HeaderValue>().unwrap(),
+            "tauri://localhost".parse::<HeaderValue>().unwrap(),
+            "https://tauri.localhost".parse::<HeaderValue>().unwrap(),
+        ]))
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers(Any);
 
@@ -337,13 +354,27 @@ async fn handle_call(
 
     let caller_level = match validation {
         TokenValidation::Valid | TokenValidation::GracePeriod => {
+            // Script 级别需要同时满足：
+            // 1. 非浏览器请求（无 Origin header）
+            // 2. 携带 x-script-signature header（由编程区子进程注入，值为 API token 的前 16 字符）
+            // 这防止了外部调用者仅通过设置 x-caller-level: script 即可提权
+            let is_browser_request = headers.get("origin").is_some();
             let level_header = headers
                 .get("x-caller-level")
                 .and_then(|v| v.to_str().ok())
                 .unwrap_or("external");
-            match level_header {
-                "script" => CallerLevel::Script,
-                _ => CallerLevel::External,
+            let script_signature = headers
+                .get("x-script-signature")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("");
+            // 验证 script signature：必须是有效 token 的前 16 字符
+            let expected_sig = state.token_state.read().await.get_token_prefix(16);
+            let signature_valid = !script_signature.is_empty()
+                && expected_sig.as_ref().map(|s| s == script_signature).unwrap_or(false);
+            if !is_browser_request && level_header == "script" && signature_valid {
+                CallerLevel::Script
+            } else {
+                CallerLevel::External
             }
         }
         TokenValidation::Invalid => {
@@ -360,9 +391,8 @@ async fn handle_call(
 
     let response = crate::api_gateway::dispatch(request, caller_level, &state.app_state, &state.app_handle).await;
 
-    let status = if response.error.is_some() {
-        let code = response.error.as_ref().unwrap().code;
-        match code {
+    let status = if let Some(error) = &response.error {
+        match error.code {
             400 => StatusCode::BAD_REQUEST,
             401 => StatusCode::UNAUTHORIZED,
             403 => StatusCode::FORBIDDEN,

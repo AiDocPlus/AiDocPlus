@@ -12,45 +12,6 @@ import { invoke } from '@tauri-apps/api/core';
 
 // ═══ 风格分析提示词模板 ═══
 
-const STYLE_ANALYSIS_SYSTEM_PROMPT = `你是一位专业的文学风格分析师。请分析以下文本的写作风格，提取可供模仿的风格特征。
-
-**重要规则**：
-1. 分析必须基于原文实际特征，2. 每个特征都要附上原文例句佐证
-3. 不要泛泛而谈，要给出具体可操作的建议
-4. 输出必须是严格的 JSON 格式`;
-
-const STYLE_ANALYSIS_USER_PROMPT = (text: string, authorName?: string) => `请分析以下${authorName ? `${authorName}的` : ''}文本的写作风格：
-
-\`\`\`
-${text.slice(0, 15000)}
-\`\`\`
-
-请从以下维度进行分析，输出 JSON 格式的风格画像：
-
-\`\`\`json
-{
-  "avgSentenceLength": 25.5,
-  "sentenceLengthStdDev": 12.3,
-  "avgParagraphLength": 180,
-  "paragraphLengthRange": { "min": 50, "max": 350 },
-  "dialogueRatio": 0.35,
-  "narrationRatio": 0.65,
-  "vocabularyDiversity": 0.42,
-  "narrativeVoice": "第三人称有限视角",
-  "tensePreference": "过去时",
-  "toneStyle": "冷峻克制",
-  "commonMetaphors": ["刀剑意象", "自然力量", "光影对比"],
-  "rhetoricalDevices": ["短句排比", "动作细节", "环境烘托"],
-  "topPatterns": ["四字成语+动作", "对话+心理"],
-  "dialogueStyle": "简洁有力，少用形容词",
-  "tagVerbPreference": ["道", "问", "答"],
-  "sensoryFocus": ["视觉", "触觉", "听觉"],
-  "pacingPreference": "快节奏，句式短促",
-  "summary": "整体风格概述（200-300字），描述文风的主要特点...",
-  "signature": "标志性特征（如：四字成语密集+动作描写+环境烘托）"
-}
-\`\`\``;
-
 // ═══ 风格画像生成 ═══
 
 export interface StyleAnalysisProgress {
@@ -89,11 +50,8 @@ export async function generateStyleProfile(
       return { success: false, error: '语料库为空，请先添加文本文件' };
     }
 
-    // 2. 合并文本（取前 20000 字符）
+    // 2. 准备分析
     onProgress?.({ phase: 'analyzing', message: '准备分析文本...', percentage: 30 });
-
-    const allContent = files.map(f => f.content).join('\n\n');
-    const textForAnalysis = allContent.slice(0, 20000);
 
     // 3. 调用 AI 分析
     onProgress?.({ phase: 'generating', message: 'AI 分析风格特征...', percentage: 50 });
@@ -101,14 +59,6 @@ export async function generateStyleProfile(
     // 注意：这里需要调用主程序的 AI 服务
     // 由于我们在文档类型模块中，需要通过回调或事件机制与主程序通信
     // 这里返回必要的信息，让调用方（UI 组件）来完成 AI 调用
-
-    const analysisRequest = {
-      systemPrompt: STYLE_ANALYSIS_SYSTEM_PROMPT,
-      userPrompt: STYLE_ANALYSIS_USER_PROMPT(textForAnalysis),
-      corpusId,
-      totalWords: files.reduce((sum, f) => sum + f.word_count, 0),
-      fileCount: files.length,
-    };
 
     onProgress?.({ phase: 'done', message: '准备就绪，等待 AI 分析', percentage: 100 });
 
@@ -176,13 +126,6 @@ export function computeLocalStyleStats(text: string): LocalStyleStats {
   const sentenceCount = Math.max(1, sentences.length);
   const sentenceLengths = sentences.map(s => s.replace(/\s/g, '').length);
   const avgSentenceLength = sentenceLengths.reduce((s, v) => s + v, 0) / sentenceCount;
-
-  // 句长标准差
-  const sentenceLengthStdDev = sentenceLengths.length > 1
-    ? Math.sqrt(
-        sentenceLengths.reduce((s, v) => s + (v - avgSentenceLength) ** 2, 0) / sentenceLengths.length,
-      )
-    : 0;
 
   // 段落
   const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 0);
@@ -351,7 +294,7 @@ function extractKeywords(text: string, maxKeywords: number = 5): string[] {
 /**
  * 构建风格注入提示词（用于 Layer 0）
  */
-export function buildStyleInjectionPrompt(profile: StyleProfile, maxTokens: number = 800): string {
+export function buildStyleInjectionPrompt(profile: StyleProfile, _maxTokens: number = 800): string {
   const parts: string[] = [];
 
   parts.push('【文风要求】');

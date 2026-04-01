@@ -50,6 +50,7 @@ pub fn search_documents(
     project_id: String,
     options: SearchOptions,
 ) -> Result<Vec<SearchResult>> {
+    crate::security::validate_id(&project_id, "projectId")?;
     // FTS5 快速路径：简单文本搜索（非正则、非全词匹配、搜索内容）
     if options.search_content && !options.use_regex && !options.match_whole_word && !options.match_case {
         if let Ok(fts_results) = crate::search_store::fts_search(
@@ -301,6 +302,7 @@ pub fn get_search_suggestions(
     prefix: String,
     limit: Option<usize>,
 ) -> Result<Vec<String>> {
+    crate::security::validate_id(&project_id, "projectId")?;
     let project_dir = state.config().projects_dir.join(&project_id);
     let docs_dir = project_dir.join("documents");
 

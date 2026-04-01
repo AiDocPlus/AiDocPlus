@@ -318,8 +318,8 @@ pub async fn send_email(
     } else {
         let mut mixed = MultiPart::mixed().multipart(content_part);
         for att in &attachment_list {
-            validate_attachment_path(&att.path)?;
-            let file_content = std::fs::read(&att.path)
+            let safe_path = validate_attachment_path(&att.path)?;
+            let file_content = std::fs::read(&safe_path)
                 .context_with(|| format!("ATTACHMENT_READ_FAILED: {}", att.filename))?;
             let ct: ContentType = att.mimeType.parse().unwrap_or(ContentType::TEXT_PLAIN);
             let attachment_part = Attachment::new(att.filename.clone()).body(file_content, ct);
@@ -363,7 +363,8 @@ fn resolve_password(password: Option<String>, account_id: Option<&str>) -> crate
 
 /// 附件路径安全校验（Phase 1.3）
 /// 只允许访问用户主目录下的文件和系统临时目录
-fn validate_attachment_path(path: &str) -> crate::error::Result<()> {
+/// 返回 canonicalized 路径，消除 TOCTOU 窗口
+fn validate_attachment_path(path: &str) -> crate::error::Result<std::path::PathBuf> {
     use crate::error::AppError;
     let canonical = std::fs::canonicalize(path)
         .map_err(|e| AppError::SecurityError(format!("ATTACHMENT_PATH_INVALID: {} - {}", path, e)))?;
@@ -372,14 +373,14 @@ fn validate_attachment_path(path: &str) -> crate::error::Result<()> {
     // 允许用户主目录
     if let Some(home) = dirs::home_dir() {
         if canonical.starts_with(&home) {
-            return Ok(());
+            return Ok(canonical);
         }
     }
 
     // 允许系统临时目录
     let temp_dir = std::env::temp_dir();
     if canonical.starts_with(&temp_dir) {
-        return Ok(());
+        return Ok(canonical);
     }
 
     Err(AppError::SecurityError(format!(

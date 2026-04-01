@@ -52,6 +52,11 @@ fn get_allowed_directories() -> Vec<PathBuf> {
 pub fn read_directory(path: String) -> Result<FileSystemEntry> {
     let path_obj = Path::new(&path);
 
+    // 读取操作也需要路径验证（安全限制）
+    let allowed_dirs = get_allowed_directories();
+    validate_path_in_allowed_dir(path_obj, &allowed_dirs)
+        .context("读取目录失败")?;
+
     if !path_obj.exists() {
         return Err(AppError::Internal(format!("Path does not exist: {}", path)));
     }
@@ -111,7 +116,13 @@ pub fn read_directory(path: String) -> Result<FileSystemEntry> {
 
 #[tauri::command]
 pub fn read_file(path: String) -> Result<String> {
-    if !Path::new(&path).exists() {
+    // 读取操作也需要路径验证（安全限制）
+    let allowed_dirs = get_allowed_directories();
+    let path_obj = Path::new(&path);
+    validate_path_in_allowed_dir(path_obj, &allowed_dirs)
+        .context("读取文件失败")?;
+
+    if !path_obj.exists() {
         return Err(AppError::Internal(format!("File not found: {}", path)));
     }
     Ok(fs::read_to_string(&path)?)
@@ -148,9 +159,25 @@ pub fn delete_file(path: String) -> Result<()> {
 pub fn read_file_base64(path: String) -> Result<String> {
     use base64::{engine::general_purpose::STANDARD, Engine};
 
+    // 安全验证：限制在允许的目录下
+    let allowed_dirs = get_allowed_directories();
+    validate_path_in_allowed_dir(Path::new(&path), &allowed_dirs)
+        .context("读取文件失败：路径不在允许的目录下")?;
+
     let file_path = Path::new(&path);
     if !file_path.exists() {
         return Err(AppError::Internal(format!("文件不存在: {}", path)));
+    }
+
+    // 文件大小检查：超过 50MB 拒绝
+    const MAX_FILE_SIZE: u64 = 50 * 1024 * 1024; // 50MB
+    let metadata = fs::metadata(file_path).context("获取文件信息失败")?;
+    if metadata.len() > MAX_FILE_SIZE {
+        return Err(AppError::ValidationError(format!(
+            "文件过大（{} MB），最大允许 {} MB",
+            metadata.len() / 1024 / 1024,
+            MAX_FILE_SIZE / 1024 / 1024
+        )));
     }
 
     let bytes = fs::read(file_path).context("读取文件失败")?;
@@ -178,9 +205,25 @@ pub fn read_file_base64(path: String) -> Result<String> {
 /// 读取文本文件内容（自动检测编码，支持 UTF-8/GBK/GB2312 等）
 #[tauri::command]
 pub fn read_text_file(path: String) -> Result<String> {
+    // 安全验证：限制在允许的目录下
+    let allowed_dirs = get_allowed_directories();
+    validate_path_in_allowed_dir(Path::new(&path), &allowed_dirs)
+        .context("读取文件失败：路径不在允许的目录下")?;
+
     let file_path = Path::new(&path);
     if !file_path.exists() {
         return Err(AppError::Internal(format!("文件不存在: {}", path)));
+    }
+
+    // 文件大小检查：超过 50MB 拒绝
+    const MAX_FILE_SIZE: u64 = 50 * 1024 * 1024; // 50MB
+    let metadata = fs::metadata(file_path).context("获取文件信息失败")?;
+    if metadata.len() > MAX_FILE_SIZE {
+        return Err(AppError::ValidationError(format!(
+            "文件过大（{} MB），最大允许 {} MB",
+            metadata.len() / 1024 / 1024,
+            MAX_FILE_SIZE / 1024 / 1024
+        )));
     }
 
     let bytes = fs::read(file_path).context("读取文件失败")?;

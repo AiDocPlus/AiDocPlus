@@ -80,7 +80,7 @@ async function aiChatStream(
     throw new Error('AI 服务未配置，请先在设置中配置 AI 服务');
   }
 
-  const requestId = `coding_${Date.now()}`;
+  const requestId = `coding_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   let rawAccumulated = '';
   let prevContentLen = 0;
 
@@ -101,7 +101,14 @@ async function aiChatStream(
 
   try {
     if (signal?.aborted) throw new Error('已取消');
-    await invoke<string>('chat_stream', {
+    // AbortSignal 取消时通知后端停止流
+    if (signal) {
+      const onAbort = () => {
+        invoke('stop_ai_stream', { requestId }).catch(() => {});
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
+    const serverFull = await invoke<string>('chat_stream', {
       messages,
       ...aiParams,
       requestId,
@@ -109,7 +116,8 @@ async function aiChatStream(
       enableThinking: options?.enableThinking || undefined,
       maxTokens: (() => { const v = useSettingsStore.getState().ai.maxTokens; return (v && v > 0) ? v : undefined; })(),
     });
-    const finalParsed = parseThinkTags(rawAccumulated);
+    // 优先使用服务端完整累积结果，防止最后 chunk 丢失
+    const finalParsed = parseThinkTags(serverFull || rawAccumulated);
     return finalParsed.content;
   } finally {
     unlisten();
@@ -516,6 +524,28 @@ export function computeLineDiff(oldText: string, newText: string): DiffLine[] {
   const oldLines = oldText.split('\n');
   const newLines = newText.split('\n');
   const m = oldLines.length, n = newLines.length;
+
+  // 超过 500 行时使用简单的逐行对比，避免 O(m*n) 内存爆炸
+  const MAX_DIFF_LINES = 500;
+  if (m > MAX_DIFF_LINES || n > MAX_DIFF_LINES) {
+    const result: DiffLine[] = [];
+    const maxLen = Math.max(m, n);
+    for (let i = 0; i < maxLen; i++) {
+      if (i < m && i < n) {
+        if (oldLines[i] === newLines[i]) {
+          result.push({ type: 'same', text: oldLines[i] });
+        } else {
+          result.push({ type: 'del', text: oldLines[i] });
+          result.push({ type: 'add', text: newLines[i] });
+        }
+      } else if (i < m) {
+        result.push({ type: 'del', text: oldLines[i] });
+      } else {
+        result.push({ type: 'add', text: newLines[i] });
+      }
+    }
+    return result;
+  }
 
   // LCS 表
   const dp: number[][] = [];

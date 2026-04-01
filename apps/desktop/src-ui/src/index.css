@@ -408,6 +408,14 @@ div[data-radix-tooltip-content] {
   display: none;
 }
 
+/* 横向滚动条高度最小化（标签栏、工具栏等） */
+.scrollbar-h-min {
+  scrollbar-width: 4px;
+}
+.scrollbar-h-min::-webkit-scrollbar {
+  height: 4px;
+}
+
 /* 日记条目右键菜单 - hover 高亮 */
 .diary-ctx-item:hover {
   background-color: hsl(210 100% 90%) !important;

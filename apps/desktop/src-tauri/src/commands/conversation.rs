@@ -22,6 +22,8 @@ pub fn db_create_conversation(
     title: String,
     createdAt: f64,
 ) -> Result<()> {
+    crate::security::validate_id(&id, "id")?;
+    crate::security::validate_id(&documentId, "documentId")?;
     conversation_store::create_conversation(&state.db, &id, &documentId, &title, createdAt)
 }
 
@@ -35,6 +37,7 @@ pub fn db_add_message(
     timestamp: Option<f64>,
     contextMode: Option<String>,
 ) -> Result<()> {
+    crate::security::validate_id(&conversationId, "conversationId")?;
     let msg = MessageRecord {
         role,
         content,
@@ -51,6 +54,7 @@ pub fn db_update_last_message(
     conversationId: String,
     content: String,
 ) -> Result<()> {
+    crate::security::validate_id(&conversationId, "conversationId")?;
     conversation_store::update_last_message(&state.db, &conversationId, &content)
 }
 
@@ -61,6 +65,7 @@ pub fn db_rename_conversation(
     conversationId: String,
     title: String,
 ) -> Result<()> {
+    crate::security::validate_id(&conversationId, "conversationId")?;
     conversation_store::rename_conversation(&state.db, &conversationId, &title)
 }
 
@@ -71,6 +76,7 @@ pub fn db_pin_conversation(
     conversationId: String,
     pinned: bool,
 ) -> Result<()> {
+    crate::security::validate_id(&conversationId, "conversationId")?;
     conversation_store::pin_conversation(&state.db, &conversationId, pinned)
 }
 
@@ -80,5 +86,6 @@ pub fn db_delete_conversation(
     state: State<'_, AppState>,
     conversationId: String,
 ) -> Result<()> {
+    crate::security::validate_id(&conversationId, "conversationId")?;
     conversation_store::delete_conversation(&state.db, &conversationId)
 }

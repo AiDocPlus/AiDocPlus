@@ -61,7 +61,7 @@ export default function EssayTemplateDialog({ onSelect, onClose }: EssayTemplate
         </div>
 
         {/* ── 子类型筛选 Tab ── */}
-        <div className="flex items-center gap-1 px-4 py-2 border-b flex-shrink-0 overflow-x-auto">
+        <div className="flex items-center gap-1 px-4 py-2 border-b flex-shrink-0 overflow-x-auto scrollbar-hide">
           <button
             className={cn(
               'text-xs px-3 py-1 rounded-full whitespace-nowrap transition-colors',

@@ -3,7 +3,7 @@
  * layoutMode='full'，自定义四栏布局
  */
 import { lazy } from 'react';
-import { TrendingUp, Sparkles, MessageSquare, TrendingUpIcon, DollarSign, Activity, FileText } from 'lucide-react';
+import { TrendingUp, Sparkles, MessageSquare, DollarSign, Activity, FileText } from 'lucide-react';
 import type { DocTypeDefinition } from '@/doctype-sdk/types';
 import { createEmptyStockResearchContent, extractStockResearchPlainText } from './types';
 import { STOCK_RESEARCH_SYSTEM_PROMPT } from './ai/prompts';
@@ -55,7 +55,7 @@ export const stockResearchDocType: DocTypeDefinition = {
     {
       id: 'stock-research:fetch-daily',
       labelKey: 'stockResearch.actionFetchDaily',
-      icon: TrendingUpIcon,
+      icon: TrendingUp,
       defaultPromptTemplate: `请获取 {{stockName}}（{{stockCode}}）最近20个交易日的日线数据，并分析走势：
 
 1. 近期涨跌幅统计

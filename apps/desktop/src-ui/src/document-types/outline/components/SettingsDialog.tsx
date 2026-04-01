@@ -45,6 +45,11 @@ const DEFAULT_SETTINGS: OutlineSettings = {
   autoSave: true,
   showWordCount: true,
   showProgress: true,
+  defaultExpandLevel: 0,
+  showCompleted: 'all',
+  autoSaveInterval: 30,
+  enableRichText: true,
+  defaultHeadingLevel: 0,
 };
 
 export function SettingsDialog({
@@ -93,7 +98,7 @@ export function SettingsDialog({
             </Label>
             <Slider
               value={[localSettings.fontSize]}
-              onValueChange={([value]) => updateSetting('fontSize', value)}
+              onValueChange={([value]) => updateSetting('fontSize', value as 14 | 16 | 18)}
               min={12}
               max={24}
               step={1}

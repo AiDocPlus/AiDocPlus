@@ -77,7 +77,8 @@ fn find_executable(name: &str) -> String {
 
     // 尝试从 PATH 环境变量查找
     if let Ok(path_var) = std::env::var("PATH") {
-        for dir in path_var.split(':') {
+        let separator = if cfg!(target_os = "windows") { ';' } else { ':' };
+        for dir in path_var.split(separator) {
             let full = std::path::Path::new(dir).join(name);
             if full.exists() {
                 return full.to_string_lossy().to_string();
@@ -126,8 +127,8 @@ pub async fn start_imbot(
     let mut cmd = match &mode {
         ImBotMode::Dev { imbot_dir } => {
             let npx = find_executable("npx");
-            println!("[IM Bot] 开发模式: {} tsx src/index.ts", npx);
-            println!("[IM Bot] 工作目录: {:?}", imbot_dir);
+            eprintln!("[IM Bot] 开发模式: {} tsx src/index.ts", npx);
+            eprintln!("[IM Bot] 工作目录: {:?}", imbot_dir);
             let mut c = tokio::process::Command::new(&npx);
             c.arg("tsx");
             c.arg("src/index.ts");
@@ -136,7 +137,7 @@ pub async fn start_imbot(
         }
         ImBotMode::Bundle { bundle_path } => {
             let node = find_executable("node");
-            println!("[IM Bot] 生产模式: {} {:?}", node, bundle_path);
+            eprintln!("[IM Bot] 生产模式: {} {:?}", node, bundle_path);
             let mut c = tokio::process::Command::new(&node);
             c.arg(bundle_path);
             c
@@ -152,8 +153,12 @@ pub async fn start_imbot(
     // 继承 PATH 以便子进程能找到 node 等
     if let Ok(path) = std::env::var("PATH") {
         // 确保常见路径在 PATH 中
+        #[cfg(target_os = "windows")]
+        let extra_paths = r"C:\Program Files\nodejs";
+        #[cfg(not(target_os = "windows"))]
         let extra_paths = "/usr/local/bin:/opt/homebrew/bin";
-        let combined = format!("{}:{}", extra_paths, path);
+        let separator = if cfg!(target_os = "windows") { ';' } else { ':' };
+        let combined = format!("{}{}{}", extra_paths, separator, path);
         cmd.env("PATH", combined);
     }
 
@@ -171,7 +176,7 @@ pub async fn start_imbot(
         .context("克隆日志文件句柄失败")?;
     cmd.stdout(std::process::Stdio::from(stdout_file));
     cmd.stderr(std::process::Stdio::from(stderr_file));
-    println!("[IM Bot] 日志文件: {:?}", log_path);
+    eprintln!("[IM Bot] 日志文件: {:?}", log_path);
 
     // Windows 隐藏控制台窗口
     #[cfg(target_os = "windows")]
@@ -184,7 +189,7 @@ pub async fn start_imbot(
         .spawn()
         .map_err(|e| AppError::ExternalToolError(format!("启动 IM Bot 失败: {}", e)))?;
 
-    println!("[IM Bot] ✅ 子进程已启动, PID={:?}", child.id());
+    eprintln!("[IM Bot] 子进程已启动, PID={:?}", child.id());
 
     {
         let mut guard = state.child.lock().await;
@@ -202,7 +207,7 @@ pub async fn stop_imbot(
     let mut guard = state.child.lock().await;
     if let Some(ref mut child) = *guard {
         child.kill().await.map_err(|e| crate::error::AppError::Internal(format!("停止 IM Bot 失败: {}", e)))?;
-        println!("[IM Bot] 子进程已停止");
+        eprintln!("[IM Bot] 子进程已停止");
         *guard = None;
     }
     Ok(ImBotStatus { running: false })

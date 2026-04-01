@@ -6,8 +6,6 @@
  */
 
 import {
-  useState,
-  useCallback,
   useRef,
   useEffect,
   useImperativeHandle,
@@ -20,14 +18,12 @@ import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 
 import Placeholder from '@tiptap/extension-placeholder';
-import { Mark, mergeAttributes } from '@tiptap/core';
+import { Mark, mergeAttributes, InputRule } from '@tiptap/core';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { cn } from '@/lib/utils';
 
 import type { RichTextContent } from '../types';
 import {
-  createRichTextFromPlain,
-  getPlainTextFromContent,
   extractTagsFromContent,
 } from '../types';
 
@@ -72,9 +68,9 @@ export const TagMark = Mark.create({
 
   addInputRules() {
     return [
-      {
+      new InputRule({
         find: /#([^\s#@$%^&*(){}[\]\\;:'",.<>/?!`~|+=]+)$/,
-        handler: ({ state, range, match, chain }) => {
+        handler: ({ range, match, chain }) => {
           const tagName = match[1];
           if (tagName.length > 0) {
             chain()
@@ -88,7 +84,7 @@ export const TagMark = Mark.create({
               .run();
           }
         },
-      },
+      }),
     ];
   },
 });
@@ -134,9 +130,9 @@ export const MentionMark = Mark.create({
 
   addInputRules() {
     return [
-      {
+      new InputRule({
         find: /@([^\s#@$%^&*(){}[\]\\;:'",.<>/?!`~|+=]+)$/,
-        handler: ({ state, range, match, chain }) => {
+        handler: ({ range, match, chain }) => {
           const mentionName = match[1];
           if (mentionName.length > 0) {
             chain()
@@ -150,7 +146,7 @@ export const MentionMark = Mark.create({
               .run();
           }
         },
-      },
+      }),
     ];
   },
 });
@@ -206,7 +202,7 @@ const PreventEnter = Extension.create({
     return [
       new Plugin({
         key: new PluginKey('preventEnter'),
-        handleKeyDown: (view, event) => {
+        handleKeyDown: (view: any, event: KeyboardEvent) => {
           // 中文等 IME 组字/选词期间勿拦截 Enter、Tab，否则选词确认失败并出现 yyo… 类乱码
           if (view.composing) return false;
           if (event.isComposing || event.keyCode === 229) return false;

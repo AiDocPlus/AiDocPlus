@@ -39,19 +39,20 @@ pub struct NovelSettings {
     pub style_corpus_weights: Option<serde_json::Value>,
 }
 
-/// 获取小说设定集文件路径
-fn novel_settings_path(project_id: &str) -> PathBuf {
+/// 获取小说设定集文件路径（含安全校验）
+fn novel_settings_path(project_id: &str) -> crate::error::Result<PathBuf> {
+    crate::security::validate_id(project_id, "projectId")?;
     let data_root = config::current_data_root();
-    data_root
+    Ok(data_root
         .join("Projects")
         .join(project_id)
-        .join("novel-settings.json")
+        .join("novel-settings.json"))
 }
 
 /// 加载小说设定集
 #[tauri::command]
 pub fn load_novel_settings(project_id: String) -> crate::error::Result<Option<NovelSettings>> {
-    let path = novel_settings_path(&project_id);
+    let path = novel_settings_path(&project_id)?;
     if !path.exists() {
         return Ok(None);
     }
@@ -66,9 +67,7 @@ pub fn save_novel_settings(
     project_id: String,
     settings: NovelSettings,
 ) -> crate::error::Result<()> {
-    let path = novel_settings_path(&project_id);
-
-    // 确保项目目录存在
+    let path = novel_settings_path(&project_id)?;
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).context("创建项目目录失败")?;
     }
@@ -82,7 +81,7 @@ pub fn save_novel_settings(
 /// 删除小说设定集（项目转为非小说项目时调用）
 #[tauri::command]
 pub fn delete_novel_settings(project_id: String) -> crate::error::Result<()> {
-    let path = novel_settings_path(&project_id);
+    let path = novel_settings_path(&project_id)?;
     if path.exists() {
         std::fs::remove_file(&path).context("删除小说设定集失败")?;
     }
@@ -91,19 +90,20 @@ pub fn delete_novel_settings(project_id: String) -> crate::error::Result<()> {
 
 // ═══ 风格语料库 CRUD ═══
 
-/// 获取风格语料库目录路径
-fn style_corpus_dir(project_id: &str) -> PathBuf {
+/// 获取风格语料库目录路径（含安全校验）
+fn style_corpus_dir(project_id: &str) -> crate::error::Result<PathBuf> {
+    crate::security::validate_id(project_id, "projectId")?;
     let data_root = config::current_data_root();
-    data_root
+    Ok(data_root
         .join("Projects")
         .join(project_id)
-        .join("style-corpus")
+        .join("style-corpus"))
 }
 
 /// 加载风格语料库列表
 #[tauri::command]
 pub fn load_style_corpus_list(project_id: String) -> crate::error::Result<Vec<serde_json::Value>> {
-    let dir = style_corpus_dir(&project_id);
+    let dir = style_corpus_dir(&project_id)?;
     if !dir.exists() {
         return Ok(vec![]);
     }
@@ -123,7 +123,7 @@ pub fn save_style_corpus_list(
     project_id: String,
     list: Vec<serde_json::Value>,
 ) -> crate::error::Result<()> {
-    let dir = style_corpus_dir(&project_id);
+    let dir = style_corpus_dir(&project_id)?;
     std::fs::create_dir_all(&dir).context("创建风格语料库目录失败")?;
     let index_path = dir.join("index.json");
     let json = serde_json::to_string_pretty(&list).context("序列化风格语料库索引失败")?;
@@ -139,7 +139,11 @@ pub fn save_style_corpus_file(
     file_name: String,
     content: String,
 ) -> crate::error::Result<String> {
-    let dir = style_corpus_dir(&project_id).join(&corpus_id);
+    crate::security::validate_id(&corpus_id, "corpusId")?;
+    if file_name.contains('/') || file_name.contains('\\') || file_name.contains("..") {
+        return Err(crate::error::AppError::SecurityError("文件名包含非法字符".to_string()));
+    }
+    let dir = style_corpus_dir(&project_id)?.join(&corpus_id);
     std::fs::create_dir_all(&dir).context("创建语料库文件目录失败")?;
     let file_path = dir.join(&file_name);
     config::atomic_write(&file_path, &content)?;
@@ -153,7 +157,8 @@ pub fn read_style_corpus_file(
     corpus_id: String,
     file_name: String,
 ) -> crate::error::Result<String> {
-    let file_path = style_corpus_dir(&project_id)
+    crate::security::validate_id(&corpus_id, "corpusId")?;
+    let file_path = style_corpus_dir(&project_id)?
         .join(&corpus_id)
         .join(&file_name);
     let content = std::fs::read_to_string(&file_path).context("读取语料库文件失败")?;
@@ -163,7 +168,8 @@ pub fn read_style_corpus_file(
 /// 删除风格语料库
 #[tauri::command]
 pub fn delete_style_corpus(project_id: String, corpus_id: String) -> crate::error::Result<()> {
-    let dir = style_corpus_dir(&project_id).join(&corpus_id);
+    crate::security::validate_id(&corpus_id, "corpusId")?;
+    let dir = style_corpus_dir(&project_id)?.join(&corpus_id);
     if dir.exists() {
         std::fs::remove_dir_all(&dir).context("删除语料库目录失败")?;
     }
@@ -176,7 +182,8 @@ pub fn read_style_corpus_all_files(
     project_id: String,
     corpus_id: String,
 ) -> crate::error::Result<Vec<StyleCorpusFileContent>> {
-    let dir = style_corpus_dir(&project_id).join(&corpus_id);
+    crate::security::validate_id(&corpus_id, "corpusId")?;
+    let dir = style_corpus_dir(&project_id)?.join(&corpus_id);
     if !dir.exists() {
         return Ok(vec![]);
     }
@@ -222,7 +229,8 @@ pub fn save_style_profile(
     corpus_id: String,
     profile: serde_json::Value,
 ) -> crate::error::Result<()> {
-    let dir = style_corpus_dir(&project_id).join(&corpus_id);
+    crate::security::validate_id(&corpus_id, "corpusId")?;
+    let dir = style_corpus_dir(&project_id)?.join(&corpus_id);
     std::fs::create_dir_all(&dir).context("创建语料库目录失败")?;
     let profile_path = dir.join("style-profile.json");
     let json = serde_json::to_string_pretty(&profile).context("序列化风格画像失败")?;
@@ -236,7 +244,8 @@ pub fn read_style_profile(
     project_id: String,
     corpus_id: String,
 ) -> crate::error::Result<Option<serde_json::Value>> {
-    let profile_path = style_corpus_dir(&project_id)
+    crate::security::validate_id(&corpus_id, "corpusId")?;
+    let profile_path = style_corpus_dir(&project_id)?
         .join(&corpus_id)
         .join("style-profile.json");
     if !profile_path.exists() {
@@ -254,7 +263,8 @@ pub fn save_style_chunks_index(
     corpus_id: String,
     chunks: Vec<serde_json::Value>,
 ) -> crate::error::Result<()> {
-    let dir = style_corpus_dir(&project_id).join(&corpus_id);
+    crate::security::validate_id(&corpus_id, "corpusId")?;
+    let dir = style_corpus_dir(&project_id)?.join(&corpus_id);
     std::fs::create_dir_all(&dir).context("创建语料库目录失败")?;
     let chunks_path = dir.join("chunks-index.json");
     let json = serde_json::to_string_pretty(&chunks).context("序列化文本块索引失败")?;
@@ -268,7 +278,8 @@ pub fn read_style_chunks_index(
     project_id: String,
     corpus_id: String,
 ) -> crate::error::Result<Vec<serde_json::Value>> {
-    let chunks_path = style_corpus_dir(&project_id)
+    crate::security::validate_id(&corpus_id, "corpusId")?;
+    let chunks_path = style_corpus_dir(&project_id)?
         .join(&corpus_id)
         .join("chunks-index.json");
     if !chunks_path.exists() {

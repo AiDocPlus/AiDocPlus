@@ -1,4 +1,8 @@
 import type { PluginHostAPI } from '../_framework/PluginHostAPI';
+import { createDirectProvider } from './providers/directProvider';
+import { createCloudRunProvider } from './providers/cloudrunProvider';
+import { createProxyProvider } from './providers/proxyProvider';
+import { createThirdPartyProvider } from './providers/thirdpartyProvider';
 
 // ── API 调用模式 ──
 
@@ -107,19 +111,15 @@ export function checkWxError(body: unknown): void {
 export function createProvider(host: PluginHostAPI, config: WechatApiConfig): WechatApiProvider {
   switch (config.mode) {
     case 'direct': {
-      const { createDirectProvider } = require('./providers/directProvider');
       return createDirectProvider(host, config.direct!);
     }
     case 'cloudrun': {
-      const { createCloudRunProvider } = require('./providers/cloudrunProvider');
       return createCloudRunProvider(host, config.cloudrun!);
     }
     case 'proxy': {
-      const { createProxyProvider } = require('./providers/proxyProvider');
       return createProxyProvider(host, config.proxy!);
     }
     case 'thirdparty': {
-      const { createThirdPartyProvider } = require('./providers/thirdpartyProvider');
       return createThirdPartyProvider(host, config.thirdparty!);
     }
     default:

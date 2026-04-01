@@ -55,7 +55,7 @@ export function HtmlReader({ content, fontSize, fontFamily, lineHeight, paragrap
   return (
     <iframe
       srcDoc={styledContent}
-      sandbox=""
+      sandbox="allow-same-origin"
       className="w-full h-full border-0"
       title="HTML content"
     />

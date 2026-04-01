@@ -9,6 +9,7 @@ import { isTauri } from '@/lib/isTauri';
 import i18n from '@/i18n';
 import { formatBackendError } from '@/lib/backendError';
 import { truncateMessages } from '@/lib/tokenEstimator';
+import { emitPluginEvent } from '@/plugins/_framework/PluginHostAPI';
 
 // Workspace 保存防抖（300ms，高频操作如连续关闭标签只触发一次保存）
 let _workspaceSaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -286,7 +287,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   setChatOpen: (open) => set({ chatOpen: open }),
   setSidebarWidth: (width) => set({ sidebarWidth: width }),
-  setTheme: (theme) => set({ theme }),
+  setTheme: (theme) => {
+    set({ theme });
+    const resolvedTheme = theme === 'auto'
+      ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+      : theme;
+    emitPluginEvent('theme:changed', { theme: resolvedTheme });
+  },
   setLoading: (isLoading) => set({ isLoading }),
   setError: (error) => set({ error }),
 
@@ -300,13 +307,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     try {
       set({ isLoading: true, error: null });
-      const t0 = performance.now();
       const projects = await invoke<Project[]>('list_projects');
-      console.log(`[Perf] list_projects (${projects.length}个): ${(performance.now() - t0).toFixed(0)}ms`);
       set({ projects });
 
       // 加载所有项目的文档（并行），以便文件树正确显示文档数
-      const t1 = performance.now();
       const results = await Promise.all(
         projects.map(async (p) => {
           try {
@@ -318,7 +322,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         })
       );
       const allDocs = results.flat();
-      console.log(`[Perf] list_documents 并行 (${projects.length}个项目, ${allDocs.length}篇文档): ${(performance.now() - t1).toFixed(0)}ms`);
       set({ documents: allDocs });
     } catch (error) {
       set({ error: formatBackendError(error) });
@@ -399,10 +402,41 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       await invoke('delete_project', { projectId });
-      set((state) => ({
-        projects: state.projects.filter(p => p.id !== projectId),
-        currentProject: state.currentProject?.id === projectId ? null : state.currentProject
-      }));
+      // 在更新 state 之前，先清理事件监听器（unlistenFn 有副作用，不能在 set 回调内执行）
+      const currentState = get();
+      const projectDocIds = new Set(currentState.documents.filter(d => d.projectId === projectId).map(d => d.id));
+      const tabsToClose = currentState.tabs.filter(t => projectDocIds.has(t.documentId));
+      for (const tab of tabsToClose) {
+        const streamState = currentState.streamStateByTab[tab.id];
+        if (streamState?.unlistenFn) streamState.unlistenFn();
+      }
+      set((state) => {
+        // 收集该项目下所有文档 ID
+        // 清理关联标签页和 AI 状态
+        const newMessagesByTab = { ...state.aiMessagesByTab };
+        const newStreamStateByTab = { ...state.streamStateByTab };
+        for (const tab of tabsToClose) {
+          delete newMessagesByTab[tab.id];
+          delete newStreamStateByTab[tab.id];
+        }
+        const remainingTabs = state.tabs.filter(t => !projectDocIds.has(t.documentId));
+        const newActiveTabId = remainingTabs.find(t => t.id === state.activeTabId)
+          ? state.activeTabId
+          : remainingTabs[0]?.id || null;
+        const newCurrentDocument = newActiveTabId
+          ? (state.documents.find(d => d.id === remainingTabs.find(t => t.id === newActiveTabId)?.documentId) ?? null)
+          : null;
+        return {
+          projects: state.projects.filter(p => p.id !== projectId),
+          currentProject: state.currentProject?.id === projectId ? null : state.currentProject,
+          documents: state.documents.filter(d => d.projectId !== projectId),
+          tabs: remainingTabs,
+          activeTabId: newActiveTabId,
+          currentDocument: newCurrentDocument,
+          aiMessagesByTab: newMessagesByTab,
+          streamStateByTab: newStreamStateByTab,
+        };
+      });
     } catch (error) {
       set({ error: formatBackendError(error) });
     } finally {
@@ -447,7 +481,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   saveDocument: async (document) => {
     try {
-      set({ isLoading: true, error: null });
+      // 不设置 isLoading：saveDocument 是高频操作（自动保存），
+      // 设置 isLoading 会导致文件树在每次自动保存时闪烁
+      set({ error: null });
       const updated = await invoke<Document>('save_document', {
         payload: {
           documentId: document.id,
@@ -469,10 +505,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         documents: state.documents.map(d => d.id === updated.id ? updated : d),
         currentDocument: state.currentDocument?.id === updated.id ? updated : state.currentDocument
       }));
+      emitPluginEvent('document:saved', { documentId: document.id });
     } catch (error) {
       set({ error: formatBackendError(error) });
-    } finally {
-      set({ isLoading: false });
     }
   },
 
@@ -852,6 +887,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     try {
       set({ isAiStreaming: true, aiStreamingTabId: tabId, error: null });
+      // 通知插件 AI 生成开始
+      const chatTabDoc = get().tabs.find(t => t.id === tabId)?.documentId;
+      if (chatTabDoc) emitPluginEvent('ai:generation-started', { documentId: chatTabDoc, type: 'chat' });
 
       // Add user message
       const userMessage: AIMessage = {
@@ -909,9 +947,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         maxContextMessages: aiSettings.maxContextMessages || 0,
       });
       const finalMessages = truncation.messages;
-      if (truncation.truncatedCount > 0) {
-        console.log(`[Context] 截断 ${truncation.truncatedCount} 条消息，使用 ${truncation.usedTokens}/${truncation.contextWindow} tokens`);
-      }
 
       // 添加一条占位 assistant 消息，后续流式更新
       const placeholderMessage: AIMessage = {
@@ -955,6 +990,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         ...(typeof aiSettings.maxTokens === 'number' && aiSettings.maxTokens > 0
           ? { maxTokens: aiSettings.maxTokens }
           : {}),
+        ...(typeof aiSettings.temperature === 'number' ? { temperature: aiSettings.temperature } : {}),
         requestId
       });
 
@@ -973,6 +1009,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ error: formatBackendError(error) });
       throw error;
     } finally {
+      // 通知插件 AI 生成完成
+      const chatTabDocFinally = get().tabs.find(t => t.id === tabId)?.documentId;
+      if (chatTabDocFinally) emitPluginEvent('ai:generation-completed', { documentId: chatTabDocFinally, type: 'chat' });
+
       if (unlisten) {
         unlisten();
       }
@@ -1052,6 +1092,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       set({ isAiStreaming: true, error: null });
 
+      // 通知插件 AI 内容生成开始
+      const contentGenDoc = get().tabs.find(t => t.id === tabId)?.documentId;
+      if (contentGenDoc) emitPluginEvent('ai:generation-started', { documentId: contentGenDoc, type: 'content' });
+
       // Get AI settings from useSettingsStore
       const aiSettings = useSettingsStore.getState().ai;
 
@@ -1102,6 +1146,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         ...(typeof aiSettings.maxTokens === 'number' && aiSettings.maxTokens > 0
           ? { maxTokens: aiSettings.maxTokens }
           : {}),
+        ...(typeof aiSettings.temperature === 'number' ? { temperature: aiSettings.temperature } : {}),
         requestId
       };
 
@@ -1114,6 +1159,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ error: formatBackendError(error), isAiStreaming: false, aiStreamingTabId: null });
       throw error;
     } finally {
+      // 通知插件 AI 内容生成完成
+      const contentGenDocFinally = get().tabs.find(t => t.id === tabId)?.documentId;
+      if (contentGenDocFinally) emitPluginEvent('ai:generation-completed', { documentId: contentGenDocFinally, type: 'content' });
+
       // 无论成功、失败还是中断，都确保清理监听器
       if (unlisten) {
         unlisten();
@@ -1341,29 +1390,49 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   createDocTemplateCategory: async (key, label) => {
-    const docTemplateCategories = await invoke<DocTemplateCategory[]>('create_doc_template_category', { key, label });
-    set({ docTemplateCategories });
-    return docTemplateCategories;
+    try {
+      const docTemplateCategories = await invoke<DocTemplateCategory[]>('create_doc_template_category', { key, label });
+      set({ docTemplateCategories });
+      return docTemplateCategories;
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : String(error) });
+      throw error;
+    }
   },
 
   updateDocTemplateCategory: async (key, label, newKey) => {
-    const docTemplateCategories = await invoke<DocTemplateCategory[]>('update_doc_template_category', {
-      key, label: label ?? null, newKey: newKey ?? null,
-    });
-    set({ docTemplateCategories });
-    return docTemplateCategories;
+    try {
+      const docTemplateCategories = await invoke<DocTemplateCategory[]>('update_doc_template_category', {
+        key, label: label ?? null, newKey: newKey ?? null,
+      });
+      set({ docTemplateCategories });
+      return docTemplateCategories;
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : String(error) });
+      throw error;
+    }
   },
 
   deleteDocTemplateCategory: async (key) => {
-    const docTemplateCategories = await invoke<DocTemplateCategory[]>('delete_doc_template_category', { key });
-    set({ docTemplateCategories });
-    return docTemplateCategories;
+    try {
+      const docTemplateCategories = await invoke<DocTemplateCategory[]>('delete_doc_template_category', { key });
+      set({ docTemplateCategories });
+      return docTemplateCategories;
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : String(error) });
+      throw error;
+    }
   },
 
   reorderDocTemplateCategories: async (orderedKeys) => {
-    const docTemplateCategories = await invoke<DocTemplateCategory[]>('reorder_doc_template_categories', { orderedKeys });
-    set({ docTemplateCategories });
-    return docTemplateCategories;
+    try {
+      const docTemplateCategories = await invoke<DocTemplateCategory[]>('reorder_doc_template_categories', { orderedKeys });
+      set({ docTemplateCategories });
+      return docTemplateCategories;
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : String(error) });
+      throw error;
+    }
   },
 
   // Workspace persistence methods
@@ -1770,12 +1839,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   closeTab: async (tabId, saveBeforeClose = true) => {
-    const { tabs, activeTabId, documents, saveDocument } = get();
+    const { tabs, activeTabId, documents, saveDocument, aiStreamingTabId, stopAiStreaming } = get();
 
     const tabIndex = tabs.findIndex(t => t.id === tabId);
     if (tabIndex === -1) return;
 
     const tab = tabs[tabIndex];
+
+    // 如果该标签页正在进行 AI 生成，先停止生成以避免内容丢失
+    if (aiStreamingTabId === tabId) {
+      stopAiStreaming();
+      // 等待一帧让事件监听器清理完毕
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
 
     // 如果有未保存更改且要求保存，则保存
     if (tab.isDirty && saveBeforeClose) {
@@ -1806,10 +1882,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }
 
-    // 清理该标签页的聊天记录
-    const { aiMessagesByTab } = get();
+    // 清理该标签页的聊天记录和流状态
+    const { aiMessagesByTab, streamStateByTab } = get();
     const newMessagesByTab = { ...aiMessagesByTab };
+    const newStreamStateByTab = { ...streamStateByTab };
     delete newMessagesByTab[tabId];
+    delete newStreamStateByTab[tabId];
 
     // 释放不再被任何标签引用的文档大字段内容
     const newDocuments = releaseUnreferencedDocContents(documents, newTabs);
@@ -1819,15 +1897,24 @@ export const useAppStore = create<AppState>((set, get) => ({
       activeTabId: newActiveTabId,
       currentDocument: newCurrentDocument,
       documents: newDocuments,
-      aiMessagesByTab: newMessagesByTab
+      aiMessagesByTab: newMessagesByTab,
+      streamStateByTab: newStreamStateByTab
     });
 
     scheduleWorkspaceSave(get().saveWorkspaceState);
   },
 
   closeOtherTabs: async (keepTabId) => {
-    const { tabs, documents, saveDocument, aiMessagesByTab } = get();
+    const { tabs, documents, saveDocument, aiMessagesByTab, streamStateByTab, aiStreamingTabId, stopAiStreaming } = get();
     const otherTabs = tabs.filter(t => t.id !== keepTabId);
+
+    // 如果正在生成的标签页不在保留列表中，先停止生成
+    if (aiStreamingTabId && !tabs.find(t => t.id === keepTabId && t.id === aiStreamingTabId)) {
+      if (otherTabs.some(t => t.id === aiStreamingTabId)) {
+        stopAiStreaming();
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+    }
 
     // 批量保存所有 dirty 文档
     for (const tab of otherTabs) {
@@ -1840,8 +1927,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     // 单次 set 更新状态
     const keepTab = tabs.find(t => t.id === keepTabId);
     const newMessagesByTab = { ...aiMessagesByTab };
+    const newStreamStateByTab = { ...streamStateByTab };
     for (const tab of otherTabs) {
       delete newMessagesByTab[tab.id];
+      delete newStreamStateByTab[tab.id];
     }
 
     // 释放不再被任何标签引用的文档大字段内容
@@ -1854,13 +1943,20 @@ export const useAppStore = create<AppState>((set, get) => ({
       currentDocument: keepTab ? documents.find(d => d.id === keepTab.documentId) || null : null,
       documents: newDocuments,
       aiMessagesByTab: newMessagesByTab,
+      streamStateByTab: newStreamStateByTab,
     });
 
     scheduleWorkspaceSave(get().saveWorkspaceState);
   },
 
   closeAllTabs: async () => {
-    const { tabs, documents, saveDocument } = get();
+    const { tabs, documents, saveDocument, aiStreamingTabId, stopAiStreaming } = get();
+
+    // 如果有任何标签页正在进行 AI 生成，先停止
+    if (aiStreamingTabId) {
+      stopAiStreaming();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
 
     // 批量保存所有 dirty 文档
     for (const tab of tabs) {
@@ -1880,6 +1976,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       currentDocument: null,
       documents: newDocuments,
       aiMessagesByTab: {},
+      streamStateByTab: {},
     });
 
     scheduleWorkspaceSave(get().saveWorkspaceState);
@@ -1898,6 +1995,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
 
+    // 记录切换前的文档 ID
+    const previousDocId = documents.find(d => d.id === (tabs.find(t => t.id === activeTabId)?.documentId))?.id ?? null;
+    const currentDocId = tab.documentId;
+
     let document = documents.find(d => d.id === tab.documentId) || null;
 
     // 先切换标签（立即响应 UI）
@@ -1910,6 +2011,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       activeTabId: tabId,
       currentDocument: document
     }));
+
+    if (previousDocId !== currentDocId) {
+      emitPluginEvent('document:switched', { previousId: previousDocId, currentId: currentDocId });
+    }
 
     // 按需加载文档完整内容
     if (document && !document._contentLoaded && document.projectId) {

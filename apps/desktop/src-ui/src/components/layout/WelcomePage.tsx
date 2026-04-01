@@ -9,7 +9,6 @@ import { useTranslation } from '@/i18n';
 import { useCallback } from 'react';
 import { FileText, BookHeart, CheckSquare, ListTree, Plus, FolderPlus, Keyboard } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
-import { getDocTypeOrDefault } from '@/doctype-sdk/registry';
 import { invoke } from '@tauri-apps/api/core';
 
 interface WelcomePageProps {

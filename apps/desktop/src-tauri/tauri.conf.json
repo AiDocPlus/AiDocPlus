@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
   "productName": "AiDocPlus",
-  "version": "0.3.12",
+  "version": "0.3.13",
   "identifier": "com.aidocplus.app",
   "build": {
     "beforeDevCommand": "cd src-ui && pnpm dev",
@@ -29,9 +29,15 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg", "nsis"],
+    "targets": [
+      "app",
+      "dmg",
+      "nsis"
+    ],
     "createUpdaterArtifacts": true,
-    "resources": ["bundled-resources/"],
+    "resources": [
+      "bundled-resources/"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -41,7 +47,7 @@
     ],
     "macOS": {
       "minimumSystemVersion": "10.13",
-      "signingIdentity": "Developer ID Application: 德华 江 (3VA3JP25LX)"
+      "signingIdentity": "Developer ID Application: \u5fb7\u534e \u6c5f (3VA3JP25LX)"
     }
   },
   "plugins": {
@@ -56,31 +62,31 @@
       }
     },
     "cli": {
-      "description": "AiDocPlus 命令行工具",
+      "description": "AiDocPlus \u547d\u4ee4\u884c\u5de5\u5177",
       "args": [
         {
           "name": "version",
           "short": "v",
-          "description": "显示版本号",
+          "description": "\u663e\u793a\u7248\u672c\u53f7",
           "takesValue": false
         }
       ],
       "subcommands": {
         "api": {
-          "description": "API 相关操作",
+          "description": "API \u76f8\u5173\u64cd\u4f5c",
           "subcommands": {
             "status": {
-              "description": "查看 API Server 状态"
+              "description": "\u67e5\u770b API Server \u72b6\u6001"
             },
             "schema": {
-              "description": "查看 API Schema"
+              "description": "\u67e5\u770b API Schema"
             },
             "call": {
-              "description": "调用 API 方法",
+              "description": "\u8c03\u7528 API \u65b9\u6cd5",
               "args": [
                 {
                   "name": "method",
-                  "description": "API 方法名（如 document.list）",
+                  "description": "API \u65b9\u6cd5\u540d\uff08\u5982 document.list\uff09",
                   "index": 1,
                   "required": true,
                   "takesValue": true
@@ -88,7 +94,7 @@
                 {
                   "name": "params",
                   "short": "p",
-                  "description": "JSON 参数",
+                  "description": "JSON \u53c2\u6570",
                   "takesValue": true
                 }
               ]
@@ -100,7 +106,9 @@
     "deep-link": {
       "mobile": [],
       "desktop": {
-        "schemes": ["aidocplus"]
+        "schemes": [
+          "aidocplus"
+        ]
       }
     }
   }

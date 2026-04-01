@@ -561,19 +561,20 @@ function getPreviousChapter(novel: NovelDocumentContent, chapterId: string): Nov
  * Phase 8.3: 从已完成章节中提取风格样本（3个200-300字段落）
  */
 function extractStyleSamples(novel: NovelDocumentContent): string | null {
-  const doneChapters = novel.volumes.flatMap(v => v.chapters).filter(c => c.status === 'done' && c.content.length > 500);
+  const doneChapters = novel.volumes.flatMap(v => v.chapters).filter(c => c.status === 'done' && getEffectiveContent(c).length > 500);
   if (doneChapters.length === 0) return null;
 
   const samples: string[] = [];
   const used = new Set<number>();
 
   for (let i = 0; i < Math.min(3, doneChapters.length); i++) {
-    const chIdx = doneChapters.length <= 3 ? i : Math.floor(Math.random() * doneChapters.length);
+    const chIdx = doneChapters.length <= 3 ? i : (i * 7 + 3) % doneChapters.length;
     if (used.has(chIdx)) continue;
     used.add(chIdx);
     const ch = doneChapters[chIdx];
     // 从章节中间提取一个段落
-    const paragraphs = ch.content.split(/\n\s*\n/).filter(p => p.trim().length > 100 && p.trim().length < 500);
+    const content = getEffectiveContent(ch);
+    const paragraphs = content.split(/\n\s*\n/).filter(p => p.trim().length > 100 && p.trim().length < 500);
     if (paragraphs.length > 0) {
       const pIdx = Math.floor(paragraphs.length / 2);
       samples.push(paragraphs[pIdx].trim().slice(0, 300));
@@ -592,7 +593,7 @@ export function getContextSummary(
   if (!activeChapterId) return '未选择章节';
   const ch = getChapterById(novel, activeChapterId);
   if (!ch) return '未选择章节';
-  const wc = ch.content.replace(/\s/g, '').length;
+  const wc = getChapterWordCount(ch);
   return `${ch.title} · ${wc}字`;
 }
 

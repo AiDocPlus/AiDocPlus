@@ -8,7 +8,7 @@ import { Plus, Trash2, Target, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from '@/i18n';
 import type { NovelDocumentContent, NovelMilestone } from '../types';
-import { updateVolumeMeta } from '../types';
+import { updateVolumeMeta, getChapterWordCount } from '../types';
 
 const LABEL = 'text-xs text-muted-foreground font-medium';
 const INPUT = 'w-full text-sm border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-ring';
@@ -22,7 +22,7 @@ interface GoalPanelProps {
 export default function GoalPanel({ novel, onNovelChange }: GoalPanelProps) {
   const { t } = useTranslation();
   const meta = novel.metadata;
-  const totalWords = novel.volumes.reduce((s, v) => s + v.chapters.reduce((s2, c) => s2 + c.content.replace(/\s/g, '').length, 0), 0);
+  const totalWords = novel.volumes.reduce((s, v) => s + v.chapters.reduce((s2, c) => s2 + getChapterWordCount(c), 0), 0);
 
   const [newMilestoneLabel, setNewMilestoneLabel] = useState('');
   const [newMilestoneWords, setNewMilestoneWords] = useState('');
@@ -115,7 +115,7 @@ export default function GoalPanel({ novel, onNovelChange }: GoalPanelProps) {
         <span className="text-sm font-medium">{t('novel.goalVolumes', { defaultValue: '卷目标' })}</span>
         <div className="space-y-1.5">
           {novel.volumes.map(vol => {
-            const volWords = vol.chapters.reduce((s, c) => s + c.content.replace(/\s/g, '').length, 0);
+            const volWords = vol.chapters.reduce((s, c) => s + getChapterWordCount(c), 0);
             return (
               <div key={vol.id} className="flex items-center gap-2 text-xs">
                 <span className="w-24 truncate">{vol.title}</span>

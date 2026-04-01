@@ -56,7 +56,6 @@ export function ManagerWindow() {
         if (dir) dirs[key] = dir;
       }
       setBundledDirs(dirs);
-      console.log('[DEBUG] ManagerWindow 初始化:', { urlParams, bundledDirs: dirs });
       setInitialized(true);
     });
   }, []);

@@ -9,10 +9,10 @@ export function useWorkspaceAutosave() {
   const isRestoringRef = useRef(false);
   const isClosingRef = useRef(false);
 
-  // 更新 ref 引用
+  // 更新 ref 引用（useAppStore.getState() 不依赖渲染周期，只需执行一次）
   useEffect(() => {
     saveWorkspaceRef.current = useAppStore.getState().saveWorkspaceState;
-  });
+  }, []);
 
   // 监听窗口关闭事件
   useEffect(() => {

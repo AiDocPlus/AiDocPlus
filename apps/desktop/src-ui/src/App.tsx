@@ -49,23 +49,19 @@ function AppContent() {
         migrateAiKeysToKeyring();
 
         // 第一批：互不依赖的操作并行执行
-        const batch1Start = performance.now();
         await Promise.all([
           loadAppBootstrapResources(),
           loadConversationsFromDB(),
         ]);
-        console.log(`[Perf] 第一批并行总耗时: ${(performance.now() - batch1Start).toFixed(0)}ms`);
 
         // 第二批：依赖第一批完成
-        const batch2Start = performance.now();
         await restoreAppBootstrapWorkspace();
-        console.log(`[Perf] restoreWorkspace: ${(performance.now() - batch2Start).toFixed(0)}ms`);
       } catch (error) {
         console.error('[App] Failed to restore workspace, loading projects:', error);
         await fallbackLoadProjectsAfterBootstrapFailure();
       }
 
-      console.log(`[Perf] 启动总耗时: ${(performance.now() - t0).toFixed(0)}ms`);
+      console.info(`[Perf] App startup: ${(performance.now() - t0).toFixed(0)}ms`);
 
       // 注册前端状态提供者，让 API Bridge 能查询 UI 状态
       registerAppFrontendStateProvider();

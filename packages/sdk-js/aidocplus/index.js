@@ -127,6 +127,9 @@ class AiDocPlusClient {
             'Authorization': `Bearer ${this._token}`,
             'X-Caller-Level': this._callerLevel,
             'Content-Length': Buffer.byteLength(payload),
+            ...(process.env.AIDOCPLUS_SCRIPT_SIGNATURE
+              ? { 'X-Script-Signature': process.env.AIDOCPLUS_SCRIPT_SIGNATURE }
+              : {}),
           },
           timeout: 60000,
         },

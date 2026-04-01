@@ -10,13 +10,11 @@ import type {
   Outline,
   FilterState,
   TagIndex,
-  OutlineNode,
 } from '../types';
 import {
   buildTagIndex,
   extractAllNodes,
   createEmptyOutline,
-  generateId,
 } from '../types';
 
 // ═══════════════════════════════════════════════════════════════════════════════

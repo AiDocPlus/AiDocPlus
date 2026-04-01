@@ -81,6 +81,8 @@ export interface EssaySnapshot {
   wordCount: number;
   createdAt: string;
   label?: string;
+  description?: string;
+  tags?: string[];
 }
 
 // ═══ 大纲规划节点 ═══
@@ -388,13 +390,15 @@ export function removeImagery(essay: EssayDocumentContent, id: string): EssayDoc
 // ── 快照 ──
 
 /** 创建快照 */
-export function createSnapshot(essay: EssayDocumentContent, label?: string): EssayDocumentContent {
+export function createSnapshot(essay: EssayDocumentContent, label?: string, description?: string, tags?: string[]): EssayDocumentContent {
   const snap: EssaySnapshot = {
     id: genId('snap'),
     content: essay.content,
     wordCount: getWordCount(essay.content),
     createdAt: new Date().toISOString(),
     label,
+    description,
+    tags,
   };
   return {
     ...essay,

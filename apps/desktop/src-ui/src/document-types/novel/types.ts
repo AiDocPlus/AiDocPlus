@@ -145,43 +145,6 @@ export interface StyleProfile {
   analyzedAt: number;
 }
 
-/** 风格语料库 */
-export interface StyleCorpus {
-  id: string;
-  name: string;
-  authorName?: string;
-  /** 来源类型：上传文件/从章节提取/外部导入 */
-  sourceType: 'upload' | 'chapter' | 'external';
-  files: StyleCorpusFile[];
-  totalWords: number;
-  totalChunks: number;
-  /** 风格画像（AI 分析后生成） */
-  styleProfile?: StyleProfile;
-  importedAt: number;
-  analyzedAt?: number;
-}
-
-/** 风格语料库文件 */
-export interface StyleCorpusFile {
-  id: string;
-  fileName: string;
-  /** 文本块列表 */
-  chunks: StyleTextChunk[];
-  wordCount: number;
-  importedAt: number;
-}
-
-/** 风格文本块（用于 RAG 检索） */
-export interface StyleTextChunk {
-  id: string;
-  content: string;
-  wordCount: number;
-  /** 场景类型（对话/动作/描写/心理/过渡） */
-  sceneType?: 'dialogue' | 'action' | 'description' | 'internal' | 'transition';
-  /** 关键词列表（用于检索） */
-  keywords?: string[];
-}
-
 export interface NovelWritingSession {
   date: string;
   startTime: number;
@@ -632,7 +595,18 @@ export function getVolumeByChapterId(novel: NovelDocumentContent, chapterId: str
 // ═══ 卷管理 ═══
 
 export function deleteVolume(novel: NovelDocumentContent, volId: string): NovelDocumentContent {
-  return { ...novel, volumes: novel.volumes.filter(v => v.id !== volId) };
+  // 收集被删除卷中的所有章节 ID
+  const volume = novel.volumes.find(v => v.id === volId);
+  const deletedChapterIds = new Set(volume ? volume.chapters.map(c => c.id) : []);
+  return {
+    ...novel,
+    volumes: novel.volumes.filter(v => v.id !== volId),
+    // 清理引用已删除章节的伏笔
+    settings: {
+      ...novel.settings,
+      foreshadowing: novel.settings.foreshadowing.filter(f => !deletedChapterIds.has(f.chapterId)),
+    },
+  };
 }
 
 export function renameVolume(novel: NovelDocumentContent, volId: string, newTitle: string): NovelDocumentContent {
@@ -671,6 +645,11 @@ export function deleteChapter(novel: NovelDocumentContent, chapterId: string): N
       ...v,
       chapters: v.chapters.filter(c => c.id !== chapterId),
     })),
+    // 清理引用已删除章节的伏笔
+    settings: {
+      ...novel.settings,
+      foreshadowing: novel.settings.foreshadowing.filter(f => f.chapterId !== chapterId),
+    },
   };
 }
 
@@ -909,12 +888,42 @@ export function updateCharacter(novel: NovelDocumentContent, charId: string, pat
 }
 
 export function deleteCharacter(novel: NovelDocumentContent, charId: string): NovelDocumentContent {
+  // 清理章节中的角色引用：povCharacterId、characterStates
+  const cleanedVolumes = novel.volumes.map(v => ({
+    ...v,
+    chapters: v.chapters.map(ch => {
+      const patched: typeof ch = {
+        ...ch,
+        povCharacterId: ch.povCharacterId === charId ? undefined : ch.povCharacterId,
+      };
+      if (ch.characterStates) {
+        patched.characterStates = ch.characterStates
+          .filter(cs => cs.characterId !== charId)
+          .map(cs => ({ ...cs }));
+      }
+      // 清理场景中的角色引用
+      if (ch.scenes) {
+        patched.scenes = ch.scenes.map(scene => ({
+          ...scene,
+          characterIds: scene.characterIds?.filter(id => id !== charId),
+        }));
+      }
+      return patched;
+    }),
+  }));
+
   return {
     ...novel,
+    volumes: cleanedVolumes,
     settings: {
       ...novel.settings,
       characters: novel.settings.characters.filter(c => c.id !== charId),
       characterRelations: novel.settings.characterRelations.filter(r => r.fromId !== charId && r.toId !== charId),
+      // 清理势力中的成员引用
+      factions: novel.settings.factions.map(f => ({
+        ...f,
+        memberIds: f.memberIds.filter(id => id !== charId),
+      })),
     },
   };
 }

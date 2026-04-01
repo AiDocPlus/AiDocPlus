@@ -451,8 +451,11 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
         // 确保最终正文内容更新到编辑器
         useAppStore.getState().updateDocumentInMemory(docId, { aiGeneratedContent: finalContent });
 
-        // 流式完成后保存到磁盘（只保存正文内容）
-        await saveDocument({ ...latestDoc, authorNotes: notesToUse, aiGeneratedContent: finalContent });
+        // 流式完成后保存到磁盘（重新从 store 获取最新文档，避免覆盖用户编辑）
+        const latestDocAtSave = useAppStore.getState().documents.find(d => d.id === docId);
+        if (latestDocAtSave) {
+          await saveDocument({ ...latestDocAtSave, authorNotes: notesToUse, aiGeneratedContent: finalContent });
+        }
 
         // Replace the streaming message with completion message（包含思考内容）
         let completionContent = t('chat.generationComplete', { defaultValue: '已根据您的提示词生成内容。\n\n生成的内容已自动更新到编辑器的 AI 内容栏。' });
@@ -499,9 +502,12 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
         const parsed = parseThinkTags(rawGenerated);
         const generated = parsed.content;
 
-        // 更新 AI 内容到 store 和磁盘（只保存正文内容）
+        // 更新 AI 内容到 store 和磁盘（重新从 store 获取最新文档，避免覆盖用户编辑）
         useAppStore.getState().updateDocumentInMemory(latestDoc.id, { aiGeneratedContent: generated });
-        await saveDocument({ ...latestDoc, authorNotes: notesToUse, aiGeneratedContent: generated });
+        const freshDoc = useAppStore.getState().documents.find(d => d.id === latestDoc.id);
+        if (freshDoc) {
+          await saveDocument({ ...freshDoc, authorNotes: notesToUse, aiGeneratedContent: generated });
+        }
 
         // Add confirmation message to chat（包含思考内容）
         let msgContent = t('chat.generationComplete', { defaultValue: '已根据您的提示词生成内容。\n\n生成的内容已自动更新到编辑器的 AI 内容栏。' });
@@ -866,7 +872,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
 
             return (
               <div
-                key={index}
+                key={`${message.role}-${message.timestamp ?? index}`}
                 ref={
                   (aiMessages.length >= 2
                     && aiMessages[aiMessages.length - 1]?.role === 'assistant'

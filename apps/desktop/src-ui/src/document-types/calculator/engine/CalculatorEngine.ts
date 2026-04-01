@@ -206,7 +206,6 @@ export class CalculatorEngine {
   /** 变量最后一次被赋值时的行号 */
   private variableDefinitionLine: Map<string, number> = new Map();
   private lineResults: Map<number, number> = new Map();
-  private customFunctions: Map<string, (...args: unknown[]) => unknown> = new Map();
   private displaySettings: CalculatorSettings = { ...DEFAULT_CALCULATOR_SETTINGS };
 
   constructor() {
@@ -348,7 +347,7 @@ export class CalculatorEngine {
   /**
    * 检测结果类型
    */
-  private detectResultType(result: number, original: string): 'number' | 'percent' | 'currency' {
+  private detectResultType(_result: number, original: string): 'number' | 'percent' | 'currency' {
     if (original.includes('%') || original.includes('percent') || original.includes('百分比')) {
       return 'percent';
     }
@@ -684,7 +683,7 @@ export class CalculatorEngine {
     // 10km in miles / 10公里换算英里
     const unitMatch = expr.match(/(\d+(?:\.\d+)?)\s*(\w+)\s+(?:in|to|换算)\s+(\w+)/i);
     if (unitMatch) {
-      const [full, value, fromUnit, toUnit] = unitMatch;
+      const [, value, fromUnit, toUnit] = unitMatch;
       // 使用 math.js 内置单位
       try {
         const result = math.evaluate(`${value} ${fromUnit} to ${toUnit}`);
@@ -802,7 +801,7 @@ export class CalculatorEngine {
   private formatScalarDisplay(
     n: number,
     resultType: 'number' | 'percent' | 'currency',
-    originalExpr: string
+    _originalExpr: string
   ): string {
     if (!Number.isFinite(n)) {
       return '—';

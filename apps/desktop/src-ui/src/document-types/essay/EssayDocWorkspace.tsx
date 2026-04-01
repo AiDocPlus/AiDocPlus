@@ -396,8 +396,8 @@ export default function EssayDocWorkspace({ document: doc, host, tabId }: DocTyp
               {leftTab === 'export' && (
                 <EssayExportPanel
                   essay={essay}
-                  onCreateSnapshot={async (title) => {
-                    const updated = createSnapshot(essayRef.current, title);
+                  onCreateSnapshot={async (title, description, tags) => {
+                    const updated = createSnapshot(essayRef.current, title, description, tags);
                     saveEssay(updated);
                   }}
                   onRestoreSnapshot={async (snapshotId) => {

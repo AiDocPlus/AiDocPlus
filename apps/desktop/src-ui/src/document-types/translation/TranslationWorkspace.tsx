@@ -112,6 +112,7 @@ class TranslationWorkspaceErrorBoundary extends Component<
 
 function TranslationWorkspaceMain({ document: doc, host }: DocTypeEditorProps) {
   const { t } = useTranslation();
+  const editorTheme = host.ui.getTheme();
   const mod = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? '⌘' : 'Ctrl+';
 
   const [trans, setTrans] = useState<TranslationDocumentContent>(() =>
@@ -136,6 +137,11 @@ function TranslationWorkspaceMain({ document: doc, host }: DocTypeEditorProps) {
   transRef.current = trans;
   const isTranslatingRef = useRef(false);
   isTranslatingRef.current = isTranslating;
+
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, []);
 
   // 文档切换时重新加载
   useEffect(() => {
@@ -357,7 +363,7 @@ function TranslationWorkspaceMain({ document: doc, host }: DocTypeEditorProps) {
       {/* ═══ 左主栏 ═══ */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* 翻译工具栏 */}
-        <div className={`${TOOLBAR_CLASS} overflow-x-auto min-w-0`}>
+        <div className={`${TOOLBAR_CLASS} overflow-x-auto scrollbar-hide min-w-0`}>
           <Languages className="h-4 w-4 text-primary shrink-0" />
           <span className="text-sm font-medium truncate">{doc.title}</span>
           <div className="flex-1" />
@@ -482,7 +488,7 @@ function TranslationWorkspaceMain({ document: doc, host }: DocTypeEditorProps) {
                 showViewModeSwitch={true}
                 showStatusBar={true}
                 editorId={`trans-source-${doc.id}`}
-                theme="light"
+                theme={editorTheme}
                 onCursorLineChange={setSourceLine}
               />
             </div>
@@ -507,7 +513,7 @@ function TranslationWorkspaceMain({ document: doc, host }: DocTypeEditorProps) {
                 showViewModeSwitch={true}
                 showStatusBar={true}
                 editorId={`trans-target-${doc.id}`}
-                theme="light"
+                theme={editorTheme}
                 initialLine={sourceLine}
               />
             </div>

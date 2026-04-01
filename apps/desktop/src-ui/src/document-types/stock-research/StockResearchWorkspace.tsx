@@ -231,7 +231,17 @@ export default function StockResearchWorkspace({ document: doc, host, tabId }: D
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [isSaving, setIsSaving] = useState(false);  // ── 编辑状态 ──
+  const [isSaving, setIsSaving] = useState(false);
+
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      if (saveStatusTimerRef.current) clearTimeout(saveStatusTimerRef.current);
+    };
+  }, []);
+
+  // ── 编辑状态 ──
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   const [noteContent, setNoteContent] = useState('');
 

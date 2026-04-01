@@ -31,6 +31,7 @@ export default defineConfig({
         help: path.resolve(__dirname, 'help.html'),
         scratchpad: path.resolve(__dirname, 'scratchpad.html'),
         reader: path.resolve(__dirname, 'reader.html'),
+        'mail-client': path.resolve(__dirname, 'mail-client.html'),
       },
       output: {
         manualChunks(id) {

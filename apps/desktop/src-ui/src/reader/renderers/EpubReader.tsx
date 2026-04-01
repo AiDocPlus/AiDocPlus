@@ -1,13 +1,25 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import ePub from 'epubjs';
 import type { Book, Rendition, NavItem } from 'epubjs';
+import type { ReaderThemeConfig } from '../useReaderStore';
 import { ChevronLeft, ChevronRight, List, X } from 'lucide-react';
 import { useTranslation } from '@/i18n';
+
+const FONT_FAMILIES: Record<string, string> = {
+  system: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif',
+  serif: '"Songti SC", "SimSun", "STSong", "Noto Serif SC", Georgia, "Times New Roman", serif',
+  sans: '"PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Helvetica Neue", Arial, sans-serif',
+  kai: '"Kaiti SC", "STKaiti", "KaiTi", "Noto Serif SC", serif',
+};
 
 interface EpubReaderProps {
   data: Uint8Array;
   fontSize: number;
-  theme: 'light' | 'dark';
+  fontFamily: string;
+  lineHeight: number;
+  theme: ReaderThemeConfig;
+  /** 恢复上次阅读位置（EPUB CFI） */
+  initialCfi?: string | null;
   onProgressChange?: (percent: number, epubCfi: string) => void;
 }
 
@@ -41,7 +53,7 @@ function TocTree({
   );
 }
 
-export function EpubReader({ data, fontSize, theme, onProgressChange }: EpubReaderProps) {
+export function EpubReader({ data, fontSize, fontFamily, lineHeight, theme, initialCfi, onProgressChange }: EpubReaderProps) {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const bookRef = useRef<Book | null>(null);
@@ -55,27 +67,30 @@ export function EpubReader({ data, fontSize, theme, onProgressChange }: EpubRead
   const [tocOpen, setTocOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const applyTheme = useCallback((rendition: Rendition, size: number, th: 'light' | 'dark') => {
-    const bg = th === 'dark' ? '#1a1a2e' : '#ffffff';
-    const color = th === 'dark' ? '#e0e0e0' : '#1a1a1a';
+  const applyTheme = useCallback((rendition: Rendition, size: number, th: ReaderThemeConfig, lh: number, ff: string) => {
+    const fontStack = FONT_FAMILIES[ff] ?? FONT_FAMILIES.system;
     rendition.themes.default({
       body: {
-        background: bg,
-        color: color,
+        background: th.bg,
+        color: th.text,
         'font-size': `${size}px`,
-        'font-family': '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        'line-height': '1.8',
+        'font-family': fontStack,
+        'line-height': String(lh),
         'max-width': '720px',
         margin: '0 auto',
         padding: '0 !important',
       },
       'p, div, li': {
-        'line-height': '1.8',
+        'line-height': String(lh),
         'margin-bottom': '0.5em',
       },
       'h1, h2, h3, h4': {
         'line-height': '1.3',
         'margin-top': '1.5em',
+        color: th.heading,
+      },
+      a: {
+        color: th.accent,
       },
       img: {
         'max-width': '100%',
@@ -88,6 +103,14 @@ export function EpubReader({ data, fontSize, theme, onProgressChange }: EpubRead
       'th, td': {
         border: '1px solid',
         padding: '0.5em',
+      },
+      pre: {
+        'background-color': th.codeBg,
+        color: th.text,
+      },
+      code: {
+        'background-color': th.codeBg,
+        color: th.text,
       },
     });
   }, []);
@@ -106,8 +129,9 @@ export function EpubReader({ data, fontSize, theme, onProgressChange }: EpubRead
     });
     renditionRef.current = rendition;
 
-    rendition.display().then(() => {
-      applyTheme(rendition, fontSize, theme);
+    const displayTarget = initialCfi || undefined;
+    rendition.display(displayTarget).then(() => {
+      applyTheme(rendition, fontSize, theme, lineHeight, fontFamily);
 
       rendition.on('relocated', (location: { start: { cfi: string; percentage: number } }) => {
         const percent = Math.round(location.start.percentage * 100);
@@ -137,9 +161,9 @@ export function EpubReader({ data, fontSize, theme, onProgressChange }: EpubRead
 
   useEffect(() => {
     if (renditionRef.current) {
-      applyTheme(renditionRef.current, fontSize, theme);
+      applyTheme(renditionRef.current, fontSize, theme, lineHeight, fontFamily);
     }
-  }, [fontSize, theme, applyTheme]);
+  }, [fontSize, theme, lineHeight, fontFamily, applyTheme]);
 
   // 键盘导航
   useEffect(() => {
@@ -169,7 +193,7 @@ export function EpubReader({ data, fontSize, theme, onProgressChange }: EpubRead
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="animate-pulse text-muted-foreground text-sm">{t('reader.importFile')}</div>
+        <div className="animate-pulse text-muted-foreground text-sm">{t('reader.loading', { defaultValue: '加载中...' })}</div>
       </div>
     );
   }

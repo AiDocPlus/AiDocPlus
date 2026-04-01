@@ -18,8 +18,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { usePluginHost, useThinkingContent } from '../_framework/PluginHostAPI';
 import { formatBackendError } from '@/lib/backendError';
 import { saveTextFileWithDialog } from '@/lib/tauriSaveTextFile';
-import { useSettingsStore, getAIInvokeParamsForService } from '@/stores/useSettingsStore';
-import { getProviderConfig, getActiveService, type AIProvider } from '@aidocplus/shared-types';
+import { getProviderConfig, type AIProvider } from '@aidocplus/shared-types';
 import type { PluginAssistantPanelProps } from '../types';
 import {
   type AssistantMessage,
@@ -107,13 +106,6 @@ function getOrCreateActiveSession(storage: StorageLike): AssistantSession {
   return newSess;
 }
 
-// ── 主题解析 ──
-function resolveTheme(): 'light' | 'dark' {
-  const t = useSettingsStore.getState().ui?.theme;
-  if (t === 'auto') return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  return t === 'dark' ? 'dark' : 'light';
-}
-
 // ── 阶段标签 ──
 const PHASE_LABELS: Record<ImagePhase, string> = {
   blank: '空白',
@@ -151,20 +143,19 @@ export function ImageAssistantPanel({
   const thinkingContent = useThinkingContent();
 
   // ── AI 服务选择 ──
-  const settingsStore = useSettingsStore();
-  const enabledServices = settingsStore.ai.services.filter(s => s.enabled);
+  const enabledServices = host.ai.listServices();
   const [selectedServiceId, setSelectedServiceId] = useState<string>(() => {
     return host.storage.get<string>('_image_assistant_service_id') || '';
   });
 
   const effectiveService = selectedServiceId
-    ? enabledServices.find(s => s.id === selectedServiceId) || getActiveService(settingsStore.ai)
-    : getActiveService(settingsStore.ai);
+    ? enabledServices.find(s => s.id === selectedServiceId) || enabledServices[0]
+    : enabledServices[0];
 
-  const aiParams = getAIInvokeParamsForService(selectedServiceId || undefined);
-  const aiAvailable = !!(aiParams.provider && aiParams.apiKey && aiParams.model);
+  const aiParams = host.ai.getServiceParams(selectedServiceId || '');
+  const aiAvailable = !!(aiParams && aiParams.provider && aiParams.apiKey && aiParams.model);
   const providerCaps = (() => {
-    if (!aiParams.provider) return { webSearch: false, thinking: false };
+    if (!aiParams?.provider) return { webSearch: false, thinking: false };
     const cfg = getProviderConfig(aiParams.provider as AIProvider);
     return cfg?.capabilities || { webSearch: false, thinking: false };
   })();
@@ -606,7 +597,7 @@ export function ImageAssistantPanel({
     const parsed = parseThinkTags(rawContent);
     const thinkingText = parsed.thinking;
     const cleanContent = parsed.content;
-    const theme = resolveTheme();
+    const theme = host.ui.getTheme();
     const segments = parseContentSegments(cleanContent, msgId);
 
     return (
@@ -804,7 +795,7 @@ export function ImageAssistantPanel({
                   <CollapsibleThinkingBlock
                     thinking={thinkingContent}
                     isThinking
-                    theme={resolveTheme()}
+                    theme={host.ui.getTheme()}
                   />
                 )}
               </div>

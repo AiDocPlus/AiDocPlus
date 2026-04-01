@@ -19,7 +19,7 @@ export default function DiaryJournalList({
   const { t } = useTranslation();
 
   return (
-    <div className="flex items-center gap-1 px-2 py-1 border-t border-b overflow-x-auto flex-shrink-0">
+    <div className="flex items-center gap-1 px-2 py-1 border-t border-b overflow-x-auto scrollbar-hide flex-shrink-0">
       <button
         className={cn('text-sm px-2 py-1 rounded whitespace-nowrap transition-colors',
           filterJournalId === null ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:text-foreground'

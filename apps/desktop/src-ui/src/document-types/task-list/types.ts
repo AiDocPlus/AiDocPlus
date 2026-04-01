@@ -43,13 +43,6 @@ export const PRIORITY_CONFIG: Record<TaskPriority, {
   },
 };
 
-/** 优先级图标（圆点） */
-export const PRIORITY_DOT = {
-  high: '🔴',
-  medium: '🟡',
-  low: '🟢',
-};
-
 // ============================================================
 // 任务条目
 // ============================================================
@@ -235,21 +228,9 @@ export function createEmptyTaskListContent(): TaskListDocumentContent {
   };
 }
 
-/** 获取当前语言 */
+/** 获取当前语言（使用浏览器语言设置作为 fallback） */
 function i18nLanguage(): string {
-  try {
-    // 尝试从 localStorage 获取
-    const stored = localStorage.getItem('settings');
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (parsed?.state?.ui?.language) {
-        return parsed.state.ui.language;
-      }
-    }
-  } catch {
-    // ignore
-  }
-  return 'zh';
+  return (navigator.language || 'zh').slice(0, 2);
 }
 
 /** 按设置裁剪过期已完成任务 */

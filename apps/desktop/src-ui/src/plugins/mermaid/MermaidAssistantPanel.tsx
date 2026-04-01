@@ -6,8 +6,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { usePluginHost, useThinkingContent } from '../_framework/PluginHostAPI';
 import { formatBackendError } from '@/lib/backendError';
 import { saveTextFileWithDialog } from '@/lib/tauriSaveTextFile';
-import { useSettingsStore, getAIInvokeParamsForService } from '@/stores/useSettingsStore';
-import { getProviderConfig, getActiveService, type AIProvider } from '@aidocplus/shared-types';
+import { getProviderConfig, type AIProvider } from '@aidocplus/shared-types';
 import type { PluginAssistantPanelProps } from '../types';
 import {
   type AssistantMessage, genMsgId, exportChatAsMarkdown,
@@ -63,12 +62,6 @@ function getOrCreateActiveSession(s: StorageLike): AssistantSession {
   const n = createSession(); saveSessions(s, [...sessions, n]); setActiveSessionIdStorage(s, n.id); return n;
 }
 
-function resolveTheme(): 'light' | 'dark' {
-  const t = useSettingsStore.getState().ui?.theme;
-  if (t === 'auto') return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  return t === 'dark' ? 'dark' : 'light';
-}
-
 // ── 组件 ──
 export function MermaidAssistantPanel({ aiContent }: PluginAssistantPanelProps) {
   const host = usePluginHost();
@@ -76,17 +69,16 @@ export function MermaidAssistantPanel({ aiContent }: PluginAssistantPanelProps) 
   const thinkingContent = useThinkingContent();
 
   // AI 服务
-  const settingsStore = useSettingsStore();
-  const enabledServices = settingsStore.ai.services.filter(s => s.enabled);
+  const enabledServices = host.ai.listServices();
   const [selectedServiceId, setSelectedServiceId] = useState<string>(() =>
     host.storage.get<string>('_mermaid_assistant_service_id') || '');
   const effectiveService = selectedServiceId
-    ? enabledServices.find(s => s.id === selectedServiceId) || getActiveService(settingsStore.ai)
-    : getActiveService(settingsStore.ai);
-  const aiParams = getAIInvokeParamsForService(selectedServiceId || undefined);
-  const aiAvailable = !!(aiParams.provider && aiParams.apiKey && aiParams.model);
+    ? enabledServices.find(s => s.id === selectedServiceId) || enabledServices[0]
+    : enabledServices[0];
+  const aiParams = host.ai.getServiceParams(selectedServiceId || '');
+  const aiAvailable = !!(aiParams && aiParams.provider && aiParams.apiKey && aiParams.model);
   const providerCaps = (() => {
-    if (!aiParams.provider) return { webSearch: false, thinking: false };
+    if (!aiParams?.provider) return { webSearch: false, thinking: false };
     const cfg = getProviderConfig(aiParams.provider as AIProvider);
     return cfg?.capabilities || { webSearch: false, thinking: false };
   })();
@@ -312,7 +304,7 @@ export function MermaidAssistantPanel({ aiContent }: PluginAssistantPanelProps) 
     const parsed = parseThinkTags(rawContent);
     const thinkingText = parsed.thinking;
     const cleanContent = parsed.content;
-    const theme = resolveTheme();
+    const theme = host.ui.getTheme();
     const mermaidBlocks = extractMermaidBlocks(cleanContent);
 
     // 如果整段内容看起来就是 Mermaid 代码（没有 fence）

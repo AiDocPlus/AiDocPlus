@@ -124,7 +124,7 @@ export default function NovelChapterContextMenu({
 
   // 卷右键菜单
   if (target.type === 'volume') {
-    const volIdx = novel.volumes.sort((a, b) => a.sortOrder - b.sortOrder).findIndex(v => v.id === target.id);
+    const volIdx = [...novel.volumes].sort((a, b) => a.sortOrder - b.sortOrder).findIndex(v => v.id === target.id);
     const isFirst = volIdx === 0;
     const isLast = volIdx === novel.volumes.length - 1;
 

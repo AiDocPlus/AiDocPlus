@@ -27,3 +27,5 @@ pub mod quick_capture;
 pub mod novel;
 pub mod stock;
 pub mod sync;
+pub mod mail_client;
+pub mod imap;

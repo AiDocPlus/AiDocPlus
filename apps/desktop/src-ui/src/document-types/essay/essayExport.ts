@@ -7,7 +7,17 @@
  * - 分享链接生成
  */
 
-import type { EssayDocumentContent, EssaySnapshot } from './types';
+import type { EssayDocumentContent } from './types';
+
+/** HTML 特殊字符转义，防止用户内容注入 */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 export interface ExportOptions {
   format: 'word' | 'pdf' | 'html' | 'markdown' | 'txt';
@@ -38,7 +48,7 @@ export async function exportToWord(essay: EssayDocumentContent, options: ExportO
 <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">
 <head>
   <meta charset="utf-8">
-  <title>${essay.title || '未命名散文'}</title>
+  <title>${escapeHtml(essay.title || '未命名散文')}</title>
   <style>
     body { font-family: ${options.fontFamily}; font-size: ${options.fontSize}px; line-height: ${options.lineHeight}; margin: ${options.pageMargin}cm; }
     h1 { font-size: ${options.fontSize + 4}px; margin-bottom: 1em; }
@@ -57,7 +67,7 @@ export async function exportToWord(essay: EssayDocumentContent, options: ExportO
   </style>
 </head>
 <body>
-  ${options.includeWatermark && options.watermarkText ? `<div class="watermark">${options.watermarkText}</div>` : ''}
+  ${options.includeWatermark && options.watermarkText ? `<div class="watermark">${escapeHtml(options.watermarkText)}</div>` : ''}
   ${options.includeMetadata ? generateMetadataHTML(essay) : ''}
   ${htmlContent}
 </body>
@@ -80,25 +90,25 @@ export async function exportToPDF(essay: EssayDocumentContent, options: ExportOp
 <html>
 <head>
   <meta charset="utf-8">
-  <title>${essay.title || '未命名散文'}</title>
+  <title>${escapeHtml(essay.title || '未命名散文')}</title>
   <style>
     body { font-family: ${options.fontFamily}; font-size: ${options.fontSize}px; line-height: ${options.lineHeight}; margin: ${options.pageMargin}cm; }
     @media print { body { margin: ${options.pageMargin}cm; } }
     .metadata { background: #f5f5f5; padding: 1em; margin-bottom: 2em; border-radius: 4px; page-break-inside: avoid; }
-    .watermark { 
-      position: fixed; 
-      top: 50%; 
-      left: 50%; 
-      transform: translate(-50%, -50%) rotate(-45deg); 
-      opacity: 0.05; 
-      font-size: 72px; 
-      color: #000; 
-      z-index: -1; 
+    .watermark {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-45deg);
+      opacity: 0.05;
+      font-size: 72px;
+      color: #000;
+      z-index: -1;
     }
   </style>
 </head>
 <body>
-  ${options.includeWatermark && options.watermarkText ? `<div class="watermark">${options.watermarkText}</div>` : ''}
+  ${options.includeWatermark && options.watermarkText ? `<div class="watermark">${escapeHtml(options.watermarkText)}</div>` : ''}
   ${options.includeMetadata ? generateMetadataHTML(essay) : ''}
   ${html}
 </body>
@@ -125,7 +135,7 @@ export function exportToHTML(essay: EssayDocumentContent, options: ExportOptions
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${essay.title || '未命名散文'}</title>
+  <title>${escapeHtml(essay.title || '未命名散文')}</title>
   <style>
     body { 
       font-family: ${options.fontFamily}; 
@@ -170,7 +180,7 @@ export function exportToHTML(essay: EssayDocumentContent, options: ExportOptions
   </style>
 </head>
 <body>
-  ${options.includeWatermark && options.watermarkText ? `<div class="watermark">${options.watermarkText}</div>` : ''}
+  ${options.includeWatermark && options.watermarkText ? `<div class="watermark">${escapeHtml(options.watermarkText)}</div>` : ''}
   ${options.includeMetadata ? generateMetadataHTML(essay) : ''}
   <main class="content">${bodyHtml}</main>
   <div class="footer">
@@ -294,9 +304,9 @@ export function exportToText(essay: EssayDocumentContent, options: ExportOptions
  * 生成 HTML 内容
  */
 function generateHTMLContent(essay: EssayDocumentContent): string {
-  // 将换行符转换为 HTML 段落
+  // 将换行符转换为 HTML 段落，并对内容进行 HTML 转义防止 XSS
   const paragraphs = essay.content.split('\n').filter(p => p.trim());
-  return paragraphs.map(p => `<p>${p.trim()}</p>`).join('\n');
+  return paragraphs.map(p => `<p>${escapeHtml(p.trim())}</p>`).join('\n');
 }
 
 /**
@@ -307,13 +317,13 @@ function generateMetadataHTML(essay: EssayDocumentContent): string {
   <div class="metadata">
     <h2>文档信息</h2>
     <div class="metadata-item">
-      <span class="metadata-label">标题：</span>${essay.title || '未命名散文'}
+      <span class="metadata-label">标题：</span>${escapeHtml(essay.title || '未命名散文')}
     </div>
     <div class="metadata-item">
-      <span class="metadata-label">子类型：</span>${essay.settings.subtype || 'lyrical'}
+      <span class="metadata-label">子类型：</span>${escapeHtml(essay.settings.subtype || 'lyrical')}
     </div>
     <div class="metadata-item">
-      <span class="metadata-label">情感基调：</span>${essay.settings.mood || 'warm'}
+      <span class="metadata-label">情感基调：</span>${escapeHtml(essay.settings.mood || 'warm')}
     </div>
     <div class="metadata-item">
       <span class="metadata-label">目标字数：</span>${essay.settings.targetWordCount || 0}
@@ -329,7 +339,7 @@ function generateMetadataHTML(essay: EssayDocumentContent): string {
     </div>
     ${essay.author ? `
     <div class="metadata-item">
-      <span class="metadata-label">作者：</span>${essay.author}
+      <span class="metadata-label">作者：</span>${escapeHtml(essay.author)}
     </div>
     ` : ''}
   </div>`;
@@ -400,93 +410,3 @@ export async function exportEssay(essay: EssayDocumentContent, options: ExportOp
 // ═══════════════════════════════════════════════════════
 // 快照管理（完整实现在 types.ts 中）
 // ═══════════════════════════════════════════════════════
-
-/**
- * 比较两个快照的差异
- */
-export function compareSnapshots(snapshot1: EssaySnapshot, snapshot2: EssaySnapshot): {
-  added: string;
-  removed: string;
-  modified: string;
-  wordCountDiff: number;
-} {
-  const lines1 = snapshot1.content.split('\n');
-  const lines2 = snapshot2.content.split('\n');
-  
-  const added: string[] = [];
-  const removed: string[] = [];
-  const modified: string[] = [];
-  
-  const maxLength = Math.max(lines1.length, lines2.length);
-  for (let i = 0; i < maxLength; i++) {
-    const line1 = lines1[i] || '';
-    const line2 = lines2[i] || '';
-    
-    if (line1 && !line2) {
-      removed.push(line1);
-    } else if (!line1 && line2) {
-      added.push(line2);
-    } else if (line1 !== line2) {
-      modified.push(`原文: ${line1}\n修改: ${line2}`);
-    }
-  }
-  
-  return {
-    added: added.join('\n'),
-    removed: removed.join('\n'),
-    modified: modified.join('\n'),
-    wordCountDiff: snapshot2.wordCount - snapshot1.wordCount,
-  };
-}
-
-// ═══════════════════════════════════════════════════════
-// 分享功能
-// ═══════════════════════════════════════════════════════
-
-/**
- * 生成分享链接
- */
-export async function generateShareLink(essay: EssayDocumentContent, options: {
-  type: 'readonly' | 'comment';
-  expiresIn: number; // 小时
-}): Promise<string> {
-  // 模拟生成分享链接
-  const shareId = Math.random().toString(36).substring(2, 15);
-  const baseUrl = window.location.origin;
-  const expiryTime = Date.now() + options.expiresIn * 60 * 60 * 1000;
-  
-  const shareData = {
-    shareId,
-    essayTitle: essay.title,
-    type: options.type,
-    expiresAt: expiryTime,
-    content: essay.content,
-    metadata: {
-      title: essay.title,
-      subtype: essay.settings.subtype,
-      mood: essay.settings.mood,
-      createdAt: essay.createdAt,
-    },
-  };
-  
-  // 在实际项目中，这里应该调用后端 API 保存分享数据
-  void shareData;
-  
-  return `${baseUrl}/share/${shareId}`;
-}
-
-/**
- * 验证分享链接
- */
-export async function validateShareLink(_shareId: string): Promise<{
-  valid: boolean;
-  essay?: EssayDocumentContent;
-  type?: 'readonly' | 'comment';
-  expiresAt?: number;
-}> {
-  // 模拟验证分享链接
-  // 在实际项目中，这里应该调用后端 API 验证
-  return {
-    valid: false,
-  };
-}

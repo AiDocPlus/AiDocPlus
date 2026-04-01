@@ -48,7 +48,12 @@ const tauriRawStorage: {
   },
   removeItem: async (name: string): Promise<void> => {
     try {
-      await invoke('save_settings', { json: '{}' });
+      const current = await invoke<string | null>('load_settings');
+      if (current) {
+        const data = JSON.parse(current);
+        delete data[name];
+        await invoke('save_settings', { json: JSON.stringify(data) });
+      }
     } catch {
       localStorage.removeItem(name);
     }
@@ -579,16 +584,21 @@ export function getAIInvokeParams(): AIInvokeParams {
 /**
  * 当 AI 服务配置变化时，自动导出到共享文件供资源管理器等外部工具使用。
  * 文件路径: ~/.aidocplus/ai-services.json
+ * 添加 debounce 防止快速连续变更导致竞态覆盖。
  */
 let _lastAiJson = '';
+let _aiExportTimer: ReturnType<typeof setTimeout> | null = null;
 useSettingsStore.subscribe((state) => {
   const ai = state.ai;
   const json = JSON.stringify({ services: ai.services, activeServiceId: ai.activeServiceId, temperature: ai.temperature, maxTokens: ai.maxTokens });
   if (json === _lastAiJson) return;
   _lastAiJson = json;
-  import('@tauri-apps/api/core').then(({ invoke }) => {
-    invoke('export_ai_services', { json }).catch(() => {});
-  });
+  if (_aiExportTimer) clearTimeout(_aiExportTimer);
+  _aiExportTimer = setTimeout(() => {
+    import('@tauri-apps/api/core').then(({ invoke }) => {
+      invoke('export_ai_services', { json }).catch(() => {});
+    });
+  }, 300);
 });
 
 /**

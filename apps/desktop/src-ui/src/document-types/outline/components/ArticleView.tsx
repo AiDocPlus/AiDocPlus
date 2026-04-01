@@ -32,7 +32,6 @@ interface ArticleSection {
 function buildArticleSections(
   nodes: OutlineNode[],
   showNotes: boolean,
-  t: (key: string, defaultValue?: string) => string,
 ): ArticleSection[] {
   const sections: ArticleSection[] = [];
 
@@ -91,8 +90,8 @@ export function ArticleView({
   const [copied, setCopied] = useState(false);
 
   const sections = useMemo(
-    () => buildArticleSections(outline.nodes, showNotes, t),
-    [outline.nodes, showNotes, t],
+    () => buildArticleSections(outline.nodes, showNotes),
+    [outline.nodes, showNotes],
   );
 
   // 完整 Markdown 文本（用于复制）

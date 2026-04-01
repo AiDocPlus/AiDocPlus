@@ -115,6 +115,14 @@ export function createDocTypeHost(opts: CreateDocTypeHostOptions): DocTypeHostAP
 
         if (options?.signal?.aborted) throw new Error('Request aborted');
 
+        // AbortSignal 取消时通知后端停止流
+        if (options?.signal) {
+          const onAbort = () => {
+            invoke('stop_ai_stream', { requestId }).catch(() => {});
+          };
+          options.signal.addEventListener('abort', onAbort, { once: true });
+        }
+
         // 直接调用 Rust chat_stream 命令，与主程序 sendChatMessage 一致
         const aiGlobal = useSettingsStore.getState().ai;
         const maxTok = pickInvokeMaxTokens(options?.maxTokens, aiGlobal.maxTokens);

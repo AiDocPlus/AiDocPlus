@@ -24,15 +24,25 @@ export function MarkdownReader({ content, fontSize, fontFamily, lineHeight, para
     fontFamily: FONT_FAMILIES[fontFamily] ?? FONT_FAMILIES.system,
     backgroundColor: theme.bg,
     color: theme.text,
-    lineHeight: String(lineHeight),
     '--reader-line-height': String(lineHeight),
     '--reader-paragraph-spacing': `${paragraphSpacing}em`,
-  } as React.CSSProperties), [fontSize, fontFamily, lineHeight, paragraphSpacing, contentWidth, theme]);
+    '--reader-text': theme.text,
+    '--reader-heading': theme.heading,
+    '--reader-muted': theme.muted,
+    '--reader-accent': theme.accent,
+    '--reader-code-bg': theme.codeBg,
+  } as React.CSSProperties), [fontFamily, lineHeight, paragraphSpacing, theme]);
 
   return (
     <div className="h-full overflow-auto reader-markdown flex justify-center" style={style}>
       <div className="w-full px-10 py-14" style={{ maxWidth: `${contentWidth}px` }}>
-        <MarkdownPreview content={content} fontSize={fontSize} theme={theme.mode === 'dark' ? 'dark' : 'light'} disableTruncation noInlineLineHeight />
+        <MarkdownPreview
+          content={content}
+          fontSize={fontSize}
+          theme={theme.mode === 'dark' ? 'dark' : 'light'}
+          disableTruncation
+          noInlineLineHeight
+        />
       </div>
     </div>
   );

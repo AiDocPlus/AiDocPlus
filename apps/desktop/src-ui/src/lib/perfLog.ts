@@ -17,7 +17,7 @@ export function logRender(componentName: string): void {
   const now = Date.now();
   if (!lastLogTime[componentName] || now - lastLogTime[componentName] > 2000) {
     lastLogTime[componentName] = now;
-    console.log(`[Render] ${componentName}: #${renderCounts[componentName]}`);
+    console.info(`[Render] ${componentName}: #${renderCounts[componentName]}`);
   }
 }
 

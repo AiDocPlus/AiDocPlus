@@ -1,6 +1,116 @@
 /// 文件系统安全模块 — 集中的输入校验与路径防护
 use std::path::{Path, PathBuf};
 
+// ── SSRF 防护 ──
+
+/// 校验 URL 是否为安全的 HTTPS 公网地址（防止 SSRF 攻击）
+/// 阻止：内网地址、环回地址、链路本地、非 HTTP(S) 协议
+pub fn validate_url_not_private(url_str: &str, field_name: &str) -> crate::error::Result<()> {
+    use crate::error::AppError;
+    use std::str::FromStr;
+
+    let url = url::Url::parse(url_str).map_err(|e| {
+        AppError::ValidationError(format!("{} URL 格式无效: {}", field_name, e))
+    })?;
+
+    let scheme = url.scheme().to_lowercase();
+    if scheme != "https" && scheme != "http" {
+        return Err(AppError::ValidationError(format!(
+            "{} 仅允许 HTTP/HTTPS 协议",
+            field_name
+        )));
+    }
+
+    let host = url.host_str().ok_or_else(|| {
+        AppError::ValidationError(format!("{} 缺少主机名", field_name))
+    })?;
+
+    // 解析主机为 IP 地址（失败说明是域名，后续 DNS 解析可能指向内网，
+    // 但在桌面应用场景下用户主动配置的域名视为可信）
+    if let Ok(ip) = std::net::IpAddr::from_str(host) {
+        if is_private_ip(&ip) {
+            return Err(AppError::SecurityError(format!(
+                "{} 不允许访问内网地址: {}",
+                field_name, host
+            )));
+        }
+    } else {
+        // 域名检查：阻止常见内网域名
+        let host_lower = host.to_lowercase();
+        let blocked_hosts = [
+            "localhost", "localhost.localdomain",
+            "ip6-localhost", "ip6-loopback",
+        ];
+        if blocked_hosts.contains(&host_lower.as_str()) {
+            return Err(AppError::SecurityError(format!(
+                "{} 不允许访问内网主机: {}",
+                field_name, host
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+/// 检查 IP 是否为内网 / 环回 / 链路本地地址
+fn is_private_ip(ip: &std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => {
+            v4.is_loopback()
+                || v4.is_private()
+                || v4.is_link_local()
+                // 0.0.0.0/8
+                || v4.octets()[0] == 0
+                // 载波级 NAT 100.64.0.0/10
+                || (v4.octets()[0] == 100 && (v4.octets()[1] & 0b1100_0000) == 0b0100_0000)
+                // IETF 协议保留 192.0.0.0/24, 192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24
+                || (v4.octets()[0] == 192 && v4.octets()[1] == 0 && v4.octets()[2] == 0)
+                || (v4.octets()[0] == 192 && v4.octets()[1] == 0 && v4.octets()[2] == 2)
+                || (v4.octets()[0] == 198 && v4.octets()[1] == 51 && v4.octets()[2] == 100)
+                || (v4.octets()[0] == 203 && v4.octets()[1] == 0 && v4.octets()[2] == 113)
+        }
+        std::net::IpAddr::V6(v6) => {
+            v6.is_loopback()
+                || v6.is_multicast()
+                // IPv6 映射的 IPv4 私有地址
+                || match v6.to_ipv4_mapped() {
+                    Some(v4) => is_private_ip(&std::net::IpAddr::V4(v4)),
+                    None => false,
+                }
+        }
+    }
+}
+
+/// 验证路径是否在允许的目录内（复用 canonicalize + starts_with 模式）
+/// 允许的目录：用户 home、temp_dir、应用数据目录
+pub fn validate_path_allowed(path: &Path, field_name: &str) -> crate::error::Result<PathBuf> {
+    use crate::error::AppError;
+
+    let canonical = path.canonicalize().map_err(|e| {
+        AppError::ValidationError(format!("{} 路径无效或不存在: {}", field_name, e))
+    })?;
+
+    let mut allowed_dirs: Vec<PathBuf> = Vec::new();
+    if let Some(home) = dirs::home_dir() {
+        allowed_dirs.push(home);
+    }
+    allowed_dirs.push(std::env::temp_dir());
+    allowed_dirs.push(crate::config::current_data_root());
+
+    for allowed in &allowed_dirs {
+        if let Ok(allowed_canonical) = allowed.canonicalize() {
+            if canonical.starts_with(&allowed_canonical) {
+                return Ok(canonical);
+            }
+        }
+    }
+
+    Err(AppError::SecurityError(format!(
+        "安全限制：{} 不在允许的目录范围内",
+        field_name
+    )))
+}
+
 // ── 常量 ──
 
 /// 单文档最大大小 (20 MB)
@@ -118,9 +228,9 @@ pub fn sanitize_filename(name: &str) -> String {
             _ => c,
         })
         .collect();
-    // 限制长度
-    let truncated = if sanitized.len() > MAX_FILENAME_LENGTH {
-        sanitized[..MAX_FILENAME_LENGTH].to_string()
+    // 限制长度（按字符截断，避免将多字节 UTF-8 字符截断为无效序列）
+    let truncated = if sanitized.chars().count() > MAX_FILENAME_LENGTH {
+        sanitized.chars().take(MAX_FILENAME_LENGTH).collect()
     } else {
         sanitized
     };

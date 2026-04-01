@@ -317,6 +317,7 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
           setNovel(prev => {
             const patched = updateDailyWordStats(prev, todayAccumulatedRef.current);
             host.doc.updateInMemory({ content: JSON.stringify(patched) });
+            host.doc.markDirty();
             return patched;
           });
         }, 10000); // 10秒节流
@@ -733,14 +734,44 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
     return () => clearInterval(idleCheck);
   }, [activeChapterId, chapterContent, IDLE_TIMEOUT]);
 
-  // ── Phase 4: 组件卸载时结束写作会话并持久化每日统计 ──
+  // ── Phase 4: 组件卸载时结束写作会话、持久化每日统计、保存当前章节内容 ──
+  // 用 ref 保存最新值，避免 cleanup 闭包捕获过时状态
+  const novelRef = useRef(novel);
+  novelRef.current = novel;
+  const activeChapterIdRef = useRef(activeChapterId);
+  activeChapterIdRef.current = activeChapterId;
+  const activeSceneIdRef = useRef(activeSceneId);
+  activeSceneIdRef.current = activeSceneId;
+  const chapterContentRef = useRef(chapterContent);
+  chapterContentRef.current = chapterContent;
+
   useEffect(() => {
     return () => {
       // 清理番茄钟
       if (pomodoroIntervalRef.current) clearInterval(pomodoroIntervalRef.current);
       // 清理每日统计节流
       if (dailyStatsThrottleRef.current) clearTimeout(dailyStatsThrottleRef.current);
+      // 清理自动保存定时器
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      // 清理保存状态定时器
+      if (saveStatusTimerRef.current) clearTimeout(saveStatusTimerRef.current);
+      // 保存当前正在编辑的章节内容，防止卸载时丢失
+      const latestNovel = novelRef.current;
+      const chId = activeChapterIdRef.current;
+      const scId = activeSceneIdRef.current;
+      const content = chapterContentRef.current;
+      if (chId && content !== undefined) {
+        let updated: NovelDocumentContent;
+        if (scId) {
+          updated = updateSceneContent(latestNovel, chId, scId, content);
+        } else {
+          updated = updateChapterContent(latestNovel, chId, content);
+        }
+        host.doc.updateInMemory({ content: JSON.stringify(updated) });
+        host.doc.save();
+      }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Phase 4: 番茄钟逻辑（统一 interval，避免嵌套泄漏） ──
@@ -1339,7 +1370,7 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
         {/* 编辑区 / 大纲视图 / 索引卡视图 */}
         {viewMode === 'outline' && (
           <div className="flex-1 min-h-0 overflow-hidden">
-            <NovelOutlineView novel={novel} onNovelChange={saveNovel} onSelectChapter={(id) => { setViewMode('editor'); selectChapter(id); }} onSelectScene={(chId, scId) => { setViewMode('editor'); selectScene(chId, scId); }} characters={novel.settings.characters} locations={novel.settings.locations} />
+            <NovelOutlineView novel={novel} onNovelChange={saveNovel} onSelectChapter={(id) => { setViewMode('editor'); selectChapter(id); }} onSelectScene={(chId, scId) => { setViewMode('editor'); selectScene(chId, scId); }} characters={novel.settings.characters} />
           </div>
         )}
         {viewMode === 'corkboard' && (
@@ -1476,7 +1507,6 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
           <div className="flex-shrink-0 h-full overflow-hidden border-l" style={{ width: rightWidth }}>
             <NovelAISidebar
               host={host}
-              document={doc}
               novel={novel}
               activeChapterId={activeChapterId}
               activeSceneId={activeSceneId}

@@ -196,6 +196,8 @@ export function wrapWithSandbox(
         isAvailable: () => false,
         truncateContent: (t: string) => t,
         getLastThinking: () => '',
+        listServices: () => [],
+        getServiceParams: () => null,
       }
     : {
         chat: async (messages, options) => {
@@ -209,6 +211,8 @@ export function wrapWithSandbox(
         isAvailable: () => api.ai.isAvailable(),
         truncateContent: (t: string) => api.ai.truncateContent(t),
         getLastThinking: () => api.ai.getLastThinking(),
+        listServices: () => api.ai.listServices(),
+        getServiceParams: (id: string) => api.ai.getServiceParams(id),
       };
 
   // ── Storage API 包装 ──

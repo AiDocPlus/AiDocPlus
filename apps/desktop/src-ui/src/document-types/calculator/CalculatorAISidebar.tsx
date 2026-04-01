@@ -4,7 +4,7 @@
  * 流式输出与停止、底部 AI 服务 / 联网 / 深度思考、统一消息组件。
  */
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import type { DocTypeHostAPI, DocTypeAISidebarProps } from '@/doctype-sdk/types';
+import type { DocTypeAISidebarProps } from '@/doctype-sdk/types';
 import { useTranslation } from '@/i18n';
 import {
   Calculator,
@@ -73,14 +73,14 @@ import {
 } from './calculatorQuickActions';
 import { buildCalculatorSyntaxSummaryForAI } from './calculatorFunctionCatalog';
 import { CALCULATOR_DOCUMENT_AI_SYSTEM_BASE } from './calculatorAiPromptShared';
-import { buildSmartContext, type CalculatorPhase } from './calculatorContext';
+import { buildSmartContext } from './calculatorContext';
 import { CalculatorCommandPalette } from './CalculatorCommandPalette';
 
 const CALC_SERVICE_STORAGE_KEY = '_calc_assistant_service_id';
 const CALC_CUSTOM_SYSTEM_KEY = '_calc_assistant_custom_system';
 
 function DynamicIcon({ name, className }: { name: string; className?: string }) {
-  const IconComponent = (LucideIcons as Record<string, React.ComponentType<{ className?: string; iconNode?: any }>>)[name];
+  const IconComponent = (LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string; iconNode?: any }>>)[name];
   if (!IconComponent) return <Calculator className={className} />;
   return <IconComponent className={className} />;
 }

@@ -109,7 +109,7 @@ describe('CalculatorEngine', () => {
     const p = engine.evaluate(`ppmt(0.01, 1, 12, -1000)`, 3);
     expect(i.type).toBe('number');
     expect(p.type).toBe('number');
-    expect(i.value + p.value).toBeCloseTo(pay, 6);
+    expect((i.value as number) + (p.value as number)).toBeCloseTo(pay, 6);
   });
 
   it('evaluates mirr with cash flow array', () => {

@@ -16,13 +16,30 @@ const MAX_SINGLE_FILE_SIZE: u64 = 50 * 1024 * 1024; // 50MB
 /// 支持：.txt, .md, .csv, .html, .xml, .json, .docx
 #[tauri::command]
 pub fn import_file(path: String) -> Result<String> {
+    use crate::error::ResultExt;
+
     let file_path = Path::new(&path);
 
-    if !file_path.exists() {
+    // 路径安全：验证导入文件在允许的目录内
+    let safe_path = crate::security::validate_path_allowed(file_path, "导入文件")?;
+
+    if !safe_path.exists() {
         return Err(AppError::Internal(format!("文件不存在: {}", path)));
     }
 
-    let ext = file_path
+    // 检查文件大小（纯文本类文件限制 20 MB）
+    let metadata = std::fs::metadata(&safe_path)
+        .map_err(|e| AppError::ImportFailed(format!("无法读取文件信息: {}", e)))?;
+    let file_size = metadata.len() as usize;
+    let max_text_size: u64 = 20 * 1024 * 1024; // 20 MB
+    if file_size as u64 > max_text_size {
+        return Err(AppError::SecurityError(format!(
+            "导入文件过大（{} > {} 字节）",
+            file_size, max_text_size
+        )));
+    }
+
+    let ext = safe_path
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("")
@@ -32,10 +49,10 @@ pub fn import_file(path: String) -> Result<String> {
         // 纯文本类文件：直接读取
         "txt" | "md" | "markdown" | "json" | "xml" | "csv" | "html" | "htm" | "yaml" | "yml"
         | "toml" | "ini" | "log" | "rst" | "tex" | "rtf" => {
-            fs::read_to_string(&path).map_err(|e| AppError::ImportFailed(format!("读取文件失败: {}", e)))
+            fs::read_to_string(&safe_path).map_err(|e| AppError::ImportFailed(format!("读取文件失败: {}", e)))
         }
         // Word 文档
-        "docx" => import_docx(&path),
+        "docx" => import_docx(&safe_path.to_string_lossy()),
         _ => Err(AppError::ValidationError(format!(
             "不支持的文件格式: .{}\n\n支持的格式：txt, md, json, xml, csv, html, yaml, toml, docx",
             ext

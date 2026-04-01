@@ -35,6 +35,37 @@ pub fn export_document_native(
     outputPath: String,
     contentOverride: Option<String>,
 ) -> Result<String> {
+    crate::security::validate_id(&projectId, "projectId")?;
+    crate::security::validate_id(&documentId, "documentId")?;
+
+    // 安全校验：format 只允许安全字符
+    if format.contains('/') || format.contains('\\') || format.contains('\0')
+        || format.contains("..") || format.trim().is_empty() {
+        return Err(AppError::SecurityError("安全限制：导出格式参数包含非法字符".to_string()));
+    }
+
+    // 安全校验：输出路径必须在用户主目录或临时目录下
+    let out_path = std::path::Path::new(&outputPath);
+    let home = dirs::home_dir().unwrap_or_default();
+    let home_canonical = home.canonicalize().unwrap_or(home);
+    let temp_canonical = std::env::temp_dir().canonicalize().unwrap_or(std::env::temp_dir());
+    let out_resolved = if out_path.exists() {
+        out_path.canonicalize().unwrap_or_else(|_| out_path.to_path_buf())
+    } else if let Some(parent) = out_path.parent() {
+        if parent.exists() {
+            parent.canonicalize().unwrap_or_else(|_| parent.to_path_buf())
+        } else {
+            return Err(AppError::SecurityError("目标目录不存在".to_string()));
+        }
+    } else {
+        out_path.to_path_buf()
+    };
+    if !out_resolved.starts_with(&home_canonical) && !out_resolved.starts_with(&temp_canonical) {
+        return Err(AppError::SecurityError(
+            "安全限制：只能导出到用户主目录或临时目录下".to_string(),
+        ));
+    }
+
     let doc_path = state.get_document_path(&projectId, &documentId);
 
     if !doc_path.exists() {
@@ -71,6 +102,8 @@ pub fn export_and_open(
     appName: Option<String>,
     contentOverride: Option<String>,
 ) -> Result<String> {
+    crate::security::validate_id(&projectId, "projectId")?;
+    crate::security::validate_id(&documentId, "documentId")?;
     let doc_path = state.get_document_path(&projectId, &documentId);
 
     if !doc_path.exists() {
@@ -87,7 +120,13 @@ pub fn export_and_open(
     cleanup_old_temp_files(&temp_dir, TEMP_FILE_MAX_AGE);
 
     let safe_title = crate::security::sanitize_filename(&title);
-    let output_path = temp_dir.join(format!("{}.{}", safe_title, format));
+    // 安全校验：format 只允许安全字符，防止路径注入
+    let safe_format = format.trim();
+    if safe_format.contains('/') || safe_format.contains('\\') || safe_format.contains('\0')
+        || safe_format.contains("..") || safe_format.is_empty() {
+        return Err(AppError::SecurityError("安全限制：导出格式参数包含非法字符".to_string()));
+    }
+    let output_path = temp_dir.join(format!("{}.{}", safe_title, safe_format));
     let output_str = output_path.to_string_lossy().to_string();
 
     // 导出文件
@@ -256,9 +295,26 @@ fn get_windows_exe_paths(app: &str) -> Vec<String> {
 /// 打开指定文件（可选指定程序）
 #[tauri::command]
 pub fn open_file_with_app(path: String, app_name: Option<String>) -> Result<()> {
+    use crate::error::AppError;
+
+    // 路径安全：验证文件在允许的目录内
+    let safe_path = crate::security::validate_path_allowed(
+        std::path::Path::new(&path), "打开文件路径"
+    )?;
+
+    // 安全校验：app_name 只允许字母数字和常见符号，防止命令注入
+    if let Some(ref app) = app_name {
+        if app.contains('/') || app.contains('\\') || app.contains('\0')
+            || app.contains("..") || app.contains('"') || app.contains('\'') {
+            return Err(AppError::SecurityError(
+                "安全限制：应用程序名称包含非法字符".to_string()
+            ));
+        }
+    }
+
     let result = match app_name.as_deref() {
-        Some(app) => open_with_app(&path, app),
-        None => open_with_default(&path),
+        Some(app) => open_with_app(&safe_path.to_string_lossy(), app),
+        None => open_with_default(&safe_path.to_string_lossy()),
     };
     result.map_err(|e| {
         let app_desc = app_name.unwrap_or_else(|| "默认程序".to_string());
@@ -298,6 +354,16 @@ pub fn open_pdf_preview(
     use tauri::Manager;
     use tauri::WebviewWindowBuilder;
     use tauri::WebviewUrl;
+
+    // 安全限制：htmlPath 必须在临时目录下
+    let path = std::path::Path::new(&htmlPath);
+    let canonical = path.canonicalize().context("路径无效")?;
+    let temp_dir = std::env::temp_dir().canonicalize().unwrap_or_else(|_| std::env::temp_dir());
+    if !canonical.starts_with(&temp_dir) {
+        return Err(AppError::SecurityError(format!(
+            "安全限制：只能预览临时目录中的文件"
+        )));
+    }
 
     let window_label = "pdf-preview";
 

@@ -26,7 +26,7 @@ export function registerSpreadsheetExcelAliases(
         continue;
       }
       if (a && typeof a === 'object' && typeof (a as { toArray?: () => unknown }).toArray === 'function') {
-        n += mathToNumberArray((a as { toArray: () => unknown }).toArray());
+        n += mathToNumberArray((a as { toArray: () => unknown }).toArray()).length;
         continue;
       }
       const v = mathToNumber(a);
@@ -45,48 +45,51 @@ export function registerSpreadsheetExcelAliases(
     return acc;
   };
 
+  // mathjs 函数签名严格，Excel 别名参数全部为 unknown → 统一 as any 绕过
+  const m = math as any;
+
   math.import(
     {
-      SUM: (...args: unknown[]) => math.sum(...args),
-      AVERAGE: (...args: unknown[]) => math.mean(...args),
-      AVERAGEA: (...args: unknown[]) => math.mean(...args),
-      PRODUCT: (...args: unknown[]) => math.prod(...args),
-      MIN: (...args: unknown[]) => math.min(...args),
-      MAX: (...args: unknown[]) => math.max(...args),
-      MEDIAN: (...args: unknown[]) => math.median(...args),
+      SUM: (...args: unknown[]) => m.sum(...args),
+      AVERAGE: (...args: unknown[]) => m.mean(...args),
+      AVERAGEA: (...args: unknown[]) => m.mean(...args),
+      PRODUCT: (...args: unknown[]) => m.prod(...args),
+      MIN: (...args: unknown[]) => m.min(...args),
+      MAX: (...args: unknown[]) => m.max(...args),
+      MEDIAN: (...args: unknown[]) => m.median(...args),
       COUNT: (...args: unknown[]) => countNumeric(...args),
       /** 样本标准差，对齐 STDEV.S / 旧版 STDEV */
-      STDEV: (...args: unknown[]) => math.std(...args),
-      STDEVS: (...args: unknown[]) => math.std(...args),
-      STDEVP: (...args: unknown[]) => math.std(...args, 'uncorrected'),
+      STDEV: (...args: unknown[]) => m.std(...args),
+      STDEVS: (...args: unknown[]) => m.std(...args),
+      STDEVP: (...args: unknown[]) => m.std(...args, 'uncorrected'),
       /** 样本方差，对齐 VAR.S / 旧版 VAR */
-      VAR: (...args: unknown[]) => math.variance(...args),
-      VARS: (...args: unknown[]) => math.variance(...args),
-      VARP: (...args: unknown[]) => math.variance(...args, 'uncorrected'),
-      CORREL: (a: unknown, b: unknown) => math.corr(a, b),
-      POWER: (x: unknown, y: unknown) => math.pow(x, y),
-      SQRT: (x: unknown) => math.sqrt(x),
-      ABS: (x: unknown) => math.abs(x),
-      MOD: (x: unknown, y: unknown) => math.mod(x, y),
+      VAR: (...args: unknown[]) => m.variance(...args),
+      VARS: (...args: unknown[]) => m.variance(...args),
+      VARP: (...args: unknown[]) => m.variance(...args, 'uncorrected'),
+      CORREL: (a: unknown, b: unknown) => m.corr(a, b),
+      POWER: (x: unknown, y: unknown) => m.pow(x, y),
+      SQRT: (x: unknown) => m.sqrt(x),
+      ABS: (x: unknown) => m.abs(x),
+      MOD: (x: unknown, y: unknown) => m.mod(x, y),
       ROUND: (x: unknown, digits?: unknown) =>
-        digits === undefined ? math.round(x) : math.round(x, mathToNumber(digits)),
+        digits === undefined ? m.round(x) : m.round(x, mathToNumber(digits)),
       ROUNDDOWN: (x: unknown, digits?: unknown) =>
-        digits === undefined ? math.floor(x) : math.floor(x, mathToNumber(digits)),
+        digits === undefined ? m.floor(x) : m.floor(x, mathToNumber(digits)),
       ROUNDUP: (x: unknown, digits?: unknown) =>
-        digits === undefined ? math.ceil(x) : math.ceil(x, mathToNumber(digits)),
+        digits === undefined ? m.ceil(x) : m.ceil(x, mathToNumber(digits)),
       /** 单参数；与 Excel FLOOR.MATH 在负数行为上可能不同 */
-      FLOOR: (x: unknown) => math.floor(x),
-      CEILING: (x: unknown) => math.ceil(x),
+      FLOOR: (x: unknown) => m.floor(x),
+      CEILING: (x: unknown) => m.ceil(x),
       /** 自然对数 */
-      LN: (x: unknown) => math.log(x),
+      LN: (x: unknown) => m.log(x),
       /** 默认以 10 为底；两参数时为 log_base(x) */
       LOG: (x: unknown, base?: unknown) =>
-        base === undefined ? math.log10(x) : math.log(x, base),
-      LOG10: (x: unknown) => math.log10(x),
-      EXP: (x: unknown) => math.exp(x),
-      PI: () => math.pi,
-      DEGREES: (x: unknown) => math.divide(math.multiply(x, 180), math.pi),
-      RADIANS: (x: unknown) => math.divide(math.multiply(x, math.pi), 180),
+        base === undefined ? m.log10(x) : m.log(x, base),
+      LOG10: (x: unknown) => m.log10(x),
+      EXP: (x: unknown) => m.exp(x),
+      PI: () => m.pi,
+      DEGREES: (x: unknown) => m.divide(m.multiply(x, 180), m.pi),
+      RADIANS: (x: unknown) => m.divide(m.multiply(x, m.pi), 180),
       AND: (...args: unknown[]) => chainBool2((a, b) => a && b, args),
       OR: (...args: unknown[]) => chainBool2((a, b) => a || b, args),
       NOT: (x: unknown) => !x,

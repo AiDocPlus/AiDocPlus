@@ -183,13 +183,6 @@ export function SearchPanel({
     [goToPrev, goToNext, onClose]
   );
 
-  // 清空搜索
-  const handleClear = useCallback(() => {
-    setQuery('');
-    setCurrentIndex(0);
-    inputRef.current?.focus();
-  }, []);
-
   if (!isOpen) return null;
 
   return (

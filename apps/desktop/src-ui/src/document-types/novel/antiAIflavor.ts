@@ -7,7 +7,7 @@
  * - Layer C: 修订层（AI 辅助）
  */
 
-import type { NovelDocumentContent, NovelChapter } from './types';
+import type { NovelDocumentContent } from './types';
 
 // ═══ Layer A: 规则层 ═══
 
@@ -87,7 +87,6 @@ export interface AIFlavorIssue {
 export function detectAIFlavor(text: string): AIFlavorDetectionResult {
   const issues: AIFlavorIssue[] = [];
   const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 0);
-  const sentences = text.split(/[。！？…]+/).filter(s => s.trim().length > 0);
 
   // 1. 词汇疲劳检测
   const vocabularyIssues = detectVocabularyFatigue(text);
@@ -140,7 +139,8 @@ function detectVocabularyFatigue(text: string): AIFlavorIssue[] {
   ];
 
   for (const word of allBannedWords) {
-    const regex = new RegExp(word, 'g');
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escaped, 'g');
     const matches = [...text.matchAll(regex)];
     if (matches.length >= 3) {
       const positions = matches.map(m => m.index || 0);
@@ -219,10 +219,11 @@ function detectTransitionDensity(text: string): AIFlavorIssue[] {
 
   if (sentences.length < 5) return issues;
 
-  for (const [category, words] of Object.entries(TRANSITION_WORDS)) {
+  for (const words of Object.values(TRANSITION_WORDS)) {
     let totalCount = 0;
     for (const word of words) {
-      const regex = new RegExp(word, 'g');
+      const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(escaped, 'g');
       const matches = text.match(regex);
       if (matches) {
         totalCount += matches.length;
@@ -370,7 +371,8 @@ export function quickAntiAIFlavor(text: string): string {
 
   // 简单替换疲劳词
   for (const [word, replacements] of Object.entries(WORD_REPLACEMENTS)) {
-    const regex = new RegExp(word, 'g');
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escaped, 'g');
     let count = 0;
     result = result.replace(regex, (match) => {
       count++;

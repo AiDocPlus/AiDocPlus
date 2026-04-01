@@ -66,8 +66,12 @@ pub fn save_document(
 
     security::validate_id(&projectId, "projectId")?;
     security::validate_id(&documentId, "documentId")?;
+    security::validate_title(&title)?;
     security::validate_content_size(&content)?;
     security::validate_content_size(&aiGeneratedContent)?;
+    if let Some(ref cc) = composedContent {
+        security::validate_content_size(cc)?;
+    }
     let doc_path = state.get_document_path(&projectId, &documentId);
 
     if !doc_path.exists() {
@@ -93,7 +97,9 @@ pub fn save_document(
     if let Some(cc) = composedContent {
         document.composed_content = Some(cc);
     }
-    document.ai_service_id = aiServiceId;
+    if aiServiceId.is_some() {
+        document.ai_service_id = aiServiceId;
+    }
     // 小说扩展字段（仅在传入时更新，避免普通保存覆盖）
     if parentId.is_some() { document.parent_id = parentId; }
     if sortOrder.is_some() { document.sort_order = sortOrder; }
@@ -265,6 +271,10 @@ pub fn create_version(
     security::validate_id(&projectId, "projectId")?;
     security::validate_id(&documentId, "documentId")?;
     security::validate_content_size(&content)?;
+    security::validate_content_size(&aiGeneratedContent)?;
+    if let Some(ref cc) = composedContent {
+        security::validate_content_size(cc)?;
+    }
     let doc_path = state.get_document_path(&projectId, &documentId);
 
     if !doc_path.exists() {
@@ -493,17 +503,24 @@ pub fn write_binary_file(path: String, data: Vec<u8>) -> Result<()> {
     // 临时目录
     allowed_dirs.push(std::env::temp_dir());
 
-    // 确保父目录存在（必须在 canonicalize 之前，否则目录不存在会报错）
-    if let Some(parent) = file_path.parent() {
+    // TOCTOU 安全修复：先验证父目录路径，验证通过后再创建目录和写入
+    // 步骤 1：获取父目录（必须存在或可创建）
+    let parent = file_path.parent()
+        .ok_or_else(|| AppError::ValidationError("路径无效: 无法获取父目录".to_string()))?;
+
+    // 步骤 2：如果父目录已存在，先 canonicalize 并验证
+    // 如果父目录不存在，先创建再验证（确保验证的是实际路径）
+    let canonical_parent = if parent.exists() {
+        parent.canonicalize()
+            .map_err(|e| AppError::ValidationError(format!("路径无效: {}", e)))?
+    } else {
+        // 父目录不存在：先创建，再验证 canonicalize 后的路径
         std::fs::create_dir_all(parent).context("创建目录失败")?;
-    }
+        parent.canonicalize()
+            .map_err(|e| AppError::ValidationError(format!("路径无效: {}", e)))?
+    };
 
-    // 验证路径：对父目录做 canonicalize（文件本身可能尚不存在）
-    let canonical_parent = file_path.parent()
-        .ok_or_else(|| AppError::ValidationError("路径无效: 无法获取父目录".to_string()))?
-        .canonicalize()
-        .map_err(|e| AppError::ValidationError(format!("路径无效: {}", e)))?;
-
+    // 步骤 3：验证路径在允许的目录内
     let is_allowed = allowed_dirs.iter().any(|dir| {
         dir.canonicalize().map(|d| canonical_parent.starts_with(&d)).unwrap_or(false)
     });
@@ -512,6 +529,7 @@ pub fn write_binary_file(path: String, data: Vec<u8>) -> Result<()> {
         return Err(AppError::SecurityError("路径不在允许的目录内".to_string()));
     }
 
+    // 步骤 4：验证通过后再写入
     std::fs::write(file_path, &data).context("写入文件失败")?;
     Ok(())
 }

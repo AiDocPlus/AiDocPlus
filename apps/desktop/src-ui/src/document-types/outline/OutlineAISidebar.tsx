@@ -167,7 +167,6 @@ export default function OutlineAISidebar({
   document: doc,
   activeNodeId,
   activeOutline,
-  selectedNodeIds = [],
   onApplyNodes,
   onClose,
 }: OutlineAISidebarProps) {
@@ -459,32 +458,6 @@ export default function OutlineAISidebar({
 
     sendMessage(finalPrompt);
   }, [doc.title, doc.id, getOutlineMarkdown, smartContextText, t, layeredContext, sendMessage]);
-
-  const selectedNodesContext = useMemo(() => {
-    if (!activeOutline || selectedNodeIds.length === 0) return '';
-    const selected = selectedNodeIds
-      .map(id => {
-        const node = findNodeInOutline(activeOutline.nodes, id);
-        return node ? `- ${node.plainText}` : null;
-      })
-      .filter((v): v is string => !!v);
-    return selected.join('\n');
-  }, [activeOutline, selectedNodeIds]);
-
-  const fireBatch = useCallback((_label: string, instruction: string) => {
-    if (!selectedNodesContext.trim()) return;
-    const prompt = [
-      instruction,
-      '',
-      isEn ? 'Selected nodes:' : '选中节点：',
-      selectedNodesContext,
-      '',
-      isEn
-        ? 'Return in Markdown list order with same item count.'
-        : '请按相同节点数量输出 Markdown 列表，保持原顺序。',
-    ].join('\n');
-    sendMessage(prompt);
-  }, [selectedNodesContext, isEn, sendMessage]);
 
   const handleExecuteAction = useCallback((item: OutlineQuickActionItem) => {
     setActionStore(prev => {
@@ -979,12 +952,3 @@ export default function OutlineAISidebar({
 // ═══════════════════════════════════════════════════════════════════════════
 // 辅助函数
 // ═══════════════════════════════════════════════════════════════════════════
-
-function findNodeInOutline(nodes: OutlineNode[], id: string): OutlineNode | null {
-  for (const node of nodes) {
-    if (node.id === id) return node;
-    const found = findNodeInOutline(node.children ?? [], id);
-    if (found) return found;
-  }
-  return null;
-}

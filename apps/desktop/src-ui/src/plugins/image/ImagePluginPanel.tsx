@@ -110,10 +110,19 @@ export function ImagePluginPanel({ pluginData, onPluginDataChange, onRequestSave
   const [qaOpen, setQaOpen] = useState(false);
   const [qaStore, setQaStore] = useState(() => loadQuickActionStore());
 
+  // 状态栏计时器（组件卸载时清除，防止内存泄漏）
+  const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const showStatus = useCallback((msg: string, isError = false) => {
     setStatusMsg(msg);
     setStatusIsError(isError);
-    setTimeout(() => setStatusMsg(null), 3000);
+    if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
+    statusTimerRef.current = setTimeout(() => setStatusMsg(null), 3000);
+  }, []);
+
+  // 组件卸载时清除状态栏计时器
+  useEffect(() => {
+    return () => { if (statusTimerRef.current) clearTimeout(statusTimerRef.current); };
   }, []);
 
   // ── AI 动作桥接 ──
@@ -750,7 +759,7 @@ export function ImagePluginPanel({ pluginData, onPluginDataChange, onRequestSave
       </div>
 
       {/* ── 标签栏 ── */}
-      <div className="flex items-center gap-0.5 px-2 py-1 border-b bg-muted/20 flex-shrink-0 overflow-x-auto">
+      <div className="flex items-center gap-0.5 px-2 py-1 border-b bg-muted/20 flex-shrink-0 overflow-x-auto scrollbar-hide">
         {canvases.map(c => (
           <div key={c.id}
             className={`group flex items-center gap-1 px-2 py-0.5 rounded text-xs cursor-pointer select-none ${

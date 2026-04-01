@@ -1,11 +1,11 @@
 /**
  * 大纲文档类型定义
- * 
+ *
  * 专业级大纲写作工具，对标幕布核心体验
  */
 
 import { lazy } from 'react';
-import { ListTree } from 'lucide-react';
+import { ListTree, Sparkles, FileText, Wand2, PlusCircle, WrapText } from 'lucide-react';
 import type { DocTypeDefinition } from '@/doctype-sdk/types';
 import {
   createEmptyOutlineDocument,
@@ -33,37 +33,34 @@ export const outlineDocType: DocTypeDefinition = {
   supportsPlugins: false,
   aiQuickActions: [
     {
-      id: 'expand',
+      id: 'outline:expand',
       labelKey: 'outline.ai.expand',
-      icon: 'Sparkles',
+      icon: Sparkles,
+      defaultPromptTemplate: '请展开以下大纲节点的子要点（3-7条），保持层级结构清晰：\n\n{{content}}',
     },
     {
-      id: 'generate',
+      id: 'outline:generate',
       labelKey: 'outline.ai.generate',
-      icon: 'FileText',
+      icon: FileText,
+      defaultPromptTemplate: '请基于以下大纲生成完整的文档正文：\n\n{{content}}',
     },
     {
-      id: 'polish',
+      id: 'outline:polish',
       labelKey: 'outline.ai.polish',
-      icon: 'Wand2',
+      icon: Wand2,
+      defaultPromptTemplate: '请对以下大纲内容进行润色优化，改善表达但不改变结构：\n\n{{content}}',
     },
     {
-      id: 'continue',
+      id: 'outline:continue',
       labelKey: 'outline.ai.continue',
-      icon: 'PlusCircle',
+      icon: PlusCircle,
+      defaultPromptTemplate: '请继续扩展以下大纲，添加下一层级的要点：\n\n{{content}}',
     },
     {
-      id: 'summarize',
+      id: 'outline:summarize',
       labelKey: 'outline.ai.summarize',
-      icon: 'WrapText',
+      icon: WrapText,
+      defaultPromptTemplate: '请对以下大纲内容进行总结提炼，生成精简版本：\n\n{{content}}',
     },
-  ],
-  exportFormats: [
-    { format: 'opml', labelKey: 'outline.export.opml', extension: 'opml' },
-    { format: 'markdown', labelKey: 'outline.export.markdown', extension: 'md' },
-    { format: 'txt', labelKey: 'outline.export.txt', extension: 'txt' },
-    { format: 'json', labelKey: 'outline.export.json', extension: 'json' },
   ],
 };
-
-export default outlineDocType;

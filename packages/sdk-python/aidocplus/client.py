@@ -104,6 +104,10 @@ class AiDocPlusClient:
             "Authorization": f"Bearer {self._token}",
             "X-Caller-Level": self._caller_level,
         }
+        # 注入 Script 级别身份签名（由编程区父进程通过环境变量传入）
+        script_sig = os.environ.get("AIDOCPLUS_SCRIPT_SIGNATURE", "")
+        if script_sig:
+            headers["X-Script-Signature"] = script_sig
 
         req = urllib.request.Request(
             f"{self._base_url}/api/v1/call",

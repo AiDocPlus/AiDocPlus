@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, X, Edit2, MoreHorizontal, Copy, Trash } from 'lucide-react';
+import { Plus, Edit2, MoreHorizontal, Copy, Trash } from 'lucide-react';
 
 import type { Outline } from '../types';
 
@@ -83,7 +83,7 @@ export function OutlineTabs({
   }, [editingId, cancelRename]);
 
   return (
-    <div className="flex items-center gap-1 px-2 py-1 bg-muted/30 border-b overflow-x-auto flex-shrink-0">
+    <div className="flex items-center gap-1 px-2 py-1 bg-muted/30 border-b overflow-x-auto scrollbar-hide flex-shrink-0">
       {outlines.map((outline) => (
         <div
           key={outline.id}

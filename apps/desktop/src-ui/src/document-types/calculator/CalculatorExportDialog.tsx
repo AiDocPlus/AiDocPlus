@@ -136,7 +136,7 @@ export function CalculatorExportDialog({
       case 'md':
         return t('calculator.exportMarkdown', { defaultValue: 'Markdown' });
       default:
-        return fmt.toUpperCase();
+        return (fmt as string).toUpperCase();
     }
   };
 

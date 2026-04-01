@@ -7,7 +7,7 @@ import { useTranslation } from '@/i18n';
 import { Settings2, Maximize2, Minimize2, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Document, PluginTrustLevel, PluginSandboxPermissions } from '@aidocplus/shared-types';
 import { PluginManagerPanel } from './PluginManagerPanel';
-import { PluginHostContext, ThinkingContext, createPluginHostAPI } from './_framework/PluginHostAPI';
+import { PluginHostContext, ThinkingContext, createPluginHostAPI, emitPluginEvent } from './_framework/PluginHostAPI';
 import type { CreatePluginHostAPIOptions } from './_framework/PluginHostAPI';
 import { wrapWithSandbox } from './_framework/PluginSandbox';
 
@@ -87,12 +87,28 @@ function PluginHostProvider({
   const [thinkingContent, setThinkingContent] = useState('');
 
   // 生命周期 Hook：onActivate / onDeactivate
+  // 使用 ref 保存旧插件引用，避免 cleanup 闭包捕获到新插件值导致竞态
+  const prevActivePluginRef = useRef(activePlugin);
   useEffect(() => {
-    // 插件面板挂载时调用 onActivate
-    activePlugin?.onActivate?.();
+    // 先调用旧插件的 onDeactivate（如果存在且是不同插件）
+    if (prevActivePluginRef.current && prevActivePluginRef.current !== activePlugin) {
+      const oldPlugin = prevActivePluginRef.current;
+      emitPluginEvent('plugin:deactivated', { pluginId: oldPlugin.id });
+      oldPlugin.onDeactivate?.();
+    }
+    // 调用新插件的 onActivate
+    if (activePlugin) {
+      emitPluginEvent('plugin:activated', { pluginId: activePlugin.id });
+      activePlugin.onActivate?.();
+    }
+    // 更新 ref 为当前插件
+    prevActivePluginRef.current = activePlugin;
+    // 组件卸载时调用当前插件的 onDeactivate
     return () => {
-      // 插件面板卸载时调用 onDeactivate
-      activePlugin?.onDeactivate?.();
+      if (prevActivePluginRef.current) {
+        emitPluginEvent('plugin:deactivated', { pluginId: prevActivePluginRef.current.id });
+      }
+      prevActivePluginRef.current?.onDeactivate?.();
     };
   }, [activePlugin]);
 

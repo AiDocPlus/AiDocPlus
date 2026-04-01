@@ -13,8 +13,17 @@ import 'katex/dist/katex.min.css';
 
 // 大文档预览截断阈值（字符数），超过此值只渲染前半部分
 const PREVIEW_TRUNCATE_THRESHOLD = 80_000;
-// Mermaid SVG 缓存：避免每次 content 变化时重新渲染未变更的图表
+// Mermaid SVG 缓存：避免每次 content 变化时重新渲染未变更的图表（LRU 上限 50）
+const MERMAID_CACHE_MAX = 50;
 const mermaidCache = new Map<string, string>();
+
+function mermaidCacheSet(key: string, value: string) {
+  if (mermaidCache.size >= MERMAID_CACHE_MAX) {
+    const firstKey = mermaidCache.keys().next().value;
+    if (firstKey !== undefined) mermaidCache.delete(firstKey);
+  }
+  mermaidCache.set(key, value);
+}
 
 // 简单哈希函数，用于 Mermaid 缓存键
 function simpleHash(str: string): string {
@@ -125,7 +134,7 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = React.memo(({
     mermaid.initialize({
       startOnLoad: false,
       theme: theme === 'dark' ? 'dark' : 'default',
-      securityLevel: 'loose',
+      securityLevel: 'strict',
       suppressErrorRendering: true,
     });
   }, [theme]);
@@ -154,7 +163,7 @@ export const MarkdownPreview: React.FC<MarkdownPreviewProps> = React.memo(({
       const id = `mermaid-${Math.random().toString(36).slice(2, 9)}`;
       try {
         const { svg } = await mermaid.render(id, code);
-        mermaidCache.set(cacheKey, svg);
+        mermaidCacheSet(cacheKey, svg);
         const wrapper = document.createElement('div');
         wrapper.className = 'mermaid-diagram';
         wrapper.innerHTML = svg;

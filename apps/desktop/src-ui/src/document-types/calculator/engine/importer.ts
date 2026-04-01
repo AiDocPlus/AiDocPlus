@@ -8,10 +8,10 @@ import {
   createLineFromExpression,
   DEFAULT_CALCULATOR_SETTINGS,
   generateLineId,
+  isNoteLine,
   normalizeCalculatorLine,
   type CalculatorDocumentContent,
   type CalculatorLineRole,
-  type CalculatorSheet,
 } from '../types';
 
 const SUBTOTAL_IMPORT_RE = /^(小计|分计|subtotal|SUBTOTAL)$/i;
@@ -74,6 +74,7 @@ async function importCsvFile(file: File): Promise<ImportResult> {
       result: { type: 'number' as const, value: 0, displayValue: '' },
       definedVariables: [],
       dependencies: [],
+      lineRole: 'normal' as const,
       isNote: isNoteLine(expression),
     };
   });

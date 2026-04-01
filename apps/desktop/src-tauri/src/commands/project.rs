@@ -2,6 +2,7 @@ use crate::config::AppState;
 use crate::error::{AppError, Result};
 use crate::project::{Project, ProjectSettings};
 use crate::security;
+use dirs;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{Read, Write};
@@ -200,6 +201,23 @@ pub fn export_project_zip(
     outputPath: String,
 ) -> Result<String> {
     security::validate_id(&projectId, "projectId")?;
+
+    // 安全校验：输出路径必须在用户主目录或临时目录下
+    let out_path = Path::new(&outputPath);
+    let home = dirs::home_dir().unwrap_or_default();
+    let home_canonical = home.canonicalize().unwrap_or(home);
+    let temp_canonical = std::env::temp_dir().canonicalize().unwrap_or(std::env::temp_dir());
+    let out_resolved = if out_path.parent().map_or(false, |p| p.exists()) {
+        out_path.parent().unwrap().canonicalize().unwrap_or_else(|_| out_path.to_path_buf())
+    } else {
+        out_path.to_path_buf()
+    };
+    if !out_resolved.starts_with(&home_canonical) && !out_resolved.starts_with(&temp_canonical) {
+        return Err(AppError::SecurityError(
+            "安全限制：只能导出到用户主目录或临时目录下".to_string(),
+        ));
+    }
+
     let project_meta_path = state.get_project_path(&projectId);
     let project_dir = state.config().projects_dir.join(&projectId);
 

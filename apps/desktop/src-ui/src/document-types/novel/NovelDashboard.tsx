@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useTranslation } from '@/i18n';
 import { cn } from '@/lib/utils';
 import type { NovelDocumentContent } from './types';
-import { getTotalWordCount, getChapterWordCount, getTodayWordCount } from './types';
+import { getTotalWordCount, getChapterWordCount, getTodayWordCount, getEffectiveContent } from './types';
 import { DIALOG_STYLE } from './constants';
 
 interface NovelDashboardProps {
@@ -70,7 +70,7 @@ export default function NovelDashboard({ open, onOpenChange, novel }: NovelDashb
 
   // 人物出场频率
   const characterAppearances = useMemo(() => {
-    const allContent = novel.volumes.flatMap(v => v.chapters.map(ch => ch.content)).join('\n');
+    const allContent = novel.volumes.flatMap(v => v.chapters.map(ch => getEffectiveContent(ch))).join('\n');
     return novel.settings.characters.map(c => {
       const names = [c.name, ...(c.aliases || [])];
       let count = 0;

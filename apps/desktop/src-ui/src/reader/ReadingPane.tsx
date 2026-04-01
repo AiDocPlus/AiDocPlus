@@ -1,91 +1,185 @@
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useCallback, useMemo, useState, useImperativeHandle, forwardRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { useReaderStore, type EbookContent } from './useReaderStore';
+import { useReaderStore, type EbookContent, type ReaderTab, type TocEntry } from './useReaderStore';
 import { EpubReader } from './renderers/EpubReader';
 import { PdfReader } from './renderers/PdfReader';
 import { MarkdownReader } from './renderers/MarkdownReader';
 import { HtmlReader } from './renderers/HtmlReader';
 import { WordReader } from './renderers/WordReader';
+import { ReadingSearch, domTextSearch, type SearchOptions } from './ReadingSearch';
+import { extractHeadings } from './ReadingSidebar';
+import { SelectionContextMenu } from './components/reading/SelectionContextMenu';
 import { Loader2, AlertCircle, BookOpen, FileText } from 'lucide-react';
 import { useTranslation } from '@/i18n';
 
-interface ReadingPaneProps {
-  onProgressChange?: (percent: number) => void;
+export interface ReadingPaneHandle {
+  getScrollContainer: () => HTMLDivElement | null;
 }
 
-export function ReadingPane({ onProgressChange }: ReadingPaneProps) {
+interface ReadingPaneProps {
+  tab: ReaderTab;
+  onProgressChange?: (percent: number) => void;
+  onWordCountChange?: (count: number) => void;
+  onTocChange?: (entries: TocEntry[]) => void;
+}
+
+export const ReadingPane = forwardRef<ReadingPaneHandle, ReadingPaneProps>(
+  function ReadingPane({ tab, onProgressChange, onWordCountChange, onTocChange }, ref) {
   const { t } = useTranslation();
-  const { currentBook, fontSize, fontFamily, lineHeight, paragraphSpacing, contentWidth, theme, closeBook, saveProgress, getProgress } = useReaderStore();
-  const [content, setContent] = useState<EbookContent | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    theme,
+    setTabContent, setTabLoading, setTabError, setTabProgress,
+    saveProgress, getProgress, closeTab, getEffectiveSettings,
+  } = useReaderStore();
+
+  const book = tab.book;
+  const content = tab.content;
+  const loading = tab.loading;
+  const error = tab.error;
+
+  // 使用 getEffectiveSettings 合并全局+单书设置
+  const settings = getEffectiveSettings(book.filename);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const progressRestoredRef = useRef(false);
-  const currentFilenameRef = useRef<string | undefined>(undefined);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchMatch, setSearchMatch] = useState({ count: 0, current: 0 });
+  const searchOptionsRef = useRef<SearchOptions>({ caseSensitive: false, wholeWord: false });
+  const lastSearchQueryRef = useRef('');
+  const searchDirectionRef = useRef<'next' | 'prev'>('next');
 
-  // 稳定二进制数据引用，避免每次渲染创建新 Uint8Array 导致 PDF/EPUB 重新加载
+  // 文本选择右键菜单
+  const [selectionMenu, setSelectionMenu] = useState<{ x: number; y: number; text: string } | null>(null);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    const selection = window.getSelection();
+    const text = selection?.toString().trim();
+    if (text && text.length > 0) {
+      e.preventDefault();
+      setSelectionMenu({ x: e.clientX, y: e.clientY, text });
+    } else {
+      setSelectionMenu(null);
+    }
+  }, []);
+
+  /** 获取上次阅读进度，用于恢复 EPUB/PDF 位置 */
+  const savedReadingProgress = getProgress(book.filename);
+
   const binaryData = useMemo(() => {
     if (!content?.is_binary) return null;
     return Uint8Array.from(atob(content.data), (c) => c.charCodeAt(0));
   }, [content?.is_binary, content?.data]);
 
-  // 加载电子书内容
-  useEffect(() => {
-    if (!currentBook) {
-      setContent(null);
-      progressRestoredRef.current = false;
-      currentFilenameRef.current = undefined;
-      return;
+  const isScrollableFormat = book?.format === 'md' || book?.format === 'html';
+
+  const performSearch = useCallback((query: string, options: SearchOptions) => {
+    searchOptionsRef.current = options;
+    lastSearchQueryRef.current = query;
+    searchDirectionRef.current = 'next';
+    if (book?.format === 'md' || book?.format === 'html') {
+      const result = domTextSearch(scrollContainerRef.current, query, options);
+      setSearchMatch({ count: result.count, current: result.currentIndex });
     }
+  }, [book?.format]);
+
+  const handleSearchNext = useCallback(() => {
+    searchDirectionRef.current = 'next';
+    if (book?.format === 'md' || book?.format === 'html') {
+      const result = domTextSearch(scrollContainerRef.current, lastSearchQueryRef.current, searchOptionsRef.current, 'next');
+      setSearchMatch({ count: result.count, current: result.currentIndex });
+    }
+  }, [book?.format]);
+
+  const handleSearchPrev = useCallback(() => {
+    searchDirectionRef.current = 'prev';
+    if (book?.format === 'md' || book?.format === 'html') {
+      const result = domTextSearch(scrollContainerRef.current, lastSearchQueryRef.current, searchOptionsRef.current, 'prev');
+      setSearchMatch({ count: result.count, current: result.currentIndex });
+    }
+  }, [book?.format]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  useEffect(() => {
+    if (!book) return;
+    if (content) return;
 
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    setTabLoading(tab.id, true);
     progressRestoredRef.current = false;
-    currentFilenameRef.current = currentBook.filename;
 
-    invoke<EbookContent>('read_ebook_file', { filename: currentBook.filename })
+    invoke<EbookContent>('read_ebook_file', { filename: book.filename })
       .then((data) => {
         if (!cancelled) {
-          setContent(data);
-          setLoading(false);
+          setTabContent(tab.id, data);
+          if (isScrollableFormat) {
+            const words = data.data.split(/\s+/).filter(Boolean).length;
+            onWordCountChange?.(words);
+          }
         }
       })
       .catch((e) => {
         if (!cancelled) {
-          setError(String(e));
-          setLoading(false);
+          setTabError(tab.id, String(e));
         }
       });
 
     return () => { cancelled = true; };
-  }, [currentBook?.filename]);
+  }, [book?.filename, tab.id, content]);
 
-  // Markdown / HTML 滚动进度追踪
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;
-    if (!el) return;
-    const filename = currentFilenameRef.current;
-    if (!filename) return;
+    if (!el || !book) return;
     const scrollable = el.scrollHeight - el.clientHeight;
     if (scrollable <= 0) return;
     const percent = Math.round((el.scrollTop / scrollable) * 100);
     onProgressChange?.(percent);
-    saveProgress(filename, {
+    setTabProgress(tab.id, {
+      scrollPosition: el.scrollTop,
+      percent,
+    });
+    saveProgress(book.filename, {
       scrollPosition: el.scrollTop,
       progressPercent: percent,
     });
-  }, [saveProgress, onProgressChange]);
+  }, [tab.id, book, saveProgress, setTabProgress, onProgressChange]);
 
-  // 恢复 Markdown / HTML 滚动位置
+  // 用 ref 存储最新 handleScroll，避免 effect 因依赖变化频繁重新注册
+  const handleScrollRef = useRef(handleScroll);
+  handleScrollRef.current = handleScroll;
+
+  // 节流滚动事件（每 200ms 最多触发一次）
   useEffect(() => {
-    if (!currentBook || !scrollContainerRef.current || progressRestoredRef.current) return;
-    if (!content) return;
-    if (currentBook.format !== 'md' && currentBook.format !== 'html') return;
+    if (!isScrollableFormat) return;
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const throttled = () => {
+      if (timer) return;
+      timer = setTimeout(() => { timer = null; handleScrollRef.current(); }, 200);
+    };
+    el.addEventListener('scroll', throttled, { passive: true });
+    return () => {
+      el.removeEventListener('scroll', throttled);
+      if (timer) clearTimeout(timer);
+    };
+  }, [isScrollableFormat]);
 
-    const saved = getProgress(currentBook.filename);
+  useEffect(() => {
+    if (!book || !scrollContainerRef.current || progressRestoredRef.current) return;
+    if (!content) return;
+    if (!isScrollableFormat) return;
+
+    const saved = getProgress(book.filename);
     if (saved?.scrollPosition && saved.scrollPosition > 0) {
-      // 延迟恢复，等待内容渲染完成
       const timer = setTimeout(() => {
         if (scrollContainerRef.current) {
           scrollContainerRef.current.scrollTop = saved.scrollPosition!;
@@ -95,9 +189,45 @@ export function ReadingPane({ onProgressChange }: ReadingPaneProps) {
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [content, currentBook, getProgress, onProgressChange]);
+  }, [content, book, getProgress, onProgressChange]);
 
-  if (!currentBook) {
+  // Listen for jump-to-progress requests from store
+  useEffect(() => {
+    if (!isScrollableFormat) return;
+    const handler = (targetTabId: string, percent: number) => {
+      if (targetTabId !== tab.id || !scrollContainerRef.current) return;
+      const scrollable = scrollContainerRef.current.scrollHeight - scrollContainerRef.current.clientHeight;
+      if (scrollable <= 0) return;
+      scrollContainerRef.current.scrollTop = (percent / 100) * scrollable;
+    };
+    setTabProgress(tab.id, { percent: 0 });
+    useReaderStore.getState().setJumpToProgressHandler(handler as any);
+    return () => {
+      useReaderStore.getState().setJumpToProgressHandler(null as any);
+    };
+  }, [tab.id, book?.format]);
+
+  useImperativeHandle(ref, () => ({
+    getScrollContainer: () => scrollContainerRef.current,
+  }), []);
+
+  useEffect(() => {
+    if (!isScrollableFormat) {
+      onTocChange?.([]);
+      return;
+    }
+    if (!content) {
+      onTocChange?.([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      const entries = extractHeadings(scrollContainerRef.current);
+      onTocChange?.(entries);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [content, book?.format, onTocChange]);
+
+  if (!book) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground select-none">
         <div className="relative mb-6">
@@ -129,8 +259,8 @@ export function ReadingPane({ onProgressChange }: ReadingPaneProps) {
       <div className="flex flex-col items-center justify-center h-full gap-3">
         <AlertCircle className="h-10 w-10 text-destructive" />
         <p className="text-destructive text-sm">{error}</p>
-        <button onClick={closeBook} className="text-sm text-muted-foreground hover:text-foreground">
-          {t('reader.open', { defaultValue: '关闭' })}
+        <button onClick={() => closeTab(tab.id)} className="text-sm text-muted-foreground hover:text-foreground">
+          {t('reader.close', { defaultValue: '关闭' })}
         </button>
       </div>
     );
@@ -138,46 +268,99 @@ export function ReadingPane({ onProgressChange }: ReadingPaneProps) {
 
   if (!content) return null;
 
-  const format = currentBook.format;
+  const format = book.format;
+
+  const searchBar = searchOpen ? (
+    <ReadingSearch
+      onSearch={performSearch}
+      onHighlightNext={handleSearchNext}
+      onHighlightPrev={handleSearchPrev}
+      onClose={() => {
+        setSearchOpen(false);
+        window.getSelection()?.removeAllRanges();
+        setSearchMatch({ count: 0, current: 0 });
+      }}
+      matchCount={searchMatch.count}
+      currentMatch={searchMatch.current}
+    />
+  ) : null;
 
   switch (format) {
     case 'epub':
       return binaryData ? (
-        <EpubReader
-          data={binaryData}
-          fontSize={fontSize}
-          theme={theme.mode}
-          onProgressChange={(percent, epubCfi) => {
-            onProgressChange?.(percent);
-            saveProgress(currentBook.filename, { epubCfi, progressPercent: percent });
-          }}
-        />
+        <div className="h-full flex flex-col">
+          {searchBar}
+          <div className="flex-1 min-h-0">
+            <EpubReader
+              data={binaryData}
+              fontSize={settings.fontSize}
+              fontFamily={settings.fontFamily}
+              lineHeight={settings.lineHeight}
+              theme={theme}
+              initialCfi={savedReadingProgress?.epubCfi}
+              onProgressChange={(percent, epubCfi) => {
+                onProgressChange?.(percent);
+                setTabProgress(tab.id, { percent, epubCfi });
+                saveProgress(book.filename, { epubCfi, progressPercent: percent });
+              }}
+            />
+          </div>
+        </div>
       ) : null;
     case 'pdf':
       return binaryData ? (
-        <PdfReader
-          data={binaryData}
-          onPageChange={(page, total) => {
-            const percent = total > 0 ? Math.round((page / total) * 100) : 0;
-            onProgressChange?.(percent);
-            saveProgress(currentBook.filename, { currentPage: page, progressPercent: percent });
-          }}
-        />
+        <div className="h-full flex flex-col">
+          {searchBar}
+          <div className="flex-1 min-h-0">
+            <PdfReader
+              data={binaryData}
+              initialPage={savedReadingProgress?.currentPage}
+              onPageChange={(page, total) => {
+                const percent = total > 0 ? Math.round((page / total) * 100) : 0;
+                onProgressChange?.(percent);
+                setTabProgress(tab.id, { percent, pdfPage: page, pdfTotalPages: total });
+                saveProgress(book.filename, { currentPage: page, progressPercent: percent });
+              }}
+            />
+          </div>
+        </div>
       ) : null;
     case 'docx':
-      return binaryData ? <WordReader data={binaryData} /> : null;
+      return binaryData ? (
+        <div className="h-full flex flex-col">
+          {searchBar}
+          <div className="flex-1 min-h-0">
+            <WordReader data={binaryData} theme={theme} onProgressChange={(percent) => {
+              onProgressChange?.(percent);
+              setTabProgress(tab.id, { percent });
+              saveProgress(book.filename, { progressPercent: percent });
+            }} />
+          </div>
+        </div>
+      ) : null;
     case 'html':
+    case 'md': {
+      const readerProps = { content: content.data, fontSize: settings.fontSize, fontFamily: settings.fontFamily, lineHeight: settings.lineHeight, paragraphSpacing: settings.paragraphSpacing, contentWidth: settings.contentWidth, theme };
+      const ReaderComponent = format === 'html' ? HtmlReader : MarkdownReader;
       return (
-        <div ref={scrollContainerRef} className="h-full overflow-auto" onScroll={handleScroll}>
-          <HtmlReader content={content.data} fontSize={fontSize} fontFamily={fontFamily} lineHeight={lineHeight} paragraphSpacing={paragraphSpacing} contentWidth={contentWidth} theme={theme} />
+        <div className="h-full flex flex-col">
+          {searchBar}
+          <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-auto" onContextMenu={handleContextMenu}>
+            <ReaderComponent {...readerProps} />
+          </div>
+          {selectionMenu && (
+            <SelectionContextMenu
+              x={selectionMenu.x} y={selectionMenu.y}
+              selectedText={selectionMenu.text}
+              filename={book.filename}
+              scrollPosition={scrollContainerRef.current?.scrollTop}
+              progressPercent={tab.progressPercent}
+              onClose={() => setSelectionMenu(null)}
+            />
+          )}
         </div>
       );
-    case 'md':
-      return (
-        <div ref={scrollContainerRef} className="h-full overflow-auto" onScroll={handleScroll}>
-          <MarkdownReader content={content.data} fontSize={fontSize} fontFamily={fontFamily} lineHeight={lineHeight} paragraphSpacing={paragraphSpacing} contentWidth={contentWidth} theme={theme} />
-        </div>
-      );
+    }
     default:
       return (
         <div className="flex items-center justify-center h-full text-destructive">
@@ -185,4 +368,4 @@ export function ReadingPane({ onProgressChange }: ReadingPaneProps) {
         </div>
       );
   }
-}
+});

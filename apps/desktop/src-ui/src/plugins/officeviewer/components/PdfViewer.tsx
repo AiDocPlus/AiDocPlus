@@ -206,7 +206,7 @@ export function PdfViewer({ filePath, fileName, onError }: PdfViewerProps) {
 
       printWindow.document.write(`
         <html>
-          <head><title>打印 PDF - ${fileName}</title></head>
+          <head><title>打印 PDF - ${fileName.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))}</title></head>
           <body style="margin:0; padding:0;">
             <div id="print-container"></div>
           </body>

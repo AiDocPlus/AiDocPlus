@@ -167,7 +167,7 @@ export function RichTextEditor({ value, onChange, placeholder, editable = true, 
     editorProps: {
       attributes: {
         class: 'rich-text-editor prose prose-sm dark:prose-invert max-w-none focus:outline-none px-3 py-2 h-full',
-        style: 'font-family: 宋体, SimSun, serif; font-size: 16px;',
+        style: 'font-family: "Songti SC", "SimSun", "STSong", serif; font-size: 16px;',
       },
     },
   });
@@ -308,7 +308,7 @@ export function RichTextEditor({ value, onChange, placeholder, editable = true, 
         )}
         {mode === 'preview' && (
           <div className="rich-text-editor prose prose-sm dark:prose-invert max-w-none px-3 py-2"
-            style={{ fontFamily: '宋体, SimSun, serif', fontSize: '16px' }}
+            style={{ fontFamily: '"Songti SC", "SimSun", "STSong", serif', fontSize: '16px' }}
             dangerouslySetInnerHTML={{ __html: value || '' }} />
         )}
       </div>
