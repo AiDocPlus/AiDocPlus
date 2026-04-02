@@ -24,6 +24,8 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(300);
 /// AI 流式请求总超时（10 分钟，流式传输持续时间更长）
 const STREAM_TIMEOUT: Duration = Duration::from_secs(600);
+/// SSE 读取取消轮询间隔：避免 `stream.next().await` 长时间阻塞时无法及时响应 stop
+const SSE_CANCEL_POLL_INTERVAL: Duration = Duration::from_millis(250);
 
 /// 将 reqwest 错误转换为用户友好的提示信息
 fn friendly_reqwest_error(e: &reqwest::Error) -> String {
@@ -130,6 +132,7 @@ pub async fn chat(
     temperature: Option<f64>,
     max_tokens: Option<u32>,
     enable_web_search: Option<bool>,
+    enable_thinking: Option<bool>,
     service_id: Option<String>,
     proxy_url: Option<String>,
     connect_timeout_secs: Option<u64>,
@@ -169,6 +172,10 @@ pub async fn chat(
         inject_web_search_params(&mut request_body, &config);
     }
 
+    // 深度思考：根据 provider 注入思考模式参数
+    let thinking = enable_thinking.unwrap_or(false);
+    inject_thinking_params(&mut request_body, &config, thinking);
+
     let url = format!("{}/chat/completions", config.get_base_url());
 
     let request_builder = config.apply_auth(client.post(&url).json(&request_body));
@@ -191,26 +198,37 @@ pub async fn chat(
         )));
     }
 
-    let openai_response: OpenAIResponse = response
+    // 使用 serde_json::Value 解析，以便提取 reasoning_content（深度思考内容）
+    let resp_body: serde_json::Value = response
         .json()
         .await
         .map_err(|e| AppError::AiError(format!("Failed to parse response: {}", e)))?;
 
-    match openai_response {
-        OpenAIResponse::Chat(resp) => {
-            let content = resp
-                .choices
-                .first()
-                .and_then(|c| c.message.as_ref())
-                .map(|m| m.content.clone())
-                .unwrap_or_default();
+    let choice = resp_body
+        .get("choices")
+        .and_then(|c| c.get(0));
 
-            Ok(content)
+    let message = choice.and_then(|c| c.get("message"));
+
+    // 提取正文内容
+    let content = message
+        .and_then(|m| m.get("content").and_then(|v| v.as_str()).map(String::from))
+        .unwrap_or_default();
+
+    // 提取 reasoning_content（深度思考），仅在 enable_thinking=true 时保留
+    if thinking {
+        let reasoning = message
+            .and_then(|m| m.get("reasoning_content"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        if !reasoning.is_empty() {
+            // 与流式路径 stream_sse_chat_completions 保持一致，用 <think/> 标签包裹
+            let wrapped = format!("<think>{}</think>\n\n{}", reasoning, content);
+            return Ok(wrapped);
         }
-        OpenAIResponse::Stream(_) => Err(AppError::AiError(
-            "Unexpected stream response in non-stream mode".to_string(),
-        )),
     }
+
+    Ok(content)
 }
 
 #[tauri::command]
@@ -272,12 +290,12 @@ pub async fn chat_stream(
     // 工具调用结束后再进行带 web_search 的流式输出
     // OpenAI + 纯联网搜索（无工具）→ Responses API
     if config.provider == "openai" && web_search && !use_tools {
-        return stream_openai_responses(&config, &messages, &req_id, &window, max_tokens, proxy_url.as_deref(), connect_timeout_secs, request_timeout_secs).await;
+        return stream_openai_responses(&config, &messages, &req_id, &window, max_tokens, proxy_url.as_deref(), connect_timeout_secs, request_timeout_secs, enable_thinking.unwrap_or(false)).await;
     }
 
     // Anthropic + 纯联网搜索（无工具）→ Anthropic Messages API（原生格式）
     if config.provider == "anthropic" && web_search && !use_tools {
-        return stream_anthropic_with_search(&config, &messages, &req_id, &window, max_tokens, proxy_url.as_deref(), connect_timeout_secs, request_timeout_secs).await;
+        return stream_anthropic_with_search(&config, &messages, &req_id, &window, max_tokens, proxy_url.as_deref(), connect_timeout_secs, request_timeout_secs, enable_thinking.unwrap_or(false)).await;
     }
 
     let client = ai_stream_client_with_opts(proxy_url.as_deref(), connect_timeout_secs, request_timeout_secs);
@@ -337,7 +355,7 @@ pub async fn chat_stream(
             }
 
             // 从 SSE 流中累积 tool_calls（流式 Function Calling）
-            let stream_result = collect_stream_tool_calls(resp, &req_id, &window).await;
+            let stream_result = collect_stream_tool_calls(resp, &req_id, &window, enable_thinking.unwrap_or(false)).await;
             let (accumulated_tool_calls, assistant_tool_msg, got_tool_calls, early_assistant_text) =
                 match stream_result {
                     Ok(r) => r,
@@ -440,7 +458,7 @@ pub async fn chat_stream(
         )));
     }
 
-    let mut full = stream_sse_chat_completions(response, &req_id, &window).await?;
+    let mut full = stream_sse_chat_completions(response, &req_id, &window, thinking).await?;
     if !has_visible_content(&full) {
         let hint = "\n\n> ⚠️ 模型未返回正文（可能因上下文过长或输出限制）。可尝试在设置中提高「最大输出 token」或减少单次工具数据后重试。\n\n";
         let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": hint }));
@@ -458,6 +476,7 @@ pub async fn generate_content(
     api_key: Option<String>,
     model: Option<String>,
     base_url: Option<String>,
+    enable_thinking: Option<bool>,
     service_id: Option<String>,
     proxy_url: Option<String>,
     connect_timeout_secs: Option<u64>,
@@ -480,7 +499,7 @@ pub async fn generate_content(
         },
     ];
 
-    let response = chat(app, messages, provider, api_key, model, base_url, None, None, None, service_id, proxy_url, connect_timeout_secs, request_timeout_secs).await?;
+    let response = chat(app, messages, provider, api_key, model, base_url, None, None, None, enable_thinking, service_id, proxy_url, connect_timeout_secs, request_timeout_secs).await?;
 
     Ok(response)
 }
@@ -755,11 +774,21 @@ where
     use futures_util::StreamExt;
     let mut stream = response.bytes_stream();
     let mut buffer = Vec::new();
+    let mut done_received = false;
 
-    while let Some(chunk_result) = stream.next().await {
+    loop {
         if is_stream_cancelled(req_id) {
             break;
         }
+
+        let next_chunk = match tokio::time::timeout(SSE_CANCEL_POLL_INTERVAL, stream.next()).await {
+            Ok(next_chunk) => next_chunk,
+            Err(_) => continue,
+        };
+
+        let Some(chunk_result) = next_chunk else {
+            break;
+        };
 
         let chunk = chunk_result
             .map_err(|e| AppError::AiError(friendly_reqwest_error(&e)))?;
@@ -783,7 +812,8 @@ where
             if let Some(data) = data {
                 if data == "[DONE]" {
                     on_event(SseEvent::Done);
-                    continue;
+                    done_received = true;
+                    break;
                 }
 
                 if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(data) {
@@ -791,8 +821,45 @@ where
                         break;
                     }
                     on_event(SseEvent::Data(&json_val));
+
+                    // 兜底结束条件：部分服务不会发送 [DONE]，但会在最终 chunk 携带 finish_reason
+                    let finish_reason = json_val
+                        .get("choices")
+                        .and_then(|c| c.get(0))
+                        .and_then(|c| c.get("finish_reason"))
+                        .and_then(|f| f.as_str())
+                        .map(|s| !s.is_empty())
+                        .unwrap_or(false);
+                    // OpenAI Responses API 兜底：response.completed 代表流已完成
+                    let response_completed = json_val
+                        .get("type")
+                        .and_then(|t| t.as_str())
+                        .map(|t| t == "response.completed")
+                        .unwrap_or(false);
+                    // Anthropic 兜底：message_stop / stop_reason 代表消息已结束
+                    let anthropic_message_stop = json_val
+                        .get("type")
+                        .and_then(|t| t.as_str())
+                        .map(|t| t == "message_stop")
+                        .unwrap_or(false);
+                    let anthropic_stop_reason = json_val
+                        .get("delta")
+                        .and_then(|d| d.get("stop_reason"))
+                        .and_then(|s| s.as_str())
+                        .map(|s| !s.is_empty())
+                        .unwrap_or(false);
+
+                    if finish_reason || response_completed || anthropic_message_stop || anthropic_stop_reason {
+                        on_event(SseEvent::Done);
+                        done_received = true;
+                        break;
+                    }
                 }
             }
+        }
+
+        if done_received {
+            break;
         }
     }
 
@@ -805,22 +872,25 @@ async fn collect_stream_tool_calls(
     response: reqwest::Response,
     req_id: &str,
     window: &tauri::Window,
+    allow_reasoning: bool,
 ) -> Result<(Vec<tools::ToolCall>, serde_json::Value, bool, Option<String>)> {
     // 累积 tool_calls 的各字段（流式下是分块到来的）
         // 使用 Mutex/AtomicBool 替代 RefCell/Cell，确保 Send 安全
     let tool_calls_map: std::sync::Mutex<std::collections::BTreeMap<usize, serde_json::Value>> = std::sync::Mutex::new(std::collections::BTreeMap::new());
     let finish_reason: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
     let assistant_api_text: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+    let suppressed_reasoning: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
     let in_reasoning: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
     let req_id_owned = req_id.to_string();
 
-    let think_tag = "\u{1f4ad}"; // 💭
+    let think_open = "<think>";
+    let think_close = "</think>";
 
     let flush_reasoning_close = || {
         if in_reasoning.load(std::sync::atomic::Ordering::Relaxed) {
-            let _ = window.emit("ai:stream:chunk", json!({ "request_id": &req_id_owned, "content": think_tag }));
-            assistant_api_text.lock().unwrap().push_str(think_tag);
+            let _ = window.emit("ai:stream:chunk", json!({ "request_id": &req_id_owned, "content": think_close }));
+            assistant_api_text.lock().unwrap().push_str(think_close);
             in_reasoning.store(false, std::sync::atomic::Ordering::Relaxed);
         }
     };
@@ -841,13 +911,17 @@ async fn collect_stream_tool_calls(
                     // reasoning_content（DeepSeek/Qwen3/GLM-5 等）
                     if let Some(reasoning) = delta.get("reasoning_content").and_then(|r| r.as_str()) {
                         if !reasoning.is_empty() {
-                            if !in_reasoning.load(std::sync::atomic::Ordering::Relaxed) {
-                                let _ = window.emit("ai:stream:chunk", json!({ "request_id": &req_id_owned, "content": think_tag }));
-                                assistant_api_text.lock().unwrap().push_str(think_tag);
-                                in_reasoning.store(true, std::sync::atomic::Ordering::Relaxed);
+                            if allow_reasoning {
+                                if !in_reasoning.load(std::sync::atomic::Ordering::Relaxed) {
+                                    let _ = window.emit("ai:stream:chunk", json!({ "request_id": &req_id_owned, "content": think_open }));
+                                    assistant_api_text.lock().unwrap().push_str(think_open);
+                                    in_reasoning.store(true, std::sync::atomic::Ordering::Relaxed);
+                                }
+                                assistant_api_text.lock().unwrap().push_str(reasoning);
+                                let _ = window.emit("ai:stream:chunk", json!({ "request_id": &req_id_owned, "content": reasoning }));
+                            } else {
+                                suppressed_reasoning.lock().unwrap().push_str(reasoning);
                             }
-                            assistant_api_text.lock().unwrap().push_str(reasoning);
-                            let _ = window.emit("ai:stream:chunk", json!({ "request_id": &req_id_owned, "content": reasoning }));
                         }
                     }
 
@@ -899,9 +973,13 @@ async fn collect_stream_tool_calls(
     flush_reasoning_close();
 
     let got_tool_calls = finish_reason.lock().unwrap().as_str() == "tool_calls" || !tool_calls_map.lock().unwrap().is_empty();
-    let api_text = assistant_api_text.into_inner().unwrap();
+    let mut api_text = assistant_api_text.into_inner().unwrap();
+    let suppressed_reasoning = suppressed_reasoning.into_inner().unwrap();
 
     if !got_tool_calls {
+        if api_text.trim().is_empty() && !suppressed_reasoning.trim().is_empty() {
+            api_text = suppressed_reasoning;
+        }
         let early = if api_text.trim().is_empty() {
             None
         } else {
@@ -951,9 +1029,11 @@ async fn stream_sse_chat_completions(
     response: reqwest::Response,
     req_id: &str,
     window: &tauri::Window,
+    allow_reasoning: bool,
 ) -> Result<String> {
     let mut full_content = String::new();
     let mut in_reasoning = false;
+    let mut suppressed_reasoning = String::new();
     // 过滤 minimax:tool_call 块（MiniMax 联网搜索内部格式）
     let mut pending_buf: Option<String> = None;
     let mut in_tool_call_block = false;
@@ -988,13 +1068,17 @@ async fn stream_sse_chat_completions(
                     // 处理 reasoning_content（Qwen/DeepSeek/xAI 思考内容）
                     if let Some(reasoning) = delta.get("reasoning_content").and_then(|r| r.as_str()) {
                         if !reasoning.is_empty() {
-                            if !in_reasoning {
-                                let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": "<think>" }));
-                                full_content.push_str("<think>");
-                                in_reasoning = true;
+                            if allow_reasoning {
+                                if !in_reasoning {
+                                    let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": "<think>" }));
+                                    full_content.push_str("<think>");
+                                    in_reasoning = true;
+                                }
+                                full_content.push_str(reasoning);
+                                let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": reasoning }));
+                            } else {
+                                suppressed_reasoning.push_str(reasoning);
                             }
-                            full_content.push_str(reasoning);
-                            let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": reasoning }));
                         }
                     }
 
@@ -1037,16 +1121,23 @@ async fn stream_sse_chat_completions(
                                         in_tool_call_block = true;
                                     } else {
                                         // 没有 tool_call 块，但需保留尾部可能是开始标签前缀的内容
-                                        // 安全阈值：如果 pending_buf 超过开始标签长度，可以安全输出前面部分
+                                        // 安全阈值：如果 pending_buf 字节长度超过开始标签字节长度，可以安全输出前面部分
+                                        // 注意：必须按字符边界切割，避免中文等多字节字符被截断导致 panic
                                         const TAG: &str = "<minimax:tool_call>";
                                         if buf.len() > TAG.len() {
-                                            let safe_len = buf.len() - TAG.len();
-                                            let safe = buf[..safe_len].to_string();
-                                            if !safe.is_empty() {
+                                            let target_byte = buf.len() - TAG.len();
+                                            // 找到不超过 target_byte 的最后一个字符边界
+                                            let safe_len = buf.char_indices()
+                                                .map(|(i, _)| i)
+                                                .take_while(|&i| i <= target_byte)
+                                                .last()
+                                                .unwrap_or(0);
+                                            if safe_len > 0 {
+                                                let safe = buf[..safe_len].to_string();
                                                 full_content.push_str(&safe);
                                                 let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": &safe }));
+                                                *buf = buf[safe_len..].to_string();
                                             }
-                                            *buf = buf[safe_len..].to_string();
                                         }
                                         break;
                                     }
@@ -1061,7 +1152,7 @@ async fn stream_sse_chat_completions(
 
     // 安全关闭：如果流结束时仍在 reasoning 状态（SSE 流异常断开未触发 Done handler）
     if in_reasoning {
-        let reasoning_end = "\n\n";
+        let reasoning_end = "</think>";
         let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": reasoning_end }));
         full_content.push_str(reasoning_end);
     }
@@ -1078,6 +1169,11 @@ async fn stream_sse_chat_completions(
         }
     }
 
+    if !has_visible_content(&full_content) && !suppressed_reasoning.trim().is_empty() {
+        full_content.push_str(&suppressed_reasoning);
+        let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": &suppressed_reasoning }));
+    }
+
     Ok(full_content)
 }
 
@@ -1091,6 +1187,7 @@ async fn stream_openai_responses(
     proxy_url: Option<&str>,
     connect_timeout_secs: Option<u64>,
     request_timeout_secs: Option<u64>,
+    allow_reasoning: bool,
 ) -> Result<String> {
     let client = ai_stream_client_with_opts(proxy_url, connect_timeout_secs, request_timeout_secs);
     let base_url = config.get_base_url();
@@ -1132,61 +1229,74 @@ async fn stream_openai_responses(
     // Responses API SSE 事件格式与 Chat Completions 不同
     let mut full_content = String::new();
     let in_reasoning = std::sync::atomic::AtomicBool::new(false);
+    let suppressed_reasoning = std::sync::Mutex::new(String::new());
 
     for_each_sse_event(response, req_id, |event| {
-        if let SseEvent::Data(json_val) = event {
-            let event_type = json_val.get("type").and_then(|t| t.as_str()).unwrap_or("");
+        match event {
+            SseEvent::Done => {
+                if in_reasoning.load(std::sync::atomic::Ordering::Relaxed) {
+                    let close = "</think>";
+                    full_content.push_str(close);
+                    let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": close }));
+                    in_reasoning.store(false, std::sync::atomic::Ordering::Relaxed);
+                }
+            }
+            SseEvent::Data(json_val) => {
+                let event_type = json_val.get("type").and_then(|t| t.as_str()).unwrap_or("");
 
-            match event_type {
-                // 文本增量输出
-                "response.output_text.delta" => {
-                    // 从推理切换到正文时关闭 💭 标记
-                    if in_reasoning.load(std::sync::atomic::Ordering::Relaxed) {
-                        let close = "💭";
-                        full_content.push_str(close);
-                        let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": close }));
-                        in_reasoning.store(false, std::sync::atomic::Ordering::Relaxed);
-                    }
-                    if let Some(delta) = json_val.get("delta").and_then(|d| d.as_str()) {
-                        if !delta.is_empty() {
-                            full_content.push_str(delta);
-                            let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": delta }));
+                match event_type {
+                    // 文本增量输出
+                    "response.output_text.delta" => {
+                        // 从推理切换到正文时关闭 </think>
+                        if in_reasoning.load(std::sync::atomic::Ordering::Relaxed) {
+                            let close = "</think>";
+                            full_content.push_str(close);
+                            let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": close }));
+                            in_reasoning.store(false, std::sync::atomic::Ordering::Relaxed);
                         }
-                    }
-                }
-                // 推理内容增量（reasoning 模型如 o3/o4-mini，默认产生）
-                "response.reasoning.delta" => {
-                    if let Some(delta) = json_val.get("delta").and_then(|d| d.as_str()) {
-                        if !delta.is_empty() {
-                            if !in_reasoning.load(std::sync::atomic::Ordering::Relaxed) {
-                                let open = "💭";
-                                full_content.push_str(open);
-                                let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": open }));
-                                in_reasoning.store(true, std::sync::atomic::Ordering::Relaxed);
+                        if let Some(delta) = json_val.get("delta").and_then(|d| d.as_str()) {
+                            if !delta.is_empty() {
+                                full_content.push_str(delta);
+                                let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": delta }));
                             }
-                            full_content.push_str(delta);
-                            let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": delta }));
                         }
                     }
-                }
-                // 推理摘要增量（需要请求中设置 reasoning.summary 参数才产生）
-                "response.reasoning_summary_text.delta" => {
-                    if let Some(delta) = json_val.get("delta").and_then(|d| d.as_str()) {
-                        if !delta.is_empty() {
-                            let think_content = format!("💭{}😎", delta);
-                            full_content.push_str(&think_content);
-                            let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": think_content }));
+                    // 推理内容增量（reasoning 模型如 o3/o4-mini，默认产生）
+                    "response.reasoning.delta" | "response.reasoning_summary_text.delta" => {
+                        if let Some(delta) = json_val.get("delta").and_then(|d| d.as_str()) {
+                            if !delta.is_empty() {
+                                if allow_reasoning {
+                                    if !in_reasoning.load(std::sync::atomic::Ordering::Relaxed) {
+                                        let open = "<think>";
+                                        full_content.push_str(open);
+                                        let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": open }));
+                                        in_reasoning.store(true, std::sync::atomic::Ordering::Relaxed);
+                                    }
+                                    full_content.push_str(delta);
+                                    let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": delta }));
+                                } else {
+                                    suppressed_reasoning.lock().unwrap().push_str(delta);
+                                }
+                            }
                         }
                     }
+                    _ => {}
                 }
-                _ => {}
             }
         }
     }).await?;
 
-    // 流结束时关闭 reasoning 标记
+    // 流结束兜底：若仍在 reasoning 状态，补齐 </think>
     if in_reasoning.load(std::sync::atomic::Ordering::Relaxed) {
-        full_content.push_str("💭");
+        let close = "</think>";
+        full_content.push_str(close);
+        let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": close }));
+    }
+
+    let suppressed_reasoning = suppressed_reasoning.into_inner().unwrap();
+    if !has_visible_content(&full_content) && !suppressed_reasoning.trim().is_empty() {
+        full_content.push_str(&suppressed_reasoning);
+        let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": &suppressed_reasoning }));
     }
 
     Ok(full_content)
@@ -1202,6 +1312,7 @@ async fn stream_anthropic_with_search(
     proxy_url: Option<&str>,
     connect_timeout_secs: Option<u64>,
     request_timeout_secs: Option<u64>,
+    allow_reasoning: bool,
 ) -> Result<String> {
     let client = ai_stream_client_with_opts(proxy_url, connect_timeout_secs, request_timeout_secs);
     let base_url = config.get_base_url();
@@ -1260,38 +1371,76 @@ async fn stream_anthropic_with_search(
 
     // Anthropic SSE 格式：event: xxx \n data: {} \n\n
     let mut full_content = String::new();
+    let mut in_reasoning = false;
+    let mut suppressed_reasoning = String::new();
 
     for_each_sse_event(response, req_id, |event| {
-        if let SseEvent::Data(json_val) = event {
-            let event_type = json_val.get("type").and_then(|t| t.as_str()).unwrap_or("");
+        match event {
+            SseEvent::Done => {
+                if in_reasoning {
+                    let close = "</think>";
+                    full_content.push_str(close);
+                    let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": close }));
+                    in_reasoning = false;
+                }
+            }
+            SseEvent::Data(json_val) => {
+                let event_type = json_val.get("type").and_then(|t| t.as_str()).unwrap_or("");
 
-            if event_type == "content_block_delta" {
-                if let Some(delta) = json_val.get("delta") {
-                    let delta_type = delta.get("type").and_then(|t| t.as_str()).unwrap_or("");
-                    match delta_type {
-                        "text_delta" => {
-                            if let Some(text) = delta.get("text").and_then(|t| t.as_str()) {
-                                if !text.is_empty() {
-                                    full_content.push_str(text);
-                                    let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": text }));
+                if event_type == "content_block_delta" {
+                    if let Some(delta) = json_val.get("delta") {
+                        let delta_type = delta.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                        match delta_type {
+                            "text_delta" => {
+                                if let Some(text) = delta.get("text").and_then(|t| t.as_str()) {
+                                    if !text.is_empty() {
+                                        if in_reasoning {
+                                            let close = "</think>";
+                                            full_content.push_str(close);
+                                            let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": close }));
+                                            in_reasoning = false;
+                                        }
+                                        full_content.push_str(text);
+                                        let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": text }));
+                                    }
                                 }
                             }
-                        }
-                        "thinking_delta" => {
-                            if let Some(thinking) = delta.get("thinking").and_then(|t| t.as_str()) {
-                                if !thinking.is_empty() {
-                                    let think_text = format!("<think>{}</think>", thinking);
-                                    full_content.push_str(&think_text);
-                                    let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": think_text }));
+                            "thinking_delta" => {
+                                if let Some(thinking) = delta.get("thinking").and_then(|t| t.as_str()) {
+                                    if !thinking.is_empty() {
+                                        if allow_reasoning {
+                                            if !in_reasoning {
+                                                let open = "<think>";
+                                                full_content.push_str(open);
+                                                let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": open }));
+                                                in_reasoning = true;
+                                            }
+                                            full_content.push_str(thinking);
+                                            let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": thinking }));
+                                        } else {
+                                            suppressed_reasoning.push_str(thinking);
+                                        }
+                                    }
                                 }
                             }
+                            _ => {}
                         }
-                        _ => {}
                     }
                 }
             }
         }
     }).await?;
+
+    if in_reasoning {
+        let close = "</think>";
+        full_content.push_str(close);
+        let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": close }));
+    }
+
+    if !has_visible_content(&full_content) && !suppressed_reasoning.trim().is_empty() {
+        full_content.push_str(&suppressed_reasoning);
+        let _ = window.emit("ai:stream:chunk", json!({ "request_id": req_id, "content": &suppressed_reasoning }));
+    }
 
     Ok(full_content)
 }
@@ -1352,10 +1501,9 @@ fn inject_thinking_params(request_body: &mut serde_json::Value, config: &AIConfi
         // GLM-5 默认 disabled，GLM-4.5 默认 enabled（动态）
         // 思考内容通过 reasoning_content 字段返回
         "glm" | "glm-code" => {
-            if enabled {
-                request_body["thinking"] = json!({ "type": "enabled" });
-            }
-            // 不再主动 disabled，让 GLM-5 保持默认行为（enabled/强制思考）
+            request_body["thinking"] = json!({
+                "type": if enabled { "enabled" } else { "disabled" }
+            });
         }
         // DeepSeek: deepseek-reasoner 自动启用思考，无额外参数
         // 由用户在设置中选择 reasoner 模型

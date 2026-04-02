@@ -73,10 +73,10 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
   const [input, setInput] = useState('');
   const [showAuthorNotes, setShowAuthorNotes] = useState(true);
   const [showTemplates, setShowTemplates] = useState(false);
-  const [useStreaming, setUseStreaming] = useState(true);
+  const [useStreaming, setUseStreaming] = useState(settingsStore.ai.streamEnabled);
   const [webSearch, setWebSearch] = useState(true);
   const [useTools, setUseTools] = useState(false);
-  const [enableThinking, setEnableThinking] = useState(false);
+  const [enableThinking, setEnableThinking] = useState(settingsStore.ai.enableThinking && supportsThinking);
   const [planMode, setPlanMode] = useState(false);
   const [authorNotesInput, setAuthorNotesInput] = useState('');
   const [contextMode, _setContextMode] = useState<ChatContextMode>('none');
@@ -157,6 +157,10 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
   const userMsgRef = useRef<HTMLDivElement>(null);
   const prevMessageCountRef = useRef(0);
   const scrollThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setEnableThinking(settingsStore.ai.enableThinking && supportsThinking);
+  }, [settingsStore.ai.enableThinking, supportsThinking]);
 
   useEffect(() => {
     const prevCount = prevMessageCountRef.current;
@@ -322,9 +326,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
     setShowAuthorNotes(false);
 
     // Check if API key is configured
-    const aiSettings = useSettingsStore.getState().ai;
-    const activeService = aiSettings.services.find(s => s.id === aiSettings.activeServiceId && s.enabled);
-    if (!activeService?.apiKey) {
+    if (!effectiveService?.apiKey) {
       const errorMessage = {
         role: 'assistant' as const,
         content: t('chat.configureApiKeyMsg', { defaultValue: '请先配置 API Key 才能使用 AI 生成功能。\n\n请点击聊天面板下方的“设置”按钮，在设置面板的 AI 标签页中配置您的 API Key。' }),
@@ -404,20 +406,19 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
           throttleTimer = null;
           lastUpdateTime = Date.now();
           const parsed = parseThinkTags(accumulatedContent);
-          // 更新编辑器
-          useAppStore.getState().updateDocumentInMemory(docId, { aiGeneratedContent: parsed.content });
-          // 更新聊天区 thinking 状态
-          if (parsed.thinking) {
-            const thinkMsg = wrapThinkForChatMessage(
-              parsed.thinking,
-              parsed.content || '',
-              parsed.isThinking,
-            );
+          // 更新编辑器：think 进行中时不清空编辑器，等正文出现或 think 结束后再写入
+          if (parsed.content || !parsed.isThinking) {
+            useAppStore.getState().updateDocumentInMemory(docId, { aiGeneratedContent: parsed.content });
+          }
+          const liveMessageContent = parsed.thinking
+            ? wrapThinkForChatMessage(parsed.thinking, parsed.content || '', parsed.isThinking)
+            : parsed.content;
+          if (liveMessageContent) {
             const messages = useAppStore.getState().getAiMessages(effectiveTabId);
             if (messages.length > 0) {
               const lastMsg = messages[messages.length - 1];
-              if (lastMsg.role === 'assistant' && (lastMsg.content.includes('正在生成') || lastMsg.content.startsWith('💭') || lastMsg.content.includes('Generating') || lastMsg.content.includes('\u003Cthink\u003E'))) {
-                useAppStore.getState().updateLastAiMessage(effectiveTabId, { content: thinkMsg });
+              if (lastMsg.role === 'assistant') {
+                useAppStore.getState().updateLastAiMessage(effectiveTabId, { content: liveMessageContent });
               }
             }
           }
@@ -439,7 +440,9 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
             }
           },
           [],  // 内容生成与聊天独立，不传聊天历史
-          webSearch
+          webSearch,
+          enableThinking && supportsThinking,
+          effectiveTabId,
         );
 
         // 清除可能残留的定时器
@@ -448,9 +451,41 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
         // 最终解析：使用后端返回的完整内容（而非事件累积的，避免尾部丢失）
         const finalParsed = parseThinkTags(serverFull || accumulatedContent);
         const finalContent = finalParsed.content;
+        const wasAborted = Boolean(useAppStore.getState().streamStateByTab[effectiveTabId]?.aborted);
 
         // 确保最终正文内容更新到编辑器
         useAppStore.getState().updateDocumentInMemory(docId, { aiGeneratedContent: finalContent });
+
+        if (wasAborted) {
+          const latestDocAtSave = useAppStore.getState().documents.find(d => d.id === docId);
+          if (latestDocAtSave && finalContent) {
+            await saveDocument({ ...latestDocAtSave, authorNotes: notesToUse, aiGeneratedContent: finalContent });
+          }
+
+          const stoppedNote = t('chat.generationStopped', { defaultValue: '已停止生成，当前可用内容已保留。' });
+          const stoppedContent = finalParsed.thinking
+            ? wrapThinkForChatMessage(
+              finalParsed.thinking,
+              finalContent ? `${finalContent}\n\n---\n\n${stoppedNote}` : `\n\n---\n\n${stoppedNote}`,
+              false,
+            )
+            : (finalContent ? `${finalContent}\n\n---\n\n${stoppedNote}` : stoppedNote);
+          const messages = useAppStore.getState().getAiMessages(effectiveTabId);
+          if (messages.length > 0 && messages[messages.length - 1].role === 'assistant') {
+            useAppStore.getState().updateLastAiMessage(effectiveTabId, {
+              content: stoppedContent,
+              timestamp: Date.now() / 1000,
+            });
+          } else {
+            useAppStore.getState().addAiMessage(effectiveTabId, {
+              role: 'assistant',
+              content: stoppedContent,
+              timestamp: Date.now() / 1000,
+            });
+          }
+          setGeneratingContent(false);
+          return;
+        }
 
         // 流式完成后保存到磁盘（重新从 store 获取最新文档，避免覆盖用户编辑）
         const latestDocAtSave = useAppStore.getState().documents.find(d => d.id === docId);
@@ -472,7 +507,13 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
           content: completionContent,
           timestamp: Date.now() / 1000
         };
-        useAppStore.getState().addAiMessage(effectiveTabId, completionMessage);
+        // 替换流式占位消息（而非新增），避免聊天面板出现重复消息
+        const msgsBeforeCompletion = useAppStore.getState().getAiMessages(effectiveTabId);
+        if (msgsBeforeCompletion.length > 0 && msgsBeforeCompletion[msgsBeforeCompletion.length - 1].role === 'assistant') {
+          useAppStore.getState().updateLastAiMessage(effectiveTabId, completionMessage);
+        } else {
+          useAppStore.getState().addAiMessage(effectiveTabId, completionMessage);
+        }
 
         // Auto-create version after generation（使用过滤后的正文内容）
         if (latestDoc && finalContent) {
@@ -496,7 +537,8 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
         // Non-streaming mode
         const rawGenerated = await generateContent(
           notesToUse,
-          contentForAI
+          contentForAI,
+          enableThinking && supportsThinking,
         );
 
         // 解析 <think> 标签：分离思考内容和正文内容
@@ -582,13 +624,14 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
 
       useAppStore.getState().addAiMessage(effectiveTabId, errorMessage);
 
-      // 停止生成时保留已累积的内容，不让它消失
+      // 停止生成时保留已累积的正文内容，不让思考内容写入正文区
       if (accumulatedContent) {
-        useAppStore.getState().updateDocumentInMemory(docId, { aiGeneratedContent: accumulatedContent });
+        const partialParsed = parseThinkTags(accumulatedContent);
+        useAppStore.getState().updateDocumentInMemory(docId, { aiGeneratedContent: partialParsed.content });
         try {
           const doc = useAppStore.getState().documents.find(d => d.id === docId);
           if (doc) {
-            await saveDocument({ ...doc, aiGeneratedContent: accumulatedContent });
+            await saveDocument({ ...doc, aiGeneratedContent: partialParsed.content });
           }
         } catch (saveErr) {
           console.error('Failed to save partial content after stop:', saveErr);
@@ -890,7 +933,7 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
                   message={message}
                   turnNumber={Math.floor(index / 2) + 1}
                   totalMessages={aiMessages.length}
-                  enableThinking={settingsStore.ai.enableThinking}
+                  enableThinking={enableThinking}
                   onApplyToDocument={handleApplyToDocument}
                 />
               </div>

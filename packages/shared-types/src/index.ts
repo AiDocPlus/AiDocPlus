@@ -736,7 +736,7 @@ export const DEFAULT_AI_SETTINGS: AISettings = {
   activeServiceId: '',
   temperature: 0.7,
   maxTokens: 0,
-  streamEnabled: true,
+  streamEnabled: false,
   systemPrompt: '',
   maxContentLength: 0,
   markdownMode: true,

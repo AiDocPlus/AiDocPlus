@@ -65,6 +65,22 @@ export function parseThinkTags(text: string): ThinkParseResult {
     isThinking = true;
   }
 
+  // 兼容历史标记：💭...💭 / 💭...😎（旧版流式推理分隔符）
+  content = content.replace(/💭([\s\S]*?)💭/g, (_match, thinkContent: string) => {
+    pushCompleteThink(thinkContent);
+    return '';
+  });
+  content = content.replace(/💭([\s\S]*?)😎/g, (_match, thinkContent: string) => {
+    pushCompleteThink(thinkContent);
+    return '';
+  });
+  const unclosedEmojiThinking = content.match(/💭([\s\S]*)$/);
+  if (unclosedEmojiThinking) {
+    thinkParts.push((unclosedEmojiThinking[1] || '').trim());
+    content = content.replace(/💭([\s\S]*)$/, '');
+    isThinking = true;
+  }
+
   // 过滤 AI 内部 XML 工具调用块，防止被 React/浏览器渲染为 HTML 标签
   // 1. minimax:tool_call 块（MiniMax 联网搜索内部格式）
   content = content.replace(/<minimax:tool_call>[\s\S]*?<\/minimax:tool_call>/gi, '');
@@ -101,7 +117,7 @@ export function wrapThinkForChatMessage(
   if (!t) return body;
   const open = '\u003Cthink\u003E';
   const close = '\u003C/think\u003E';
-  if (isThinkingOpen) return `${open}${thinking}`;
+  if (isThinkingOpen) return body ? `${body}\n\n${open}${thinking}` : `${open}${thinking}`;
   return `${open}${thinking}${close}\n\n${body}`;
 }
 

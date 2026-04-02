@@ -144,7 +144,7 @@ export interface ChatMessageProps {
 }
 
 export const ChatMessage = memo(function ChatMessage({
-  message, turnNumber, totalMessages, enableThinking: _enableThinking, onApplyToDocument,
+  message, turnNumber, totalMessages, enableThinking, onApplyToDocument,
 }: ChatMessageProps) {
   const { t } = useTranslation();
   const isUserTurn = message.role === 'user';
@@ -154,12 +154,12 @@ export const ChatMessage = memo(function ChatMessage({
     const parsed = parseThinkTags(message.content);
     return (
       <div className="w-full space-y-2">
-        {parsed.thinking && (
+        {enableThinking && parsed.thinking && (
           <div className="max-w-[80%] rounded-lg px-4 py-2 bg-muted">
             <div className="text-xs font-medium opacity-70 mb-1">{t('chat.ai', { defaultValue: 'AI' })}</div>
             <CollapsibleThinkingBlock
               thinking={parsed.thinking}
-              isThinking={false}
+              isThinking={parsed.isThinking}
               theme={resolveTheme()}
               className="border-l-purple-400/60 dark:border-l-purple-500/50"
             />
@@ -216,10 +216,10 @@ export const ChatMessage = memo(function ChatMessage({
                 const parsed = parseThinkTags(message.content);
                 return (
                   <>
-                    {parsed.thinking && (
+                    {enableThinking && parsed.thinking && (
                       <CollapsibleThinkingBlock
                         thinking={parsed.thinking}
-                        isThinking={false}
+                        isThinking={parsed.isThinking}
                         theme={resolveTheme()}
                       />
                     )}

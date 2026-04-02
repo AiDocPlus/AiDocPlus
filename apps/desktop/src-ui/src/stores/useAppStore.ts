@@ -139,8 +139,8 @@ interface AppState {
   setAiStreaming: (streaming: boolean, tabId?: string) => void;
   stopAiStreaming: () => void;
   sendChatMessage: (options: import('./useAppStore.ai.request.helpers').ChatMessageOptions) => Promise<string>;
-  generateContent: (authorNotes: string, currentContent: string) => Promise<string>;
-  generateContentStream: (authorNotes: string, currentContent: string, onChunk: (chunk: string) => void, conversationHistory?: AIMessage[], enableWebSearch?: boolean) => Promise<string>;
+  generateContent: (authorNotes: string, currentContent: string, enableThinking?: boolean) => Promise<string>;
+  generateContentStream: (authorNotes: string, currentContent: string, onChunk: (chunk: string) => void, conversationHistory?: AIMessage[], enableWebSearch?: boolean, enableThinking?: boolean, tabId?: string) => Promise<string>;
 
   // Plugin Actions
   updatePluginData: (documentId: string, pluginId: string, data: unknown) => void;
@@ -835,8 +835,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }
 
-    // 也调用无参数版本以兼容旧的后端
-    invoke('stop_ai_stream').catch(() => {});
     set({ isAiStreaming: false, aiStreamingTabId: null });
   },
   // AI Actions（流式聊天，支持停止）
@@ -1037,7 +1035,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  generateContent: async (authorNotes, currentContent) => {
+  generateContent: async (authorNotes, currentContent, optEnableThinking) => {
     try {
       set({ isAiStreaming: true, error: null });
       // 注意：非流式模式下 aiStreamingTabId 由 ChatPanel 在调用前设置
@@ -1046,10 +1044,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       const genTab = get().tabs.find(t => t.id === get().aiStreamingTabId);
       const genDoc = genTab ? get().documents.find(d => d.id === genTab.documentId) : null;
       const aiParams = getAIInvokeParamsForService(genDoc?.aiServiceId);
+      const aiSettings = useSettingsStore.getState().ai;
       const generated = await invoke<string>('generate_content', {
         authorNotes,
         currentContent,
         ...aiParams,
+        enableThinking: (optEnableThinking ?? aiSettings.enableThinking) || undefined,
       });
 
       return generated;
@@ -1061,9 +1061,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  generateContentStream: async (authorNotes, currentContent, onChunk, conversationHistory, enableWebSearch) => {
+  generateContentStream: async (authorNotes, currentContent, onChunk, conversationHistory, enableWebSearch, optEnableThinking, explicitTabId) => {
     const { aiStreamingTabId } = get();
-    const tabId = aiStreamingTabId || 'default';
+    const tabId = explicitTabId || aiStreamingTabId || 'default';
 
     // 获取当前标签页的流状态
     const currentStreamState = get().streamStateByTab[tabId] || {
@@ -1095,6 +1095,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
 
     let unlisten: (() => void) | null = null;
+    let streamIdleTimer: ReturnType<typeof setInterval> | null = null;
+    let lastActivityAt = Date.now();
+    let idleStopRequested = false;
 
     try {
       set({ isAiStreaming: true, error: null });
@@ -1113,6 +1116,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         if (!streamState || streamState.aborted || streamState.sessionId !== newSessionId) return;
         // 只接受匹配当前 requestId 的事件
         if (event.payload.request_id !== requestId) return;
+        lastActivityAt = Date.now();
         onChunk(event.payload.content);
       });
 
@@ -1149,7 +1153,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           return combined || undefined;
         })(),
         enableWebSearch: enableWebSearch || undefined,
-        enableThinking: aiSettings.enableThinking || undefined,
+        enableThinking: (optEnableThinking ?? aiSettings.enableThinking) || undefined,
         ...(typeof aiSettings.maxTokens === 'number' && aiSettings.maxTokens > 0
           ? { maxTokens: aiSettings.maxTokens }
           : {}),
@@ -1159,17 +1163,53 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       // Invoke the streaming command with conversation history
       // 后端返回完整累积文本，优先使用（防止 IPC 事件丢失导致尾部内容缺失）
-      const serverFull = await invoke<string>('generate_content_stream', invokeParams);
+      const invokePromise = invoke<string>('generate_content_stream', invokeParams);
+      const streamIdleTimeoutMs = 30000;
+      streamIdleTimer = setInterval(() => {
+        const streamState = get().streamStateByTab[tabId];
+        if (!streamState || streamState.aborted || streamState.sessionId !== newSessionId) return;
+        if (!idleStopRequested && Date.now() - lastActivityAt >= streamIdleTimeoutMs) {
+          idleStopRequested = true;
+          set((state) => ({
+            streamStateByTab: {
+              ...state.streamStateByTab,
+              [tabId]: {
+                ...state.streamStateByTab[tabId],
+                aborted: true,
+              }
+            }
+          }));
+          if (get().aiStreamingTabId === tabId) {
+            set({ isAiStreaming: false, aiStreamingTabId: null });
+          }
+          invoke('stop_ai_stream', { requestId }).catch(() => {});
+        }
+      }, 1000);
+
+      const serverFull = await invokePromise;
+      const streamState = get().streamStateByTab[tabId];
+      if (streamState?.aborted || streamState?.sessionId !== newSessionId) {
+        return serverFull || '';
+      }
 
       set({ isAiStreaming: false, aiStreamingTabId: null });
       return serverFull || '';
     } catch (error) {
-      set({ error: formatBackendError(error), isAiStreaming: false, aiStreamingTabId: null });
+      set({ isAiStreaming: false, aiStreamingTabId: null });
+      const streamState = get().streamStateByTab[tabId];
+      if (streamState?.aborted || streamState?.sessionId !== newSessionId) {
+        return '';
+      }
+      set({ error: formatBackendError(error) });
       throw error;
     } finally {
       // 通知插件 AI 内容生成完成
       const contentGenDocFinally = get().tabs.find(t => t.id === tabId)?.documentId;
       if (contentGenDocFinally) emitPluginEvent('ai:generation-completed', { documentId: contentGenDocFinally, type: 'content' });
+
+      if (streamIdleTimer) {
+        clearInterval(streamIdleTimer);
+      }
 
       // 无论成功、失败还是中断，都确保清理监听器
       if (unlisten) {
