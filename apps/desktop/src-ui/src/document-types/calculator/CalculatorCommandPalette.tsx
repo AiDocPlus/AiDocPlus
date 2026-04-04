@@ -7,7 +7,6 @@ import { useTranslation } from '@/i18n';
 import {
   Search, Star, Clock, Command, CornerDownLeft
 } from 'lucide-react';
-import * as LucideIcons from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -24,13 +23,7 @@ import {
   type CalculatorQuickActionStore,
   type CalculatorQuickActionItem,
 } from './calculatorQuickActions';
-
-// 动态图标组件
-function DynamicIcon({ name, className }: { name: string; className?: string }) {
-  const IconComponent = (LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string; iconNode?: any }>>)[name];
-  if (!IconComponent) return <Search className={className} />;
-  return <IconComponent className={className} />;
-}
+import { DynamicIcon } from '../_shared/DynamicIcon';
 
 // 简单的内存存储
 const memoryStorage: Record<string, unknown> = {};
@@ -242,7 +235,7 @@ export function CalculatorCommandPalette({
             ref={inputRef}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={isEn ? 'Search actions... (⌘K)' : '搜索快捷操作... (⌘K)'}
+            placeholder={t('calculator.searchActions', { defaultValue: '搜索快捷操作... (⌘K)' })}
             className="border-0 shadow-none focus-visible:ring-0 px-0 h-6"
             onKeyDown={handleKeyDown}
           />
@@ -259,7 +252,7 @@ export function CalculatorCommandPalette({
             className="h-6 text-xs px-2"
             onClick={() => setActiveTab('all')}
           >
-            {isEn ? 'All' : '全部'}
+            {t('calculator.allActions', { defaultValue: '全部' })}
           </Button>
           <Button
             variant={activeTab === 'recent' ? 'secondary' : 'ghost'}
@@ -268,7 +261,7 @@ export function CalculatorCommandPalette({
             onClick={() => setActiveTab('recent')}
           >
             <Clock className="h-3 w-3" />
-            {isEn ? 'Recent' : '最近'}
+            {t('calculator.recent', { defaultValue: '最近' })}
           </Button>
           <Button
             variant={activeTab === 'favorites' ? 'secondary' : 'ghost'}
@@ -277,11 +270,11 @@ export function CalculatorCommandPalette({
             onClick={() => setActiveTab('favorites')}
           >
             <Star className="h-3 w-3" />
-            {isEn ? 'Favorites' : '收藏'}
+            {t('calculator.paletteFavorites', { defaultValue: '收藏' })}
           </Button>
           <div className="flex-1" />
           <span className="text-xs text-muted-foreground">
-            {filteredItems.length} {isEn ? 'results' : '结果'}
+            {filteredItems.length} {t('calculator.paletteResults', { defaultValue: '结果' })}
           </span>
         </div>
 
@@ -290,7 +283,7 @@ export function CalculatorCommandPalette({
           <div className="py-1">
             {filteredItems.length === 0 ? (
               <div className="text-center text-muted-foreground text-sm py-8">
-                {isEn ? 'No actions found' : '未找到匹配的操作'}
+                {t('calculator.paletteNoMatch', { defaultValue: '未找到匹配的操作' })}
               </div>
             ) : groupedItems ? (
               // 分组显示
@@ -306,7 +299,7 @@ export function CalculatorCommandPalette({
                       <div
                         key={item.id}
                         data-index={globalIdx}
-                        className={`flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors ${
+                        className={`group flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors ${
                           globalIdx === selectedIndex ? 'bg-primary/10' : 'hover:bg-muted/50'
                         }`}
                         onClick={() => handleSelectItem(item)}
@@ -318,7 +311,7 @@ export function CalculatorCommandPalette({
                             {isEn ? item.labelEn : item.label}
                           </div>
                           <div className="text-xs text-muted-foreground truncate">
-                            {isEn ? item.prompt.slice(0, 50) + '...' : item.prompt.slice(0, 50) + '...'}
+                            {item.prompt.length > 50 ? item.prompt.slice(0, 50) + '...' : item.prompt}
                           </div>
                         </div>
                         <Button
@@ -392,15 +385,15 @@ export function CalculatorCommandPalette({
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1">
               <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">↑↓</kbd>
-              {isEn ? 'Navigate' : '导航'}
+              {t('calculator.paletteNavigate', { defaultValue: '导航' })}
             </span>
             <span className="flex items-center gap-1">
               <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">↵</kbd>
-              {isEn ? 'Select' : '选择'}
+              {t('calculator.paletteSelect', { defaultValue: '选择' })}
             </span>
             <span className="flex items-center gap-1">
               <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">Tab</kbd>
-              {isEn ? 'Switch tab' : '切换标签'}
+              {t('calculator.paletteSwitchTab', { defaultValue: '切换标签' })}
             </span>
           </div>
           <span className="flex items-center gap-1">

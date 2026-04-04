@@ -341,11 +341,36 @@ export function getDefaultStore(): CalculatorQuickActionStore {
 function mergeWithDefaults(stored: CalculatorQuickActionStore): CalculatorQuickActionStore {
   const cats = [...stored.categories];
   for (const dc of DEFAULT_CATEGORIES) {
-    if (!cats.find(c => c.id === dc.id)) cats.push({ ...dc });
+    const existing = cats.find(c => c.id === dc.id);
+    if (!existing) {
+      cats.push({ ...dc });
+    } else {
+      // 版本迁移：补齐缺失字段
+      if (!(existing as Record<string, unknown>).labelEn && dc.labelEn) {
+        (existing as Record<string, unknown>).labelEn = dc.labelEn;
+      }
+    }
   }
   const items = [...stored.items];
   for (const di of DEFAULT_ITEMS) {
-    if (!items.find(i => i.id === di.id)) items.push({ ...di });
+    const existing = items.find(i => i.id === di.id);
+    if (!existing) {
+      items.push({ ...di });
+    } else {
+      // 版本迁移：补齐新增字段（如 keywords、hidden）
+      if (!existing.keywords && di.keywords) {
+        existing.keywords = di.keywords;
+      }
+      if (existing.hidden === undefined && di.hidden !== undefined) {
+        existing.hidden = di.hidden;
+      }
+      if (!existing.labelEn && di.labelEn) {
+        existing.labelEn = di.labelEn;
+      }
+      if (!existing.prompt && di.prompt) {
+        existing.prompt = di.prompt;
+      }
+    }
   }
   return { ...stored, categories: cats, items, version: CURRENT_VERSION };
 }
@@ -355,8 +380,10 @@ export function loadQuickActions(storage: {
   set: (key: string, value: unknown) => void;
 }): CalculatorQuickActionStore {
   const saved = storage.get<CalculatorQuickActionStore>(STORAGE_KEY);
-  if (saved && saved.categories && saved.items) {
-    return mergeWithDefaults(saved);
+  if (saved && Array.isArray(saved.categories) && Array.isArray(saved.items)) {
+    const merged = mergeWithDefaults(saved);
+    storage.set(STORAGE_KEY, merged);
+    return merged;
   }
   const store = getDefaultStore();
   storage.set(STORAGE_KEY, store);

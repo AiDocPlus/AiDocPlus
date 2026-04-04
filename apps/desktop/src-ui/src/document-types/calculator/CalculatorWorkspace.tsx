@@ -339,6 +339,10 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
   const [past, setPast] = useState<CalculatorDocumentContent[]>([]);
   const [future, setFuture] = useState<CalculatorDocumentContent[]>([]);
   const MAX_HISTORY = 50;
+  const pastRef = useRef(past);
+  pastRef.current = past;
+  const futureRef = useRef(future);
+  futureRef.current = future;
 
   // 当前行选择状态
   const [activeLineIndex, setActiveLineIndex] = useState<number | null>(null);
@@ -494,30 +498,32 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
 
   // 撤销
   const handleUndo = useCallback(() => {
-    setPast(p => {
-      if (p.length === 0) return p;
-      const cur = calcDocRef.current;
-      const previous = p[p.length - 1];
-      setFuture(f => [cur, ...f].slice(0, MAX_HISTORY));
-      setCalcDoc(previous);
-      host.doc.updateInMemory({ content: JSON.stringify(previous, null, 2) });
-      host.doc.markDirty();
-      return p.slice(0, -1);
-    });
+    const p = pastRef.current;
+    if (p.length === 0) return;
+    const cur = calcDocRef.current;
+    const previous = p[p.length - 1];
+    setPast(prev => prev.slice(0, -1));
+    setFuture(f => [cur, ...f].slice(0, MAX_HISTORY));
+    setCalcDoc(previous);
+    host.doc.updateInMemory({ content: JSON.stringify(previous, null, 2) });
+    host.doc.markDirty();
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => host.doc.save(), 3000);
   }, [host.doc]);
 
   // 重做
   const handleRedo = useCallback(() => {
-    setFuture(f => {
-      if (f.length === 0) return f;
-      const cur = calcDocRef.current;
-      const next = f[0];
-      setPast(p => [...p, cur].slice(-MAX_HISTORY));
-      setCalcDoc(next);
-      host.doc.updateInMemory({ content: JSON.stringify(next, null, 2) });
-      host.doc.markDirty();
-      return f.slice(1);
-    });
+    const f = futureRef.current;
+    if (f.length === 0) return;
+    const cur = calcDocRef.current;
+    const next = f[0];
+    setPast(p => [...p, cur].slice(-MAX_HISTORY));
+    setFuture(prev => prev.slice(1));
+    setCalcDoc(next);
+    host.doc.updateInMemory({ content: JSON.stringify(next, null, 2) });
+    host.doc.markDirty();
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => host.doc.save(), 3000);
   }, [host.doc]);
 
   const canUndo = past.length > 0;
@@ -559,7 +565,8 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
 
   const handleSelectSheet = useCallback((sheetId: string) => {
     const updated = switchSheet(calcDoc, sheetId);
-    saveDoc(updated);
+    // 切换 Sheet 仅改变活动视图，不加入撤销历史
+    saveDoc(updated, false);
   }, [calcDoc, saveDoc]);
 
   const handleRenameSheet = useCallback((sheetId: string, name: string) => {
@@ -580,7 +587,7 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
     const newSheet: CalculatorSheet = {
       ...sheet,
       id: `sheet-${Date.now()}`,
-      name: `${sheet.name} (copy)`,
+      name: `${sheet.name}${t('calculator.copySuffix', { defaultValue: ' (copy)' })}`,
       lines: sheet.lines.map((l, i) => ({
         ...l,
         id: `line-${base}-${i}-${Math.random().toString(36).slice(2, 9)}`,
@@ -942,49 +949,57 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
   }, [handleCopyLine, handleDeleteLine]);
 
   // 全局键盘快捷键（须放在 handleCopyLine 等定义之后，避免 TDZ）
+  const handleCopyLineRef = useRef(handleCopyLine);
+  handleCopyLineRef.current = handleCopyLine;
+  const handleCutLineRef = useRef(handleCutLine);
+  handleCutLineRef.current = handleCutLine;
+  const handlePasteLineRef = useRef(handlePasteLine);
+  handlePasteLineRef.current = handlePasteLine;
+  const handleDeleteLineRef = useRef(handleDeleteLine);
+  handleDeleteLineRef.current = handleDeleteLine;
+  const handleInsertSubtotalLineRef = useRef(handleInsertSubtotalLine);
+  handleInsertSubtotalLineRef.current = handleInsertSubtotalLine;
+
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && activeLineIndex !== null) {
-        const selection = window.getSelection();
-        if (!selection || selection.toString().length === 0) {
+      const el = e.target as HTMLElement | null;
+      const inEditor = el?.tagName === 'TEXTAREA' || el?.tagName === 'INPUT';
+      const hasSelection = inEditor
+        ? (el as HTMLTextAreaElement | HTMLInputElement).selectionStart !== (el as HTMLTextAreaElement | HTMLInputElement).selectionEnd
+        : (window.getSelection()?.toString().length ?? 0) > 0;
+
+      const inWorkspace = el?.closest?.('[data-calculator-workspace="true"]');
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && activeLineIndex !== null && inWorkspace) {
+        if (!hasSelection) {
           e.preventDefault();
-          handleCopyLine();
+          handleCopyLineRef.current();
         }
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'x' && activeLineIndex !== null) {
-        const selection = window.getSelection();
-        if (!selection || selection.toString().length === 0) {
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'x' && activeLineIndex !== null && inWorkspace) {
+        if (!hasSelection) {
           e.preventDefault();
-          handleCutLine();
+          handleCutLineRef.current();
         }
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'v' && lineClipboard) {
-        const selection = window.getSelection();
-        if (!selection || selection.toString().length === 0) {
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'v' && lineClipboard && inWorkspace) {
+        if (!hasSelection) {
           e.preventDefault();
-          handlePasteLine();
+          handlePasteLineRef.current();
         }
       } else if (e.key === 'Delete' && activeLineIndex !== null) {
+        const inEl = el?.tagName === 'TEXTAREA' || el?.tagName === 'INPUT';
+        if (inEl) return;
         e.preventDefault();
-        handleDeleteLine();
+        handleDeleteLineRef.current();
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 't') {
-        const el = e.target as HTMLElement | null;
         if (el?.closest?.('[data-calculator-workspace="true"]')) {
           e.preventDefault();
-          handleInsertSubtotalLine();
+          handleInsertSubtotalLineRef.current();
         }
       }
     };
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [
-    activeLineIndex,
-    lineClipboard,
-    handleCopyLine,
-    handleCutLine,
-    handlePasteLine,
-    handleDeleteLine,
-    handleInsertSubtotalLine,
-  ]);
+  }, [activeLineIndex, lineClipboard]);
 
   // 检查是否可以执行行操作
   const canDeleteLine = activeLineIndex !== null && activeLineIndex >= 0 && activeSheet && activeSheet.lines.length > 0;
@@ -1076,11 +1091,26 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
 
   const confirmImport = useCallback(() => {
     if (pendingImportContent) {
-      saveDoc(pendingImportContent);
+      // 对导入内容的每个 Sheet 重新计算行结果
+      const doc = pendingImportContent;
+      const activeImportSheet = doc.sheets.find(s => s.id === doc.activeSheetId) || doc.sheets[0];
+      if (activeImportSheet) {
+        const computedLines = computeAllLines(activeImportSheet.lines, activeImportSheet.id);
+        const updated = updateSheet(doc, activeImportSheet.id, {
+          lines: computedLines,
+          variables: sheetVariablesFromEngine(
+            engineRef.current?.getVariables() || {},
+            engineRef.current?.getVariableDefinitionLines(),
+          ),
+        });
+        saveDoc(updated);
+      } else {
+        saveDoc(doc);
+      }
     }
     setPendingImportContent(null);
     setImportConfirmOpen(false);
-  }, [pendingImportContent, saveDoc]);
+  }, [pendingImportContent, computeAllLines, saveDoc]);
 
   // 统计信息
   const stats = useMemo(() => {
@@ -1145,12 +1175,19 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
       return { count: 0, sum: NaN, avg: NaN, min: NaN, max: NaN };
     }
     const sum = values.reduce((a, b) => a + b, 0);
+    let min = values[0]!;
+    let max = values[0]!;
+    for (let i = 1; i < values.length; i++) {
+      const v = values[i]!;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
     return {
       count: values.length,
       sum,
       avg: sum / values.length,
-      min: Math.min(...values),
-      max: Math.max(...values),
+      min,
+      max,
     };
   }, [sectionFloatStats]);
 
@@ -1545,11 +1582,11 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
             <DropdownMenuSub>
               <DropdownMenuSubTrigger className="gap-2">
                 <Star className="h-3.5 w-3.5 shrink-0" />
-                <span>{isEn ? 'Favorites' : '收藏'}</span>
+                <span>{t('calculator.favorites', { defaultValue: '收藏' })}</span>
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="max-h-64 overflow-y-auto">
                 {favoriteTemplates.length === 0 ? (
-                  <DropdownMenuItem disabled>{isEn ? 'No favorites' : '暂无收藏'}</DropdownMenuItem>
+                  <DropdownMenuItem disabled>{t('calculator.noFavorites', { defaultValue: '暂无收藏' })}</DropdownMenuItem>
                 ) : (
                   favoriteTemplates.map((tmpl) => (
                     <DropdownMenuItem
@@ -2012,7 +2049,7 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
         open={showExportDialog}
         onOpenChange={setShowExportDialog}
         calcDoc={calcDoc}
-        defaultTitle={doc.title || 'calculator'}
+        defaultTitle={doc.title || t('calculator.import', { defaultValue: '计算文档' })}
       />
     </div>
   );

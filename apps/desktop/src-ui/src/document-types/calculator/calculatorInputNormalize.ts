@@ -24,10 +24,39 @@ export function normalizeCalculatorInput(raw: string): string {
 }
 
 /**
- * 去掉西式千分位（1,234,567.89），保留数组/参数中的单数字逗号（如 [12, 15]）
+ * 去掉西式千分位（1,234,567.89），但保留方括号内的逗号（数组字面量如 [100,234]）。
+ * 按 [] 括号深度分段：仅对方括号外部做千分位剥离，括号内部（含逗号分隔的数组元素）原样保留。
  */
 export function stripThousandsSeparators(s: string): string {
-  return s.replace(/\d{1,3}(?:,\d{3})+(?:\.\d+)?/g, chunk => chunk.replace(/,/g, ''));
+  // 收集括号内/外片段（支持任意嵌套深度）
+  const segments: { text: string; insideBracket: boolean }[] = [];
+  let depth = 0;
+  let segStart = 0;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i]!;
+    if (ch === '[') {
+      if (depth === 0 && i > segStart) {
+        segments.push({ text: s.slice(segStart, i), insideBracket: false });
+        segStart = i;
+      }
+      depth++;
+    } else if (ch === ']') {
+      depth--;
+      if (depth === 0) {
+        segments.push({ text: s.slice(segStart, i + 1), insideBracket: true });
+        segStart = i + 1;
+      }
+    }
+  }
+  if (segStart < s.length) {
+    segments.push({ text: s.slice(segStart), insideBracket: depth > 0 });
+  }
+  if (segments.length === 0) return s;
+  const THOUSANDS_RE = /\d{1,3}(?:,\d{3})+(?:\.\d+)?/g;
+  return segments.map(seg => {
+    if (seg.insideBracket) return seg.text;
+    return seg.text.replace(THOUSANDS_RE, chunk => chunk.replace(/,/g, ''));
+  }).join('');
 }
 
 /**
@@ -55,6 +84,15 @@ export function normalizeCalculatorOperators(s: string): string {
   );
   out = out.replace(/(\d+(?:\.\d+)?)\s*乘以\s*(\d+(?:\.\d+)?)/g, '$1*$2');
   out = out.replace(/(\d+(?:\.\d+)?)\s*除以\s*(\d+(?:\.\d+)?)/g, '$1/$2');
+  // 标识符 乘以/除以 标识符（如 "利润乘以税率" 无空格也能匹配）
+  out = out.replace(
+    /([\u4e00-\u9fa5a-zA-Z_][\u4e00-\u9fa5a-zA-Z0-9_]*)\s*乘以\s*([\u4e00-\u9fa5a-zA-Z_][\u4e00-\u9fa5a-zA-Z0-9_]*)/g,
+    '$1*$2',
+  );
+  out = out.replace(
+    /([\u4e00-\u9fa5a-zA-Z_][\u4e00-\u9fa5a-zA-Z0-9_]*)\s*除以\s*([\u4e00-\u9fa5a-zA-Z_][\u4e00-\u9fa5a-zA-Z0-9_]*)/g,
+    '$1/$2',
+  );
   out = out.replace(/\s+乘以\s+/g, '*');
   out = out.replace(/\s+除以\s+/g, '/');
   // 万分率、千分率
@@ -74,14 +112,13 @@ export function formatExpressionOperatorsForDisplay(expr: string, mode: 'ascii' 
   out = out.replace(/\)\s*\/\s*(?=\d)/g, ') ÷ ');
   out = out.replace(/\)\*(\d)/g, ')×$1');
   out = out.replace(/\)\/(\d)/g, ')÷$1');
-  // 链式：每轮处理「带空格」与「紧凑」的 digit * digit，避免 lookbehind 把 a*b*c 误展成带多余空格
-  for (let i = 0; i < 24; i++) {
+  // 链式 digit * digit / digit / digit：用 while 循环替代固定 24 次迭代
+  let changed = true;
+  while (changed) {
     const next = out
       .replace(/(\d)\s*\*\s*(\d)/g, '$1 × $2')
-      .replace(/(\d)\*(\d)/g, '$1 × $2')
-      .replace(/(\d)\s*\/\s*(\d)/g, '$1 ÷ $2')
-      .replace(/(\d)\/(\d)/g, '$1 ÷ $2');
-    if (next === out) break;
+      .replace(/(\d)\s*\/\s*(\d)/g, '$1 ÷ $2');
+    changed = next !== out;
     out = next;
   }
   return out;

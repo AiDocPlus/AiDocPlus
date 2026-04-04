@@ -23,7 +23,6 @@ import {
   ScrollText,
   RotateCcw,
 } from 'lucide-react';
-import * as LucideIcons from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { Button } from '@/components/ui/button';
 import {
@@ -63,6 +62,7 @@ import {
 import { DocTypeChatMessage } from '../_shared/DocTypeChatMessage';
 import { DocTypeAIServiceMenu } from '../_shared/DocTypeAIServiceMenu';
 import { CollapsibleThinkingBlock } from '../_shared/CollapsibleThinkingBlock';
+import { DynamicIcon } from '../_shared/DynamicIcon';
 import {
   loadQuickActions,
   saveQuickActions,
@@ -72,18 +72,12 @@ import {
   type CalculatorQuickActionItem,
 } from './calculatorQuickActions';
 import { buildCalculatorSyntaxSummaryForAI } from './calculatorFunctionCatalog';
-import { CALCULATOR_DOCUMENT_AI_SYSTEM_BASE } from './calculatorAiPromptShared';
+import { getCalculatorSystemPrompt } from './calculatorAiPromptShared';
 import { buildSmartContext } from './calculatorContext';
 import { CalculatorCommandPalette } from './CalculatorCommandPalette';
 
 const CALC_SERVICE_STORAGE_KEY = '_calc_assistant_service_id';
 const CALC_CUSTOM_SYSTEM_KEY = '_calc_assistant_custom_system';
-
-function DynamicIcon({ name, className }: { name: string; className?: string }) {
-  const IconComponent = (LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string; iconNode?: any }>>)[name];
-  if (!IconComponent) return <Calculator className={className} />;
-  return <IconComponent className={className} />;
-}
 
 function resolveTheme(): 'light' | 'dark' {
   const t = useSettingsStore.getState().ui?.theme;
@@ -115,6 +109,9 @@ interface ChatSession {
 const MAX_HISTORY_MESSAGES = 12;
 const MAX_HISTORY_TOTAL_CHARS = 10000;
 const MAX_SINGLE_HISTORY_MSG_CHARS = 6000;
+const MAX_SESSIONS_COUNT = 20;
+const MAX_MESSAGES_PER_SESSION = 100;
+const MAX_SESSIONS_STORAGE_CHARS = 200_000; // ~200KB，防止单文档 localStorage 膨胀
 
 function sliceHistoryForApi(messages: ChatMessage[]): Array<{ role: 'user' | 'assistant'; content: string }> {
   const roleMsgs = messages.filter((m): m is ChatMessage & { role: 'user' | 'assistant' } =>
@@ -140,6 +137,44 @@ function sessionsStorageKey(documentId: string): string {
   return `_calc_sessions_${documentId}`;
 }
 
+/** 裁剪会话数据：限制会话数、每个会话消息数、总存储体积 */
+function pruneSessions(sessions: ChatSession[]): ChatSession[] {
+  // 1. 限制会话数量，保留最近活跃的
+  let pruned = sessions
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, MAX_SESSIONS_COUNT);
+
+  // 2. 限制每个会话的消息数量，保留最近的消息
+  pruned = pruned.map((s) => ({
+    ...s,
+    messages: s.messages.slice(-MAX_MESSAGES_PER_SESSION),
+  }));
+
+  // 3. 如果序列化后仍然过大，逐步裁剪最早会话的消息
+  try {
+    let json = JSON.stringify(pruned);
+    while (json.length > MAX_SESSIONS_STORAGE_CHARS && pruned.length > 0) {
+      // 找到最早更新的非活跃会话，删除其最早的一半消息
+      const oldest = pruned[pruned.length - 1];
+      if (oldest.messages.length > 2) {
+        oldest.messages = oldest.messages.slice(-Math.ceil(oldest.messages.length / 2));
+      } else {
+        // 消息已经很少了，直接移除该会话（但至少保留 1 个）
+        if (pruned.length > 1) {
+          pruned = pruned.slice(0, -1);
+        } else {
+          break;
+        }
+      }
+      json = JSON.stringify(pruned);
+    }
+  } catch {
+    // 序列化失败时不裁剪，由写入时的 try-catch 兜底
+  }
+
+  return pruned;
+}
+
 export function CalculatorAISidebar({
   document: doc,
   host,
@@ -150,6 +185,8 @@ export function CalculatorAISidebar({
   const { t, i18n } = useTranslation();
   const isEn = i18n.language === 'en';
   const sessionsKey = sessionsStorageKey(doc.id);
+  const msgIdRef = useRef(0);
+  const nextMsgId = () => `msg-${Date.now()}-${++msgIdRef.current}`;
 
   const aiServices = useSettingsStore((s) => s.ai.services);
   const enabledServices = useMemo(() => aiServices.filter((x) => x.enabled), [aiServices]);
@@ -214,7 +251,13 @@ export function CalculatorAISidebar({
   }, [messages, streamingContent, streaming]);
 
   useEffect(() => {
-    host.storage.set(sessionsKey, sessions);
+    try {
+      const toSave = pruneSessions(sessions);
+      host.storage.set(sessionsKey, toSave);
+    } catch {
+      // localStorage 满或序列化失败，静默忽略
+      // 裁剪逻辑已在 pruneSessions 中处理，此处为最终兜底
+    }
   }, [sessions, sessionsKey, host]);
 
   const updateActiveSession = useCallback(
@@ -226,8 +269,8 @@ export function CalculatorAISidebar({
 
   // 使用分层上下文引擎构建智能上下文
   const buildContext = useCallback(() => {
-    return buildSmartContext(activeSheet);
-  }, [activeSheet]);
+    return buildSmartContext(activeSheet, { isEn: i18n.language.startsWith('en') });
+  }, [activeSheet, i18n.language]);
 
   const extractAndInsertFormula = useCallback(
     (content: string) => {
@@ -245,7 +288,7 @@ export function CalculatorAISidebar({
       if (!messageContent || streaming || !aiAvailable) return;
 
       const userMessage: ChatMessage = {
-        id: `msg-${Date.now()}`,
+        id: nextMsgId(),
         role: 'user',
         content: messageContent,
         timestamp: Date.now(),
@@ -271,7 +314,7 @@ export function CalculatorAISidebar({
         defaultValue:
           '【回答约束】仅使用摘要中的函数与语法；金融符号见摘要「易错」；展示单位用双引号；可粘贴公式用 ```formula 每行一条。',
       });
-      let systemPrompt = `${CALCULATOR_DOCUMENT_AI_SYSTEM_BASE}
+      let systemPrompt = `${getCalculatorSystemPrompt(isEn)}
 
 ${context}
 
@@ -322,7 +365,7 @@ ${extraRules}
 
         if (!userStoppedRef.current) {
           const assistantMsg: ChatMessage = {
-            id: `msg-${Date.now()}`,
+            id: nextMsgId(),
             role: 'assistant',
             content: fullContent,
             timestamp: Date.now(),
@@ -342,7 +385,7 @@ ${extraRules}
               messages: [
                 ...s.messages,
                 {
-                  id: `msg-${Date.now()}`,
+                  id: nextMsgId(),
                   role: 'assistant',
                   content: partial,
                   timestamp: Date.now(),
@@ -357,7 +400,7 @@ ${extraRules}
             messages: [
               ...s.messages,
               {
-                id: `msg-${Date.now()}`,
+                id: nextMsgId(),
                 role: 'assistant',
                 content: `❌ ${formatBackendError(err)}`,
                 timestamp: Date.now(),
@@ -437,21 +480,33 @@ ${extraRules}
 
   const handleDeleteSession = useCallback(
     (id: string) => {
+      let targetSessionId: string | null = null;
       setSessions((prev) => {
         if (prev.length <= 1) return prev;
         const next = prev.filter((s) => s.id !== id);
         if (id === activeSessionId) {
-          setActiveSessionId(next[next.length - 1].id);
+          targetSessionId = next[next.length - 1].id;
         }
         return next;
       });
+      // 在 updater 外部执行副作用，保证 updater 是纯函数
+      if (targetSessionId) {
+        setActiveSessionId(targetSessionId);
+      }
     },
     [activeSessionId],
   );
 
   const handleClear = useCallback(() => {
+    const messages = sessions.find(s => s.id === activeSessionId)?.messages;
+    if (messages && messages.length > 0) {
+      const confirmed = window.confirm(
+        isEn ? 'Clear all messages in this conversation?' : '确定清空当前对话的所有消息？',
+      );
+      if (!confirmed) return;
+    }
     updateActiveSession((s) => ({ ...s, messages: [], updatedAt: Date.now() }));
-  }, [updateActiveSession]);
+  }, [updateActiveSession, sessions, activeSessionId, isEn]);
 
   const contextHint = useMemo(() => {
     const err = activeSheet.lines.filter((l) => l.result.type === 'error').length;
@@ -460,8 +515,19 @@ ${extraRules}
     ).length;
     const n = activeSheet.lines.length;
     const sn = activeSheet.name?.slice(0, 8) || '';
-    return `${sn}${sn ? ' · ' : ''}${n}行 ${v}变量${err ? ` ${err}错` : ''}`;
-  }, [activeSheet]);
+    return t('calculator.aiContextHint', {
+      defaultValue: '{{sheet}}{{sep}}{{lines}}{{linesLabel}} {{vars}}{{varsLabel}}{{errors}}',
+      sheet: sn,
+      sep: sn ? ' · ' : '',
+      lines: n,
+      linesLabel: t('calculator.contextLines', { defaultValue: '行' }),
+      vars: v,
+      varsLabel: t('calculator.contextVars', { defaultValue: '变量' }),
+      errors: err
+        ? ` ${err}${t('calculator.contextErrors', { defaultValue: '错' })}`
+        : '',
+    });
+  }, [activeSheet, t]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -631,7 +697,7 @@ ${extraRules}
                 return (
                   <DropdownMenuSub key={cat.id}>
                     <DropdownMenuSubTrigger className="text-xs gap-2">
-                      <DynamicIcon name={cat.icon} className="h-3.5 w-3.5 shrink-0" />
+                      <DynamicIcon name={cat.icon} className="h-3.5 w-3.5 shrink-0" fallback={Calculator} />
                       {isEn ? cat.labelEn : cat.label}
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent className="max-h-56 overflow-y-auto">
@@ -642,7 +708,7 @@ ${extraRules}
                           onClick={() => handleQuickAction(item)}
                           disabled={streaming || !aiAvailable}
                         >
-                          <DynamicIcon name={item.icon} className="h-3 w-3 shrink-0" />
+                          <DynamicIcon name={item.icon} className="h-3 w-3 shrink-0" fallback={Calculator} />
                           <span className="flex-1 truncate">{isEn ? item.labelEn : item.label}</span>
                           {actionStore.favorites?.includes(item.id) && (
                             <Star className="h-3 w-3 text-amber-500 fill-amber-500 shrink-0" />

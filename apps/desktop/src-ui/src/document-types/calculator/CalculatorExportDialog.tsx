@@ -2,7 +2,7 @@
  * CalculatorExportDialog — 计算结果导出对话框
  * 支持 CSV、TXT、JSON、Markdown 四种格式导出
  */
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Download, FileSpreadsheet, FileText, FileJson, FileCode2
@@ -64,6 +64,16 @@ export function CalculatorExportDialog({
   const [format, setFormat] = useState<ExportFormat>('csv');
   const [filename, setFilename] = useState(defaultTitle);
   const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
+
+  // 当对话框打开时，同步 filename 到 defaultTitle
+  const prevOpenRef = useRef(false);
+  useEffect(() => {
+    if (open && !prevOpenRef.current) {
+      setFilename(defaultTitle);
+    }
+    prevOpenRef.current = open;
+  }, [open, defaultTitle]);
 
   const csvColumnLabels = useMemo(
     () => ({
@@ -107,6 +117,7 @@ export function CalculatorExportDialog({
     const extension = format === 'md' ? 'md' : format;
     const fullFilename = `${filename || defaultTitle}.${extension}`;
     setExporting(true);
+    setExportError('');
     try {
       const filters =
         extension === 'md'
@@ -120,6 +131,7 @@ export function CalculatorExportDialog({
       if (path) onOpenChange(false);
     } catch (e) {
       console.error('[CalculatorExportDialog]', e);
+      setExportError(e instanceof Error ? e.message : String(e));
     } finally {
       setExporting(false);
     }
@@ -204,6 +216,13 @@ export function CalculatorExportDialog({
             })}
           </p>
         </div>
+
+        {/* 错误提示 */}
+        {exportError && (
+          <div className="text-sm text-destructive bg-destructive/10 rounded-md px-3 py-2">
+            {exportError}
+          </div>
+        )}
 
         {/* 底部按钮 */}
         <div className="flex justify-end gap-2 pt-4 border-t">

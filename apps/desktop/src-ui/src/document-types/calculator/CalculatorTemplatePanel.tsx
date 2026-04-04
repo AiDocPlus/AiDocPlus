@@ -1270,7 +1270,12 @@ export function loadCustomTemplates(): CalculatorTemplate[] {
   try {
     const saved = localStorage.getItem(STORAGE_KEY_CUSTOM_TEMPLATES);
     if (saved) {
-      return JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(
+          (t: unknown) => t && typeof t === 'object' && typeof (t as Record<string, unknown>).id === 'string',
+        );
+      }
     }
   } catch {
     // ignore
@@ -1290,7 +1295,10 @@ export function loadFavorites(): string[] {
   try {
     const saved = localStorage.getItem(STORAGE_KEY_FAVORITES);
     if (saved) {
-      return JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((id: unknown) => typeof id === 'string');
+      }
     }
   } catch {
     // ignore
@@ -1356,8 +1364,8 @@ function TemplateEditDialog({ open, onOpenChange, template, onSave }: TemplateEd
     const newTemplate: CalculatorTemplate = {
       id: template?.id || `tmpl_custom_${Date.now()}`,
       categoryId,
-      name: name || '新模板',
-      nameEn: nameEn || 'New Template',
+      name: name || t('calculator.newTemplateName', { defaultValue: '新模板' }),
+      nameEn: nameEn || t('calculator.newTemplateNameEn', { defaultValue: 'New Template' }),
       icon: 'Star',
       description: description || '',
       descriptionEn: descriptionEn || '',
@@ -1403,7 +1411,7 @@ function TemplateEditDialog({ open, onOpenChange, template, onSave }: TemplateEd
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {TEMPLATE_CATEGORIES.filter(c => c.id !== 'custom').map(cat => (
+                {TEMPLATE_CATEGORIES.map(cat => (
                   <SelectItem key={cat.id} value={cat.id}>
                     {isEn ? cat.nameEn : cat.name}
                   </SelectItem>
@@ -1583,11 +1591,13 @@ export function CalculatorTemplatePanel({
 
   // 复制模板
   const handleDuplicateTemplate = useCallback((template: CalculatorTemplate) => {
+    const isEn = i18n.language.startsWith('en');
+    const suffix = isEn ? ' (copy)' : ' (副本)';
     const newTemplate: CalculatorTemplate = {
       ...template,
       id: `tmpl_custom_${Date.now()}`,
-      name: `${template.name} (copy)`,
-      nameEn: `${template.nameEn} (copy)`,
+      name: `${template.name}${suffix}`,
+      nameEn: `${template.nameEn}${suffix}`,
       isCustom: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -1631,9 +1641,9 @@ export function CalculatorTemplatePanel({
 
         if (data.templates && Array.isArray(data.templates)) {
           setCustomTemplates(prev => {
-            const newTemplates = [...prev, ...data.templates.map((t: CalculatorTemplate) => ({
+            const newTemplates = [...prev, ...data.templates.map((t: CalculatorTemplate, i: number) => ({
               ...t,
-              id: `tmpl_imported_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+              id: `tmpl_imported_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}`,
               isCustom: true,
             }))];
             saveCustomTemplates(newTemplates);
@@ -1718,7 +1728,7 @@ export function CalculatorTemplatePanel({
                 )}
               </div>
             </SelectItem>
-            {TEMPLATE_CATEGORIES.filter(c => c.id !== 'custom').map(cat => (
+            {TEMPLATE_CATEGORIES.map(cat => (
               <SelectItem key={cat.id} value={cat.id}>
                 <div className="flex items-center gap-2">
                   <DynamicIcon name={cat.icon} className="h-3.5 w-3.5" />

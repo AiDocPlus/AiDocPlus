@@ -117,11 +117,19 @@ function tokenizeExpression(
   const operators = ['+', '-', '*', '/', '%', '=', '<', '>', '!', '&', '|', '^', ':', '?', '·'];
   const builtInFunctions = new Set([
     'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'sinh', 'cosh', 'tanh',
+    'asinh', 'acosh', 'atanh', 'cot', 'csc', 'sec', 'csch', 'sech', 'coth',
     'log', 'ln', 'exp', 'sqrt', 'abs', 'floor', 'ceil', 'round', 'pow',
     'min', 'max', 'sum', 'mean', 'avg', 'std', 'median', 'variance',
-    'npv', 'irr', 'pmt', 'fv', 'pv',
+    'erf', 'gamma', 'lgamma',
+    'npv', 'irr', 'pmt', 'fv', 'pv', 'nper', 'rate', 'ipmt', 'ppmt', 'mirr',
+    'normsdist', 'normsinv', 'normspdf',
+    'listAt', 'listSlice', 'listLen', 'listRange', 'listSort',
+    'rollMean', 'rollSum',
+    'quantileSeq', 'prod', 'atan2',
+    'xirr', 'xnpv',
     '合计', '求和', '平均', '均值', '最小值', '最大值', '标准差', '方差', '绝对值', '平方根', '开方',
   ]);
+  const builtInConstants = new Set(['e', 'pi', 'PI', 'i']);
 
   while (remaining.length > 0) {
     const spaceMatch = remaining.match(/^(\s+)/);
@@ -197,6 +205,8 @@ function tokenizeExpression(
       const name = idMatch[1];
       if (builtInFunctions.has(name.toLowerCase())) {
         tokens.push({ type: 'function', value: name });
+      } else if (builtInConstants.has(name)) {
+        tokens.push({ type: 'variable', value: name });
       } else if (variables.has(name)) {
         tokens.push({ type: 'variable', value: name });
       } else if (['line', 'lines', 'let', 'today', 'now', 'if', 'else'].includes(name.toLowerCase())) {
@@ -511,14 +521,25 @@ const SortableLineRow = memo(function SortableLineRow({
         </span>
       );
     }
+    if (line.lineRole === 'subtotal') {
+      return (
+        <span className="text-amber-700 dark:text-amber-400 text-xs font-medium">
+          {result.displayValue || t('calculator.rowKindSubtotal', { defaultValue: '小计' })}
+        </span>
+      );
+    }
     if (line.isNote) {
-      return <span className="text-muted-foreground/50 italic text-xs">comment</span>;
+      return (
+        <span className="text-muted-foreground/50 italic text-xs">
+          {t('calculator.rowKindComment', { defaultValue: '注释' })}
+        </span>
+      );
     }
     if (result.type === 'error') {
       return (
         <span className="text-red-400 text-xs flex items-center gap-1">
           <X className="h-3 w-3" />
-          {result.error || 'Error'}
+          {result.error || t('calculator.errorFallback', { defaultValue: 'Error' })}
         </span>
       );
     }
@@ -785,12 +806,17 @@ export const CalculatorLineEditor = forwardRef(function CalculatorLineEditor(
   /** 行间 ↑↓ 或插入行后，将光标放到目标行行末 */
   const pendingCaretEndLineRef = useRef<number | null>(null);
 
+  const variableNamesCacheRef = useRef<Set<string>>(new Set());
   const variableNames = useMemo(() => {
-    const set = new Set<string>(Object.keys(variables));
-    for (const n of inferAssignmentVariableNames(lines)) {
-      set.add(n);
+    const keys = Object.keys(variables);
+    const inferred = inferAssignmentVariableNames(lines);
+    const newSet = new Set<string>([...keys, ...inferred]);
+    const cached = variableNamesCacheRef.current;
+    if (newSet.size === cached.size && [...newSet].every(n => cached.has(n))) {
+      return cached;
     }
-    return set;
+    variableNamesCacheRef.current = newSet;
+    return newSet;
   }, [variables, lines]);
 
   // DnD sensors
@@ -923,7 +949,10 @@ export const CalculatorLineEditor = forwardRef(function CalculatorLineEditor(
 
     if (line.isNote) {
       // 移除注释符号
-      newExpression = line.expression.replace(/^(\/\/\s?|#\s?|@\s?|\/\*\s?)/, '');
+      newExpression = line.expression
+        .replace(/^\/\*\s*/, '')
+        .replace(/\s*\*\/\s*$/, '')
+        .replace(/^(\/\/\s?|#\s?|@\s?)/, '');
     } else {
       // 添加注释符号
       newExpression = '// ' + line.expression;
