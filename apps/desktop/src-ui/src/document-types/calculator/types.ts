@@ -73,7 +73,7 @@ export function inferLineRole(
 
 /** 标题/注释：不调用数学求值 */
 export function lineRoleSkipsEngineEvaluate(role: CalculatorLineRole): boolean {
-  return role === 'heading' || role === 'comment';
+  return role === 'heading' || role === 'comment' || role === 'subtotal';
 }
 
 /** 根据表达式与 # 行为刷新行的 lineRole / isNote（编辑时调用） */
@@ -467,7 +467,7 @@ export function parseCalculatorContent(content: string): CalculatorDocumentConte
     const parsed = JSON.parse(content);
 
     // V2 格式（多 Sheet）
-    if (parsed && typeof parsed === 'object' && parsed.version === 2 && Array.isArray(parsed.sheets)) {
+    if (parsed && typeof parsed === 'object' && parsed.version == 2 && Array.isArray(parsed.sheets)) {
       const p = parsed as Record<string, unknown>;
       const rawSheets = p.sheets as unknown[];
       const settingsIn = p.settings && typeof p.settings === 'object' && p.settings !== null
@@ -491,7 +491,7 @@ export function parseCalculatorContent(content: string): CalculatorDocumentConte
     }
 
     // V1 格式（单 Sheet）- 迁移到 V2
-    if (parsed && typeof parsed === 'object' && parsed.version === 1 && Array.isArray(parsed.lines)) {
+    if (parsed && typeof parsed === 'object' && parsed.version == 1 && Array.isArray(parsed.lines)) {
       const p1 = parsed as Record<string, unknown>;
       const settingsV1 =
         p1.settings && typeof p1.settings === 'object' && p1.settings !== null
@@ -607,6 +607,8 @@ export function generateLineId(): string {
 /** 检测是否为备注行 */
 export function isNoteLine(text: string): boolean {
   const trimmed = text.trimStart();
+  // subtotal / 小计 / 分计：特殊语义行，跳过引擎求值
+  if (SUBTOTAL_LINE_RE.test(trimmed)) return true;
   // 支持 //、#、@、/* 作为注释开头
   return trimmed.startsWith('//') || trimmed.startsWith('#') || trimmed.startsWith('@') || trimmed.startsWith('/*');
 }

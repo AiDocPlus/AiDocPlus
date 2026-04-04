@@ -4,11 +4,11 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from '@/i18n';
 import { Search, Star, Clock, Command, CornerDownLeft } from 'lucide-react';
-import * as LucideIcons from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { DynamicIcon } from '../_shared/DynamicIcon';
 import {
   loadQuickActions,
   saveQuickActions,
@@ -17,12 +17,6 @@ import {
   type TaskListQuickActionStore,
   type TaskListQuickActionItem,
 } from './taskListQuickActions';
-
-function DynamicIcon({ name, className }: { name: string; className?: string }) {
-  const IconComponent = (LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string; iconNode?: any }>>)[name];
-  if (!IconComponent) return <Search className={className} />;
-  return <IconComponent className={className} />;
-}
 
 const memoryStorage: Record<string, unknown> = {};
 const simpleStorage = {
@@ -74,7 +68,7 @@ export function TaskListCommandPalette({
     }
   }, [open]);
 
-  const isEn = i18n.language === 'en';
+  const isEn = i18n.language.startsWith('en');
 
   useEffect(() => {
     if (open) {
@@ -125,11 +119,11 @@ export function TaskListCommandPalette({
   }, [filteredItems.length, searchQuery, activeTab]);
 
   useEffect(() => {
-    if (listRef.current) {
-      const selectedElement = listRef.current.querySelector(`[data-index="${selectedIndex}"]`);
-      if (selectedElement) {
-        selectedElement.scrollIntoView({ block: 'nearest' });
-      }
+    if (!listRef.current) return;
+    const viewport = listRef.current.querySelector('[data-radix-scroll-area-viewport]');
+    const selectedElement = (viewport || listRef.current).querySelector(`[data-index="${selectedIndex}"]`);
+    if (selectedElement) {
+      selectedElement.scrollIntoView({ block: 'nearest' });
     }
   }, [selectedIndex]);
 
@@ -221,7 +215,7 @@ export function TaskListCommandPalette({
             ref={inputRef}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={isEn ? 'Search actions... (⌘K)' : '搜索快捷操作... (⌘K)'}
+            placeholder={t('taskList.paletteSearchPlaceholder', { defaultValue: '搜索快捷操作... (⌘K)' })}
             className="border-0 shadow-none focus-visible:ring-0 px-0 h-6"
             onKeyDown={handleKeyDown}
           />
@@ -237,7 +231,7 @@ export function TaskListCommandPalette({
             className="h-6 text-xs px-2"
             onClick={() => setActiveTab('all')}
           >
-            {isEn ? 'All' : '全部'}
+            {t('taskList.paletteTabAll', { defaultValue: '全部' })}
           </Button>
           <Button
             variant={activeTab === 'recent' ? 'secondary' : 'ghost'}
@@ -246,7 +240,7 @@ export function TaskListCommandPalette({
             onClick={() => setActiveTab('recent')}
           >
             <Clock className="h-3 w-3" />
-            {isEn ? 'Recent' : '最近'}
+            {t('taskList.paletteTabRecent', { defaultValue: '最近' })}
           </Button>
           <Button
             variant={activeTab === 'favorites' ? 'secondary' : 'ghost'}
@@ -255,11 +249,11 @@ export function TaskListCommandPalette({
             onClick={() => setActiveTab('favorites')}
           >
             <Star className="h-3 w-3" />
-            {isEn ? 'Favorites' : '收藏'}
+            {t('taskList.paletteTabFavorites', { defaultValue: '收藏' })}
           </Button>
           <div className="flex-1" />
           <span className="text-xs text-muted-foreground">
-            {filteredItems.length} {isEn ? 'results' : '结果'}
+            {filteredItems.length} {t('taskList.paletteResults', { defaultValue: '结果' })}
           </span>
         </div>
 
@@ -267,7 +261,7 @@ export function TaskListCommandPalette({
           <div className="py-1">
             {filteredItems.length === 0 ? (
               <div className="text-center text-muted-foreground text-sm py-8">
-                {isEn ? 'No actions found' : '未找到匹配的操作'}
+                {t('taskList.paletteNoResults', { defaultValue: '未找到匹配的操作' })}
               </div>
             ) : groupedItems ? (
               groupedItems.map(({ category, items }) => (
@@ -294,8 +288,7 @@ export function TaskListCommandPalette({
                             {isEn ? item.labelEn : item.label}
                           </div>
                           <div className="text-xs text-muted-foreground truncate">
-                            {item.prompt.slice(0, 50)}
-                            …
+                            {item.prompt.length > 50 ? `${item.prompt.slice(0, 50)}…` : item.prompt}
                           </div>
                         </div>
                         <Button
@@ -361,15 +354,15 @@ export function TaskListCommandPalette({
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1">
               <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">↑↓</kbd>
-              {isEn ? 'Navigate' : '导航'}
+              {t('taskList.paletteNavigate', { defaultValue: '导航' })}
             </span>
             <span className="flex items-center gap-1">
               <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">↵</kbd>
-              {isEn ? 'Select' : '选择'}
+              {t('taskList.paletteSelect', { defaultValue: '选择' })}
             </span>
             <span className="flex items-center gap-1">
               <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">Tab</kbd>
-              {isEn ? 'Switch tab' : '切换标签'}
+              {t('taskList.paletteSwitchTab', { defaultValue: '切换标签' })}
             </span>
           </div>
           <span className="flex items-center gap-1">

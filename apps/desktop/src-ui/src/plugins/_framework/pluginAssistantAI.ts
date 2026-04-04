@@ -74,8 +74,14 @@ export async function chatWithPluginAssistant(
   onChunk: (delta: string) => void,
   signal?: AbortSignal,
   serviceId?: string,
+  options?: { enableWebSearch?: boolean; enableThinking?: boolean },
 ): Promise<string> {
-  return host.ai.chatStream(messages, onChunk, { signal, serviceId });
+  return host.ai.chatStream(messages, onChunk, {
+    signal,
+    serviceId,
+    enableWebSearch: options?.enableWebSearch,
+    enableThinking: options?.enableThinking,
+  });
 }
 
 // ── 导出对话为 Markdown ──

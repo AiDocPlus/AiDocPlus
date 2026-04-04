@@ -472,6 +472,8 @@ export function MarkdownEditor({
         { key: 'Mod-g', run: () => { window.dispatchEvent(new CustomEvent('editor-menu-action', { detail: 'goto_line' })); return true; } },
       ]),
       updateListener,
+      // 内容底部留白，使最后一行可以滚动到视窗顶部附近
+      scrollPastEnd(),
     ];
 
     const state = EditorState.create({

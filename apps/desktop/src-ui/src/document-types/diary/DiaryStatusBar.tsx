@@ -1,20 +1,25 @@
 /**
  * DiaryStatusBar — 日记编辑器状态栏
  *
- * 显示：字数、今日目标进度、连续天数、保存状态
- * 注意：心情和天气已在工具栏显示，此处不再重复
+ * 显示：保存状态、字数、段落、阅读时间、今日目标进度、连续天数、今日字数
+ * 支持专注模式（最小化显示）
  */
-import { Flame, Target, CheckCircle, Clock } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/i18n';
 import type { DiaryEntry } from './types';
+import { STATUS_BAR_CLASS } from '../_shared/styles';
 
 interface DiaryStatusBarProps {
   entry: DiaryEntry | null;
   todayWordCount: number;
   dailyGoal: number;
   streak: number;
-  sessionTime?: number; // 写作时长（秒）
+  chapterWords: number;
+  paragraphCount: number;
+  readingTimeMin: number;
+  writingTime?: number; // 写作计时器秒数
+  focusMode?: boolean;
   saveStatus: 'saved' | 'saving' | 'unsaved';
 }
 
@@ -23,111 +28,84 @@ export default function DiaryStatusBar({
   todayWordCount,
   dailyGoal,
   streak,
-  sessionTime,
+  chapterWords,
+  paragraphCount,
+  readingTimeMin,
+  writingTime = 0,
+  focusMode = false,
   saveStatus,
 }: DiaryStatusBarProps) {
   const { t } = useTranslation();
 
-  const formatSessionTime = (seconds: number): string => {
-    if (seconds < 60) return `${seconds}s`;
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
-  };
-
-  // 计算目标进度
   const goalProgress = dailyGoal > 0 ? Math.min(100, Math.round((todayWordCount / dailyGoal) * 100)) : 0;
   const goalReached = dailyGoal > 0 && todayWordCount >= dailyGoal;
 
-  return (
-    <div className="flex items-center gap-3 px-3 py-1 text-xs text-muted-foreground border-t bg-card/50">
-      {/* 字数 */}
-      <div className="flex items-center gap-1">
-        <span className="font-medium tabular-nums">{entry?.wordCount || 0}</span>
-        <span>{t('diary.charUnit', { defaultValue: '字' })}</span>
+  // 专注模式：最小状态栏
+  if (focusMode) {
+    return (
+      <div className={cn(STATUS_BAR_CLASS, 'text-[10px] bg-card/80')}>
+        <span className={cn('flex items-center gap-0.5',
+          saveStatus === 'unsaved' ? 'text-amber-500' : saveStatus === 'saving' ? 'text-blue-500' : 'text-green-500')}>
+          {saveStatus === 'saved' ? '✅' : saveStatus === 'saving' ? '⏳' : '⚠️'}
+        </span>
+        <span className="tabular-nums">{chapterWords}{t('diary.charUnit', { defaultValue: '字' })}</span>
+        {dailyGoal > 0 && (
+          <>
+            <span className="w-px h-3 bg-border" />
+            <span className={cn('tabular-nums', todayWordCount >= dailyGoal ? 'text-green-600 dark:text-green-400' : '')}>
+              {todayWordCount}/{dailyGoal}
+            </span>
+          </>
+        )}
+        <div className="flex-1" />
+        <span className="text-muted-foreground/50">{t('diary.pressEscToExit', { defaultValue: '按 Esc 退出专注' })}</span>
       </div>
+    );
+  }
 
-      {/* 分隔符 */}
-      <div className="w-px h-3 bg-border" />
-
-      {/* 今日目标进度 */}
-      {dailyGoal > 0 && (
-        <div className="flex items-center gap-1">
-          {goalReached ? (
-            <CheckCircle className="h-3.5 w-3.5 text-green-500" />
-          ) : (
-            <Target className="h-3.5 w-3.5" />
-          )}
-          <div className="flex items-center gap-1">
-            <span className={cn(goalReached && 'text-green-600 font-medium')}>
-              {todayWordCount}
-            </span>
-            <span>/</span>
-            <span>{dailyGoal}</span>
-          </div>
-          {/* 进度条 */}
-          <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-            <div
-              className={cn(
-                'h-full transition-all rounded-full',
-                goalReached ? 'bg-green-500' : 'bg-primary'
-              )}
-              style={{ width: `${goalProgress}%` }}
-            />
-          </div>
-          {goalReached && (
-            <span className="text-green-600 font-medium">
-              {t('diary.dailyGoalReached', { defaultValue: '达成!' })}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* 分隔符 */}
-      {dailyGoal > 0 && <div className="w-px h-3 bg-border" />}
-
-      {/* 连续天数 */}
-      {streak > 0 && (
-        <div className="flex items-center gap-0.5">
-          <Flame className="h-3.5 w-3.5 text-orange-500" />
-          <span className="font-medium tabular-nums">{streak}</span>
-          <span>{t('diary.streak', { defaultValue: '天' }).replace(/{{count}}/g, '')}</span>
-        </div>
-      )}
-
-      {/* 写作时长 */}
-      {sessionTime && sessionTime > 0 && (
+  return (
+    <div className={cn(STATUS_BAR_CLASS, 'text-[10px]')}>
+      {/* 保存状态 */}
+      <span className={cn('flex items-center gap-0.5',
+        saveStatus === 'unsaved' ? 'text-amber-500' : saveStatus === 'saving' ? 'text-blue-500' : 'text-green-500')}>
+        {saveStatus === 'saved' ? '✅' : saveStatus === 'saving' ? '⏳' : '⚠️'}
+        {saveStatus === 'saved' ? t('diary.statusSaved', { defaultValue: '已保存' })
+          : saveStatus === 'saving' ? t('diary.statusSaving', { defaultValue: '保存中...' })
+          : t('diary.statusUnsaved', { defaultValue: '未保存' })}
+      </span>
+      <span className="w-px h-3 bg-border" />
+      <span className="tabular-nums">{chapterWords}{t('diary.charUnit', { defaultValue: '字' })}</span>
+      <span className="w-px h-3 bg-border" />
+      <span>{paragraphCount}{t('diary.paragraphUnit', { defaultValue: '段' })}</span>
+      <span className="w-px h-3 bg-border" />
+      <span className="flex items-center gap-0.5"><Clock className="h-2.5 w-2.5" />{t('diary.readingTime', { defaultValue: '约{{min}}分钟', min: readingTimeMin })}</span>
+      {/* 每日字数目标进度 */}
+      {writingTime > 0 && (
         <>
-          <div className="w-px h-3 bg-border" />
-          <div className="flex items-center gap-0.5">
-            <Clock className="h-3.5 w-3.5" />
-            <span className="tabular-nums">{formatSessionTime(sessionTime)}</span>
-          </div>
+          <span className="w-px h-3 bg-border" />
+          <span className="flex items-center gap-0.5 text-muted-foreground">
+            <span>{writingTime < 60 ? `${writingTime}s` : `${Math.floor(writingTime / 60)}:${String(writingTime % 60).padStart(2, '0')}`}</span>
+          </span>
         </>
       )}
-
-      {/* 弹性空间 */}
+      {dailyGoal > 0 && (
+        <>
+          <span className="w-px h-3 bg-border" />
+          <span className="flex items-center gap-1">
+            <span className={cn('tabular-nums', goalReached ? 'text-green-600 dark:text-green-400 font-medium' : '')}>
+              {goalReached ? '✅' : '🎯'} {todayWordCount}/{dailyGoal}
+            </span>
+            <span className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+              <span className={cn('block h-full rounded-full transition-all',
+                goalReached ? 'bg-green-500' : todayWordCount >= dailyGoal * 0.7 ? 'bg-yellow-500' : 'bg-primary/60',
+              )} style={{ width: `${goalProgress}%` }} />
+            </span>
+          </span>
+        </>
+      )}
       <div className="flex-1" />
-
-      {/* 保存状态 */}
-      <div className={cn(
-        'flex items-center gap-0.5',
-        saveStatus === 'saved' && 'text-green-600',
-        saveStatus === 'saving' && 'text-amber-600',
-        saveStatus === 'unsaved' && 'text-muted-foreground',
-      )}>
-        <div className={cn(
-          'w-1.5 h-1.5 rounded-full',
-          saveStatus === 'saved' && 'bg-green-500',
-          saveStatus === 'saving' && 'bg-amber-500 animate-pulse',
-          saveStatus === 'unsaved' && 'bg-muted-foreground/50',
-        )} />
-        <span>
-          {saveStatus === 'saved' && t('diary.statusSaved', { defaultValue: '已保存' })}
-          {saveStatus === 'saving' && t('diary.statusSaving', { defaultValue: '保存中...' })}
-          {saveStatus === 'unsaved' && t('diary.statusUnsaved', { defaultValue: '未保存' })}
-        </span>
-      </div>
+      <span>🔥 {t('diary.streak', { defaultValue: '连续{{count}}天', count: streak })}</span>
+      <span className="text-green-600 dark:text-green-400">{t('diary.todayWords', { defaultValue: '今日+{{count}}', count: todayWordCount })}</span>
     </div>
   );
 }

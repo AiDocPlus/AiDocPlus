@@ -13,10 +13,18 @@ import { getAIInvokeParamsForService } from '@/stores/useSettingsStore';
 import { formatBackendError } from '@/lib/backendError';
 import type { DocTypeHostAPI } from '@/doctype-sdk/types';
 import type { DiaryDocumentContent } from './types';
+import { getTodayDateStr } from './types';
 import { buildDailyPromptRequest, buildDiarySystemPrompt } from './diaryContext';
 
-const CACHE_KEY = '_diary_daily_prompt';
-const CACHE_DATE_KEY = '_diary_daily_prompt_date';
+const CACHE_KEY_PREFIX = '_diary_daily_prompt';
+const CACHE_DATE_KEY_PREFIX = '_diary_daily_prompt_date';
+
+function cacheKeysForDoc(docId: string) {
+  return {
+    cacheKey: `${CACHE_KEY_PREFIX}_${docId}`,
+    dateKey: `${CACHE_DATE_KEY_PREFIX}_${docId}`,
+  };
+}
 
 interface CachedPrompt {
   prompts: string[];
@@ -37,18 +45,19 @@ export default function DiaryDailyPrompt({ host, diary, onStartWithPrompt }: Dia
 
   const aiParams = getAIInvokeParamsForService();
   const aiAvailable = !!(aiParams.provider && aiParams.apiKey && aiParams.model);
+  const { cacheKey, dateKey } = cacheKeysForDoc(host.documentId);
 
   // 从缓存加载（不自动调用 AI，由用户主动触发）
   useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const cachedDate = host.storage.get<string>(CACHE_DATE_KEY);
+    const today = getTodayDateStr();
+    const cachedDate = host.storage.get<string>(dateKey);
     if (cachedDate === today) {
-      const cached = host.storage.get<CachedPrompt>(CACHE_KEY);
+      const cached = host.storage.get<CachedPrompt>(cacheKey);
       if (cached && cached.prompts.length > 0) {
         setPrompts(cached.prompts);
       }
     }
-  }, []);
+  }, [host.documentId, cacheKey, dateKey]);
 
   const generatePrompts = useCallback(async () => {
     if (!aiAvailable || loading) return;
@@ -75,15 +84,15 @@ export default function DiaryDailyPrompt({ host, diary, onStartWithPrompt }: Dia
       const result = lines.slice(0, 5);
       setPrompts(result);
       // 缓存
-      const today = new Date().toISOString().slice(0, 10);
-      host.storage.set(CACHE_KEY, { prompts: result, date: today });
-      host.storage.set(CACHE_DATE_KEY, today);
+      const today = getTodayDateStr();
+      host.storage.set(cacheKey, { prompts: result, date: today });
+      host.storage.set(dateKey, today);
     } catch (err) {
       setError(formatBackendError(err));
     } finally {
       setLoading(false);
     }
-  }, [aiAvailable, loading, diary, host.ai, host.storage]);
+  }, [aiAvailable, loading, diary, host.ai, host.storage, cacheKey, dateKey]);
 
   if (!aiAvailable) return null;
 

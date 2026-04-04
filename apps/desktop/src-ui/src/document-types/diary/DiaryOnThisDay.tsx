@@ -37,7 +37,7 @@ export default function DiaryOnThisDay({ entries, onSelectEntry }: DiaryOnThisDa
         <div className="px-2 pb-2 space-y-1 max-h-[200px] overflow-auto">
           {entries.map(entry => {
             const year = entry.date.slice(0, 4);
-            const excerpt = entry.content.replace(/^#+\s+/gm, '').replace(/\n/g, ' ').trim();
+            const excerpt = (entry.content || '').replace(/\n/g, ' ').trim();
             const displayExcerpt = excerpt.length > 50 ? excerpt.slice(0, 50) + '...' : excerpt;
 
             return (
@@ -49,7 +49,7 @@ export default function DiaryOnThisDay({ entries, onSelectEntry }: DiaryOnThisDa
                 <div className="flex items-center gap-1.5 text-sm">
                   <span className="text-muted-foreground font-medium">{year}年</span>
                   {entry.mood && <span>{MOOD_EMOJI[entry.mood]}</span>}
-                  <span className="truncate font-medium">{entry.title || entry.time}</span>
+                  <span className="truncate font-medium">{entry.title || entry.time || t('diary.untitled', { defaultValue: '无标题' })}</span>
                 </div>
                 {displayExcerpt && (
                   <div className="text-xs text-muted-foreground mt-0.5 truncate">{displayExcerpt}</div>

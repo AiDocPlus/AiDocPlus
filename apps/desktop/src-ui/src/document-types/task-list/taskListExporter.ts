@@ -4,18 +4,6 @@
 import type { TaskListDocumentContent } from './types';
 import { PRIORITY_CONFIG, normalizeTaskPriority } from './types';
 
-export function downloadExport(content: string, filename: string, mimeType: string): void {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
 function escapeCSVField(field: string): string {
   if (field.includes(',') || field.includes('"') || field.includes('\n')) {
     return `"${field.replace(/"/g, '""')}"`;
@@ -27,6 +15,7 @@ function escapeCSVField(field: string): string {
 export function exportTaskListToMarkdown(
   doc: TaskListDocumentContent,
   labels: { list: string; pending: string; completed: string; priority: string; status: string },
+  isEn = false,
 ): string {
   const lines: string[] = [`# ${labels.list}`, ''];
   for (const list of doc.lists) {
@@ -36,7 +25,7 @@ export function exportTaskListToMarkdown(
     if (pending.length > 0) {
       lines.push(`### ${labels.pending}`, '');
       for (const t of pending) {
-        const pr = PRIORITY_CONFIG[normalizeTaskPriority(t.priority)].label;
+        const pr = PRIORITY_CONFIG[normalizeTaskPriority(t.priority)][isEn ? 'labelEn' : 'label'];
         const content = t.content.replace(/\n/g, ' ');
         lines.push(`- [ ] **${pr}** ${content}`);
       }
@@ -79,12 +68,12 @@ export function exportTaskListToCSV(
 }
 
 /** 纯文本（全列表） */
-export function exportTaskListToTXT(doc: TaskListDocumentContent): string {
+export function exportTaskListToTXT(doc: TaskListDocumentContent, isEn = false): string {
   const lines: string[] = [];
   for (const list of doc.lists) {
     lines.push(`【${list.name}】`, '');
     for (const t of list.tasks) {
-      const pr = PRIORITY_CONFIG[normalizeTaskPriority(t.priority)].label;
+      const pr = PRIORITY_CONFIG[normalizeTaskPriority(t.priority)][isEn ? 'labelEn' : 'label'];
       const mark = t.status === 'completed' ? '✓' : '□';
       lines.push(`${mark} [${pr}] ${t.content}`);
       lines.push('');
@@ -110,6 +99,7 @@ interface ImageRow {
 function buildImageRows(
   doc: TaskListDocumentContent,
   labels: { list: string; pending: string; completed: string },
+  isEn = false,
 ): ImageRow[] {
   const rows: ImageRow[] = [];
   rows.push({ kind: 'title', text: labels.list });
@@ -122,7 +112,7 @@ function buildImageRows(
     if (pending.length > 0) {
       rows.push({ kind: 'h3', text: labels.pending });
       for (const t of pending) {
-        const pr = PRIORITY_CONFIG[normalizeTaskPriority(t.priority)].label;
+        const pr = PRIORITY_CONFIG[normalizeTaskPriority(t.priority)][isEn ? 'labelEn' : 'label'];
         const content = t.content.replace(/\n/g, ' ');
         rows.push({ kind: 'body', text: `☐ [${pr}] ${content}` });
       }
@@ -173,6 +163,7 @@ function lineHeightForKind(kind: ImageRowKind): number {
 /** 按像素宽度折行（支持中英文混排） */
 function wrapLineToWidth(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   if (!text) return [''];
+  if (maxWidth <= 0) return [text];
   const lines: string[] = [];
   let i = 0;
   while (i < text.length) {
@@ -198,6 +189,7 @@ const MAX_IMAGE_LINE_COUNT = 450;
 function renderTaskListRasterCanvas(
   doc: TaskListDocumentContent,
   labels: { list: string; pending: string; completed: string },
+  isEn = false,
 ): HTMLCanvasElement | null {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
@@ -207,7 +199,7 @@ function renderTaskListRasterCanvas(
   const contentWidth = 760;
   const maxTextWidth = contentWidth;
 
-  const rawRows = buildImageRows(doc, labels);
+  const rawRows = buildImageRows(doc, labels, isEn);
   const drawLines: { text: string; font: string; lineHeight: number }[] = [];
 
   for (const row of rawRows) {
@@ -257,37 +249,13 @@ export function exportTaskListRasterToBlob(
   doc: TaskListDocumentContent,
   format: 'png' | 'jpeg',
   labels: { list: string; pending: string; completed: string },
+  isEn = false,
 ): Promise<Blob | null> {
-  const canvas = renderTaskListRasterCanvas(doc, labels);
+  const canvas = renderTaskListRasterCanvas(doc, labels, isEn);
   if (!canvas) return Promise.resolve(null);
   const mime = format === 'jpeg' ? 'image/jpeg' : 'image/png';
   const q = format === 'jpeg' ? 0.92 : undefined;
   return new Promise((resolve) => {
     canvas.toBlob((blob) => resolve(blob), mime, q);
   });
-}
-
-/**
- * 将任务清单渲染为 PNG / JPEG 并触发浏览器下载（无系统保存对话框时使用）
- */
-export function downloadTaskListAsRasterImage(
-  doc: TaskListDocumentContent,
-  format: 'png' | 'jpeg',
-  labels: { list: string; pending: string; completed: string },
-  filename: string,
-): void {
-  void exportTaskListRasterToBlob(doc, format, labels).then((blob) => {
-    if (blob) downloadBlob(blob, filename);
-  });
-}
-
-function downloadBlob(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 }

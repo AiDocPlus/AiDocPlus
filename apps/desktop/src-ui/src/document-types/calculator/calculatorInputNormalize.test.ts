@@ -21,6 +21,16 @@ describe('calculatorInputNormalize', () => {
     expect(normalizeCalculatorInput('[12, 15, 18]')).toBe('[12, 15, 18]');
   });
 
+  it('preserves commas inside array brackets (no spaces)', () => {
+    expect(stripThousandsSeparators('[100,234,567]')).toBe('[100,234,567]');
+    expect(stripThousandsSeparators('sum([1,234])')).toBe('sum([1,234])');
+    expect(stripThousandsSeparators('[1,234,567.89]')).toBe('[1,234,567.89]');
+  });
+
+  it('strips thousands outside brackets even with adjacent array', () => {
+    expect(stripThousandsSeparators('1,234 + [100,200]')).toBe('1234 + [100,200]');
+  });
+
   it('handles ‰ ‱ and middle dot between digits', () => {
     expect(normalizeCalculatorInput('5‰')).toBe('(5/1000)');
     expect(normalizeCalculatorInput('2‱')).toBe('(2/10000)');
@@ -37,5 +47,11 @@ describe('calculatorInputNormalize', () => {
     expect(formatExpressionOperatorsForDisplay('3*4', 'ascii')).toBe('3*4');
     expect(formatExpressionOperatorsForDisplay('3*4', 'cjk')).toBe('3 × 4');
     expect(formatExpressionOperatorsForDisplay('2*3*4', 'cjk')).toBe('2 × 3 × 4');
+    expect(formatExpressionOperatorsForDisplay('1*2*3*4*5*6*7*8*9*10', 'cjk')).toBe('1 × 2 × 3 × 4 × 5 × 6 × 7 × 8 × 9 × 10');
+  });
+
+  it('normalizes 乘以/除以 between identifiers without spaces', () => {
+    expect(normalizeCalculatorInput('利润乘以税率')).toBe('利润*税率');
+    expect(normalizeCalculatorInput('总价除以数量')).toBe('总价/数量');
   });
 });

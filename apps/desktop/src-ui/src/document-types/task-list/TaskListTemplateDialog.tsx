@@ -1,7 +1,7 @@
 /**
  * TaskListTemplateDialog — 模板选择对话框
  */
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   FileCode2,
@@ -69,6 +69,14 @@ export function TaskListTemplateDialog({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
+  // 关闭时重置搜索和分类状态
+  useEffect(() => {
+    if (!open) {
+      setSearchQuery('');
+      setSelectedCategory(null);
+    }
+  }, [open]);
+
   // 分组模板
   const groupedTemplates = useMemo(
     () => groupTemplatesByCategory(TASKLIST_TEMPLATES),
@@ -81,21 +89,21 @@ export function TaskListTemplateDialog({
 
     // 按分类过滤
     if (selectedCategory) {
-      templates = templates.filter((t) => t.category === selectedCategory);
+      templates = templates.filter((tpl) => tpl.category === selectedCategory);
     }
 
-    // 按搜索词过滤
+    // 按搜索词过滤（用翻译后的名称，而非 i18n key 原始字符串）
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       templates = templates.filter(
-        (t) =>
-          t.nameKey.toLowerCase().includes(query) ||
-          t.tasks.some((task) => task.content.toLowerCase().includes(query)),
+        (tpl) =>
+          t(`taskList.templates.${tpl.id}`, { defaultValue: t(tpl.nameKey) }).toLowerCase().includes(query) ||
+          tpl.tasks.some((task) => task.content.toLowerCase().includes(query)),
       );
     }
 
     return templates;
-  }, [selectedCategory, searchQuery]);
+  }, [selectedCategory, searchQuery, t]);
 
   // 处理模板选择
   const handleSelectTemplate = (template: TaskListTemplate) => {

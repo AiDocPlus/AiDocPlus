@@ -14,8 +14,7 @@ import {
   parseImport, mergeImportedEntries,
   type ImportResult, type ConflictMode,
 } from './diaryImport';
-
-const DIALOG_STYLE = { fontFamily: "'宋体', 'SimSun', serif", fontSize: '16px' };
+import { DIALOG_STYLE } from '../_shared/styles';
 
 // FORMAT_LABELS 在组件内通过 t() 初始化
 
@@ -35,25 +34,36 @@ export default function DiaryImportDialog({
     'dayone-json': 'Day One JSON',
     'markdown': 'Markdown',
     'plaintext': t('diary.formatPlainText', { defaultValue: '纯文本' }),
+    'csv': 'CSV',
     'unknown': t('diary.formatUnknown', { defaultValue: '未知格式' }),
   };
   const [result, setResult] = useState<ImportResult | null>(null);
   const [conflictMode, setConflictMode] = useState<ConflictMode>('skip');
   const [targetJournalId, setTargetJournalId] = useState(diary.settings.defaultJournalId);
   const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState('');
   const [importResult, setImportResult] = useState<{ added: number; skipped: number; overwritten: number } | null>(null);
 
   const handleFileSelect = useCallback(async () => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.json,.md,.txt,.markdown';
+    input.accept = '.json,.md,.txt,.markdown,.csv';
     input.onchange = async () => {
       const file = input.files?.[0];
       if (!file) return;
-      const text = await file.text();
-      const parsed = parseImport(text);
-      setResult(parsed);
-      setImportResult(null);
+      if (file.size > 50 * 1024 * 1024) {
+        setImportError(t('diary.fileTooLarge', { defaultValue: '文件过大（超过 50MB）' }));
+        return;
+      }
+      try {
+        const text = await file.text();
+        const parsed = parseImport(text);
+        setResult(parsed);
+        setImportResult(null);
+        setImportError(''); // 清除之前的错误提示
+      } catch {
+        setImportError(t('diary.fileReadError', { defaultValue: '文件读取失败' }));
+      }
     };
     input.click();
   }, []);
@@ -84,6 +94,7 @@ export default function DiaryImportDialog({
           <FileUp className="h-4 w-4 text-blue-500" />
           <span className="text-sm font-medium">{t('diary.importDiary', { defaultValue: '导入日记' })}</span>
           <div className="flex-1" />
+          {importError && <span className="text-xs text-red-500">{importError}</span>}
           {result && result.entries.length > 0 && !importResult && (
             <Button variant="default" size="sm" className="h-7 text-xs gap-1" onClick={handleImport} disabled={importing}>
               <FileUp className="h-3 w-3" />

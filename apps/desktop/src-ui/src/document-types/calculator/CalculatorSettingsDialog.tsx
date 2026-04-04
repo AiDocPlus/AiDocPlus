@@ -2,7 +2,7 @@
  * CalculatorSettingsDialog — 计算文档设置对话框
  * 配置小数位数、日期格式、货币符号、实时计算等（由父组件控制 open）
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Settings, Hash, Calendar, DollarSign, Zap, Check, Divide,
@@ -81,8 +81,12 @@ export function CalculatorSettingsDialog({
     () => ({ ...DEFAULT_SETTINGS, ...settings })
   );
 
+  const prevOpenRef = useRef(false);
   useEffect(() => {
-    setLocalSettings({ ...DEFAULT_SETTINGS, ...settings });
+    if (open && !prevOpenRef.current) {
+      setLocalSettings({ ...DEFAULT_SETTINGS, ...settings });
+    }
+    prevOpenRef.current = open;
   }, [settings, open]);
 
   const handleSave = () => {
@@ -91,7 +95,7 @@ export function CalculatorSettingsDialog({
   };
 
   const handleReset = () => {
-    setLocalSettings(DEFAULT_SETTINGS);
+    setLocalSettings({ ...DEFAULT_SETTINGS });
   };
 
   const updateSetting = <K extends keyof CalculatorSettings>(

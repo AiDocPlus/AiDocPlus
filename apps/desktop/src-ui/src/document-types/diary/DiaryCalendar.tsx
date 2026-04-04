@@ -30,9 +30,6 @@ interface DiaryCalendarProps {
   weekStartsOn: 0 | 1;
 }
 
-const WEEKDAY_LABELS_MON = ['一', '二', '三', '四', '五', '六', '日'];
-const WEEKDAY_LABELS_SUN = ['日', '一', '二', '三', '四', '五', '六'];
-
 function getHeatColor(wordCount: number): string {
   if (wordCount === 0) return '';
   if (wordCount < 100) return 'bg-green-100 dark:bg-green-900/30';
@@ -58,7 +55,9 @@ export default function DiaryCalendar({
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
 
-  const weekLabels = weekStartsOn === 1 ? WEEKDAY_LABELS_MON : WEEKDAY_LABELS_SUN;
+  const weekLabels = weekStartsOn === 1
+    ? [t('diary.weekdayShortMon', { defaultValue: '一' }), t('diary.weekdayShortTue', { defaultValue: '二' }), t('diary.weekdayShortWed', { defaultValue: '三' }), t('diary.weekdayShortThu', { defaultValue: '四' }), t('diary.weekdayShortFri', { defaultValue: '五' }), t('diary.weekdayShortSat', { defaultValue: '六' }), t('diary.weekdayShortSun', { defaultValue: '日' })]
+    : [t('diary.weekdayShortSun', { defaultValue: '日' }), t('diary.weekdayShortMon', { defaultValue: '一' }), t('diary.weekdayShortTue', { defaultValue: '二' }), t('diary.weekdayShortWed', { defaultValue: '三' }), t('diary.weekdayShortThu', { defaultValue: '四' }), t('diary.weekdayShortFri', { defaultValue: '五' }), t('diary.weekdayShortSat', { defaultValue: '六' })];
 
   const days = useMemo(() => {
     const monthStart = startOfMonth(currentDate);
@@ -71,6 +70,30 @@ export default function DiaryCalendar({
   const wordCountMap = useMemo(() => getWordCountByDay(diary, year, month), [diary, year, month]);
   const moodMap = useMemo(() => getMoodByDay(diary, year, month), [diary, year, month]);
 
+  // 跨月日期补充查询：仅收集网格中实际出现的非当月日期
+  const crossMonthData = useMemo(() => {
+    const data = new Map<string, { wc: number; mood: DiaryMood | undefined }>();
+    const prefix = `${year}-${String(month).padStart(2, '0')}`;
+    // 先收集网格中非当月的日期集合
+    const crossDates = new Set<string>();
+    for (const day of days) {
+      const dateStr = format(day, 'yyyy-MM-dd');
+      if (!dateStr.startsWith(prefix)) crossDates.add(dateStr);
+    }
+    if (crossDates.size === 0) return data;
+    // 只遍历条目，匹配网格中需要的跨月日期
+    for (const entry of diary.entries) {
+      if (entry.deletedAt || !crossDates.has(entry.date)) continue;
+      const existing = data.get(entry.date);
+      const wc = (existing?.wc || 0) + entry.wordCount;
+      data.set(entry.date, {
+        wc,
+        mood: entry.mood || existing?.mood,
+      });
+    }
+    return data;
+  }, [diary, year, month, days]);
+
   return (
     <div className="flex flex-col px-1.5 py-1.5">
       {/* 月份导航 */}
@@ -78,7 +101,7 @@ export default function DiaryCalendar({
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onMonthChange(subMonths(currentDate, 1))}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <span className="text-sm font-medium">{year}年{month}月</span>
+        <span className="text-sm font-medium">{t('diary.monthFormat', { defaultValue: `${year}年${month}月`, year, month })}</span>
         <div className="flex items-center gap-0.5">
           <Button variant="ghost" size="icon" className="h-7 w-7"
             onClick={() => { onMonthChange(new Date()); onDateSelect(format(new Date(), 'yyyy-MM-dd')); }}
@@ -106,9 +129,9 @@ export default function DiaryCalendar({
           const isSelected = selectedDate === dateStr;
           const isCurrentDay = isToday(day);
           const dayNum = day.getDate();
-          const wc = inMonth ? (wordCountMap.get(dayNum) || 0) : 0;
-          const mood = inMonth ? moodMap.get(dayNum) : undefined;
-          const heatClass = inMonth ? getHeatColor(wc) : '';
+          const wc = inMonth ? (wordCountMap.get(dayNum) || 0) : (crossMonthData.get(dateStr)?.wc || 0);
+          const mood = inMonth ? moodMap.get(dayNum) : crossMonthData.get(dateStr)?.mood;
+          const heatClass = getHeatColor(wc);
 
           return (
             <button

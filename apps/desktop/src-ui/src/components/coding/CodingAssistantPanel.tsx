@@ -371,8 +371,8 @@ export function CodingAssistantPanel({
         <div className="flex items-center gap-1.5 px-2.5 py-1.5">
           <Bot className="h-4 w-4 text-blue-500" />
           <span className="text-base font-medium">{t('coding.aiAssistant', { defaultValue: 'AI 编程助手' })}</span>
-          {/* AI 服务选择器（≥2 个已启用服务时显示） */}
-          {enabledServices.length >= 2 && (
+          {/* AI 服务选择器（≥1 个已启用服务时显示） */}
+          {enabledServices.length >= 1 && (
             <Popover>
               <PopoverTrigger asChild>
                 <button

@@ -41,7 +41,10 @@ export function sumSectionNumericResults(
   for (let j = sectionBoundaryIndex + 1; j < untilExclusive; j++) {
     const prev = built[j];
     if (!prev || prev.lineRole !== 'normal') continue;
-    if (prev.result.type !== 'number') continue;
+    // 接受所有含数值 value 的类型（number/percent/currency/date/duration）
+    if (prev.result.type !== 'number' && prev.result.type !== 'percent'
+      && prev.result.type !== 'currency' && prev.result.type !== 'date'
+      && prev.result.type !== 'duration') continue;
     const v = prev.result.value;
     if (typeof v === 'number' && Number.isFinite(v)) {
       sum += v;

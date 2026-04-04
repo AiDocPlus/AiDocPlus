@@ -50,6 +50,11 @@ export function getWordAtCaret(value: string, caret: number): { word: string; st
 }
 
 function functionInsertSnippet(entry: CalculatorFunctionEntry): string {
+  // 表达式模板（caretHint=end）直接返回完整模板
+  if (entry.caretHint === 'end') {
+    return entry.insertTemplate;
+  }
+  // 函数调用模板：截取到第一个 ( 为止（含括号）
   const t = entry.insertTemplate;
   const p = t.indexOf('(');
   if (p >= 0) {

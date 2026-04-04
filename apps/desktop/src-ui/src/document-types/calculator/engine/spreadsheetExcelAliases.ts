@@ -4,6 +4,17 @@
  */
 import type { MathJsStatic } from 'mathjs';
 import { xnpv as xnpvFn, xirr as xirrFn } from './financialCalculator';
+
+/** Excel 风格舍入：down=向零截断，up=远离零 */
+function excelRound(value: number, digits: number, direction: 'down' | 'up'): number {
+  if (!Number.isFinite(value)) return value;
+  const factor = Math.pow(10, digits);
+  const shifted = value * factor;
+  const truncated = direction === 'down'
+    ? (value >= 0 ? Math.floor(shifted) : Math.ceil(shifted))
+    : (value >= 0 ? Math.ceil(shifted) : Math.floor(shifted));
+  return truncated / factor;
+}
 import {
   normdist as normdistFn,
   normSdist as normSdistFn,
@@ -74,11 +85,14 @@ export function registerSpreadsheetExcelAliases(
       ROUND: (x: unknown, digits?: unknown) =>
         digits === undefined ? m.round(x) : m.round(x, mathToNumber(digits)),
       ROUNDDOWN: (x: unknown, digits?: unknown) =>
-        digits === undefined ? m.floor(x) : m.floor(x, mathToNumber(digits)),
+        excelRound(mathToNumber(x), digits !== undefined ? mathToNumber(digits) : 0, 'down'),
       ROUNDUP: (x: unknown, digits?: unknown) =>
-        digits === undefined ? m.ceil(x) : m.ceil(x, mathToNumber(digits)),
-      /** 单参数；与 Excel FLOOR.MATH 在负数行为上可能不同 */
-      FLOOR: (x: unknown) => m.floor(x),
+        excelRound(mathToNumber(x), digits !== undefined ? mathToNumber(digits) : 0, 'up'),
+      /** 双参数 FLOOR(x, significance)，对齐 Excel FLOOR.MATH */
+      FLOOR: (x: unknown, sig?: unknown) =>
+        sig !== undefined
+          ? m.floor(mathToNumber(x) / mathToNumber(sig)) * mathToNumber(sig)
+          : m.floor(x),
       CEILING: (x: unknown) => m.ceil(x),
       /** 自然对数 */
       LN: (x: unknown) => m.log(x),

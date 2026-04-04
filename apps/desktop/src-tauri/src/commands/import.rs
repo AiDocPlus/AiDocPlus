@@ -16,8 +16,6 @@ const MAX_SINGLE_FILE_SIZE: u64 = 50 * 1024 * 1024; // 50MB
 /// 支持：.txt, .md, .csv, .html, .xml, .json, .docx
 #[tauri::command]
 pub fn import_file(path: String) -> Result<String> {
-    use crate::error::ResultExt;
-
     let file_path = Path::new(&path);
 
     // 路径安全：验证导入文件在允许的目录内

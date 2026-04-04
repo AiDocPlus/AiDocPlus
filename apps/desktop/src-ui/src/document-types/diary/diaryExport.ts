@@ -44,7 +44,7 @@ export const DEFAULT_EXPORT_OPTIONS: DiaryExportOptions = {
 
 /** 根据选项筛选条目 */
 function filterEntries(diary: DiaryDocumentContent, opts: DiaryExportOptions): DiaryEntry[] {
-  let entries = [...diary.entries];
+  let entries = [...diary.entries].filter(e => !e.deletedAt);
 
   switch (opts.range) {
     case 'dateRange':
@@ -144,7 +144,12 @@ export function exportToPlainText(diary: DiaryDocumentContent, opts: DiaryExport
         .replace(/\*(.+?)\*/g, '$1')
         .replace(/~~(.+?)~~/g, '$1')
         .replace(/`(.+?)`/g, '$1')
-        .replace(/\[(.+?)\]\(.+?\)/g, '$1');
+        .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+        .replace(/\[([^\]]*)\]\([^)]+\)/g, '$1')
+        .replace(/^\s*[-*+]\s+/gm, '')
+        .replace(/^\s*\d+\.\s+/gm, '')
+        .replace(/^>\s+/gm, '')
+        .replace(/^\|.*\|$/gm, m => m.replace(/\|/g, ' ').replace(/[-:]+/g, '').trim());
       parts.push(stripped);
     }
     parts.push('');
@@ -160,6 +165,7 @@ export function exportToJSON(diary: DiaryDocumentContent, opts: DiaryExportOptio
     exportedAt: new Date().toISOString(),
     version: 1,
     entries: entries.map(e => ({
+      id: e.id,
       date: e.date,
       time: e.time,
       title: e.title,
@@ -169,14 +175,12 @@ export function exportToJSON(diary: DiaryDocumentContent, opts: DiaryExportOptio
       location: e.location,
       tags: e.tags,
       starred: e.starred,
+      colorLabel: e.colorLabel,
       wordCount: getEntryWordCount(e),
       journal: diary.journals.find(j => j.id === e.journalId)?.name,
+      createdAt: e.createdAt,
+      updatedAt: e.updatedAt,
     })),
   };
   return JSON.stringify(exportData, null, 2);
-}
-
-/** 生成用于 DOCX/PDF/HTML 后端导出的 Markdown（通过 contentOverride 参数传给 Rust） */
-export function buildExportMarkdown(diary: DiaryDocumentContent, opts: DiaryExportOptions): string {
-  return exportToMarkdown(diary, opts);
 }

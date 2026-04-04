@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createCalculatorEngine } from './CalculatorEngine';
+import { isNoteLine } from '../types';
 
 describe('CalculatorEngine', () => {
   it('defines and evaluates multi-character Chinese variable 现金股票 across lines', () => {
@@ -324,5 +325,66 @@ describe('CalculatorEngine', () => {
     const slice = engine.evaluate('切片 = listSlice(数据, 1, 2)', 3);
     expect(slice.type).toBe('matrix');
     expect(Number(engine.evaluate('listLen(数据)', 4).value)).toBe(3);
+  });
+
+  it('strips currency symbols before evaluation while preserving result type', () => {
+    const engine = createCalculatorEngine();
+    engine.clearVariables();
+    // Currency symbol should not break evaluation
+    const r1 = engine.evaluate('$50 - 20%', 1);
+    expect(r1.type).toBe('currency');
+    expect(Number(r1.value)).toBeCloseTo(40, 1);
+    const r2 = engine.evaluate('¥100 + 10%', 2);
+    expect(r2.type).toBe('currency');
+    expect(Number(r2.value)).toBeCloseTo(110, 1);
+    // Pure number without currency symbol
+    const r3 = engine.evaluate('50 - 20%', 3);
+    expect(r3.type).toBe('percent');
+    expect(Number(r3.value)).toBeCloseTo(40, 1);
+  });
+
+  it('normspdf is callable as a registered function', () => {
+    const engine = createCalculatorEngine();
+    engine.clearVariables();
+    const r = engine.evaluate('normspdf(0)', 1);
+    expect(r.type).toBe('number');
+    // φ(0) = 1/√(2π) ≈ 0.3989
+    expect(Number(r.value)).toBeCloseTo(0.3989, 3);
+  });
+
+  it('non-assignment matrix expression returns matrix type (not NaN)', () => {
+    const engine = createCalculatorEngine();
+    engine.clearVariables();
+    const r = engine.evaluate('[1, 2, 3]', 1);
+    expect(r.type).toBe('matrix');
+    expect(r.displayValue).toMatch(/项/);
+  });
+
+  it('non-assignment matrix expression with function call returns matrix type', () => {
+    const engine = createCalculatorEngine();
+    engine.clearVariables();
+    const r = engine.evaluate('range(1, 5)', 1);
+    expect(r.type).toBe('matrix');
+  });
+
+  it('ROUNDDOWN truncates toward zero for negative numbers (Excel semantics)', () => {
+    const engine = createCalculatorEngine();
+    engine.clearVariables();
+    const r1 = engine.evaluate('ROUNDDOWN(2.7)', 1);
+    expect(Number(r1.value)).toBe(2);
+    const r2 = engine.evaluate('ROUNDDOWN(-2.7)', 2);
+    expect(Number(r2.value)).toBe(-2);
+    const r3 = engine.evaluate('ROUNDUP(2.3)', 3);
+    expect(Number(r3.value)).toBe(3);
+    const r4 = engine.evaluate('ROUNDUP(-2.3)', 4);
+    expect(Number(r4.value)).toBe(-3);
+  });
+
+  it('isNoteLine recognizes subtotal/小计', () => {
+    expect(isNoteLine('subtotal')).toBe(true);
+    expect(isNoteLine('SUBTOTAL')).toBe(true);
+    expect(isNoteLine('小计')).toBe(true);
+    expect(isNoteLine('分计')).toBe(true);
+    expect(isNoteLine('10 + 20')).toBe(false);
   });
 });

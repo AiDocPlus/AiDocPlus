@@ -8,6 +8,8 @@ import {
   listRank,
   listRange,
   listSlice,
+  rollMean,
+  rollSum,
   MAX_LIST_ELEMENTS,
 } from './listComputation';
 
@@ -49,5 +51,31 @@ describe('listComputation', () => {
   it('clampList truncates to MAX_LIST_ELEMENTS', () => {
     const long = Array.from({ length: MAX_LIST_ELEMENTS + 50 }, (_, i) => i);
     expect(clampList(long).length).toBe(MAX_LIST_ELEMENTS);
+  });
+
+  it('rollMean sliding window correctness', () => {
+    const a = [1, 2, 3, 4, 5];
+    const r = rollMean(a, 3);
+    // Positions 0,1: not enough → NaN
+    expect(Number.isNaN(r[0])).toBe(true);
+    expect(Number.isNaN(r[1])).toBe(true);
+    expect(r[2]).toBeCloseTo(2);   // (1+2+3)/3
+    expect(r[3]).toBeCloseTo(3);   // (2+3+4)/3
+    expect(r[4]).toBeCloseTo(4);   // (3+4+5)/3
+  });
+
+  it('rollSum sliding window correctness', () => {
+    const a = [10, 20, 30, 40];
+    const r = rollSum(a, 2);
+    expect(Number.isNaN(r[0])).toBe(true);
+    expect(r[1]).toBe(30);  // 10+20
+    expect(r[2]).toBe(50);  // 20+30
+    expect(r[3]).toBe(70);  // 30+40
+  });
+
+  it('rollMean/rollSum window of 1 returns original array', () => {
+    const a = [3, 7, 2];
+    expect(rollMean(a, 1)).toEqual([3, 7, 2]);
+    expect(rollSum(a, 1)).toEqual([3, 7, 2]);
   });
 });

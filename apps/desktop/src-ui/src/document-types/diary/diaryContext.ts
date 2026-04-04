@@ -7,7 +7,7 @@
  * - 当前条目上下文
  */
 import type { DiaryDocumentContent, DiaryEntry } from './types';
-import { MOOD_LABEL, MOOD_SCORE, WEATHER_LABEL, getEntryWordCount } from './types';
+import { MOOD_LABEL, MOOD_SCORE, WEATHER_LABEL, getEntryWordCount, getTodayDateStr, toLocalDateStr } from './types';
 
 export type DiaryContextMode = 'current' | 'week' | 'month';
 
@@ -67,10 +67,10 @@ function getRecentContext(diary: DiaryDocumentContent, days: number): string | n
   const today = new Date();
   const cutoff = new Date(today);
   cutoff.setDate(cutoff.getDate() - days);
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const cutoffStr = toLocalDateStr(cutoff);
 
   const recentEntries = diary.entries
-    .filter(e => e.date >= cutoffStr)
+    .filter(e => e.date >= cutoffStr && !e.deletedAt)
     .sort((a, b) => b.date.localeCompare(a.date));
 
   if (recentEntries.length === 0) return null;
@@ -81,7 +81,7 @@ function getRecentContext(diary: DiaryDocumentContent, days: number): string | n
   // 按日期列出摘要
   for (const entry of recentEntries.slice(0, 10)) {
     const mood = entry.mood ? MOOD_LABEL[entry.mood] : '';
-    const excerpt = entry.content.replace(/\n/g, ' ').slice(0, 60);
+    const excerpt = (entry.content || '').replace(/\n/g, ' ').slice(0, 60);
     lines.push(`- ${entry.date} ${mood} ${excerpt}${entry.content.length > 60 ? '...' : ''}`);
   }
   if (recentEntries.length > 10) {
@@ -96,17 +96,18 @@ function getMoodTrend(diary: DiaryDocumentContent, days: number): string | null 
   const today = new Date();
   const cutoff = new Date(today);
   cutoff.setDate(cutoff.getDate() - days);
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const cutoffStr = toLocalDateStr(cutoff);
 
   const moods = diary.entries
-    .filter(e => e.date >= cutoffStr && e.mood)
-    .map(e => ({ date: e.date, score: MOOD_SCORE[e.mood!] }));
+    .filter(e => e.date >= cutoffStr && !e.deletedAt && e.mood)
+    .map(e => ({ date: e.date, score: MOOD_SCORE[e.mood!] }))
+    .sort((a, b) => a.date.localeCompare(b.date));
 
   if (moods.length < 2) return null;
 
   const avg = moods.reduce((s, m) => s + m.score, 0) / moods.length;
-  const first = moods[moods.length - 1].score;
-  const last = moods[0].score;
+  const first = moods[0].score;
+  const last = moods[moods.length - 1].score;
   const trend = last > first ? '上升' : last < first ? '下降' : '平稳';
 
   return `平均 ${avg.toFixed(1)}/5，趋势${trend}（${moods.length}条记录）`;
@@ -121,11 +122,15 @@ export function getContextSummary(diary: DiaryDocumentContent, mode: DiaryContex
 
   const cutoff = new Date(today);
   cutoff.setDate(cutoff.getDate() - days);
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
-  const count = diary.entries.filter(e => e.date >= cutoffStr).length;
-  const totalWords = diary.entries
-    .filter(e => e.date >= cutoffStr)
-    .reduce((s, e) => s + getEntryWordCount(e), 0);
+  const cutoffStr = toLocalDateStr(cutoff);
+  let count = 0;
+  let totalWords = 0;
+  for (const e of diary.entries) {
+    if (e.date >= cutoffStr && !e.deletedAt) {
+      count++;
+      totalWords += getEntryWordCount(e);
+    }
+  }
 
   return `近${days}天 · ${count}篇 · ${totalWords}字`;
 }
@@ -133,7 +138,9 @@ export function getContextSummary(diary: DiaryDocumentContent, mode: DiaryContex
 /** 日记 AI 快捷操作定义 */
 export interface DiaryQuickAction {
   id: string;
-  label: string;
+  /** i18n key for label, e.g. 'diary.qaContinue' */
+  labelKey: string;
+  labelDefault: string;
   icon: string;
   promptTemplate: string;
 }
@@ -141,94 +148,107 @@ export interface DiaryQuickAction {
 export const DIARY_QUICK_ACTIONS: DiaryQuickAction[] = [
   {
     id: 'continue',
-    label: '续写日记',
+    labelKey: 'diary.qaContinue',
+    labelDefault: '续写日记',
     icon: '📝',
     promptTemplate: '请根据以下日记内容，帮我续写，保持风格一致：\n\n{{content}}',
   },
   {
     id: 'reflect',
-    label: '深度反思',
+    labelKey: 'diary.qaReflect',
+    labelDefault: '深度反思',
     icon: '🔍',
     promptTemplate: '请对今天的日记进行深度反思分析，帮助我理解自己的情感和行为模式：\n\n{{content}}',
   },
   {
     id: 'prompt',
-    label: '写作提示',
+    labelKey: 'diary.qaPrompt',
+    labelDefault: '写作提示',
     icon: '💡',
     promptTemplate: '根据我最近的日记，请给我一些今天可以写的话题和灵感提示。考虑我的心情和最近的经历。',
   },
   {
     id: 'weekly',
-    label: '生成周报',
+    labelKey: 'diary.qaWeekly',
+    labelDefault: '生成周报',
     icon: '📊',
     promptTemplate: '请帮我生成一份本周的日记周报。汇总近7天的关键事件、心情变化、成就和待改进事项，用结构化格式输出（概述、亮点、反思、下周展望）。',
   },
   {
     id: 'monthly',
-    label: '生成月报',
+    labelKey: 'diary.qaMonthly',
+    labelDefault: '生成月报',
     icon: '📅',
     promptTemplate: '请帮我生成一份本月的日记月报。汇总近30天的主要经历、心情趋势、成长收获和目标完成情况，用结构化格式输出。',
   },
   {
     id: 'mood-review',
-    label: '心情复盘',
+    labelKey: 'diary.qaMoodReview',
+    labelDefault: '心情复盘',
     icon: '💭',
     promptTemplate: '请分析我近期日记中的心情变化趋势，找出心情波动的可能原因，并给出调节建议。关注情绪转折点和反复出现的主题。',
   },
   {
     id: 'style',
-    label: '风格分析',
+    labelKey: 'diary.qaStyle',
+    labelDefault: '风格分析',
     icon: '✍️',
     promptTemplate: '请分析我日记的写作风格特点，包括：用词偏好、句式特点、主题倾向、情感表达模式。给出具体的提升建议。\n\n{{content}}',
   },
   {
     id: 'awareness',
-    label: '自我觉察',
+    labelKey: 'diary.qaAwareness',
+    labelDefault: '自我觉察',
     icon: '🧠',
     promptTemplate: '请引导我进行一次情绪觉察练习。基于我最近的日记，帮助我识别隐藏的情绪模式和内心需求。用温和引导的方式提问。',
   },
   {
     id: 'tomorrow',
-    label: '明日建议',
+    labelKey: 'diary.qaTomorrow',
+    labelDefault: '明日建议',
     icon: '🔮',
     promptTemplate: '基于今天的日记反思，请给我一些明天可以做的事情建议，帮助我更好地生活。\n\n{{content}}',
   },
   {
     id: 'polish',
-    label: '润色美化',
+    labelKey: 'diary.qaPolish',
+    labelDefault: '润色美化',
     icon: '✨',
     promptTemplate: '请对以下日记文字进行润色美化，提升表达质量，但保持原意和个人风格：\n\n{{content}}',
   },
   {
     id: 'gratitude',
-    label: '感恩引导',
+    labelKey: 'diary.qaGratitude',
+    labelDefault: '感恩引导',
     icon: '🙏',
     promptTemplate: '请帮我从今天的经历中发现值得感恩的事情，引导我以感恩的心态看待生活。\n\n{{content}}',
   },
-  // D1.1: 报告生成
   {
     id: 'yearly',
-    label: '年度回顾',
+    labelKey: 'diary.qaYearly',
+    labelDefault: '年度回顾',
     icon: '📆',
     promptTemplate: '请帮我生成一份年度日记回顾。分析全年的主要经历、成长轨迹、心情变化趋势、重要事件和里程碑。用结构化格式输出（年度关键词、季度概述、最难忘时刻、成长收获、明年展望）。',
   },
-  // D1.2: 情绪洞察
   {
     id: 'emotion-insight',
-    label: '情绪洞察',
-    icon: '🔮',
+    labelKey: 'diary.qaEmotionInsight',
+    labelDefault: '情绪洞察',
+    icon: '📈',
     promptTemplate: '{{emotionInsight}}',
   },
   {
     id: 'emotion-trigger',
-    label: '情绪触发器',
+    labelKey: 'diary.qaEmotionTrigger',
+    labelDefault: '情绪触发器',
     icon: '⚡',
     promptTemplate: '请分析我近期日记中的情绪变化，帮我找出情绪触发器：\n1. 哪些事件/人/地点让我心情变好？\n2. 哪些因素导致心情低落？\n3. 我的情绪模式有什么规律？\n\n基于分析给出具体的情绪管理建议。',
   },
   {
     id: 'habit-insight',
-    label: '习惯分析',
-    icon: '📊',
+    labelKey: 'diary.qaHabitInsight',
+    labelDefault: '习惯分析',
+    icon: '📋',
     promptTemplate: '请分析我的日记写作习惯和生活规律：\n1. 写作频率和时间偏好\n2. 常见的主题和话题\n3. 情绪与活动的关联\n4. 建议如何优化日常习惯以提升幸福感',
   },
 ];
@@ -238,7 +258,7 @@ export function detectMoodAlert(diary: DiaryDocumentContent): string | null {
   const today = new Date();
   const cutoff = new Date(today);
   cutoff.setDate(cutoff.getDate() - 3);
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const cutoffStr = toLocalDateStr(cutoff);
 
   const recentMoods = diary.entries
     .filter(e => e.date >= cutoffStr && e.mood && !e.deletedAt)
@@ -254,7 +274,7 @@ export function detectMoodAlert(diary: DiaryDocumentContent): string | null {
 
 /** 生成每日写作提示（基于近期日记+历史上的今天） */
 export function buildDailyPromptRequest(diary: DiaryDocumentContent): string {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getTodayDateStr();
   const mmdd = today.slice(5);
   const onThisDay = diary.entries
     .filter(e => e.date.slice(5) === mmdd && e.date !== today && !e.deletedAt)

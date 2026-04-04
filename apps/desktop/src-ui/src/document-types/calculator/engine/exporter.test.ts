@@ -44,8 +44,10 @@ describe('exportToCSV', () => {
       type: 'Kind',
       noteKind: 'Note',
     });
+    // CSV 输出包含 UTF-8 BOM
+    expect(csv.startsWith('\uFEFF')).toBe(true);
     const first = csv.split('\n')[0];
-    expect(first).toBe('Line,Expr,Res,Kind');
+    expect(first).toBe('\uFEFFLine,Expr,Res,Kind');
   });
 
   it('uses × ÷ in expression column when operatorSymbols is cjk', () => {

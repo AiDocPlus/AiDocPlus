@@ -29,18 +29,44 @@ export function TaskListHelpDialog({ open, onOpenChange }: TaskListHelpDialogPro
     },
     {
       keys: '⌘/Ctrl + K',
-      desc: t('taskList.helpCommandPalette', { defaultValue: '在 AI 侧栏打开快捷操作搜索' }),
+      desc: t('taskList.helpCommandPalette', { defaultValue: '打开快捷操作搜索（AI 侧栏中）' }),
     },
     {
       keys: 'Escape',
-      desc: t('taskList.helpClearSelection', {
-        defaultValue: '清除任务多选（焦点不在输入框时）',
+      desc: t('taskList.helpEscape', {
+        defaultValue: '取消多选（非编辑/输入状态时）',
       }),
     },
     {
       keys: '⌘/Ctrl + F',
       desc: t('taskList.helpSearchFocus', {
         defaultValue: '聚焦工具栏任务搜索框',
+      }),
+    },
+    {
+      keys: 'Enter',
+      desc: t('taskList.helpNewTask', { defaultValue: '在列表末尾添加新任务' }),
+    },
+    {
+      keys: '⌘/Ctrl + A',
+      desc: t('taskList.helpSelectAll', { defaultValue: '全选可见任务' }),
+    },
+    {
+      keys: 'Space',
+      desc: t('taskList.helpToggleComplete', {
+        defaultValue: '切换已选任务完成状态',
+      }),
+    },
+    {
+      keys: '1 / 2 / 3',
+      desc: t('taskList.helpPriorityKeys', {
+        defaultValue: '设置已选任务优先级（高/中/低）',
+      }),
+    },
+    {
+      keys: 'Backspace',
+      desc: t('taskList.helpDeleteEmpty', {
+        defaultValue: '删除内容为空的任务（编辑时）',
       }),
     },
   ];

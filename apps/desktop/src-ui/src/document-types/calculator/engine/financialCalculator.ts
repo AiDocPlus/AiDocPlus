@@ -18,7 +18,7 @@ function paymentWhen(type?: number): financial.PaymentDueTime {
  * npv(rate, [cashFlows]) 或 npv([-100, 30, 30, 30, 30], 0.1)
  */
 export function npv(rate: number, cashFlows: number[]): number {
-  return financial.npv(rate, cashFlows);
+  return finiteOrNaN(financial.npv(rate, cashFlows));
 }
 
 /**
@@ -26,7 +26,7 @@ export function npv(rate: number, cashFlows: number[]): number {
  * irr([cashFlows])
  */
 export function irr(cashFlows: number[]): number {
-  return financial.irr(cashFlows);
+  return finiteOrNaN(financial.irr(cashFlows));
 }
 
 /**
@@ -39,7 +39,7 @@ export function irr(cashFlows: number[]): number {
  * - type: 0=期末付款, 1=期初付款（默认 0）
  */
 export function pmt(rate: number, nper: number, pv: number, fv = 0, type = 0): number {
-  return financial.pmt(rate, nper, pv, fv, paymentWhen(type));
+  return finiteOrNaN(financial.pmt(rate, nper, pv, fv, paymentWhen(type)));
 }
 
 /**
@@ -47,7 +47,7 @@ export function pmt(rate: number, nper: number, pv: number, fv = 0, type = 0): n
  * fv(rate, nper, pmt, pv?, type?)
  */
 export function fv(rate: number, nper: number, pmt: number, pv = 0, type = 0): number {
-  return financial.fv(rate, nper, pmt, pv, paymentWhen(type));
+  return finiteOrNaN(financial.fv(rate, nper, pmt, pv, paymentWhen(type)));
 }
 
 /**
@@ -55,7 +55,7 @@ export function fv(rate: number, nper: number, pmt: number, pv = 0, type = 0): n
  * pv(rate, nper, pmt, fv?, type?)
  */
 export function pv(rate: number, nper: number, pmt: number, fv = 0, type = 0): number {
-  return financial.pv(rate, nper, pmt, fv, paymentWhen(type));
+  return finiteOrNaN(financial.pv(rate, nper, pmt, fv, paymentWhen(type)));
 }
 
 /**
@@ -63,7 +63,7 @@ export function pv(rate: number, nper: number, pmt: number, fv = 0, type = 0): n
  * nper(rate, pmt, pv, fv?, type?)
  */
 export function nper(rate: number, pmt: number, pv: number, fv = 0, type = 0): number {
-  return financial.nper(rate, pmt, pv, fv, paymentWhen(type));
+  return finiteOrNaN(financial.nper(rate, pmt, pv, fv, paymentWhen(type)));
 }
 
 /**
@@ -80,7 +80,7 @@ export function rate(
   tol?: number,
   maxIter?: number,
 ): number {
-  return financial.rate(nper, pmt, pv, fv, paymentWhen(type), guess, tol, maxIter);
+  return finiteOrNaN(financial.rate(nper, pmt, pv, fv, paymentWhen(type), guess, tol, maxIter));
 }
 
 /**
@@ -88,7 +88,7 @@ export function rate(
  * ipmt(rate, per, nper, pv, fv?, type?)
  */
 export function ipmt(rate: number, per: number, nper: number, pv: number, fv = 0, type = 0): number {
-  return financial.ipmt(rate, per, nper, pv, fv, paymentWhen(type));
+  return finiteOrNaN(financial.ipmt(rate, per, nper, pv, fv, paymentWhen(type)));
 }
 
 /**
@@ -96,7 +96,7 @@ export function ipmt(rate: number, per: number, nper: number, pv: number, fv = 0
  * ppmt(rate, per, nper, pv, fv?, type?)
  */
 export function ppmt(rate: number, per: number, nper: number, pv: number, fv = 0, type = 0): number {
-  return financial.ppmt(rate, per, nper, pv, fv, paymentWhen(type));
+  return finiteOrNaN(financial.ppmt(rate, per, nper, pv, fv, paymentWhen(type)));
 }
 
 /**
@@ -104,7 +104,7 @@ export function ppmt(rate: number, per: number, nper: number, pv: number, fv = 0
  * mirr(cashFlows, financeRate, reinvestRate)
  */
 export function mirr(cashFlows: number[], financeRate: number, reinvestRate: number): number {
-  return financial.mirr(cashFlows, financeRate, reinvestRate);
+  return finiteOrNaN(financial.mirr(cashFlows, financeRate, reinvestRate));
 }
 
 /**
@@ -128,11 +128,17 @@ export function discount(futureValue: number, rate: number, periods: number): nu
  * roi(gain, cost)
  */
 export function roi(gain: number, cost: number): number {
+  if (cost === 0) return Number.NaN;
   return (gain - cost) / cost;
 }
 
 /** 现金流数组最大长度（防止 irr/npv 长时间阻塞） */
 export const MAX_FINANCIAL_CASH_FLOWS = 500;
+
+/** 将 financial 库可能返回的 Infinity/非有限值兜底为 NaN */
+function finiteOrNaN(v: number): number {
+  return Number.isFinite(v) ? v : Number.NaN;
+}
 
 /**
  * 将「日期」统一为与首项的间隔天数（Excel 序列号或相对天数；绝对值大于 1e9 视为 Unix 毫秒）
@@ -140,6 +146,7 @@ export const MAX_FINANCIAL_CASH_FLOWS = 500;
 function dayOffsetsFromFirst(dates: number[]): number[] {
   if (dates.length === 0) return [];
   const d0 = dates[0]!;
+  // 任意值 > 1e9 即视为 Unix 毫秒时间戳（正常使用不会混合序列号和毫秒）
   const useMs = dates.some((d) => Math.abs(d) > 1e9);
   return dates.map((d) => (useMs ? (d - d0) / 86400000 : d - d0));
 }
@@ -201,11 +208,42 @@ export function xirr(values: number[], dates: number[], guess = 0.1): number {
   let fLo = xnpv(lo, values, dates);
   let fHi = xnpv(hi, values, dates);
   if (!Number.isFinite(fLo) || !Number.isFinite(fHi)) return Number.NaN;
+
+  // 先向右扩展 hi
   for (let expand = 0; expand < 30 && fLo * fHi > 0; expand++) {
     hi *= 2;
     fHi = xnpv(hi, values, dates);
     if (!Number.isFinite(fHi)) break;
   }
+
+  // 若同号，再向左扩展 lo（在 -1 上限附近搜索变号点）
+  if (fLo * fHi > 0) {
+    for (let expand = 0; expand < 30; expand++) {
+      const testRate = lo - (lo + 1) * 0.5; // 向 -1 方向靠近
+      if (testRate <= -1) break;
+      const fTest = xnpv(testRate, values, dates);
+      if (!Number.isFinite(fTest)) break;
+      if (fTest * fHi <= 0) {
+        lo = testRate;
+        fLo = fTest;
+        break;
+      }
+      fLo = fTest;
+      lo = testRate;
+    }
+  }
+
+  // 最终仍同号则尝试在中间搜索变号点
+  if (fLo * fHi > 0) {
+    const probes = [-0.5, -0.25, 0, 0.01, 0.05, 0.1, 0.2, 0.5, 1, 2, 5];
+    for (const p of probes) {
+      const fP = xnpv(p, values, dates);
+      if (!Number.isFinite(fP)) continue;
+      if (fLo * fP < 0) { hi = p; fHi = fP; break; }
+      if (fP * fHi < 0) { lo = p; fLo = fP; break; }
+    }
+  }
+
   if (fLo * fHi > 0) return Number.NaN;
 
   for (let iter = 0; iter < 150; iter++) {
@@ -231,6 +269,9 @@ export function xirr(values: number[], dates: number[], guess = 0.1): number {
  */
 export function annualizedReturn(totalReturn: number, days: number): number {
   if (!Number.isFinite(days) || days <= 0) {
+    return Number.NaN;
+  }
+  if (totalReturn < -1) {
     return Number.NaN;
   }
   return Math.pow(1 + totalReturn, 365 / days) - 1;
@@ -272,8 +313,8 @@ export function formatPercent(value: number, decimals: number = 2): string {
  */
 export function tryParseFinancial(expr: string): { fn: string; args: number[] } | null {
   const patterns: Array<{ pattern: RegExp; fn: string }> = [
-    { pattern: /npv\s*\(\s*([\d.]+)\s*,\s*\[([\d,\s.-]+)\]\s*\)/i, fn: 'npv' },
-    { pattern: /npv\s*\(\s*\[([\d,\s.-]+)\]\s*,\s*([\d.]+)\s*\)/i, fn: 'npv_alt' },
+    { pattern: /npv\s*\(\s*([-\d.]+)\s*,\s*\[([\d,\s.-]+)\]\s*\)/i, fn: 'npv' },
+    { pattern: /npv\s*\(\s*\[([\d,\s.-]+)\]\s*,\s*([-\d.]+)\s*\)/i, fn: 'npv_alt' },
     { pattern: /irr\s*\(\s*\[([\d,\s.-]+)\]\s*\)/i, fn: 'irr' },
     { pattern: /pmt\s*\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.-]+)\s*\)/i, fn: 'pmt' },
     { pattern: /fv\s*\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.-]+)\s*\)/i, fn: 'fv' },

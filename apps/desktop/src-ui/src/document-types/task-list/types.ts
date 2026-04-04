@@ -271,19 +271,22 @@ export function normalizeTaskListDocument(raw: TaskListDocumentContent): TaskLis
   if (!lists.some((l) => l.id === activeListId)) {
     activeListId = lists[0].id;
   }
+  const rs = (raw.settings && typeof raw.settings === 'object')
+    ? raw.settings as TaskListSettings
+    : null;
   const settings: TaskListSettings = {
     ...DEFAULT_TASKLIST_SETTINGS,
-    ...(raw.settings && typeof raw.settings === 'object' ? raw.settings : {}),
-    defaultPriority: normalizeTaskPriority((raw.settings as TaskListSettings | undefined)?.defaultPriority),
-    sortBy: ['priority', 'createdAt', 'sortOrder'].includes((raw.settings as TaskListSettings)?.sortBy)
-      ? (raw.settings as TaskListSettings).sortBy
+    ...(rs || {}),
+    defaultPriority: normalizeTaskPriority(rs?.defaultPriority),
+    sortBy: ['priority', 'createdAt', 'sortOrder'].includes(rs?.sortBy)
+      ? rs!.sortBy
       : DEFAULT_TASKLIST_SETTINGS.sortBy,
-    sortOrder: (raw.settings as TaskListSettings)?.sortOrder === 'desc' ? 'desc' : 'asc',
-    showCompleted: typeof (raw.settings as TaskListSettings)?.showCompleted === 'boolean'
-      ? (raw.settings as TaskListSettings).showCompleted
+    sortOrder: rs?.sortOrder === 'desc' ? 'desc' : 'asc',
+    showCompleted: typeof rs?.showCompleted === 'boolean'
+      ? rs.showCompleted
       : DEFAULT_TASKLIST_SETTINGS.showCompleted,
-    completedRetentionDays: typeof (raw.settings as TaskListSettings)?.completedRetentionDays === 'number'
-      ? Math.max(0, (raw.settings as TaskListSettings).completedRetentionDays)
+    completedRetentionDays: typeof rs?.completedRetentionDays === 'number' && Number.isFinite(rs.completedRetentionDays)
+      ? Math.max(0, rs.completedRetentionDays)
       : DEFAULT_TASKLIST_SETTINGS.completedRetentionDays,
   };
   const merged: TaskListDocumentContent = {
@@ -385,21 +388,22 @@ export function sortTasksForDisplay(
   const pending = tasks.filter((t) => t.status === 'pending');
   const completed = tasks.filter((t) => t.status === 'completed');
   const dir = sortOrder === 'asc' ? 1 : -1;
-  const sorted = [...pending];
-  if (sortBy === 'priority') {
-    sorted.sort((a, b) => {
+
+  const sortFn = (a: TaskItem, b: TaskItem) => {
+    if (sortBy === 'priority') {
       const pa = normalizeTaskPriority(a.priority);
       const pb = normalizeTaskPriority(b.priority);
       return dir * (PRIORITY_RANK[pa] - PRIORITY_RANK[pb]);
-    });
-  } else if (sortBy === 'createdAt') {
-    sorted.sort(
-      (a, b) => dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
-    );
-  } else {
-    sorted.sort((a, b) => dir * (a.sortOrder - b.sortOrder));
-  }
-  return [...sorted, ...completed];
+    }
+    if (sortBy === 'createdAt') {
+      return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    }
+    return dir * (a.sortOrder - b.sortOrder);
+  };
+
+  const sortedPending = [...pending].sort(sortFn);
+  const sortedCompleted = [...completed].sort(sortFn);
+  return [...sortedPending, ...sortedCompleted];
 }
 
 /** 计算统计 */
@@ -423,7 +427,7 @@ export function calculateStatistics(tasks: TaskItem[]): TaskStatistics {
 }
 
 /** 提取纯文本（用于搜索和 AI 上下文） */
-export function extractTaskListPlainText(doc: TaskListDocumentContent): string {
+export function extractTaskListPlainText(doc: TaskListDocumentContent, isEn = false): string {
   const list = getActiveList(doc);
   if (!list) return '';
 
@@ -432,21 +436,21 @@ export function extractTaskListPlainText(doc: TaskListDocumentContent): string {
 
   const lines: string[] = [];
 
-  lines.push(`列表: ${list.name}`);
+  lines.push(isEn ? `List: ${list.name}` : `列表: ${list.name}`);
   lines.push('');
 
   if (pending.length > 0) {
-    lines.push('待办任务:');
+    lines.push(isEn ? 'Pending tasks:' : '待办任务:');
     pending.forEach((t) => {
       const pr = normalizeTaskPriority(t.priority);
-      const priorityLabel = PRIORITY_CONFIG[pr].label;
+      const priorityLabel = PRIORITY_CONFIG[pr][isEn ? 'labelEn' : 'label'];
       lines.push(`- [${priorityLabel}] ${t.content}`);
     });
   }
 
   if (completed.length > 0) {
     lines.push('');
-    lines.push('已完成任务:');
+    lines.push(isEn ? 'Completed tasks:' : '已完成任务:');
     completed.slice(-10).forEach((t) => {
       lines.push(`- ✓ ${t.content}`);
     });
@@ -454,7 +458,11 @@ export function extractTaskListPlainText(doc: TaskListDocumentContent): string {
 
   const stats = calculateStatistics(list.tasks);
   lines.push('');
-  lines.push(`统计: 待办 ${stats.pending}, 已完成 ${stats.completed}, 高优先 ${stats.highPriority}`);
+  lines.push(
+    isEn
+      ? `Stats: Pending ${stats.pending}, Completed ${stats.completed}, High ${stats.highPriority}`
+      : `统计: 待办 ${stats.pending}, 已完成 ${stats.completed}, 高优先 ${stats.highPriority}`,
+  );
 
   return lines.join('\n');
 }

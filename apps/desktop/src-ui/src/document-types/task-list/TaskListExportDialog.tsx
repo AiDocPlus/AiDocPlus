@@ -4,7 +4,7 @@
  * 版式类：DOCX / PDF（Rust 原生导出）
  * 图片：PNG / JPEG（Canvas 渲染）
  */
-import { useState, useMemo, useCallback, type ComponentType } from 'react';
+import { useState, useEffect, useMemo, useCallback, type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import { save } from '@tauri-apps/plugin-dialog';
@@ -82,10 +82,20 @@ export function TaskListExportDialog({
   projectId,
   defaultTitle = 'tasks',
 }: TaskListExportDialogProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isEn = i18n.language.startsWith('en');
   const [format, setFormat] = useState<ExportFormat>('md');
   const [filename, setFilename] = useState(defaultTitle);
   const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  // 当 defaultTitle 变化时同步 filename
+  useEffect(() => {
+    setFilename(defaultTitle);
+  }, [defaultTitle]);
+
+  // 格式变更时清除错误
+  useEffect(() => { setExportError(null); }, [format]);
 
   const mdLabels = useMemo(
     () => ({
@@ -124,21 +134,21 @@ export function TaskListExportDialog({
       case 'csv':
         return exportTaskListToCSV(taskDoc, csvCols);
       case 'txt':
-        return exportTaskListToTXT(taskDoc);
+        return exportTaskListToTXT(taskDoc, isEn);
       case 'json':
         return exportTaskListToJSON(taskDoc);
       case 'md':
-        return exportTaskListToMarkdown(taskDoc, mdLabels);
+        return exportTaskListToMarkdown(taskDoc, mdLabels, isEn);
       case 'docx':
       case 'pdf':
-        return `${exportTaskListToMarkdown(taskDoc, mdLabels)}\n\n---\n(${t('taskList.exportNativePreviewHint', { defaultValue: '预览为 Markdown 源；实际文件为' })} ${format.toUpperCase()})`;
+        return `${exportTaskListToMarkdown(taskDoc, mdLabels, isEn)}\n\n---\n(${t('taskList.exportNativePreviewHint', { defaultValue: '预览为 Markdown 源；实际文件为' })} ${format.toUpperCase()})`;
       case 'png':
       case 'jpg':
-        return `${exportTaskListToMarkdown(taskDoc, mdLabels)}\n\n---\n(${t('taskList.exportImagePreviewHint', { defaultValue: '图片导出为画布渲染，版式与上图文字一致' })})`;
+        return `${exportTaskListToMarkdown(taskDoc, mdLabels, isEn)}\n\n---\n(${t('taskList.exportImagePreviewHint', { defaultValue: '图片导出为画布渲染，版式与上图文字一致' })})`;
       default:
         return '';
     }
-  }, [taskDoc, format, csvCols, mdLabels, t]);
+  }, [taskDoc, format, csvCols, mdLabels, t, isEn]);
 
   const handleExport = useCallback(async () => {
     const base = filename.trim() || defaultTitle;
@@ -146,7 +156,7 @@ export function TaskListExportDialog({
     if (format === 'docx' || format === 'pdf') {
       setExporting(true);
       try {
-        const md = exportTaskListToMarkdown(taskDoc, mdLabels);
+        const md = exportTaskListToMarkdown(taskDoc, mdLabels, isEn);
         const filePath = await save({
           defaultPath: `${base}.${format}`,
           filters: [{ name: format.toUpperCase(), extensions: [format] }],
@@ -170,6 +180,7 @@ export function TaskListExportDialog({
         onOpenChange(false);
       } catch (e) {
         console.error('[TaskListExportDialog]', e);
+        setExportError(e instanceof Error ? e.message : String(e));
       } finally {
         setExporting(false);
       }
@@ -193,8 +204,12 @@ export function TaskListExportDialog({
           taskDoc,
           format === 'jpg' ? 'jpeg' : 'png',
           imageLabels,
+          isEn,
         );
-        if (!blob) return;
+        if (!blob) {
+          setExportError(t('taskList.exportCanvasError', { defaultValue: '图片渲染失败，请重试' }));
+          return;
+        }
 
         const bytes = new Uint8Array(await blob.arrayBuffer());
         await invoke('write_binary_file', {
@@ -204,6 +219,7 @@ export function TaskListExportDialog({
         onOpenChange(false);
       } catch (e) {
         console.error('[TaskListExportDialog]', e);
+        setExportError(e instanceof Error ? e.message : String(e));
       } finally {
         setExporting(false);
       }
@@ -217,13 +233,13 @@ export function TaskListExportDialog({
         text = exportTaskListToCSV(taskDoc, csvCols);
         break;
       case 'txt':
-        text = exportTaskListToTXT(taskDoc);
+        text = exportTaskListToTXT(taskDoc, isEn);
         break;
       case 'json':
         text = exportTaskListToJSON(taskDoc);
         break;
       case 'md':
-        text = exportTaskListToMarkdown(taskDoc, mdLabels);
+        text = exportTaskListToMarkdown(taskDoc, mdLabels, isEn);
         extension = 'md';
         break;
       default:
@@ -243,6 +259,7 @@ export function TaskListExportDialog({
       if (path) onOpenChange(false);
     } catch (e) {
       console.error('[TaskListExportDialog]', e);
+      setExportError(e instanceof Error ? e.message : String(e));
     } finally {
       setExporting(false);
     }
@@ -258,6 +275,7 @@ export function TaskListExportDialog({
     projectId,
     onOpenChange,
     t,
+    isEn,
   ]);
 
   return (
@@ -324,6 +342,15 @@ export function TaskListExportDialog({
             </ScrollArea>
           </div>
         </div>
+
+        {exportError && (
+          <div className="flex items-center gap-2 px-3 py-2 text-sm text-destructive bg-destructive/10 rounded-md">
+            <span>{exportError}</span>
+            <button type="button" className="ml-auto text-xs underline" onClick={() => setExportError(null)}>
+              {t('common.close', { defaultValue: '关闭' })}
+            </button>
+          </div>
+        )}
 
         <div className="flex justify-end gap-2 pt-2 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={exporting}>

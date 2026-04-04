@@ -1,4 +1,4 @@
-use crate::ai::{AIConfig, ChatMessage, OpenAIResponse};
+use crate::ai::{AIConfig, ChatMessage};
 use crate::error::AppError;
 use crate::tools;
 use serde_json::json;

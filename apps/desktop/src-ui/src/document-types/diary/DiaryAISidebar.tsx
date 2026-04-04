@@ -11,7 +11,7 @@
  * - 心情预警
  * - AI 服务切换
  */
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo, memo } from 'react';
 import {
   Send, Square, Trash2, Loader2, Copy, Check, ArrowDownToLine,
   ChevronDown, Globe, RefreshCw, Pencil,
@@ -48,6 +48,7 @@ import {
   SIDEBAR_AI_HEADER_ROW,
   SIDEBAR_AI_HEADER_SUBROW,
 } from '@/document-types/_shared/styles';
+import { genId } from './types';
 
 // ═══════════════════════════════════════════════════════
 // 消息 & 会话类型
@@ -62,7 +63,7 @@ interface DiaryAIMessage {
 }
 
 function genMsgId(): string {
-  return `dmsg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  return genId('dmsg');
 }
 
 interface DiaryAISession {
@@ -77,10 +78,93 @@ const SESSIONS_KEY = '_diary_ai_sessions';
 const ACTIVE_SESSION_KEY = '_diary_ai_active_session';
 
 function genSessionId(): string {
-  return `dsess_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  return genId('dsess');
 }
 
 type StorageLike = { get<T>(key: string): T | null; set(key: string, value: unknown): void };
+
+// ── 单条消息 memo 组件（避免长对话时全部重渲染） ──
+interface DiaryMessageItemProps {
+  msg: DiaryAIMessage;
+  isEditing: boolean;
+  editingContent: string;
+  isCopied: boolean;
+  theme: string;
+  onCopyMsg: () => void;
+  onStartEdit: () => void;
+  onConfirmEdit: () => void;
+  onRegenerate: () => void;
+  onInsert: () => void;
+  onSetEditingContent: (v: string) => void;
+  onCancelEdit: () => void;
+}
+
+const DiaryMessageItem = memo(function DiaryMessageItem({
+  msg, isEditing, editingContent, isCopied, theme,
+  onCopyMsg, onStartEdit, onConfirmEdit, onRegenerate, onInsert, onSetEditingContent, onCancelEdit,
+}: DiaryMessageItemProps) {
+  const { t } = useTranslation();
+  const parsed = msg.role === 'assistant' ? parseThinkTags(msg.content) : null;
+
+  return (
+    <div className={`group/msg flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+      <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
+        msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'
+      } ${msg.isError ? 'border border-red-300' : ''}`}>
+        {isEditing ? (
+          <div className="space-y-2">
+            <textarea className="w-full min-h-[60px] text-sm border rounded p-2 bg-background text-foreground resize-none"
+              value={editingContent} onChange={e => onSetEditingContent(e.target.value)}
+              placeholder={t('diary.aiEditPlaceholder', { defaultValue: '编辑消息内容...' })} />
+            <div className="flex gap-1 justify-end">
+              <Button size="sm" className="h-6 text-xs" onClick={onConfirmEdit}>{t('diary.aiSend', { defaultValue: '发送' })}</Button>
+              <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={onCancelEdit}>{t('diary.aiCancel', { defaultValue: '取消' })}</Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {msg.role === 'assistant' && parsed ? (
+              <div className="space-y-2">
+                {parsed.thinking && (
+                  <CollapsibleThinkingBlock thinking={parsed.thinking} isThinking={false} theme={theme} />
+                )}
+                <MarkdownPreview content={parsed.content || msg.content} className="text-sm" />
+              </div>
+            ) : msg.role === 'assistant' ? (
+              <MarkdownPreview content={msg.content} className="text-sm" />
+            ) : (
+              <div className="whitespace-pre-wrap">{msg.content}</div>
+            )}
+            <div className="hidden group-hover/msg:flex items-center gap-0.5 mt-1">
+              <button className="p-0.5 rounded hover:bg-accent" onClick={onCopyMsg}
+                title={t('diary.copy', { defaultValue: '复制' })}>
+                {isCopied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
+              </button>
+              {msg.role === 'user' && (
+                <button className="p-0.5 rounded hover:bg-accent" onClick={onStartEdit}
+                  title={t('diary.aiEditResend', { defaultValue: '编辑并重新发送' })}>
+                  <Pencil className="h-3 w-3 text-muted-foreground" />
+                </button>
+              )}
+              {msg.role === 'assistant' && !msg.isError && (
+                <>
+                  <button className="p-0.5 rounded hover:bg-accent" onClick={onRegenerate}
+                    title={t('diary.aiRegenerate', { defaultValue: '重新生成' })}>
+                    <RefreshCw className="h-3 w-3 text-muted-foreground" />
+                  </button>
+                  <button className="p-0.5 rounded hover:bg-accent" onClick={onInsert}
+                    title={t('diary.insertToDiary', { defaultValue: '插入到日记' })}>
+                    <ArrowDownToLine className="h-3 w-3 text-muted-foreground" />
+                  </button>
+                </>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+});
 
 function loadSessions(storage: StorageLike): DiaryAISession[] {
   return storage.get<DiaryAISession[]>(SESSIONS_KEY) || [];
@@ -206,6 +290,8 @@ export default function DiaryAISidebar({
   }, [sessions, persistSessions, host.storage]);
 
   const handleSwitchSession = useCallback((id: string) => {
+    // 切换会话时中断正在进行的流式请求，避免消息写入错误的会话
+    abortRef.current?.abort();
     setActiveSessionId(id);
     host.storage.set(ACTIVE_SESSION_KEY, id);
     setSessionMenuOpen(false);
@@ -245,7 +331,7 @@ export default function DiaryAISidebar({
     streamingContentRef.current = '';
 
     const systemPrompt = customPrompt || buildDiarySystemPrompt(diary, activeEntry, contextMode);
-    const historyMsgs = [...(activeSession?.messages || []), userMsg];
+    const historyMsgs = [...messages, userMsg];
     const apiMessages = [
       { role: 'system' as const, content: systemPrompt },
       ...historyMsgs.slice(-8).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
@@ -253,6 +339,7 @@ export default function DiaryAISidebar({
 
     const controller = new AbortController();
     abortRef.current = controller;
+    const sendingSessionId = activeSessionId;
 
     try {
       // DocTypeHost.chatStream 的 onChunk 参数为已累计的**全文**，非增量，禁止 += 拼接
@@ -267,25 +354,50 @@ export default function DiaryAISidebar({
       });
 
       const assistantMsg: DiaryAIMessage = { id: genMsgId(), role: 'assistant', content: full, timestamp: Date.now() };
-      updateActiveSession(s => ({ ...s, messages: [...s.messages, assistantMsg], updatedAt: Date.now() }));
+      // 使用 saved sendingSessionId 确保即使中途切换了会话，消息仍写入正确的会话
+      const finalSessionId = sendingSessionId;
+      setSessions(prev => {
+        const updated = prev.map(s => s.id === finalSessionId
+          ? { ...s, messages: [...s.messages, assistantMsg], updatedAt: Date.now() }
+          : s);
+        saveSessions(host.storage, updated);
+        return updated;
+      });
     } catch (err: unknown) {
       if ((err as Error)?.name === 'AbortError') {
         const partialContent = streamingContentRef.current;
         if (partialContent) {
-          updateActiveSession(s => ({ ...s, messages: [...s.messages, { id: genMsgId(), role: 'assistant', content: partialContent, timestamp: Date.now() }], updatedAt: Date.now() }));
+          const finalSessionId = sendingSessionId;
+          setSessions(prev => {
+            const updated = prev.map(s => s.id === finalSessionId
+              ? { ...s, messages: [...s.messages, { id: genMsgId(), role: 'assistant', content: partialContent, timestamp: Date.now() }], updatedAt: Date.now() }
+              : s);
+            saveSessions(host.storage, updated);
+            return updated;
+          });
         }
       } else {
         const errContent = formatBackendError(err);
-        updateActiveSession(s => ({ ...s, messages: [...s.messages, { id: genMsgId(), role: 'assistant', content: `❌ ${errContent}`, timestamp: Date.now(), isError: true }], updatedAt: Date.now() }));
+        const finalSessionId = sendingSessionId;
+        setSessions(prev => {
+          const updated = prev.map(s => s.id === finalSessionId
+            ? { ...s, messages: [...s.messages, { id: genMsgId(), role: 'assistant', content: `❌ ${errContent}`, timestamp: Date.now(), isError: true }], updatedAt: Date.now() }
+            : s);
+          saveSessions(host.storage, updated);
+          return updated;
+        });
       }
     } finally {
       setStreaming(false);
       setStreamingContent('');
       abortRef.current = null;
     }
-  }, [streaming, aiAvailable, customPrompt, diary, activeEntry, contextMode, activeSession, enableWebSearch, enableThinking, providerCaps, host.ai, selectedServiceId, updateActiveSession]);
+  }, [streaming, aiAvailable, customPrompt, diary, activeEntry, contextMode, messages, activeSessionId, enableWebSearch, enableThinking, providerCaps, host.ai, host.storage, selectedServiceId]);
 
-  sendMessageRef.current = sendMessage;
+  // 在 commit 阶段后更新 ref，确保 setTimeout 调用时拿到最新闭包
+  useEffect(() => {
+    sendMessageRef.current = sendMessage;
+  }, [sendMessage]);
 
   // ── 停止 / 清空 ──
   const handleStop = useCallback(() => { abortRef.current?.abort(); }, []);
@@ -324,7 +436,7 @@ export default function DiaryAISidebar({
   }, [editingMsgId, editingContent, messages, updateActiveSession]);
 
   const handleInsert = useCallback((content: string) => {
-    const cleaned = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    const cleaned = content.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim();
     onInsertToDoc(cleaned);
   }, [onInsertToDoc]);
 
@@ -339,15 +451,31 @@ export default function DiaryAISidebar({
     sendMessage(prompt);
   }, [activeEntry, diary, sendMessage]);
 
-  // ── 自动滚动 ──
+  // ── 智能滚动：检测用户是否手动上滚 ──
+  const userScrolledUpRef = useRef(false);
+
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const el = scrollRef.current;
+    if (!el) return;
+    const handleScroll = () => {
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50;
+      userScrolledUpRef.current = !atBottom;
+    };
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    if (scrollRef.current && !userScrolledUpRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
   }, [messages, streamingContent]);
 
   // ── 推荐快捷操作（基于日记阶段） ──
   const recommendedActions = useMemo(() => {
     if (!activeEntry || !activeEntry.content) {
-      return DIARY_QUICK_ACTIONS.filter(a => ['continue', 'prompt', 'gratitude'].includes(a.id)).slice(0, 4);
+      // 空内容时不推荐续写，改为推荐写法灵感、提示和感恩
+      return DIARY_QUICK_ACTIONS.filter(a => ['prompt', 'gratitude', 'reflect', 'insight'].includes(a.id)).slice(0, 4);
     }
     if (activeEntry.content.length < 100) {
       return DIARY_QUICK_ACTIONS.filter(a => ['continue', 'prompt', 'reflect'].includes(a.id)).slice(0, 4);
@@ -364,7 +492,7 @@ export default function DiaryAISidebar({
             <PopoverTrigger asChild>
               <button type="button" className="text-sm font-medium truncate max-w-[140px] hover:text-blue-600 transition-colors flex items-center gap-0.5"
                 title={t('diary.aiSwitchSession', { defaultValue: '切换对话' })}>
-                {activeSession?.title || t('diary.aiTitle', { defaultValue: '日记助手' })}
+                {activeSession?.title || t('diary.aiTitle', { defaultValue: 'AI 日记助手' })}
                 <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 opacity-50" />
               </button>
             </PopoverTrigger>
@@ -459,7 +587,7 @@ export default function DiaryAISidebar({
             {DIARY_QUICK_ACTIONS.map(action => (
               <DropdownMenuItem key={action.id} className="text-xs cursor-pointer"
                 onClick={() => handleQuickAction(action.promptTemplate)}>
-                {action.label}
+                {t(action.labelKey, { defaultValue: action.labelDefault })}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
@@ -491,7 +619,7 @@ export default function DiaryAISidebar({
                 {recommendedActions.map(action => (
                   <Button key={action.id} variant="outline" size="sm" className="h-7 text-xs justify-start"
                     onClick={() => handleQuickAction(action.promptTemplate)} disabled={streaming || !aiAvailable}>
-                    <span className="truncate">{action.label}</span>
+                    <span className="truncate">{t(action.labelKey, { defaultValue: action.labelDefault })}</span>
                   </Button>
                 ))}
               </div>
@@ -499,87 +627,40 @@ export default function DiaryAISidebar({
           </div>
         )}
 
-        {messages.map(msg => {
-          const parsed = msg.role === 'assistant' ? parseThinkTags(msg.content) : null;
-          return (
-            <div key={msg.id} className={`group/msg flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
-                msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'
-              } ${msg.isError ? 'border border-red-300' : ''}`}>
-                {editingMsgId === msg.id ? (
-                  <div className="space-y-2">
-                    <textarea className="w-full min-h-[60px] text-sm border rounded p-2 bg-background text-foreground resize-none"
-                      value={editingContent} onChange={e => setEditingContent(e.target.value)}
-                      placeholder={t('diary.aiEditPlaceholder', { defaultValue: '编辑消息内容...' })} />
-                    <div className="flex gap-1 justify-end">
-                      <Button size="sm" className="h-6 text-xs" onClick={handleConfirmEdit}>{t('diary.aiSend', { defaultValue: '发送' })}</Button>
-                      <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setEditingMsgId(null)}>{t('diary.aiCancel', { defaultValue: '取消' })}</Button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    {msg.role === 'assistant' && parsed ? (
-                      <div className="space-y-2">
-                        {parsed.thinking && (
-                          <CollapsibleThinkingBlock
-                            thinking={parsed.thinking}
-                            isThinking={false}
-                            theme={resolveTheme()}
-                          />
-                        )}
-                        <MarkdownPreview content={parsed.content || msg.content} className="text-sm" />
-                      </div>
-                    ) : msg.role === 'assistant' ? (
-                      <MarkdownPreview content={msg.content} className="text-sm" />
-                    ) : (
-                      <div className="whitespace-pre-wrap">{msg.content}</div>
-                    )}
-                    {/* 消息操作（hover 显示） */}
-                    <div className="hidden group-hover/msg:flex items-center gap-0.5 mt-1">
-                      <button className="p-0.5 rounded hover:bg-accent" onClick={() => handleCopyMsg(msg.id, parsed?.content || msg.content)}
-                        title={t('diary.copy', { defaultValue: '复制' })}>
-                        {copiedId === msg.id ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 text-muted-foreground" />}
-                      </button>
-                      {msg.role === 'user' && (
-                        <button className="p-0.5 rounded hover:bg-accent" onClick={() => handleStartEdit(msg)}
-                          title={t('diary.aiEditResend', { defaultValue: '编辑并重新发送' })}>
-                          <Pencil className="h-3 w-3 text-muted-foreground" />
-                        </button>
-                      )}
-                      {msg.role === 'assistant' && !msg.isError && (
-                        <>
-                          <button className="p-0.5 rounded hover:bg-accent" onClick={() => handleRegenerate(msg.id)}
-                            title={t('diary.aiRegenerate', { defaultValue: '重新生成' })}>
-                            <RefreshCw className="h-3 w-3 text-muted-foreground" />
-                          </button>
-                          <button className="p-0.5 rounded hover:bg-accent" onClick={() => handleInsert(parsed?.content || msg.content)}
-                            title={t('diary.insertToDiary', { defaultValue: '插入到日记' })}>
-                            <ArrowDownToLine className="h-3 w-3 text-muted-foreground" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {messages.map(msg => (
+          <DiaryMessageItem
+            key={msg.id}
+            msg={msg}
+            isEditing={editingMsgId === msg.id}
+            editingContent={editingContent}
+            isCopied={copiedId === msg.id}
+            theme={resolveTheme()}
+            onCopyMsg={handleCopyMsg}
+            onStartEdit={handleStartEdit}
+            onConfirmEdit={handleConfirmEdit}
+            onRegenerate={handleRegenerate}
+            onInsert={handleInsert}
+            onSetEditingContent={setEditingContent}
+            onCancelEdit={() => setEditingMsgId(null)}
+          />
+        ))}
 
         {/* 流式输出（含 think 标签实时折叠） */}
         {streaming && streamingContent && (() => {
           const streamParsed = parseThinkTags(streamingContent);
+          const hasThinking = !!streamParsed.thinking;
+          const streamContent = streamParsed.content || streamingContent;
           return (
             <div className="flex justify-start">
               <div className="max-w-[85%] rounded-lg px-3 py-2 bg-muted text-sm space-y-2">
-                {streamParsed.thinking && (
+                {hasThinking && (
                   <CollapsibleThinkingBlock
-                    thinking={streamParsed.thinking}
-                    isThinking={streamParsed.isThinking}
+                    thinking={streamParsed!.thinking}
+                    isThinking={streamParsed!.isThinking}
                     theme={resolveTheme()}
                   />
                 )}
-                {streamParsed.content && <MarkdownPreview content={streamParsed.content} className="text-sm" />}
+                <MarkdownPreview content={streamContent} className="text-sm" />
               </div>
             </div>
           );

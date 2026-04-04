@@ -14,11 +14,10 @@ import { save } from '@tauri-apps/plugin-dialog';
 import type { DiaryDocumentContent } from './types';
 import { saveTextFileWithDialog } from '@/lib/tauriSaveTextFile';
 import {
-  exportToMarkdown, exportToPlainText, exportToJSON, buildExportMarkdown,
+  exportToMarkdown, exportToPlainText, exportToJSON,
   DEFAULT_EXPORT_OPTIONS, type DiaryExportOptions,
 } from './diaryExport';
-
-const DIALOG_STYLE = { fontFamily: "'宋体', 'SimSun', serif", fontSize: '16px' };
+import { DIALOG_STYLE } from '../_shared/styles';
 
 type ExportFormat = 'markdown' | 'plaintext' | 'docx' | 'pdf' | 'json' | 'html';
 
@@ -37,6 +36,16 @@ export default function DiaryExportDialog({
   const [format, setFormat] = useState<ExportFormat>('markdown');
   const [options, setOptions] = useState<DiaryExportOptions>({ ...DEFAULT_EXPORT_OPTIONS });
   const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
+
+  // 收集所有可用标签
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    for (const e of diary.entries) {
+      if (!e.deletedAt) for (const tag of e.tags) tagSet.add(tag);
+    }
+    return Array.from(tagSet).sort();
+  }, [diary.entries]);
 
   const FORMATS: { key: ExportFormat; icon: typeof FileText; label: string; desc: string }[] = [
     { key: 'markdown', icon: FileText, label: 'Markdown', desc: t('diary.exportMdDesc', { defaultValue: '按日期分组，含元数据' }) },
@@ -53,15 +62,16 @@ export default function DiaryExportDialog({
       case 'plaintext': return exportToPlainText(diary, options);
       case 'json': return exportToJSON(diary, options);
       case 'docx': case 'pdf': case 'html':
-        return buildExportMarkdown(diary, options) + '\n\n(' + t('diary.exportPreviewHint', { defaultValue: '预览为 Markdown 源文本，实际导出为 {{format}} 格式', format: format.toUpperCase() }) + ')';
+        return exportToMarkdown(diary, options) + '\n\n(' + t('diary.exportPreviewHint', { defaultValue: '预览为 Markdown 源文本，实际导出为 {{format}} 格式', format: format.toUpperCase() }) + ')';
       default: return '';
     }
-  }, [format, diary, options]);
+  }, [format, diary, options, t]);
 
   const previewLines = useMemo(() => previewContent.split('\n').slice(0, 500).join('\n'), [previewContent]);
 
   const handleExport = useCallback(async () => {
     setExporting(true);
+    setExportError('');
     try {
       if (format === 'markdown' || format === 'plaintext' || format === 'json') {
         const content = format === 'markdown' ? exportToMarkdown(diary, options)
@@ -80,7 +90,7 @@ export default function DiaryExportDialog({
         if (path) onOpenChange(false);
       } else {
         // DOCX/PDF/HTML: 通过 Rust 后端导出
-        const md = buildExportMarkdown(diary, options);
+        const md = exportToMarkdown(diary, options);
         const ext = format;
         const defaultFileName = `diary-export.${ext}`;
         const filePath = await save({
@@ -107,10 +117,12 @@ export default function DiaryExportDialog({
       }
     } catch (err) {
       console.error('Diary export error:', err);
+      const msg = err instanceof Error ? err.message : String(err);
+      setExportError(t('diary.exportFailed', { defaultValue: '导出失败' }) + ': ' + msg);
     } finally {
       setExporting(false);
     }
-  }, [format, diary, options, documentId, projectId, onOpenChange]);
+  }, [format, diary, options, documentId, projectId, onOpenChange, t]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -127,6 +139,7 @@ export default function DiaryExportDialog({
           <Button variant="default" size="sm" className="h-7 text-xs gap-1" onClick={handleExport} disabled={exporting}>
             <FileDown className="h-3 w-3" />{exporting ? t('diary.exporting', { defaultValue: '导出中...' }) : t('diary.exportSave', { defaultValue: '导出' })}
           </Button>
+          {exportError && <span className="text-xs text-red-500">{exportError}</span>}
         </div>
 
         <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -138,6 +151,7 @@ export default function DiaryExportDialog({
               {[
                 { key: 'all' as const, label: t('diary.exportAll', { defaultValue: '全部日记' }) },
                 { key: 'starred' as const, label: t('diary.exportStarred', { defaultValue: '仅收藏' }) },
+                { key: 'dateRange' as const, label: t('diary.exportDateRange', { defaultValue: '按日期范围' }) },
               ].map(r => (
                 <label key={r.key} className="flex items-center gap-2 text-xs cursor-pointer">
                   <input type="radio" name="range" checked={options.range === r.key}
@@ -145,6 +159,31 @@ export default function DiaryExportDialog({
                   {r.label}
                 </label>
               ))}
+              {options.range === 'dateRange' && (
+                <div className="flex items-center gap-1 pl-4 text-xs">
+                  <input type="date" className="px-1 py-0.5 text-xs border rounded bg-background"
+                    value={options.dateFrom || ''} onChange={e => setOptions(prev => ({ ...prev, dateFrom: e.target.value || undefined }))} />
+                  <span className="text-muted-foreground">~</span>
+                  <input type="date" className="px-1 py-0.5 text-xs border rounded bg-background"
+                    value={options.dateTo || ''} onChange={e => setOptions(prev => ({ ...prev, dateTo: e.target.value || undefined }))} />
+                </div>
+              )}
+              {allTags.length > 0 && (
+                <>
+                  <label className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input type="radio" name="range" checked={options.range === 'tag'}
+                      onChange={() => setOptions(prev => ({ ...prev, range: 'tag', tag: prev.tag || allTags[0] }))} />
+                    {t('diary.exportByTag', { defaultValue: '按标签' })}
+                  </label>
+                  {options.range === 'tag' && (
+                    <select className="w-full px-1 py-0.5 text-xs border rounded bg-background"
+                      value={options.tag || allTags[0]}
+                      onChange={e => setOptions(prev => ({ ...prev, tag: e.target.value }))}>
+                      {allTags.map(tag => <option key={tag} value={tag}>#{tag}</option>)}
+                    </select>
+                  )}
+                </>
+              )}
               {diary.journals.length > 1 && diary.journals.map(j => (
                 <label key={j.id} className="flex items-center gap-2 text-xs cursor-pointer">
                   <input type="radio" name="range" checked={options.range === 'journal' && options.journalId === j.id}

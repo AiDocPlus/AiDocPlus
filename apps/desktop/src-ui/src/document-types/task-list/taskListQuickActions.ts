@@ -288,7 +288,7 @@ export function loadQuickActions(storage: {
   set: (key: string, value: unknown) => void;
 }): TaskListQuickActionStore {
   const saved = storage.get<TaskListQuickActionStore>(STORAGE_KEY);
-  if (saved && saved.categories && saved.items) {
+  if (saved && Array.isArray(saved.categories) && Array.isArray(saved.items)) {
     return mergeWithDefaults(saved);
   }
   const store = getDefaultStore();

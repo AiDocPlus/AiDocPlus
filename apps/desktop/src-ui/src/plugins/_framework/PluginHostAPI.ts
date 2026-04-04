@@ -524,6 +524,14 @@ export function createPluginHostAPI(opts: CreatePluginHostAPIOptions): PluginHos
           throw new Error('Request aborted');
         }
 
+        // AbortSignal 取消时通知后端停止流（必须在 invoke 之前注册）
+        if (options?.signal) {
+          const onAbort = () => {
+            invoke('stop_ai_stream', { requestId }).catch(() => {});
+          };
+          options.signal.addEventListener('abort', onAbort, { once: true });
+        }
+
         // 调用后端流式接口
         const serverFull = await invoke<string>('chat_stream', {
           messages,
@@ -533,18 +541,6 @@ export function createPluginHostAPI(opts: CreatePluginHostAPIOptions): PluginHos
           enableThinking: options?.enableThinking || undefined,
           requestId,
         });
-
-        // AbortSignal 取消时通知后端停止流
-        if (options?.signal) {
-          const onAbort = () => {
-            invoke('stop_ai_stream', { requestId }).catch(() => {});
-          };
-          options.signal.addEventListener('abort', onAbort, { once: true });
-          // 如果在 invoke 期间已取消，立即通知后端
-          if (options.signal.aborted) {
-            invoke('stop_ai_stream', { requestId }).catch(() => {});
-          }
-        }
 
         // 优先使用服务端完整累积结果，防止最后 chunk 丢失
         const finalParsed = parseThinkTags(serverFull || rawAccumulated);

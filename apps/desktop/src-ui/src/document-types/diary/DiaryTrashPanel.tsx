@@ -11,8 +11,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useTranslation } from '@/i18n';
 import type { DiaryDocumentContent } from './types';
 import { getDeletedEntries, restoreEntry, permanentDeleteEntry, cleanupDeletedEntries, MOOD_EMOJI } from './types';
-
-const DIALOG_STYLE = { fontFamily: "'宋体', 'SimSun', serif", fontSize: '16px' };
+import { DIALOG_STYLE } from '../_shared/styles';
 
 interface DiaryTrashPanelProps {
   open: boolean;
@@ -34,32 +33,34 @@ export default function DiaryTrashPanel({
   }, [diary, onDiaryChange]);
 
   const handlePermanentDelete = useCallback((entryId: string) => {
+    if (!window.confirm(t('diary.confirmPermanentDelete', { defaultValue: '确定要永久删除这条日记吗？此操作不可撤销。' }))) return;
     const updated = permanentDeleteEntry(diary, entryId);
     onDiaryChange(updated);
-  }, [diary, onDiaryChange]);
+  }, [diary, onDiaryChange, t]);
 
   const handleCleanup = useCallback(() => {
+    if (!window.confirm(t('diary.confirmCleanupOld', { defaultValue: '确定要清理超过30天的已删除条目吗？此操作不可撤销。' }))) return;
     const updated = cleanupDeletedEntries(diary);
     onDiaryChange(updated);
-  }, [diary, onDiaryChange]);
+  }, [diary, onDiaryChange, t]);
 
   const handleEmptyTrash = useCallback(() => {
-    let updated = diary;
-    for (const entry of deletedEntries) {
-      updated = permanentDeleteEntry(updated, entry.id);
-    }
+    if (!window.confirm(t('diary.confirmEmptyTrash', { defaultValue: '确定要清空回收站吗？{{count}} 条记录将被永久删除，此操作不可撤销。', count: deletedEntries.length }))) return;
+    const deletedIds = new Set(deletedEntries.map(e => e.id));
+    const updated = { ...diary, entries: diary.entries.filter(e => !deletedIds.has(e.id)) };
     onDiaryChange(updated);
-  }, [diary, deletedEntries, onDiaryChange]);
+  }, [diary, deletedEntries, onDiaryChange, t]);
 
-  const formatDeletedTime = (ts: number) => {
-    const d = new Date(ts);
-    const now = Date.now();
-    const diffDays = Math.floor((now - ts) / 86400000);
-    if (diffDays === 0) return t('diary.timeToday', { defaultValue: '今天' });
-    if (diffDays === 1) return t('diary.timeYesterday', { defaultValue: '昨天' });
-    if (diffDays < 7) return t('diary.timeDaysAgo', { defaultValue: '{{count}}天前', count: diffDays });
-    return `${d.getMonth() + 1}/${d.getDate()}`;
-  };
+function formatDeletedTime(ts: number, t: (key: string, options?: Record<string, unknown>) => string) {
+  const d = new Date(ts);
+  const diffDays = Math.floor((Date.now() - ts) / 86400000);
+  if (diffDays === 0) return t('diary.timeToday', { defaultValue: '今天' });
+  if (diffDays === 1) return t('diary.timeYesterday', { defaultValue: '昨天' });
+  if (diffDays < 7) return t('diary.timeDaysAgo', { defaultValue: '{{count}}天前', count: diffDays });
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -101,22 +102,22 @@ export default function DiaryTrashPanel({
                     <div className="flex items-center gap-1.5 text-sm">
                       {entry.mood && <span>{MOOD_EMOJI[entry.mood]}</span>}
                       <span className="font-medium truncate">
-                        {entry.title || entry.content.slice(0, 30).replace(/\n/g, ' ') || t('diary.untitled', { defaultValue: '无标题' })}
+                        {entry.title || (entry.content || '').slice(0, 30).replace(/\n/g, ' ') || t('diary.untitled', { defaultValue: '无标题' })}
                       </span>
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
                       <span>{entry.date}</span>
-                      <span>{entry.content.replace(/\s/g, '').length}{t('diary.charUnit', { defaultValue: '字' })}</span>
+                      <span>{entry.wordCount}{t('diary.charUnit', { defaultValue: '字' })}</span>
                       {entry.deletedAt && (
                         <span className="flex items-center gap-0.5 text-red-500/70">
                           <AlertTriangle className="h-2.5 w-2.5" />
-                          {t('diary.deletedAt', { defaultValue: '删除于 {{time}}', time: formatDeletedTime(entry.deletedAt) })}
+                          {t('diary.deletedAt', { defaultValue: '删除于 {{time}}', time: formatDeletedTime(entry.deletedAt, t) })}
                         </span>
                       )}
                     </div>
-                    {entry.content && (
+                    {(entry.content || '') && (
                       <div className="text-xs text-muted-foreground/60 mt-0.5 truncate">
-                        {entry.content.replace(/\n/g, ' ').slice(0, 80)}
+                        {(entry.content || '').replace(/\n/g, ' ').slice(0, 80)}
                       </div>
                     )}
                   </div>

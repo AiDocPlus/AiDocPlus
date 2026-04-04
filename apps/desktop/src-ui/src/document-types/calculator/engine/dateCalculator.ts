@@ -115,17 +115,20 @@ export function parseDateExpression(expr: string): Date | null {
     const match = normalized.match(pattern);
     if (match) {
       try {
-        // 根据模式解析
+        let year: number, month: number, day: number;
         if (pattern === datePatterns[0]) {
-          // YYYY-MM-DD
-          return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
+          year = parseInt(match[1]); month = parseInt(match[2]); day = parseInt(match[3]);
         } else if (pattern === datePatterns[1]) {
-          // MM/DD/YYYY
-          return new Date(parseInt(match[3]), parseInt(match[1]) - 1, parseInt(match[2]));
+          year = parseInt(match[3]); month = parseInt(match[1]); day = parseInt(match[2]);
         } else {
-          // N月M日（当年）
-          return new Date(new Date().getFullYear(), parseInt(match[1]) - 1, parseInt(match[2]));
+          year = new Date().getFullYear(); month = parseInt(match[1]); day = parseInt(match[2]);
         }
+        // 校验合法性：月 1-12，日 1-31
+        if (month < 1 || month > 12 || day < 1 || day > 31) continue;
+        const date = new Date(year, month - 1, day);
+        // 反向校验：Date 构造器会静默进位（如 2月30日→3月2日）
+        if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) continue;
+        return date;
       } catch {
         continue;
       }
@@ -176,14 +179,17 @@ export function parseDateArithmetic(expr: string): Date | null {
  * 返回天数差
  */
 export function parseDateDifference(expr: string): number | null {
-  // 匹配：date1 (to|-|到|至) date2
-  const diffPattern = /^(.+?)\s*(?:to|-|到|至)\s*(.+)$/;
+  // 匹配：date1 (to|到|至) date2  或  date1 - date2（- 两侧需有空格，避免与 YYYY-MM-DD 冲突）
+  const diffPattern = /^(.+?)\s*(?:to|到|至)\s*(.+)$|^(.+?)\s+-\s+(.+)$/;
   const match = expr.match(diffPattern);
 
-  if (!match) return null;
+  const left = (match?.[1] ?? match?.[3])?.trim();
+  const right = (match?.[2] ?? match?.[4])?.trim();
 
-  const date1 = parseDateExpression(match[1].trim()) || parseDateArithmetic(match[1].trim());
-  const date2 = parseDateExpression(match[2].trim()) || parseDateArithmetic(match[2].trim());
+  if (!left || !right) return null;
+
+  const date1 = parseDateExpression(left) || parseDateArithmetic(left);
+  const date2 = parseDateExpression(right) || parseDateArithmetic(right);
 
   if (!date1 || !date2) return null;
 
@@ -219,19 +225,19 @@ export function formatDateDisplay(
 /**
  * 格式化日期差显示
  */
-export function formatDurationDisplay(days: number): string {
-  if (Math.abs(days) < 7) {
-    return `${days} 天`;
-  } else if (Math.abs(days) < 30) {
-    const weeks = Math.round(days / 7);
-    return `${weeks} 周`;
-  } else if (Math.abs(days) < 365) {
-    const months = Math.round(days / 30);
-    return `${months} 个月`;
-  } else {
-    const years = (days / 365).toFixed(1);
-    return `${years} 年`;
+export function formatDurationDisplay(days: number, locale: string = 'zh'): string {
+  const absDays = Math.abs(days);
+  const sign = days < 0 ? '-' : '';
+  if (locale.startsWith('zh')) {
+    if (absDays < 7) return `${sign}${days} 天`;
+    if (absDays < 30) return `${sign}${Math.round(absDays / 7)} 周`;
+    if (absDays < 365) return `${sign}${Math.round(absDays / 30)} 个月`;
+    return `${sign}${(absDays / 365).toFixed(1)} 年`;
   }
+  if (absDays < 7) return `${sign}${days} day${absDays !== 1 ? 's' : ''}`;
+  if (absDays < 30) return `${sign}${Math.round(absDays / 7)} week${Math.round(absDays / 7) !== 1 ? 's' : ''}`;
+  if (absDays < 365) return `${sign}${Math.round(absDays / 30)} month${Math.round(absDays / 30) !== 1 ? 's' : ''}`;
+  return `${sign}${(absDays / 365).toFixed(1)} year${(absDays / 365).toFixed(1) !== '1.0' ? 's' : ''}`;
 }
 
 // ============================================================
@@ -250,7 +256,8 @@ export interface DateCalcResult {
  */
 export function tryParseDateExpression(
   expr: string,
-  dateFormatSetting?: string
+  dateFormatSetting?: string,
+  locale?: string
 ): DateCalcResult | null {
   const trimmed = expr.trim();
   const dateFnsPattern = dateFormatSetting
@@ -263,7 +270,7 @@ export function tryParseDateExpression(
     return {
       type: 'duration',
       value: diff,
-      displayValue: formatDurationDisplay(diff),
+      displayValue: formatDurationDisplay(diff, locale),
     };
   }
 

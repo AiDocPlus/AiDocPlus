@@ -1,8 +1,13 @@
 /**
  * diaryAnalysis.ts — 日记统计分析逻辑
  */
-import type { DiaryDocumentContent, DiaryMood } from './types';
-import { MOOD_SCORE, getEntryWordCount } from './types';
+import type { DiaryDocumentContent, DiaryMood, DiaryEntry } from './types';
+import { MOOD_SCORE, MOOD_LABEL, MOOD_EMOJI, getEntryWordCount, getTodayDateStr, toLocalDateStr } from './types';
+
+/** 获取未删除的条目（统计分析统一使用） */
+function activeEntries(diary: DiaryDocumentContent): DiaryEntry[] {
+  return diary.entries.filter(e => !e.deletedAt);
+}
 
 /** 年度热力图数据 */
 export interface HeatmapDay {
@@ -12,9 +17,10 @@ export interface HeatmapDay {
 }
 
 export function getYearlyHeatmap(diary: DiaryDocumentContent, year: number): HeatmapDay[] {
+  const entries = activeEntries(diary);
   // 先建立 date→{count, words} 的 Map，O(N)
   const dateMap = new Map<string, { count: number; words: number }>();
-  for (const e of diary.entries) {
+  for (const e of entries) {
     if (e.date.startsWith(String(year))) {
       const existing = dateMap.get(e.date);
       if (existing) {
@@ -31,7 +37,7 @@ export function getYearlyHeatmap(diary: DiaryDocumentContent, year: number): Hea
   const days: HeatmapDay[] = [];
   const d = new Date(start);
   while (d <= end) {
-    const dateStr = d.toISOString().slice(0, 10);
+    const dateStr = toLocalDateStr(d);
     const entry = dateMap.get(dateStr);
     days.push({
       date: dateStr,
@@ -54,9 +60,9 @@ export function getMoodTrend(diary: DiaryDocumentContent, days: number): MoodPoi
   const today = new Date();
   const cutoff = new Date(today);
   cutoff.setDate(cutoff.getDate() - days);
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const cutoffStr = toLocalDateStr(cutoff);
 
-  return diary.entries
+  return activeEntries(diary)
     .filter(e => e.date >= cutoffStr && e.mood)
     .map(e => ({ date: e.date, score: MOOD_SCORE[e.mood!], mood: e.mood! }))
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -65,7 +71,7 @@ export function getMoodTrend(diary: DiaryDocumentContent, days: number): MoodPoi
 /** 心情分布 */
 export function getMoodDistribution(diary: DiaryDocumentContent): { mood: DiaryMood; count: number }[] {
   const counts: Record<string, number> = {};
-  for (const e of diary.entries) {
+  for (const e of activeEntries(diary)) {
     if (e.mood) counts[e.mood] = (counts[e.mood] || 0) + 1;
   }
   return Object.entries(counts)
@@ -76,7 +82,7 @@ export function getMoodDistribution(diary: DiaryDocumentContent): { mood: DiaryM
 /** 标签频率 */
 export function getTagFrequency(diary: DiaryDocumentContent): { tag: string; count: number }[] {
   const counts: Record<string, number> = {};
-  for (const e of diary.entries) {
+  for (const e of activeEntries(diary)) {
     for (const tag of e.tags) {
       counts[tag] = (counts[tag] || 0) + 1;
     }
@@ -89,7 +95,7 @@ export function getTagFrequency(diary: DiaryDocumentContent): { tag: string; cou
 /** 写作时段分布（24小时） */
 export function getWritingHourDistribution(diary: DiaryDocumentContent): number[] {
   const hours = new Array(24).fill(0);
-  for (const e of diary.entries) {
+  for (const e of activeEntries(diary)) {
     if (e.time) {
       const h = parseInt(e.time.split(':')[0], 10);
       if (h >= 0 && h < 24) hours[h]++;
@@ -106,12 +112,13 @@ export interface MonthlyStats {
 }
 
 export function getMonthlyStats(diary: DiaryDocumentContent, months: number = 12): MonthlyStats[] {
+  const entries = activeEntries(diary);
   const today = new Date();
   const stats: MonthlyStats[] = [];
   for (let i = months - 1; i >= 0; i--) {
     const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
     const prefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    const monthEntries = diary.entries.filter(e => e.date.startsWith(prefix));
+    const monthEntries = entries.filter(e => e.date.startsWith(prefix));
     stats.push({
       month: prefix,
       entries: monthEntries.length,
@@ -123,7 +130,7 @@ export function getMonthlyStats(diary: DiaryDocumentContent, months: number = 12
 
 /** 最长条目排行 */
 export function getLongestEntries(diary: DiaryDocumentContent, limit: number = 10): { date: string; title: string; words: number }[] {
-  return [...diary.entries]
+  return [...activeEntries(diary)]
     .map(e => ({ date: e.date, title: e.title || e.content.slice(0, 30).replace(/\n/g, ' '), words: getEntryWordCount(e) }))
     .sort((a, b) => b.words - a.words)
     .slice(0, limit);
@@ -142,7 +149,7 @@ export interface MoodWeatherCorrelation {
 
 export function getMoodWeatherCorrelation(diary: DiaryDocumentContent): MoodWeatherCorrelation[] {
   const map = new Map<string, { total: number; count: number }>();
-  for (const e of diary.entries) {
+  for (const e of activeEntries(diary)) {
     if (e.mood && e.weather) {
       const key = e.weather.type;
       const existing = map.get(key);
@@ -162,16 +169,13 @@ export function getMoodWeatherCorrelation(diary: DiaryDocumentContent): MoodWeat
 /** 心情与星期关联分析 */
 export interface MoodWeekdayCorrelation {
   weekday: number; // 0=周日, 1=周一, ..., 6=周六
-  weekdayLabel: string;
   avgScore: number;
   count: number;
 }
 
-const WEEKDAY_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-
 export function getMoodWeekdayCorrelation(diary: DiaryDocumentContent): MoodWeekdayCorrelation[] {
   const buckets: { total: number; count: number }[] = Array.from({ length: 7 }, () => ({ total: 0, count: 0 }));
-  for (const e of diary.entries) {
+  for (const e of activeEntries(diary)) {
     if (e.mood) {
       const d = new Date(e.date + 'T00:00:00');
       const weekday = d.getDay();
@@ -181,7 +185,6 @@ export function getMoodWeekdayCorrelation(diary: DiaryDocumentContent): MoodWeek
   }
   return buckets.map((b, i) => ({
     weekday: i,
-    weekdayLabel: WEEKDAY_LABELS[i],
     avgScore: b.count > 0 ? Math.round(b.total / b.count * 10) / 10 : 0,
     count: b.count,
   }));
@@ -197,12 +200,13 @@ export interface MoodTagCorrelation {
 }
 
 export function getMoodTagCorrelation(diary: DiaryDocumentContent): MoodTagCorrelation[] {
+  const entries = activeEntries(diary);
   // 全局平均
-  const allMoods = diary.entries.filter(e => e.mood).map(e => MOOD_SCORE[e.mood!]);
+  const allMoods = entries.filter(e => e.mood).map(e => MOOD_SCORE[e.mood!]);
   const globalAvg = allMoods.length > 0 ? allMoods.reduce((s, v) => s + v, 0) / allMoods.length : 3;
 
   const map = new Map<string, { total: number; count: number }>();
-  for (const e of diary.entries) {
+  for (const e of entries) {
     if (e.mood && e.tags.length > 0) {
       for (const tag of e.tags) {
         const existing = map.get(tag);
@@ -232,14 +236,15 @@ export interface MoodHeatmapCell {
   count: number;
 }
 
-const PERIOD_LABELS = ['凌晨', '上午', '下午', '晚上'];
+const PERIOD_KEYS = ['diary.periodDawn', 'diary.periodMorning', 'diary.periodAfternoon', 'diary.periodEvening'];
+const PERIOD_DEFAULTS = ['凌晨', '上午', '下午', '晚上'];
 
-export function getMoodHeatmap(diary: DiaryDocumentContent): { cells: MoodHeatmapCell[]; periodLabels: string[]; weekdayLabels: string[] } {
+export function getMoodHeatmap(diary: DiaryDocumentContent): { cells: MoodHeatmapCell[]; periodKeys: string[]; periodDefaults: string[] } {
   const grid: { total: number; count: number }[][] = Array.from({ length: 7 }, () =>
     Array.from({ length: 4 }, () => ({ total: 0, count: 0 })),
   );
 
-  for (const e of diary.entries) {
+  for (const e of activeEntries(diary)) {
     if (e.mood && e.time) {
       const d = new Date(e.date + 'T00:00:00');
       const weekday = d.getDay();
@@ -263,16 +268,26 @@ export function getMoodHeatmap(diary: DiaryDocumentContent): { cells: MoodHeatma
     }
   }
 
-  return { cells, periodLabels: PERIOD_LABELS, weekdayLabels: WEEKDAY_LABELS };
+  return { cells, periodKeys: PERIOD_KEYS, periodDefaults: PERIOD_DEFAULTS };
 }
 
 /** 周期性模式检测（哪些日子心情规律性高/低） */
 export interface PeriodicPattern {
   type: 'weekday_low' | 'weekday_high' | 'time_low' | 'time_high';
-  label: string;
-  detail: string;
+  /** i18n key, e.g. 'diary.patternWeekdayLow' */
+  labelKey: string;
+  labelDefault: string;
+  /** i18n key for detail */
+  detailKey: string;
+  detailDefault: string;
+  detailParams: Record<string, unknown>;
   significance: number; // 偏离程度（0-1）
 }
+
+const WEEKDAY_KEYS = ['diary.weekdaySun', 'diary.weekdayMon', 'diary.weekdayTue', 'diary.weekdayWed', 'diary.weekdayThu', 'diary.weekdayFri', 'diary.weekdaySat'];
+const WEEKDAY_DEFAULTS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+export { WEEKDAY_KEYS, WEEKDAY_DEFAULTS, PERIOD_KEYS, PERIOD_DEFAULTS };
 
 export function detectPeriodicPatterns(diary: DiaryDocumentContent): PeriodicPattern[] {
   const patterns: PeriodicPattern[] = [];
@@ -283,19 +298,26 @@ export function detectPeriodicPatterns(diary: DiaryDocumentContent): PeriodicPat
   if (validWeekdays.length >= 5) {
     const allAvg = validWeekdays.reduce((s, w) => s + w.avgScore * w.count, 0) / validWeekdays.reduce((s, w) => s + w.count, 0);
     for (const w of validWeekdays) {
+      const wdLabel = WEEKDAY_DEFAULTS[w.weekday];
       const diff = w.avgScore - allAvg;
       if (diff < -0.5 && w.count >= 3) {
         patterns.push({
           type: 'weekday_low',
-          label: `${w.weekdayLabel}心情偏低`,
-          detail: `${w.weekdayLabel}平均心情 ${w.avgScore}/5（低于均值 ${Math.abs(diff).toFixed(1)}），共 ${w.count} 次记录`,
+          labelKey: 'diary.patternWeekdayLow',
+          labelDefault: `${wdLabel}心情偏低`,
+          detailKey: 'diary.patternWeekdayLowDetail',
+          detailDefault: `${wdLabel}平均心情 {{avg}}/5（低于均值 {{absDiff}}），共 {{count}} 次记录`,
+          detailParams: { avg: w.avgScore, absDiff: Math.abs(diff).toFixed(1), count: w.count },
           significance: Math.min(1, Math.abs(diff) / 2),
         });
       } else if (diff > 0.5 && w.count >= 3) {
         patterns.push({
           type: 'weekday_high',
-          label: `${w.weekdayLabel}心情偏高`,
-          detail: `${w.weekdayLabel}平均心情 ${w.avgScore}/5（高于均值 ${diff.toFixed(1)}），共 ${w.count} 次记录`,
+          labelKey: 'diary.patternWeekdayHigh',
+          labelDefault: `${wdLabel}心情偏高`,
+          detailKey: 'diary.patternWeekdayHighDetail',
+          detailDefault: `${wdLabel}平均心情 {{avg}}/5（高于均值 {{diff}}），共 {{count}} 次记录`,
+          detailParams: { avg: w.avgScore, diff: diff.toFixed(1), count: w.count },
           significance: Math.min(1, diff / 2),
         });
       }
@@ -317,18 +339,25 @@ export function detectPeriodicPatterns(diary: DiaryDocumentContent): PeriodicPat
     for (let p = 0; p < 4; p++) {
       if (periodCounts[p] < 3) continue;
       const diff = periodAvgs[p] - allPeriodAvg;
+      const pLabel = PERIOD_DEFAULTS[p];
       if (diff < -0.5) {
         patterns.push({
           type: 'time_low',
-          label: `${PERIOD_LABELS[p]}心情偏低`,
-          detail: `${PERIOD_LABELS[p]}写日记时平均心情 ${periodAvgs[p].toFixed(1)}/5，低于其他时段`,
+          labelKey: 'diary.patternTimeLow',
+          labelDefault: `${pLabel}心情偏低`,
+          detailKey: 'diary.patternTimeLowDetail',
+          detailDefault: `${pLabel}写日记时平均心情 {{avg}}/5，低于其他时段`,
+          detailParams: { avg: periodAvgs[p].toFixed(1) },
           significance: Math.min(1, Math.abs(diff) / 2),
         });
       } else if (diff > 0.5) {
         patterns.push({
           type: 'time_high',
-          label: `${PERIOD_LABELS[p]}心情偏高`,
-          detail: `${PERIOD_LABELS[p]}写日记时平均心情 ${periodAvgs[p].toFixed(1)}/5，高于其他时段`,
+          labelKey: 'diary.patternTimeHigh',
+          labelDefault: `${pLabel}心情偏高`,
+          detailKey: 'diary.patternTimeHighDetail',
+          detailDefault: `${pLabel}写日记时平均心情 {{avg}}/5，高于其他时段`,
+          detailParams: { avg: periodAvgs[p].toFixed(1) },
           significance: Math.min(1, diff / 2),
         });
       }
@@ -348,7 +377,7 @@ export function buildEmotionInsightPrompt(diary: DiaryDocumentContent): string {
   if (dist.length > 0) {
     parts.push('【心情分布】');
     for (const d of dist) {
-      parts.push(`  ${d.mood}: ${d.count}次`);
+      parts.push(`  ${MOOD_EMOJI[d.mood]} ${MOOD_LABEL[d.mood]}: ${d.count}次`);
     }
   }
 
@@ -367,7 +396,7 @@ export function buildEmotionInsightPrompt(diary: DiaryDocumentContent): string {
   if (validWd.length > 0) {
     parts.push('\n【心情与星期关联】');
     for (const w of validWd) {
-      parts.push(`  ${w.weekdayLabel}: 平均 ${w.avgScore}/5（${w.count}次）`);
+      parts.push(`  ${WEEKDAY_DEFAULTS[w.weekday]}: 平均 ${w.avgScore}/5（${w.count}次）`);
     }
   }
 
@@ -386,7 +415,7 @@ export function buildEmotionInsightPrompt(diary: DiaryDocumentContent): string {
   if (patterns.length > 0) {
     parts.push('\n【检测到的周期性模式】');
     for (const p of patterns) {
-      parts.push(`  ${p.label}: ${p.detail}`);
+      parts.push(`  ${p.labelDefault}: ${p.detailDefault.replace(/\{\{(\w+)\}\}/g, (_, k) => String(p.detailParams[k] ?? ''))}`);
     }
   }
 

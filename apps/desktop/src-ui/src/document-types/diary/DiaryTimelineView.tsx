@@ -15,6 +15,7 @@ import { MOOD_EMOJI, MOOD_LABEL, WEATHER_EMOJI, WEATHER_LABEL, getEntryWordCount
 interface DiaryTimelineViewProps {
   entries: DiaryEntry[];
   selectedEntryId: string | null;
+  highlightKeyword?: string;
   onSelectEntry: (entryId: string) => void;
 }
 
@@ -26,7 +27,7 @@ interface MonthGroup {
 }
 
 export default function DiaryTimelineView({
-  entries, selectedEntryId, onSelectEntry,
+  entries, selectedEntryId, highlightKeyword, onSelectEntry,
 }: DiaryTimelineViewProps) {
   const { t } = useTranslation();
 
@@ -41,7 +42,7 @@ export default function DiaryTimelineView({
         const [y, m] = month.split('-').map(Number);
         groups.push({
           month,
-          label: `${y}年${m}月`,
+          label: t('diary.monthLabel', { defaultValue: `${y}年${m}月`, year: y, month: m }),
           entries: [],
           totalWords: 0,
         });
@@ -51,14 +52,38 @@ export default function DiaryTimelineView({
       group.totalWords += getEntryWordCount(entry);
     }
     return groups;
-  }, [entries]);
+  }, [entries, t]);
 
   const getExcerpt = (content: string, maxLen = 120): string => {
     const text = content.replace(/^#+\s+/gm, '').replace(/\n/g, ' ').trim();
     return text.length > maxLen ? text.slice(0, maxLen) + '...' : text;
   };
 
-  const weekDays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  const renderHighlighted = (text: string) => {
+    if (!highlightKeyword) return text;
+    const kw = highlightKeyword.toLowerCase();
+    const parts: React.ReactNode[] = [];
+    let remaining = text;
+    let lowerRemaining = text.toLowerCase();
+    let key = 0;
+    while (remaining.length > 0) {
+      const idx = lowerRemaining.indexOf(kw);
+      if (idx < 0) {
+        parts.push(remaining);
+        break;
+      }
+      if (idx > 0) parts.push(remaining.slice(0, idx));
+      parts.push(<mark key={key++} className="bg-yellow-200 dark:bg-yellow-700/60 rounded-sm px-0.5">{remaining.slice(idx, idx + kw.length)}</mark>);
+      remaining = remaining.slice(idx + kw.length);
+      lowerRemaining = lowerRemaining.slice(idx + kw.length);
+    }
+    return <>{parts}</>;
+  };
+
+  const weekDays = [
+    t('diary.weekdaySunFull', { defaultValue: '周日' }), t('diary.weekdayMonFull', { defaultValue: '周一' }), t('diary.weekdayTueFull', { defaultValue: '周二' }),
+    t('diary.weekdayWedFull', { defaultValue: '周三' }), t('diary.weekdayThuFull', { defaultValue: '周四' }), t('diary.weekdayFriFull', { defaultValue: '周五' }), t('diary.weekdaySatFull', { defaultValue: '周六' }),
+  ];
 
   if (entries.length === 0) {
     return (
@@ -137,7 +162,7 @@ export default function DiaryTimelineView({
                     {entry.title && (
                       <div className="text-sm font-medium mb-1 flex items-center gap-1.5">
                         {entry.mood && <span className="text-sm">{MOOD_EMOJI[entry.mood]}</span>}
-                        {entry.title}
+                        {renderHighlighted(entry.title)}
                       </div>
                     )}
                     {!entry.title && entry.mood && (
@@ -149,7 +174,7 @@ export default function DiaryTimelineView({
                     {/* 摘要 */}
                     {entry.content && (
                       <div className="text-xs text-muted-foreground leading-relaxed">
-                        {getExcerpt(entry.content)}
+                        {renderHighlighted(getExcerpt(entry.content))}
                       </div>
                     )}
 

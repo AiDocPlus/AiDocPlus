@@ -12,14 +12,13 @@ import { Button } from '@/components/ui/button';
 import { ResizableHandle } from '@/components/ui/resizable-handle';
 import { useAppStore } from '@/stores/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { BookHeart, Clock, Sparkles, List, AlignJustify, Trash2 } from 'lucide-react';
+import { BookHeart, Sparkles, List, AlignJustify, Trash2, Search } from 'lucide-react';
 import DiaryCalendar from './DiaryCalendar';
 import DiaryEntryList from './DiaryEntryList';
 import DiaryFilterPanel from './DiaryFilterPanel';
 import DiaryTimelineView from './DiaryTimelineView';
 import DiaryToolbar from './DiaryToolbar';
 import DiaryEditor from './DiaryEditor';
-import DiaryEntryInfo, { type InfoTab } from './DiaryEntryInfo';
 import DiaryContextMenu from './DiaryContextMenu';
 import DiarySettingsDialog from './DiarySettingsDialog';
 import DiaryAISidebar from './DiaryAISidebar';
@@ -30,12 +29,13 @@ import DiaryImportDialog from './DiaryImportDialog';
 import DiaryTemplateDialog from './DiaryTemplateDialog';
 import DiaryDailyPrompt from './DiaryDailyPrompt';
 import DiaryTrashPanel from './DiaryTrashPanel';
+import DiarySearchDialog from './DiarySearchDialog';
 import DiaryStatusBar from './DiaryStatusBar';
 import NovelEditorSettings, { loadAppearance, getAppearanceStyle, getEditorInnerStyle, type EditorAppearance } from '../novel/NovelEditorSettings';
 import {
   parseDiaryContent, createEmptyDiaryContent, createEntry,
   updateEntryContent, updateEntryMeta, toggleEntryStarred, softDeleteEntry, duplicateEntry, moveEntryToJournal,
-  addGlobalTag, collectAllTags, addSnapshot, restoreFromSnapshot,
+  collectAllTags, addSnapshot, updateDiaryMetadata,
   getEntryById, getEntriesOnThisDay,
   getPrevEntryDate, getNextEntryDate, getTodayDateStr,
   getTotalWordCount, getTodayWordCount, calculateStreak,
@@ -73,9 +73,14 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
 
   // ── 条目状态 ──
   const [selectedDate, setSelectedDate] = useState(getTodayDateStr());
+  const selectedDateRef = useRef(selectedDate);
+  selectedDateRef.current = selectedDate;
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
+  const activeEntryIdRef = useRef(activeEntryId);
+  activeEntryIdRef.current = activeEntryId;
   const [entryContent, setEntryContent] = useState('');
-  const [editorRevision, setEditorRevision] = useState(0);
+  const entryContentRef = useRef(entryContent);
+  entryContentRef.current = entryContent;
 
   // ── 高级筛选状态 ──
   const [advancedFilter, setAdvancedFilter] = useState<DiaryFilterState>({ ...EMPTY_FILTER });
@@ -92,7 +97,7 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
   }, [host.storage]);
 
   // ── 右键菜单状态 ──
-  const [ctxEntry, setCtxEntry] = useState<import('./types').DiaryEntry | null>(null);
+  const [ctxEntry, setCtxEntry] = useState<DiaryEntry | null>(null);
   const [ctxPos, setCtxPos] = useState({ x: 0, y: 0 });
 
   // ── 弹窗状态 ──
@@ -102,7 +107,7 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
   const [importOpen, setImportOpen] = useState(false);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [trashOpen, setTrashOpen] = useState(false);
-  const [forceInfoTab, setForceInfoTab] = useState<InfoTab | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   // ── 解析日记内容 ──
   const getDiary = useCallback((): DiaryDocumentContent => {
@@ -112,13 +117,17 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
 
   // ── 初始化日记数据 ──
   useEffect(() => {
+    // 切换文档时清理旧文档的 timer 和状态
+    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
+    if (saveStatusTimerRef.current) { clearTimeout(saveStatusTimerRef.current); saveStatusTimerRef.current = null; }
+    dirtyMarkedRef.current = false;
     const d = getDiary();
     setDiary(d);
     // 恢复上次编辑的条目
     const lastEntryId = host.storage.get<string>('_diary_last_entry_id');
     const lastDate = host.storage.get<string>('_diary_last_date');
-    if (lastEntryId && d.entries.find(e => e.id === lastEntryId)) {
-      const entry = d.entries.find(e => e.id === lastEntryId)!;
+    if (lastEntryId && d.entries.find(e => e.id === lastEntryId && !e.deletedAt)) {
+      const entry = d.entries.find(e => e.id === lastEntryId && !e.deletedAt)!;
       setActiveEntryId(lastEntryId);
       setEntryContent(entry.content);
       setSelectedDate(entry.date);
@@ -126,7 +135,7 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
       setCalendarDate(new Date(y, m - 1, 1));
     } else if (lastDate) {
       setSelectedDate(lastDate);
-      const entries = d.entries.filter(e => e.date === lastDate).sort((a, b) => a.createdAt - b.createdAt);
+      const entries = d.entries.filter(e => e.date === lastDate && !e.deletedAt).sort((a, b) => a.createdAt - b.createdAt);
       if (entries.length > 0) {
         setActiveEntryId(entries[0].id);
         setEntryContent(entries[0].content);
@@ -144,34 +153,43 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
     }
   }, [doc.id, getDiary, host.doc, host.storage]);
 
-  const [diary, setDiary] = useState<DiaryDocumentContent>(getDiary);
+  const [diary, setDiary] = useState<DiaryDocumentContent>(() => createEmptyDiaryContent());
   const diaryRef = useRef(diary);
   diaryRef.current = diary;
   const filteredEntries = useMemo(() => applyFilter(diary, advancedFilter), [diary, advancedFilter]);
 
-  // ── 保存（非编辑操作：元数据/心情/天气等，立即同步到 store，独立 debounce 写磁盘） ──
-  const metaSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // ── 统一保存 debounce ──
+  // 所有变更（内容编辑 + 元数据修改）共用同一个 timer，避免并发保存
+  // 注意：后调用的 delay 会覆盖先前的 timer，所以元数据(2s)比内容(5s)更早保存
+  const scheduleSave = useCallback((delayMs: number) => {
+    setSaveStatus('unsaved');
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      setSaveStatus('saving');
+      host.doc.save().then(() => {
+        dirtyMarkedRef.current = false;
+      }).catch(() => {
+        setSaveStatus('unsaved');
+      });
+      saveTimerRef.current = null;
+      if (saveStatusTimerRef.current) clearTimeout(saveStatusTimerRef.current);
+      saveStatusTimerRef.current = setTimeout(() => setSaveStatus('saved'), SAVE_STATUS_DISPLAY_MS);
+    }, delayMs);
+  }, [host.doc]);
+
   const saveDiary = useCallback((updated: DiaryDocumentContent) => {
+    updated = updateDiaryMetadata(updated);
     setDiary(updated);
     diaryRef.current = updated;
     host.doc.updateInMemory({ content: JSON.stringify(updated) });
     host.doc.markDirty();
-    setSaveStatus('unsaved');
-    if (metaSaveTimerRef.current) clearTimeout(metaSaveTimerRef.current);
-    metaSaveTimerRef.current = setTimeout(() => {
-      setSaveStatus('saving');
-      host.doc.save();
-      metaSaveTimerRef.current = null;
-      if (saveStatusTimerRef.current) clearTimeout(saveStatusTimerRef.current);
-      saveStatusTimerRef.current = setTimeout(() => setSaveStatus('saved'), SAVE_STATUS_DISPLAY_MS);
-    }, META_SAVE_DEBOUNCE_MS);
-  }, [host.doc]);
+    scheduleSave(META_SAVE_DEBOUNCE_MS);
+  }, [host.doc, scheduleSave]);
 
   // ── 组件卸载时清理所有 timer ──
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      if (metaSaveTimerRef.current) clearTimeout(metaSaveTimerRef.current);
       if (saveStatusTimerRef.current) clearTimeout(saveStatusTimerRef.current);
     };
   }, []);
@@ -179,17 +197,24 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
   const handleSave = useCallback(() => {
     setIsSaving(true);
     setSaveStatus('saving');
-    // 先更新当前条目内容
-    if (activeEntryId) {
-      const updated = updateEntryContent(diary, activeEntryId, entryContent);
+    // 使用 ref 获取最新内容，避免闭包过期
+    const currentContent = entryContentRef.current;
+    const currentEntryId = activeEntryIdRef.current;
+    if (currentEntryId) {
+      let updated = updateEntryContent(diaryRef.current, currentEntryId, currentContent);
+      updated = updateDiaryMetadata(updated);
       setDiary(updated);
+      diaryRef.current = updated;
       host.doc.updateInMemory({ content: JSON.stringify(updated) });
     }
-    host.doc.save().finally(() => {
+    host.doc.save().then(() => {
       setIsSaving(false);
       setSaveStatus('saved');
+    }).catch(() => {
+      setIsSaving(false);
+      setSaveStatus('unsaved');
     });
-  }, [activeEntryId, diary, entryContent, host.doc]);
+  }, [host.doc]);
 
   const handleSaveAll = useCallback(() => {
     handleSave();
@@ -197,7 +222,7 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
 
   // ── 选中条目 ──
   const selectEntry = useCallback((entryId: string) => {
-    if (!entryId) return; // 防御：无效 entryId 直接返回
+    if (!entryId) return;
 
     // 取消待处理的保存
     if (saveTimerRef.current) {
@@ -205,42 +230,35 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
       saveTimerRef.current = null;
     }
 
-    // 保存当前条目（仅当内容真的变化了才保存）
-    const currentActiveId = activeEntryId;
-    const currentContent = entryContent;
+    // 使用 ref 获取最新值，避免闭包过期
+    const currentActiveId = activeEntryIdRef.current;
+    const currentContent = entryContentRef.current;
     if (currentActiveId && currentContent !== undefined) {
       const currentEntry = diaryRef.current.entries.find(e => e.id === currentActiveId);
-      // 只有内容真的变化了才保存
       if (currentEntry && currentEntry.content !== currentContent) {
         const updated = updateEntryContent(diaryRef.current, currentActiveId, currentContent);
         saveDiary(updated);
       }
     }
 
-    // 查找新条目（防御：确保条目存在）
     const entry = diaryRef.current.entries.find(e => e.id === entryId);
-    if (!entry) {
-      console.warn('[Diary] selectEntry: entry not found', entryId);
-      return;
-    }
+    if (!entry) return;
 
-    // 更新状态
     setActiveEntryId(entryId);
     setEntryContent(entry.content || '');
     setSelectedDate(entry.date);
     host.storage.set('_diary_last_entry_id', entryId);
     host.storage.set('_diary_last_date', entry.date);
 
-    // 同步日历月份
     const [y, m] = entry.date.split('-').map(Number);
     if (calendarDate.getFullYear() !== y || calendarDate.getMonth() + 1 !== m) {
       setCalendarDate(new Date(y, m - 1, 1));
     }
-  }, [activeEntryId, entryContent, saveDiary, calendarDate, host.storage]);
+  }, [saveDiary, calendarDate, host.storage]);
 
   // ── 日期选择 ──
   const selectDate = useCallback((dateStr: string) => {
-    if (!dateStr) return; // 防御：无效 dateStr 直接返回
+    if (!dateStr) return;
 
     // 取消待处理的保存
     if (saveTimerRef.current) {
@@ -248,9 +266,9 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
       saveTimerRef.current = null;
     }
 
-    // 保存当前条目（仅当内容真的变化了才保存）
-    const currentActiveId = activeEntryId;
-    const currentContent = entryContent;
+    // 使用 ref 获取最新值
+    const currentActiveId = activeEntryIdRef.current;
+    const currentContent = entryContentRef.current;
     if (currentActiveId && currentContent !== undefined) {
       const currentEntry = diaryRef.current.entries.find(e => e.id === currentActiveId);
       if (currentEntry && currentEntry.content !== currentContent) {
@@ -261,7 +279,9 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
 
     setSelectedDate(dateStr);
     host.storage.set('_diary_last_date', dateStr);
-    const entries = diaryRef.current.entries.filter(e => e.date === dateStr).sort((a, b) => a.createdAt - b.createdAt);
+    const [y, m] = dateStr.split('-').map(Number);
+    setCalendarDate(new Date(y, m - 1, 1));
+    const entries = diaryRef.current.entries.filter(e => e.date === dateStr && !e.deletedAt).sort((a, b) => a.createdAt - b.createdAt);
     if (entries.length > 0) {
       setActiveEntryId(entries[0].id);
       setEntryContent(entries[0].content || '');
@@ -270,31 +290,75 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
       setActiveEntryId(null);
       setEntryContent('');
     }
-  }, [activeEntryId, entryContent, saveDiary, host.storage]);
+  }, [saveDiary, host.storage]);
 
   // ── 新建条目 ──
   const handleNewEntry = useCallback(() => {
-    // 保存当前
-    if (activeEntryId) {
-      const updated = updateEntryContent(diary, activeEntryId, entryContent);
+    // 使用 ref 获取最新值
+    const currentId = activeEntryIdRef.current;
+    const currentContent = entryContentRef.current;
+    if (currentId) {
+      const updated = updateEntryContent(diaryRef.current, currentId, currentContent);
       saveDiary(updated);
     }
-    const journalId = diary.settings.defaultJournalId;
-    const updated = createEntry(diary, journalId, selectedDate);
+    const journalId = diaryRef.current.settings.defaultJournalId;
+    const dateStr = selectedDateRef.current;
+    const updated = createEntry(diaryRef.current, journalId, dateStr);
     const newEntry = updated.entries[updated.entries.length - 1];
     saveDiary(updated);
     setActiveEntryId(newEntry.id);
     setEntryContent(newEntry.content);
-  }, [activeEntryId, entryContent, diary, saveDiary, selectedDate]);
+  }, [saveDiary]);
+
+  // ── 写作计时器 ──
+  // 追踪用户在当前条目上的写作时间，停止输入后暂停
+  const writingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const writingSecondsRef = useRef(0);
+  const [writingTime, setWritingTime] = useState(0);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const IDLE_TIMEOUT = 5000; // 5秒无输入暂停计时
+
+  // 切换条目或日期时重置计时器
+  useEffect(() => {
+    if (writingTimerRef.current) { clearInterval(writingTimerRef.current); writingTimerRef.current = null; }
+    if (idleTimerRef.current) { clearTimeout(idleTimerRef.current); idleTimerRef.current = null; }
+    writingSecondsRef.current = 0;
+    setWritingTime(0);
+  }, [activeEntryId]);
+
+  const startWritingTimer = useCallback(() => {
+    if (writingTimerRef.current) return; // 已在运行
+    writingTimerRef.current = setInterval(() => {
+      writingSecondsRef.current++;
+      // 每10秒更新一次 UI
+      if (writingSecondsRef.current % 10 === 0) setWritingTime(writingSecondsRef.current);
+    }, 1000);
+  }, []);
+
+  // 组件卸载时清理
+  useEffect(() => {
+    return () => {
+      if (writingTimerRef.current) clearInterval(writingTimerRef.current);
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+  }, []);
+
 
   // ── 内容变化（用 diaryRef 避免 diary 引用变化导致回调重建 → 子组件 effect 循环） ──
   const dirtyMarkedRef = useRef(false);
   const handleContentChange = useCallback((content: string) => {
-    // 内容未变时提前退出，避免 debounce 回调导致不必要的 diary 更新
     const currentEntry = activeEntryId ? diaryRef.current.entries.find(e => e.id === activeEntryId) : null;
     if (currentEntry && currentEntry.content === content) return;
     setEntryContent(content);
     setSaveStatus('unsaved');
+    // 启动写作计时器
+    startWritingTimer();
+    // 重置空闲暂停
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = setTimeout(() => {
+      if (writingTimerRef.current) { clearInterval(writingTimerRef.current); writingTimerRef.current = null; }
+      if (writingSecondsRef.current > 0) setWritingTime(writingSecondsRef.current);
+    }, IDLE_TIMEOUT);
     // 首次变化时立即 markDirty 以显示 Tab 红点（不调用 updateInMemory 避免全局重渲染）
     if (!dirtyMarkedRef.current) {
       host.doc.markDirty();
@@ -304,38 +368,29 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
       let updated = updateEntryContent(diaryRef.current, activeEntryId, content);
       updated = addSnapshot(updated, activeEntryId);
       setDiary(updated);
+      diaryRef.current = updated;
+      // 同步内存数据（供上层组件和自动保存使用）
+      host.doc.updateInMemory({ content: JSON.stringify(updated) });
     }
   }, [activeEntryId, host.doc]);
 
-  // ── 自动保存（延迟同步到 store + 保存到磁盘） ──
+  // ── 自动保存（延迟保存到磁盘） ──
   useEffect(() => {
     if (!activeEntryId) return;
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      // 延迟同步到 store（避免每次按键都触发上层重渲染）
-      host.doc.updateInMemory({ content: JSON.stringify(diaryRef.current) });
-      host.doc.markDirty();
-      setSaveStatus('saving');
-      host.doc.save().then(() => {
-        dirtyMarkedRef.current = false;
-      });
-      saveTimerRef.current = null;
-      if (saveStatusTimerRef.current) clearTimeout(saveStatusTimerRef.current);
-      saveStatusTimerRef.current = setTimeout(() => setSaveStatus('saved'), SAVE_STATUS_DISPLAY_MS);
-    }, CONTENT_SAVE_DEBOUNCE_MS);
-    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [entryContent, activeEntryId, host.doc]);
+    scheduleSave(CONTENT_SAVE_DEBOUNCE_MS);
+    // 注意：不设 cleanup，scheduleSave 内部已自行管理 timer
+  }, [entryContent, activeEntryId, scheduleSave]);
 
   // ── 导航 ──
   const handlePrevDay = useCallback(() => {
-    const prev = getPrevEntryDate(diary, selectedDate);
+    const prev = getPrevEntryDate(diaryRef.current, selectedDate);
     if (prev) selectDate(prev);
-  }, [diary, selectedDate, selectDate]);
+  }, [selectedDate, selectDate]);
 
   const handleNextDay = useCallback(() => {
-    const next = getNextEntryDate(diary, selectedDate);
+    const next = getNextEntryDate(diaryRef.current, selectedDate);
     if (next) selectDate(next);
-  }, [diary, selectedDate, selectDate]);
+  }, [selectedDate, selectDate]);
 
   const handleToday = useCallback(() => {
     const today = getTodayDateStr();
@@ -344,7 +399,10 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
   }, [selectDate]);
 
   // ── 元数据操作 ──
-  const activeEntry = activeEntryId ? getEntryById(diary, activeEntryId) || null : null;
+  const activeEntry = useMemo(
+    () => activeEntryId ? getEntryById(diary, activeEntryId) || null : null,
+    [diary, activeEntryId],
+  );
 
   const handleMoodChange = useCallback((mood: DiaryMood | undefined) => {
     if (!activeEntryId) return;
@@ -374,7 +432,7 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
     const entry = getEntryById(diaryRef.current, activeEntryId);
     if (!entry) return;
     const tags = entry.tags.includes(tag)
-      ? entry.tags.filter(t => t !== tag)
+      ? entry.tags.filter(x => x !== tag)
       : [...entry.tags, tag];
     saveDiary(updateEntryMeta(diaryRef.current, activeEntryId, { tags }));
   }, [activeEntryId, saveDiary]);
@@ -400,27 +458,23 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
     saveDiary(updateEntryMeta(diaryRef.current, activeEntryId, { colorLabel }));
   }, [activeEntryId, saveDiary]);
 
-  // ── Phase 2: 条目信息面板回调 ──
-  const handleUpdatePrivateNote = useCallback((note: string) => {
-    if (!activeEntryId) return;
-    saveDiary(updateEntryMeta(diaryRef.current, activeEntryId, { privateNote: note }));
-  }, [activeEntryId, saveDiary]);
-
-  const handleUpdateLocation = useCallback((location: string) => {
-    if (!activeEntryId) return;
-    saveDiary(updateEntryMeta(diaryRef.current, activeEntryId, { location }));
-  }, [activeEntryId, saveDiary]);
-
-  const handleTagAdd = useCallback((tag: string) => {
-    if (!activeEntryId) return;
-    const entry = getEntryById(diaryRef.current, activeEntryId);
+  const handleSearchReplace = useCallback((entryId: string, search: string, replace: string, useRegex: boolean) => {
+    const entry = diaryRef.current.entries.find(e => e.id === entryId);
     if (!entry) return;
-    let updated = addGlobalTag(diaryRef.current, tag);
-    if (!entry.tags.includes(tag)) {
-      updated = updateEntryMeta(updated, activeEntryId, { tags: [...entry.tags, tag] });
+    try {
+      const re = useRegex ? new RegExp(search, 'g') : new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+      const escapedReplace = useRegex ? replace : replace.replace(/\$/g, '$$$$');
+      const newContent = entry.content.replace(re, escapedReplace);
+      if (newContent !== entry.content) {
+        const updated = updateEntryContent(diaryRef.current, entryId, newContent);
+        saveDiary(updated);
+        // 如果替换的是当前活动条目，更新编辑器内容
+        if (entryId === activeEntryIdRef.current) setEntryContent(newContent);
+      }
+    } catch {
+      // 正则语法错误，静默忽略
     }
-    saveDiary(updated);
-  }, [activeEntryId, saveDiary]);
+  }, [saveDiary]);
 
   const handleMoveToJournal = useCallback((journalId: string) => {
     if (!activeEntryId) return;
@@ -439,11 +493,11 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
   const handleCtxDelete = useCallback((entryId: string) => {
     const updated = softDeleteEntry(diaryRef.current, entryId);
     saveDiary(updated);
-    if (activeEntryId === entryId) {
+    if (activeEntryIdRef.current === entryId) {
       setActiveEntryId(null);
       setEntryContent('');
     }
-  }, [saveDiary, activeEntryId]);
+  }, [saveDiary]);
 
   const handleCtxMoveToJournal = useCallback((entryId: string, journalId: string) => {
     saveDiary(moveEntryToJournal(diaryRef.current, entryId, journalId));
@@ -469,15 +523,17 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
   const allTags = useMemo(() => collectAllTags(diary), [diary]);
 
   const handleFocus = useCallback(() => {
-    if (focusMode) {
-      setFocusMode(false);
-      setLeftCollapsed(false);
-    } else {
-      setFocusMode(true);
-      setLeftCollapsed(true);
-      setRightCollapsed(true);
-    }
-  }, [focusMode]);
+    setFocusMode(prev => {
+      if (prev) {
+        setLeftCollapsed(false);
+        setRightCollapsed(false);
+      } else {
+        setLeftCollapsed(true);
+        setRightCollapsed(true);
+      }
+      return !prev;
+    });
+  }, []);
 
 
   // ── 键盘快捷键 ──
@@ -485,31 +541,49 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
     const handler = (e: KeyboardEvent) => {
       const meta = e.metaKey || e.ctrlKey;
       // Escape: 退出专注模式
-      if (e.key === 'Escape' && focusMode) {
-        e.preventDefault();
-        setFocusMode(false);
-        setLeftCollapsed(false);
-        return;
+      if (e.key === 'Escape') {
+        if (focusMode) {
+          e.preventDefault();
+          setFocusMode(false);
+          setLeftCollapsed(false);
+          setRightCollapsed(false);
+          return;
+        }
+        if (searchOpen) {
+          e.preventDefault();
+          setSearchOpen(false);
+          return;
+        }
       }
       if (!meta) return;
+      // ⌘F: 打开搜索
+      if ((e.key === 'f' || e.key === 'F') && !e.shiftKey) {
+        e.preventDefault();
+        setSearchOpen(true);
+        return;
+      }
+      // 在输入框中时仅拦截保存（⌘S）
+      const tag = (e.target as HTMLElement)?.tagName;
+      const isEditing = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable;
+      if (isEditing && e.key !== 's' && e.key !== 'S') return;
       switch (e.key) {
         case 'n': case 'N':
-          if (!e.shiftKey) { e.preventDefault(); handleNewEntry(); }
+          if (!e.shiftKey && !isEditing) { e.preventDefault(); handleNewEntry(); }
           break;
         case 's': case 'S':
           e.preventDefault();
           if (e.shiftKey) handleSaveAll(); else handleSave();
           break;
-        case '[': e.preventDefault(); handlePrevDay(); break;
-        case ']': e.preventDefault(); handleNextDay(); break;
+        case '[': if (!isEditing) { e.preventDefault(); handlePrevDay(); } break;
+        case ']': if (!isEditing) { e.preventDefault(); handleNextDay(); } break;
         case 't': case 'T':
-          if (!e.shiftKey) { e.preventDefault(); handleToday(); }
+          if (!e.shiftKey && !isEditing) { e.preventDefault(); handleToday(); }
           break;
         case 'b': case 'B':
           if (!e.shiftKey) { /* 让编辑器处理 ⌘B 粗体 */ }
           break;
         case 'e': case 'E':
-          if (!e.shiftKey) { e.preventDefault(); handleFocus(); }
+          if (!e.shiftKey && !isEditing) { e.preventDefault(); handleFocus(); }
           break;
         case 'j': case 'J':
           if (!e.shiftKey) { /* 让编辑器处理 */ }
@@ -518,17 +592,23 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [focusMode, handleNewEntry, handleSave, handleSaveAll, handlePrevDay, handleNextDay, handleToday, handleFocus]);
+  }, [focusMode, searchOpen, handleNewEntry, handleSave, handleSaveAll, handlePrevDay, handleNextDay, handleToday, handleFocus]);
 
   // ── 统计数据 ──
+  const activeEntryCount = useMemo(() => diary.entries.filter(e => !e.deletedAt).length, [diary.entries]);
   const totalWords = useMemo(() => getTotalWordCount(diary), [diary]);
   const todayWords = useMemo(() => getTodayWordCount(diary), [diary]);
   const streak = useMemo(() => calculateStreak(diary), [diary]);
-  const onThisDay = useMemo(() => getEntriesOnThisDay(diary, selectedDate), [diary, selectedDate]);
-  const chapterWords = activeEntry ? getEntryWordCount(activeEntry) : 0;
-  const paragraphCount = activeEntry ? (entryContent.split(/\n\s*\n/).filter(p => p.trim()).length) : 0;
-  const readingTimeMin = Math.max(1, Math.round(chapterWords / 300));
+  const today = getTodayDateStr();
+  const onThisDay = useMemo(() => getEntriesOnThisDay(diary, today), [diary, today]);
+  const chapterWords = useMemo(() => activeEntry ? getEntryWordCount(activeEntry) : 0, [activeEntry]);
+  const paragraphCount = useMemo(() => activeEntry ? (entryContent.split(/\n\s*\n/).filter(p => p.trim()).length) : 0, [activeEntry, entryContent]);
+  const readingTimeMin = useMemo(() => Math.max(1, Math.round(chapterWords / 300)), [chapterWords]);
   const dailyWordGoal = diary.metadata.dailyWordGoal || 0;
+  const recentEntries = useMemo(
+    () => [...diary.entries].filter(e => !e.deletedAt).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 5),
+    [diary.entries],
+  );
 
   return (
     <div className="flex h-full w-full overflow-hidden" style={{ fontFamily: "'宋体', 'SimSun', serif", fontSize: '16px' }}>
@@ -544,6 +624,12 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
               onMonthChange={setCalendarDate}
               onDateSelect={selectDate}
               onDateDoubleClick={(dateStr) => {
+                // 检查当日是否已有条目，避免重复创建
+                const existing = diaryRef.current.entries.filter(e => e.date === dateStr && !e.deletedAt);
+                if (existing.length > 0) {
+                  selectDate(dateStr);
+                  return;
+                }
                 selectDate(dateStr);
                 // 在该日期创建新条目
                 const journalId = diaryRef.current.settings.defaultJournalId;
@@ -598,6 +684,7 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
               <DiaryTimelineView
                 entries={filteredEntries}
                 selectedEntryId={activeEntryId}
+                highlightKeyword={advancedFilter.keyword}
                 onSelectEntry={selectEntry}
               />
             )}
@@ -605,7 +692,7 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
             {/* 底部统计 */}
             <div className="px-2 py-1 border-t text-[10px] text-muted-foreground space-y-0.5 flex-shrink-0">
               <div className="flex items-center justify-between">
-                <span>{diary.entries.length}条 · {totalWords > 9999 ? `${(totalWords / 10000).toFixed(1)}万` : totalWords}字</span>
+                <span>{activeEntryCount}{t('diary.entryCountUnit', { defaultValue: '条' })} · {totalWords > 9999 ? `${(totalWords / 10000).toFixed(1)}${t('diary.tenThousandUnit', { defaultValue: '万' })}` : totalWords}{t('diary.charUnit', { defaultValue: '字' })}</span>
                 <span className="text-green-600 dark:text-green-400">{t('diary.todayWords', { defaultValue: '今日+{{count}}', count: todayWords })}</span>
               </div>
               <div className="flex items-center gap-1">
@@ -614,6 +701,11 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
                   <span className="text-muted-foreground/60">({t('diary.longestStreak', { defaultValue: '最长{{count}}天', count: streak.longest })})</span>
                 )}
                 <div className="flex-1" />
+                <button className="flex items-center gap-0.5 text-muted-foreground/60 hover:text-foreground transition-colors"
+                  onClick={() => setSearchOpen(true)}
+                  title={t('diary.searchAndReplace', { defaultValue: '搜索替换 (⌘F)' })}>
+                  <Search className="h-3 w-3" />
+                </button>
                 <button className="flex items-center gap-0.5 text-muted-foreground/60 hover:text-foreground transition-colors"
                   onClick={() => setTrashOpen(true)}
                   title={t('diary.trash', { defaultValue: '回收站' })}>
@@ -649,7 +741,6 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
             onCloseAllTabs={() => closeAllTabs()}
             onSave={handleSave}
             onSaveAll={handleSaveAll}
-            onOpenVersionHistory={() => setForceInfoTab('history')}
             onOpenDashboard={() => setDashboardOpen(true)}
             onOpenExport={() => setExportOpen(true)}
             onOpenImport={() => setImportOpen(true)}
@@ -677,40 +768,24 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
                 <DiaryEditor
                   entryId={activeEntry.id}
                   content={entryContent}
-                  host={host}
                   onChange={handleContentChange}
                   textIndent={editorAppearance.textIndent}
-                  key={`${activeEntry.id}-${editorRevision}`}
+                  key={activeEntry.id}
                 />
               </div>
             </div>
             {/* 状态栏 */}
             <DiaryStatusBar
               entry={activeEntry}
-              todayWordCount={getTodayWordCount(diary)}
-              dailyGoal={diary.metadata.dailyWordGoal || 0}
-              streak={calculateStreak(diary).current}
+              todayWordCount={todayWords}
+              dailyGoal={dailyWordGoal}
+              streak={streak.current}
+              chapterWords={chapterWords}
+              paragraphCount={paragraphCount}
+              readingTimeMin={readingTimeMin}
+              writingTime={writingTime}
+              focusMode={focusMode}
               saveStatus={saveStatus}
-            />
-            {/* 条目信息面板 */}
-            <DiaryEntryInfo
-              entry={activeEntry}
-              journals={diary.journals}
-              allTags={allTags}
-              onUpdatePrivateNote={handleUpdatePrivateNote}
-              onUpdateLocation={handleUpdateLocation}
-              onTagToggle={handleTagToggle}
-              onTagAdd={handleTagAdd}
-              onMoveToJournal={handleMoveToJournal}
-              onRestoreSnapshot={(snapshotId) => {
-                if (!activeEntryId) return;
-                const updated = restoreFromSnapshot(diary, activeEntryId, snapshotId);
-                saveDiary(updated);
-                const entry = getEntryById(updated, activeEntryId);
-                if (entry) setEntryContent(entry.content);
-              }}
-              forceTab={forceInfoTab}
-              onForceTabHandled={() => setForceInfoTab(null)}
             />
           </>
         ) : (
@@ -734,11 +809,11 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
               {/* 统计卡片 */}
               <div className="grid grid-cols-3 gap-3 text-center">
                 <div className="rounded-lg border bg-card p-2">
-                  <div className="text-lg font-bold text-foreground">{diary.entries.length}</div>
+                  <div className="text-lg font-bold text-foreground">{activeEntryCount}</div>
                   <div className="text-[10px] text-muted-foreground">{t('diary.totalEntries', { defaultValue: '条目总数' })}</div>
                 </div>
                 <div className="rounded-lg border bg-card p-2">
-                  <div className="text-lg font-bold text-foreground">{totalWords > 9999 ? `${(totalWords / 10000).toFixed(1)}万` : totalWords}</div>
+                  <div className="text-lg font-bold text-foreground">{totalWords > 9999 ? `${(totalWords / 10000).toFixed(1)}${t('diary.tenThousandUnit', { defaultValue: '万' })}` : totalWords}</div>
                   <div className="text-[10px] text-muted-foreground">{t('diary.totalWords', { defaultValue: '总字数' })}</div>
                 </div>
                 <div className="rounded-lg border bg-card p-2">
@@ -788,7 +863,7 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground font-medium">{t('diary.recentEntries', { defaultValue: '最近写作' })}</p>
                   <div className="flex flex-wrap gap-1.5 justify-center">
-                    {[...diary.entries].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 5).map(entry => (
+                    {recentEntries.map(entry => (
                       <button key={entry.id} onClick={() => selectEntry(entry.id)}
                         className="text-xs px-2.5 py-1 rounded-md border hover:bg-accent transition-colors">
                         {entry.mood && MOOD_EMOJI[entry.mood]} {entry.date.slice(5)} {entry.title || entry.time}
@@ -801,65 +876,6 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
           </div>
         )}
 
-        {/* 状态栏（专注模式下显示最小版本） */}
-        {activeEntry && (
-          focusMode ? (
-            /* 专注模式最小状态栏 */
-            <div className="flex items-center gap-2 px-3 py-0.5 border-t text-[10px] text-muted-foreground flex-shrink-0 bg-card/80">
-              <span className={cn('flex items-center gap-0.5',
-                saveStatus === 'unsaved' ? 'text-amber-500' : saveStatus === 'saving' ? 'text-blue-500' : 'text-green-500')}>
-                {saveStatus === 'saved' ? '✅' : saveStatus === 'saving' ? '⏳' : '⚠️'}
-              </span>
-              <span className="tabular-nums">{chapterWords}{t('diary.charUnit', { defaultValue: '字' })}</span>
-              {dailyWordGoal > 0 && (
-                <>
-                  <span className="w-px h-3 bg-border" />
-                  <span className={cn('tabular-nums', todayWords >= dailyWordGoal ? 'text-green-600 dark:text-green-400' : '')}>
-                    {todayWords}/{dailyWordGoal}
-                  </span>
-                </>
-              )}
-              <div className="flex-1" />
-              <span className="text-muted-foreground/50">{t('diary.pressEscToExit', { defaultValue: '按 Esc 退出专注' })}</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 px-3 py-0.5 border-t text-[10px] text-muted-foreground flex-shrink-0 bg-card">
-              {/* 保存状态 */}
-              <span className={cn('flex items-center gap-0.5',
-                saveStatus === 'unsaved' ? 'text-amber-500' : saveStatus === 'saving' ? 'text-blue-500' : 'text-green-500')}>
-                {saveStatus === 'saved' ? '✅' : saveStatus === 'saving' ? '⏳' : '⚠️'}
-                {saveStatus === 'saved' ? t('diary.statusSaved', { defaultValue: '已保存' })
-                  : saveStatus === 'saving' ? t('diary.statusSaving', { defaultValue: '保存中...' })
-                  : t('diary.statusUnsaved', { defaultValue: '未保存' })}
-              </span>
-              <span className="w-px h-3 bg-border" />
-              <span className="tabular-nums">{chapterWords}{t('diary.charUnit', { defaultValue: '字' })}</span>
-              <span className="w-px h-3 bg-border" />
-              <span>{paragraphCount}{t('diary.paragraphUnit', { defaultValue: '段' })}</span>
-              <span className="w-px h-3 bg-border" />
-              <span className="flex items-center gap-0.5"><Clock className="h-2.5 w-2.5" />{t('diary.readingTime', { defaultValue: '约{{min}}分钟', min: readingTimeMin })}</span>
-              {/* 每日字数目标进度 */}
-              {dailyWordGoal > 0 && (
-                <>
-                  <span className="w-px h-3 bg-border" />
-                  <span className="flex items-center gap-1">
-                    <span className={cn('tabular-nums', todayWords >= dailyWordGoal ? 'text-green-600 dark:text-green-400 font-medium' : '')}>
-                      {todayWords >= dailyWordGoal ? '✅' : '🎯'} {todayWords}/{dailyWordGoal}
-                    </span>
-                    <span className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-                      <span className={cn('block h-full rounded-full transition-all',
-                        todayWords >= dailyWordGoal ? 'bg-green-500' : todayWords >= dailyWordGoal * 0.7 ? 'bg-yellow-500' : 'bg-primary/60',
-                      )} style={{ width: `${Math.min(100, Math.round(todayWords / dailyWordGoal * 100))}%` }} />
-                    </span>
-                  </span>
-                </>
-              )}
-              <div className="flex-1" />
-              <span>🔥 {t('diary.streak', { defaultValue: '连续{{count}}天', count: streak.current })}</span>
-              <span className="text-green-600 dark:text-green-400">{t('diary.todayWords', { defaultValue: '今日+{{count}}', count: todayWords })}</span>
-            </div>
-          )
-        )}
       </div>
 
       {/* ═══ 右键菜单 ═══ */}
@@ -918,6 +934,15 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
         projectId={doc.projectId}
       />
 
+      {/* ═══ 搜索替换弹窗 ═══ */}
+      <DiarySearchDialog
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        diary={diary}
+        onSelectEntry={(entryId) => { selectEntry(entryId); setSearchOpen(false); }}
+        onReplaceInEntry={handleSearchReplace}
+      />
+
       {/* ═══ 设置弹窗 ═══ */}
       <DiarySettingsDialog
         open={settingsOpen}
@@ -951,7 +976,6 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
                     const newContent = currentContent + '\n\n' + text;
                     setEntryContent(newContent);
                     saveDiary(updateEntryContent(diaryRef.current, activeEntryId, newContent));
-                    setEditorRevision(r => r + 1);
                   }
                 }}
               />

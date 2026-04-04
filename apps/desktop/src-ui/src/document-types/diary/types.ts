@@ -3,6 +3,8 @@
  * 所有数据存储在 Document.content 字段中的 JSON
  */
 
+import { MAX_SNAPSHOTS, SNAPSHOT_INTERVAL_MS, TRASH_CLEANUP_THRESHOLD_MS } from './constants';
+
 // ═══════════════════════════════════════════════════════
 // 数据模型
 // ═══════════════════════════════════════════════════════
@@ -166,6 +168,8 @@ export interface DiaryHabit {
   unit?: string;
   /** 数值类型的目标值 */
   target?: number;
+  /** 数值类型的步长（默认 1） */
+  step?: number;
   sortOrder: number;
   archived?: boolean;
 }
@@ -194,8 +198,7 @@ export interface DiaryMetadata {
 // ID 生成
 // ═══════════════════════════════════════════════════════
 
-function genId(prefix: string): string {
-  // 使用 crypto.randomUUID() 生成唯一 ID，避免 Date.now() + Math.random() 的碰撞风险
+export function genId(prefix: string): string {
   const randomPart = crypto.randomUUID().replace(/-/g, '').slice(2, 8);
   return `${prefix}_${randomPart}`;
 }
@@ -208,8 +211,21 @@ export function parseDiaryContent(raw: string): DiaryDocumentContent | null {
   if (!raw) return null;
   try {
     const data = JSON.parse(raw);
-    if (data && data.version === 1 && Array.isArray(data.entries)) return data as DiaryDocumentContent;
-    return null;
+    if (!data || data.version !== 1 || !Array.isArray(data.entries)) return null;
+    // 补全缺失的顶层字段，防止下游访问 undefined 崩溃
+    const empty = createEmptyDiaryContent();
+    if (!data.settings) data.settings = empty.settings;
+    if (!Array.isArray(data.journals) || data.journals.length === 0) {
+      data.journals = empty.journals;
+      data.settings.defaultJournalId = empty.settings.defaultJournalId;
+    } else {
+      // 确保 defaultJournalId 指向存在的日记本
+      if (!data.journals.some(j => j.id === data.settings.defaultJournalId)) {
+        data.settings.defaultJournalId = data.journals[0].id;
+      }
+    }
+    if (!data.metadata) data.metadata = empty.metadata;
+    return data as DiaryDocumentContent;
   } catch {
     return null;
   }
@@ -218,7 +234,7 @@ export function parseDiaryContent(raw: string): DiaryDocumentContent | null {
 export function createEmptyDiaryContent(): DiaryDocumentContent {
   const defaultJournals: DiaryJournal[] = [
     { id: genId('dj'), name: '我的日记', icon: '📖', color: '#3b82f6', sortOrder: 0 },
-    { id: genId('dj'), name: '工作日志', icon: '�', color: '#8b5cf6', sortOrder: 1 },
+    { id: genId('dj'), name: '工作日志', icon: '💼', color: '#8b5cf6', sortOrder: 1 },
     { id: genId('dj'), name: '生活随笔', icon: '🌱', color: '#22c55e', sortOrder: 2 },
     { id: genId('dj'), name: '读书笔记', icon: '📚', color: '#f59e0b', sortOrder: 3 },
     { id: genId('dj'), name: '健康运动', icon: '🏃', color: '#ef4444', sortOrder: 4 },
@@ -250,7 +266,7 @@ export function createEmptyDiaryContent(): DiaryDocumentContent {
 export function extractDiaryPlainText(content: string): string {
   const diary = parseDiaryContent(content);
   if (!diary) return content;
-  return diary.entries.map(e => `${e.date} ${e.title}\n${e.content}`).join('\n\n');
+  return diary.entries.filter(e => !e.deletedAt).map(e => `${e.date} ${e.title}\n${e.content}`).join('\n\n');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -307,10 +323,6 @@ export function updateEntryMeta(
   };
 }
 
-export function deleteEntry(diary: DiaryDocumentContent, entryId: string): DiaryDocumentContent {
-  return { ...diary, entries: diary.entries.filter(e => e.id !== entryId) };
-}
-
 /** 软删除条目（移入回收站） */
 export function softDeleteEntry(diary: DiaryDocumentContent, entryId: string): DiaryDocumentContent {
   return {
@@ -343,8 +355,7 @@ export function permanentDeleteEntry(diary: DiaryDocumentContent, entryId: strin
 
 /** 清理超过30天的已删除条目 */
 export function cleanupDeletedEntries(diary: DiaryDocumentContent): DiaryDocumentContent {
-  // 避免循环导入，直接使用内联常量
-  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const cutoff = Date.now() - TRASH_CLEANUP_THRESHOLD_MS;
   return {
     ...diary,
     entries: diary.entries.filter(e => !e.deletedAt || e.deletedAt > cutoff),
@@ -356,11 +367,11 @@ export function addSnapshot(diary: DiaryDocumentContent, entryId: string): Diary
   const entry = diary.entries.find(e => e.id === entryId);
   if (!entry) return diary;
   const now = Date.now();
-  const snaps = entry.snapshots || [];
-  // 检查是否达到快照上限
-  if (snaps.length >= 20) return diary;
-  // 检查时间间隔（60秒）
-  if (snaps.length > 0 && now - snaps[snaps.length - 1].timestamp < 60000) return diary;
+  const snaps = [...(entry.snapshots || [])];
+  // 检查时间间隔（先检查，避免先删旧快照再放弃导致数据丢失）
+  if (snaps.length > 0 && now - snaps[snaps.length - 1].timestamp < SNAPSHOT_INTERVAL_MS) return diary;
+  // 检查是否达到快照上限，FIFO 淘汰最旧的
+  if (snaps.length >= MAX_SNAPSHOTS) snaps.shift();
   const newSnap: DiaryEntrySnapshot = {
     id: `snap_${now}_${Math.random().toString(36).slice(2, 6)}`,
     content: entry.content,
@@ -382,10 +393,11 @@ export function restoreFromSnapshot(diary: DiaryDocumentContent, entryId: string
   if (!entry) return diary;
   const snap = entry.snapshots?.find(s => s.id === snapshotId);
   if (!snap) return diary;
+  const newWordCount = snap.content.replace(/\s/g, '').length;
   return {
     ...diary,
     entries: diary.entries.map(e =>
-      e.id === entryId ? { ...e, content: snap.content, title: snap.title, updatedAt: Date.now() } : e
+      e.id === entryId ? { ...e, content: snap.content, title: snap.title, wordCount: newWordCount, updatedAt: Date.now() } : e
     ),
   };
 }
@@ -400,6 +412,8 @@ export function duplicateEntry(diary: DiaryDocumentContent, entryId: string): Di
     title: src.title ? `${src.title} (副本)` : '',
     createdAt: now,
     updatedAt: now,
+    deletedAt: undefined,
+    snapshots: undefined,
   };
   return { ...diary, entries: [...diary.entries, copy] };
 }
@@ -422,32 +436,17 @@ export function getEntryById(diary: DiaryDocumentContent, entryId: string): Diar
   return diary.entries.find(e => e.id === entryId);
 }
 
-export function getEntriesByDate(diary: DiaryDocumentContent, date: string): DiaryEntry[] {
-  return diary.entries.filter(e => e.date === date).sort((a, b) => a.createdAt - b.createdAt);
-}
-
-export function getEntriesByDateRange(diary: DiaryDocumentContent, from: string, to: string): DiaryEntry[] {
-  return diary.entries.filter(e => e.date >= from && e.date <= to).sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt);
-}
-
-export function getEntriesByJournal(diary: DiaryDocumentContent, journalId: string): DiaryEntry[] {
-  return diary.entries.filter(e => e.journalId === journalId).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
-}
-
-export function getEntriesByTag(diary: DiaryDocumentContent, tag: string): DiaryEntry[] {
-  return diary.entries.filter(e => e.tags.includes(tag));
-}
-
+/** 获取历史同月同日条目（排除今年） */
 export function getEntriesOnThisDay(diary: DiaryDocumentContent, today: string): DiaryEntry[] {
   const mmdd = today.slice(5); // "MM-DD"
   return diary.entries
-    .filter(e => e.date.slice(5) === mmdd && e.date !== today)
+    .filter(e => !e.deletedAt && e.date.slice(5) === mmdd && e.date !== today)
     .sort((a, b) => b.date.localeCompare(a.date));
 }
 
 /** 获取前一条有条目的日期 */
 export function getPrevEntryDate(diary: DiaryDocumentContent, currentDate: string): string | null {
-  const dates = [...new Set(diary.entries.map(e => e.date))].sort();
+  const dates = [...new Set(diary.entries.filter(e => !e.deletedAt).map(e => e.date))].sort();
   const idx = dates.indexOf(currentDate);
   if (idx > 0) return dates[idx - 1];
   // 如果当前日期不在列表中，找比它小的最大日期
@@ -457,43 +456,11 @@ export function getPrevEntryDate(diary: DiaryDocumentContent, currentDate: strin
 
 /** 获取后一条有条目的日期 */
 export function getNextEntryDate(diary: DiaryDocumentContent, currentDate: string): string | null {
-  const dates = [...new Set(diary.entries.map(e => e.date))].sort();
+  const dates = [...new Set(diary.entries.filter(e => !e.deletedAt).map(e => e.date))].sort();
   const idx = dates.indexOf(currentDate);
   if (idx >= 0 && idx < dates.length - 1) return dates[idx + 1];
   const next = dates.filter(d => d > currentDate);
   return next.length > 0 ? next[0] : null;
-}
-
-// ═══════════════════════════════════════════════════════
-// 日记本 CRUD
-// ═══════════════════════════════════════════════════════
-
-export function addJournal(diary: DiaryDocumentContent, name: string, icon: string, color: string): DiaryDocumentContent {
-  const journal: DiaryJournal = {
-    id: genId('dj'),
-    name,
-    icon,
-    color,
-    sortOrder: diary.journals.length,
-  };
-  return { ...diary, journals: [...diary.journals, journal] };
-}
-
-export function renameJournal(diary: DiaryDocumentContent, journalId: string, name: string): DiaryDocumentContent {
-  return {
-    ...diary,
-    journals: diary.journals.map(j => j.id === journalId ? { ...j, name } : j),
-  };
-}
-
-export function deleteJournal(diary: DiaryDocumentContent, journalId: string): DiaryDocumentContent {
-  const defaultId = diary.settings.defaultJournalId;
-  if (journalId === defaultId) return diary; // 不允许删除默认日记本
-  return {
-    ...diary,
-    journals: diary.journals.filter(j => j.id !== journalId),
-    entries: diary.entries.map(e => e.journalId === journalId ? { ...e, journalId: defaultId } : e),
-  };
 }
 
 // ═══════════════════════════════════════════════════════
@@ -509,47 +476,62 @@ export function getTotalWordCount(diary: DiaryDocumentContent): number {
 }
 
 export function getTodayWordCount(diary: DiaryDocumentContent): number {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getTodayDateStr();
   return diary.entries
     .filter(e => e.date === today && !e.deletedAt)
     .reduce((sum, e) => sum + getEntryWordCount(e), 0);
+}
+
+/** 本地时区安全的日期格式化 YYYY-MM-DD */
+export function toLocalDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** 本地时区安全的日期偏移 */
+function offsetDate(dateStr: string, days: number): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 export function calculateStreak(diary: DiaryDocumentContent): { current: number; longest: number } {
   const activeEntries = diary.entries.filter(e => !e.deletedAt);
   if (activeEntries.length === 0) return { current: 0, longest: 0 };
 
-  const dates = [...new Set(activeEntries.map(e => e.date))].sort().reverse();
-  const today = new Date().toISOString().slice(0, 10);
+  const dateSet = new Set(activeEntries.map(e => e.date));
+  const today = getTodayDateStr();
+  const sortedDates = [...dateSet].sort();
 
-  // 计算当前连续天数
+  // 计算当前连续天数（回溯到最早条目日期即可）
   let current = 0;
   let checkDate = today;
-  for (let i = 0; i < 1000; i++) {
-    if (dates.includes(checkDate)) {
+  const earliestDate = sortedDates.length > 0 ? sortedDates[0] : today;
+  while (checkDate >= earliestDate) {
+    if (dateSet.has(checkDate)) {
       current++;
-    } else if (i > 0) {
-      // 允许今天还没写
+    } else if (checkDate !== today) {
+      // 允许今天还没写，其他日期断了就停
       break;
     }
     // 前一天
-    const d = new Date(checkDate);
-    d.setDate(d.getDate() - 1);
-    checkDate = d.toISOString().slice(0, 10);
+    checkDate = offsetDate(checkDate, -1);
   }
 
   // 计算最长连续天数
   let longest = 0;
   let streak = 0;
-  const sortedDates = [...dates].sort();
   for (let i = 0; i < sortedDates.length; i++) {
     if (i === 0) {
       streak = 1;
     } else {
-      const prev = new Date(sortedDates[i - 1]);
-      const curr = new Date(sortedDates[i]);
-      const diff = (curr.getTime() - prev.getTime()) / 86400000;
-      if (diff === 1) {
+      const expected = offsetDate(sortedDates[i - 1], 1);
+      if (sortedDates[i] === expected) {
         streak++;
       } else {
         streak = 1;
@@ -559,18 +541,6 @@ export function calculateStreak(diary: DiaryDocumentContent): { current: number;
   }
 
   return { current, longest };
-}
-
-export function getEntriesCountByMonth(diary: DiaryDocumentContent, year: number, month: number): Map<number, number> {
-  const prefix = `${year}-${String(month).padStart(2, '0')}`;
-  const map = new Map<number, number>();
-  for (const entry of diary.entries) {
-    if (entry.date.startsWith(prefix) && !entry.deletedAt) {
-      const day = parseInt(entry.date.slice(8, 10), 10);
-      map.set(day, (map.get(day) || 0) + 1);
-    }
-  }
-  return map;
 }
 
 export function getWordCountByDay(diary: DiaryDocumentContent, year: number, month: number): Map<number, number> {
@@ -588,12 +558,12 @@ export function getWordCountByDay(diary: DiaryDocumentContent, year: number, mon
 export function getMoodByDay(diary: DiaryDocumentContent, year: number, month: number): Map<number, DiaryMood> {
   const prefix = `${year}-${String(month).padStart(2, '0')}`;
   const map = new Map<number, DiaryMood>();
-  for (const entry of diary.entries) {
-    if (entry.date.startsWith(prefix) && entry.mood && !entry.deletedAt) {
-      const day = parseInt(entry.date.slice(8, 10), 10);
-      // 同一天多条取最后一条的心情
-      map.set(day, entry.mood);
-    }
+  const sorted = diary.entries
+    .filter(e => e.date.startsWith(prefix) && e.mood && !e.deletedAt)
+    .sort((a, b) => a.updatedAt - b.updatedAt);
+  for (const entry of sorted) {
+    const day = parseInt(entry.date.slice(8, 10), 10);
+    map.set(day, entry.mood);
   }
   return map;
 }
@@ -604,31 +574,24 @@ export function getMoodByDay(diary: DiaryDocumentContent, year: number, month: n
 
 export function updateDiaryMetadata(diary: DiaryDocumentContent): DiaryDocumentContent {
   const { current, longest } = calculateStreak(diary);
+  const activeCount = diary.entries.filter(e => !e.deletedAt).length;
   return {
     ...diary,
     metadata: {
       ...diary.metadata,
       currentStreak: current,
       longestStreak: Math.max(longest, diary.metadata.longestStreak),
-      totalEntries: diary.entries.length,
+      totalEntries: activeCount,
       totalWords: getTotalWordCount(diary),
     },
   };
-}
-
-export function addGlobalTag(diary: DiaryDocumentContent, tag: string): DiaryDocumentContent {
-  if (diary.settings.tags.includes(tag)) return diary;
-  return { ...diary, settings: { ...diary.settings, tags: [...diary.settings.tags, tag] } };
-}
-
-export function removeGlobalTag(diary: DiaryDocumentContent, tag: string): DiaryDocumentContent {
-  return { ...diary, settings: { ...diary.settings, tags: diary.settings.tags.filter(t => t !== tag) } };
 }
 
 /** 收集所有已使用的标签（去重） */
 export function collectAllTags(diary: DiaryDocumentContent): string[] {
   const tagSet = new Set<string>(diary.settings.tags);
   for (const entry of diary.entries) {
+    if (entry.deletedAt) continue;
     for (const tag of entry.tags) tagSet.add(tag);
   }
   return [...tagSet].sort();
@@ -679,19 +642,107 @@ export function applyFilter(diary: DiaryDocumentContent, filter: DiaryFilterStat
   return [...entries].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
 }
 
-export function countFilterResults(diary: DiaryDocumentContent, filter: DiaryFilterState): number {
-  return applyFilter(diary, filter).length;
-}
-
-/** 获取今天日期字符串 YYYY-MM-DD */
+/** 获取今天日期字符串 YYYY-MM-DD（使用本地时区） */
 export function getTodayDateStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 /** 格式化日期显示 */
-export function formatDateDisplay(dateStr: string): string {
+export function formatDateDisplay(dateStr: string, t?: (key: string, opts?: Record<string, unknown>) => string): string {
   const d = new Date(dateStr + 'T00:00:00');
-  const weekDays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${weekDays[d.getDay()]}`;
+  const weekDays = t
+    ? [t('diary.weekdaySun', { defaultValue: '周日' }), t('diary.weekdayMon', { defaultValue: '周一' }), t('diary.weekdayTue', { defaultValue: '周二' }), t('diary.weekdayWed', { defaultValue: '周三' }), t('diary.weekdayThu', { defaultValue: '周四' }), t('diary.weekdayFri', { defaultValue: '周五' }), t('diary.weekdaySat', { defaultValue: '周六' })]
+    : ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  const ymd = t
+    ? t('diary.dateDisplay', { defaultValue: '{{year}}年{{month}}月{{day}}日', year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() })
+    : `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+  return `${ymd} ${weekDays[d.getDay()]}`;
+}
+
+// ═══════════════════════════════════════════════════════
+// 习惯追踪
+// ═══════════════════════════════════════════════════════
+
+/** 添加习惯定义 */
+export function addHabit(diary: DiaryDocumentContent, habit: DiaryHabit): DiaryDocumentContent {
+  return {
+    ...diary,
+    metadata: { ...diary.metadata, habits: [...(diary.metadata.habits || []), habit] },
+  };
+}
+
+/** 更新习惯定义 */
+export function updateHabit(diary: DiaryDocumentContent, habitId: string, patch: Partial<DiaryHabit>): DiaryDocumentContent {
+  return {
+    ...diary,
+    metadata: {
+      ...diary.metadata,
+      habits: (diary.metadata.habits || []).map(h => h.id === habitId ? { ...h, ...patch } : h),
+    },
+  };
+}
+
+/** 删除习惯定义 */
+export function deleteHabit(diary: DiaryDocumentContent, habitId: string): DiaryDocumentContent {
+  return {
+    ...diary,
+    metadata: {
+      ...diary.metadata,
+      habits: (diary.metadata.habits || []).filter(h => h.id !== habitId),
+    },
+  };
+}
+
+/** 计算习惯连续完成天数 */
+export function calculateHabitStreak(diary: DiaryDocumentContent, habitId: string): { current: number; longest: number } {
+  const entries = diary.entries.filter(e => !e.deletedAt).sort((a, b) => b.date.localeCompare(a.date));
+  const dateSet = new Set<string>();
+  for (const e of entries) {
+    const record = (e.habitRecords || []).find(r => r.habitId === habitId);
+    if (record && (record.done || (record.value !== undefined && record.value > 0))) {
+      dateSet.add(e.date);
+    }
+  }
+  if (dateSet.size === 0) return { current: 0, longest: 0 };
+
+  const sortedDates = Array.from(dateSet).sort().reverse();
+  let current = 0;
+  let longest = 0;
+  let streak = 1;
+
+  for (let i = 1; i < sortedDates.length; i++) {
+    const prev = new Date(sortedDates[i - 1] + 'T00:00:00');
+    const curr = new Date(sortedDates[i] + 'T00:00:00');
+    const diffDays = Math.round((prev.getTime() - curr.getTime()) / 86400000);
+    if (diffDays === 1) {
+      streak++;
+    } else {
+      if (streak > longest) longest = streak;
+      streak = 1;
+    }
+  }
+  if (streak > longest) longest = streak;
+
+  // 计算当前连续（从今天往回数）
+  const today = getTodayDateStr();
+  if (dateSet.has(today)) {
+    current = 1;
+    for (let i = 1; ; i++) {
+      const d = new Date(today + 'T00:00:00');
+      d.setDate(d.getDate() - i);
+      const dateStr = toLocalDateStr(d);
+      if (dateSet.has(dateStr)) {
+        current++;
+      } else {
+        break;
+      }
+    }
+  }
+
+  return { current, longest };
 }
 

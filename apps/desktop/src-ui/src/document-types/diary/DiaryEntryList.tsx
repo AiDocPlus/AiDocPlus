@@ -73,7 +73,7 @@ export default function DiaryEntryList({
           <div key={group.date}>
             {/* 日期分组标题 */}
             <div className="px-2 py-1.5 text-sm text-muted-foreground font-medium sticky top-0 bg-card/95 backdrop-blur-sm border-b text-center">
-              {formatDateDisplay(group.date)}
+              {formatDateDisplay(group.date, t)}
             </div>
             {group.entries.map(entry => (
                 <div
@@ -122,7 +122,7 @@ export default function DiaryEntryList({
                 </div>
                 {/* 右侧字数 */}
                 <span className="text-xs text-muted-foreground tabular-nums flex-shrink-0 mt-0.5">
-                  {entry.wordCount > 0 ? `${entry.wordCount}字` : ''}
+                  {entry.wordCount > 0 ? `${entry.wordCount}${t('diary.charUnit', { defaultValue: '字' })}` : ''}
                 </span>
               </div>
             ))}

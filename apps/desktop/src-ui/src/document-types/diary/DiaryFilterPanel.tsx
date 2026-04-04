@@ -5,7 +5,7 @@
  * 筛选维度：关键词、日期范围、心情、天气、标签、收藏
  * 筛选条件显示为标签条（可单独移除）
  */
-import { useState } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { Search, X, Filter, Star, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/i18n';
@@ -30,7 +30,22 @@ export default function DiaryFilterPanel({
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const active = isFilterActive(filter);
-  const allTags = collectAllTags(diary);
+  const allTags = useMemo(() => collectAllTags(diary), [diary]);
+  const [localKeyword, setLocalKeyword] = useState(filter.keyword);
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const filterRef = useRef(filter);
+  filterRef.current = filter;
+  // 外部筛选被清除时同步输入框
+  useEffect(() => { if (!filter.keyword && localKeyword) setLocalKeyword(''); }, [filter.keyword, localKeyword]);
+  useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
+  const handleKeywordChange = useCallback((value: string) => {
+    setLocalKeyword(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      onFilterChange({ ...filterRef.current, keyword: value });
+    }, 300);
+  }, [onFilterChange]);
 
   const patch = (p: Partial<DiaryFilterState>) => onFilterChange({ ...filter, ...p });
 
@@ -50,7 +65,7 @@ export default function DiaryFilterPanel({
 
   const toggleTag = (tag: string) => {
     const tags = filter.tags.includes(tag)
-      ? filter.tags.filter(t => t !== tag)
+      ? filter.tags.filter(x => x !== tag)
       : [...filter.tags, tag];
     patch({ tags });
   };
@@ -71,8 +86,8 @@ export default function DiaryFilterPanel({
         <Search className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
         <input
           className="flex-1 text-sm bg-transparent border-0 focus:outline-none px-1"
-          value={filter.keyword}
-          onChange={e => patch({ keyword: e.target.value })}
+          value={localKeyword}
+          onChange={e => handleKeywordChange(e.target.value)}
           placeholder={t('diary.searchEntries', { defaultValue: '搜索日记...' })}
         />
         {active && (

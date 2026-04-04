@@ -3,7 +3,7 @@
  *
  * 移动到日记本 / 标记收藏 / 复制 / 删除 / 快速设心情 / 快速设天气
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Star, StarOff, Copy, Trash2, BookOpen, SmilePlus, Cloud } from 'lucide-react';
 import { useTranslation } from '@/i18n';
 import type { DiaryEntry, DiaryJournal, DiaryMood, DiaryWeatherType } from './types';
@@ -29,6 +29,7 @@ export default function DiaryContextMenu({
 }: DiaryContextMenuProps) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (!entry) return;
@@ -44,6 +45,19 @@ export default function DiaryContextMenu({
     };
   }, [entry, onClose]);
 
+  // 关闭菜单时重置确认删除状态
+  useEffect(() => {
+    if (!entry) setConfirmDelete(false);
+  }, [entry]);
+
+  // 动态计算菜单位置，避免溢出屏幕
+  const menuStyle = useMemo(() => {
+    const maxH = 360;
+    const left = Math.max(0, Math.min(position.x, window.innerWidth - 200));
+    const top = Math.max(0, Math.min(position.y, window.innerHeight - maxH));
+    return { left, top, maxH };
+  }, [position]);
+
   if (!entry) return null;
 
   const menuItem = 'diary-ctx-item flex items-center gap-2 px-3 py-1.5 text-xs cursor-pointer';
@@ -52,10 +66,11 @@ export default function DiaryContextMenu({
   return (
     <div
       ref={ref}
-      className="fixed z-50 min-w-[180px] rounded-md border shadow-lg py-1 overflow-hidden"
+      className="fixed z-50 min-w-[180px] rounded-md border shadow-lg py-1 overflow-y-auto"
       style={{
-        left: Math.min(position.x, window.innerWidth - 200),
-        top: Math.min(position.y, window.innerHeight - 400),
+        left: menuStyle.left,
+        top: menuStyle.top,
+        maxHeight: `${menuStyle.maxH}px`,
         fontFamily: "'宋体', 'SimSun', serif",
         fontSize: '16px',
         opacity: 1,
@@ -78,10 +93,20 @@ export default function DiaryContextMenu({
       </div>
 
       {/* 删除 */}
-      <div className={`${menuItem} text-red-600 hover:text-red-600`} onClick={() => { onDelete(entry.id); onClose(); }}>
-        <Trash2 className="h-3.5 w-3.5" />
-        {t('diary.deleteEntry', { defaultValue: '删除条目' })}
-      </div>
+      {confirmDelete ? (
+        <div className="flex items-center gap-1 px-3 py-1.5">
+          <span className="text-[10px] text-red-600">{t('diary.confirmDelete', { defaultValue: '移入回收站？' })}</span>
+          <button className="text-[10px] px-1.5 py-0.5 rounded bg-red-600 text-white hover:bg-red-700"
+            onClick={() => { onDelete(entry.id); onClose(); }}>{t('common.confirm', { defaultValue: '确定' })}</button>
+          <button className="text-[10px] px-1.5 py-0.5 rounded border hover:bg-accent"
+            onClick={() => setConfirmDelete(false)}>{t('common.cancel', { defaultValue: '取消' })}</button>
+        </div>
+      ) : (
+        <div className={`${menuItem} text-red-600 hover:text-red-600`} onClick={() => setConfirmDelete(true)}>
+          <Trash2 className="h-3.5 w-3.5" />
+          {t('diary.deleteEntry', { defaultValue: '删除条目' })}
+        </div>
+      )}
 
       {/* 移动到日记本 */}
       {journals.length > 1 && (

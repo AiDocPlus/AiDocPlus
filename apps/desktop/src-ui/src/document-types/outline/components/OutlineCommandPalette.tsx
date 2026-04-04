@@ -7,7 +7,6 @@ import { useTranslation } from '@/i18n';
 import {
   Search, Star, Clock, Command, CornerDownLeft
 } from 'lucide-react';
-import * as LucideIcons from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -24,13 +23,7 @@ import {
   type OutlineQuickActionStore,
   type OutlineQuickActionItem,
 } from '../outlineQuickActions';
-
-// 动态图标组件
-function DynamicIcon({ name, className }: { name: string; className?: string }) {
-  const IconComponent = (LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string; iconNode?: any }>>)[name];
-  if (!IconComponent) return <Search className={className} />;
-  return <IconComponent className={className} />;
-}
+import { DynamicIcon } from '../../_shared/DynamicIcon';
 
 // 简单的内存存储
 const memoryStorage: Record<string, unknown> = {};

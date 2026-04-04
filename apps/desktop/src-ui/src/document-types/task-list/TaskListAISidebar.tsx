@@ -23,7 +23,6 @@ import {
   Trash2,
   RefreshCw,
 } from 'lucide-react';
-import * as LucideIcons from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { Button } from '@/components/ui/button';
 import {
@@ -58,6 +57,7 @@ import {
   AI_OPTION_THINKING_ACTIVE,
   MSG_ACTION_BTN,
 } from '../_shared/styles';
+import { DynamicIcon } from '../_shared/DynamicIcon';
 import {
   type TaskListDocumentContent,
   type TaskList,
@@ -73,7 +73,7 @@ import {
   type TaskListQuickActionStore,
   type TaskListQuickActionItem,
 } from './taskListQuickActions';
-import { TASKLIST_AI_SYSTEM_BASE } from './taskListAiPromptShared';
+import { getTaskListSystemPrompt } from './taskListAiPromptShared';
 import { TASKLIST_AI_SERVICE_STORAGE_KEY } from './taskListStorageKeys';
 import {
   buildSmartContext,
@@ -82,9 +82,15 @@ import {
 } from './taskListContext';
 import { TaskListCommandPalette } from './TaskListCommandPalette';
 
-const TASKLIST_CUSTOM_SYSTEM_KEY = '_tasklist_custom_system';
-const TASKLIST_AI_WEB_KEY = '_tasklist_ai_web';
-const TASKLIST_AI_THINK_KEY = '_tasklist_ai_think';
+function taskListCustomSystemKey(documentId: string): string {
+  return `_tasklist_custom_system_${documentId}`;
+}
+function taskListAiWebKey(documentId: string): string {
+  return `_tasklist_ai_web_${documentId}`;
+}
+function taskListAiThinkKey(documentId: string): string {
+  return `_tasklist_ai_think_${documentId}`;
+}
 
 const MAX_SINGLE_HISTORY_MSG_CHARS = 6000;
 
@@ -150,17 +156,12 @@ function substituteTaskListPrompt(
   userInputFallback: string,
 ): string {
   if (!list) return prompt;
+  const isEn = (navigator.language || 'zh').slice(0, 2) === 'en';
   let p = prompt;
-  p = p.replace(/\{\{currentTask\}\}/g, getCurrentTaskSummary(list));
-  p = p.replace(/\{\{allTasks\}\}/g, getAllTasksSummary(list));
+  p = p.replace(/\{\{currentTask\}\}/g, getCurrentTaskSummary(list, isEn));
+  p = p.replace(/\{\{allTasks\}\}/g, getAllTasksSummary(list, isEn));
   p = p.replace(/\{\{userInput\}\}/g, userInputFallback);
   return p;
-}
-
-function DynamicIcon({ name, className }: { name: string; className?: string }) {
-  const IconComponent = (LucideIcons as unknown as Record<string, ComponentType<{ className?: string; iconNode?: any }>>)[name];
-  if (!IconComponent) return <CheckSquare className={className} />;
-  return <IconComponent className={className} />;
 }
 
 function resolveTheme(): 'light' | 'dark' {
@@ -185,6 +186,9 @@ export default function TaskListAISidebar({
   const isEn = i18n.language.startsWith('en');
 
   const sessionsKey = useMemo(() => taskListSessionsKey(document.id), [document.id]);
+  const customSystemKey = useMemo(() => taskListCustomSystemKey(document.id), [document.id]);
+  const aiWebKey = useMemo(() => taskListAiWebKey(document.id), [document.id]);
+  const aiThinkKey = useMemo(() => taskListAiThinkKey(document.id), [document.id]);
 
   const hostRef = useRef(host);
   hostRef.current = host;
@@ -195,10 +199,10 @@ export default function TaskListAISidebar({
     host.storage.get<string>(TASKLIST_AI_SERVICE_STORAGE_KEY),
   );
   const [webSearchEnabled, setWebSearchEnabled] = useState(
-    () => host.storage.get<boolean>(TASKLIST_AI_WEB_KEY) ?? true,
+    () => host.storage.get<boolean>(aiWebKey) ?? true,
   );
   const [deepThinkEnabled, setDeepThinkEnabled] = useState(
-    () => host.storage.get<boolean>(TASKLIST_AI_THINK_KEY) ?? true,
+    () => host.storage.get<boolean>(aiThinkKey) ?? true,
   );
 
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
@@ -248,13 +252,16 @@ export default function TaskListAISidebar({
   const [promptOpen, setPromptOpen] = useState(false);
   const [promptDraft, setPromptDraft] = useState('');
   const [customSystemPrompt, setCustomSystemPrompt] = useState(
-    () => host.storage.get<string>(TASKLIST_CUSTOM_SYSTEM_KEY) || '',
+    () => host.storage.get<string>(customSystemKey) || '',
   );
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // AI 可用性
-  const aiParams = getAIInvokeParamsForService(selectedServiceId || undefined);
+  const aiParams = useMemo(
+    () => getAIInvokeParamsForService(selectedServiceId || undefined),
+    [selectedServiceId],
+  );
   const aiAvailable = !!(aiParams.provider && aiParams.apiKey && aiParams.model);
 
   const providerCaps = useMemo(() => {
@@ -283,10 +290,34 @@ export default function TaskListAISidebar({
     }
   }, [sessionsKey]);
 
-  // 保存会话
+  // 保存会话（带清理，对标 Calculator pruneSessions）
+  const MAX_SESSIONS_COUNT = 20;
+  const MAX_MESSAGES_PER_SESSION = 100;
+  const MAX_SESSIONS_STORAGE_CHARS = 200_000;
+
+  const pruneSessions = useCallback((ss: ChatSession[]): ChatSession[] => {
+    let pruned = [...ss].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, MAX_SESSIONS_COUNT);
+    pruned = pruned.map((s) => ({ ...s, messages: s.messages.slice(-MAX_MESSAGES_PER_SESSION) }));
+    try {
+      let json = JSON.stringify(pruned);
+      while (json.length > MAX_SESSIONS_STORAGE_CHARS && pruned.length > 0) {
+        const oldest = pruned[pruned.length - 1];
+        if (oldest.messages.length > 2) {
+          oldest.messages = oldest.messages.slice(-Math.ceil(oldest.messages.length / 2));
+        } else {
+          pruned = pruned.slice(0, -1);
+        }
+        json = JSON.stringify(pruned);
+      }
+    } catch { /* best effort */ }
+    return pruned;
+  }, []);
+
   useEffect(() => {
-    hostRef.current.storage.set(sessionsKey, sessions);
-  }, [sessions, sessionsKey]);
+    try {
+      hostRef.current.storage.set(sessionsKey, pruneSessions(sessions));
+    } catch { /* silently ignore storage failures */ }
+  }, [sessions, sessionsKey, pruneSessions]);
 
   // 滚动到底部
   useEffect(() => {
@@ -304,8 +335,8 @@ export default function TaskListAISidebar({
   // 构建上下文（字符串，供 system 注入）
   const buildContextString = useCallback(() => {
     if (!activeList) return t('taskList.noListForContext', { defaultValue: '暂无任务列表' });
-    return buildSmartContext(activeList, taskDoc.settings);
-  }, [activeList, taskDoc.settings, t]);
+    return buildSmartContext(activeList, taskDoc.settings, isEn);
+  }, [activeList, taskDoc.settings, isEn, t]);
 
   const contextHint = useMemo(() => {
     if (!activeList) return '';
@@ -325,7 +356,7 @@ export default function TaskListAISidebar({
 
       const historyPayload = sliceHistoryForApi(historyBeforeUser);
       const context = buildContextString();
-      let systemPrompt = `${TASKLIST_AI_SYSTEM_BASE}\n\n${context}`;
+      let systemPrompt = `${getTaskListSystemPrompt(isEn)}\n\n${context}`;
 
       const userSys = customSystemPrompt.trim();
       if (userSys) {
@@ -521,21 +552,8 @@ export default function TaskListAISidebar({
     abortRef.current?.abort();
   }, []);
 
-  // 快捷操作
-  const handleQuickAction = useCallback(
-    (item: TaskListQuickActionItem) => {
-      setActionStore((prev) => {
-        const next = recordRecentUsed(prev, item.id);
-        saveQuickActions(host.storage, next);
-        return next;
-      });
-      const prompt = substituteTaskListPrompt(item.prompt, activeList, inputValue.trim());
-      sendMessageRef.current(prompt);
-    },
-    [activeList, host.storage, inputValue],
-  );
-
-  const handlePaletteSelect = useCallback(
+  // 快捷操作（侧栏菜单和命令面板共用）
+  const handleActionSelect = useCallback(
     (item: TaskListQuickActionItem) => {
       setActionStore((prev) => {
         const next = recordRecentUsed(prev, item.id);
@@ -586,16 +604,16 @@ export default function TaskListAISidebar({
       let currentContent: string[] = [];
 
       for (const line of lines) {
-        const match = line.match(/^- \[(高|中|低|High|Medium|Low)\]\s*(.+)/);
+        const match = line.match(/^- \[(高|中|低|High|Medium|Low)\]\s*(.+)/i);
         if (match) {
           if (currentTask) {
             currentTask.content = currentContent.join('\n').trim();
             newTasks.push(currentTask);
           }
-          const priorityLabel = match[1];
+          const priorityLabel = match[1].toLowerCase();
           let priority: TaskPriority = 'medium';
-          if (priorityLabel === '高' || priorityLabel === 'High') priority = 'high';
-          else if (priorityLabel === '低' || priorityLabel === 'Low') priority = 'low';
+          if (priorityLabel === '高' || priorityLabel === 'high') priority = 'high';
+          else if (priorityLabel === '低' || priorityLabel === 'low') priority = 'low';
 
           currentTask = createEmptyTask(priority);
           currentContent = [match[2].trim()];
@@ -630,7 +648,7 @@ export default function TaskListAISidebar({
               <button
                 type="button"
                 className="text-sm font-medium truncate max-w-[140px] hover:text-sky-600 dark:hover:text-sky-400 transition-colors flex items-center gap-0.5 text-left"
-                title={t('calculator.switchSession', { defaultValue: '切换对话' })}
+                title={t('taskList.switchSession', { defaultValue: '切换对话' })}
               >
                 {activeSession?.title || t('taskList.aiAssistant', { defaultValue: 'AI 助手' })}
                 <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 opacity-50" />
@@ -704,7 +722,7 @@ export default function TaskListAISidebar({
                 variant="ghost"
                 size="sm"
                 className={cn('h-7 w-7 p-0 shrink-0', promptOpen && 'text-amber-600 dark:text-amber-400')}
-                title={t('calculator.aiSystemPrompt', { defaultValue: '系统提示词' })}
+                title={t('taskList.aiSystemPromptTitle', { defaultValue: '系统提示词' })}
               >
                 <ScrollText className="h-4 w-4" />
               </Button>
@@ -722,7 +740,7 @@ export default function TaskListAISidebar({
                     onClick={() => setPromptDraft('')}
                   >
                     <RotateCcw className="h-3 w-3 mr-1" />
-                    {t('calculator.aiSystemPromptReset', { defaultValue: '清空' })}
+                    {t('taskList.aiSystemPromptReset', { defaultValue: '清空' })}
                   </Button>
                 </div>
                 <textarea
@@ -740,11 +758,11 @@ export default function TaskListAISidebar({
                     onClick={() => {
                       const next = promptDraft.trim();
                       setCustomSystemPrompt(next);
-                      host.storage.set(TASKLIST_CUSTOM_SYSTEM_KEY, next);
+                      host.storage.set(customSystemKey, next);
                       setPromptOpen(false);
                     }}
                   >
-                    {t('calculator.aiSystemPromptSave', { defaultValue: '保存' })}
+                    {t('taskList.aiSystemPromptSave', { defaultValue: '保存' })}
                   </Button>
                 </div>
               </div>
@@ -755,7 +773,7 @@ export default function TaskListAISidebar({
             size="sm"
             className="h-7 w-7 p-0 shrink-0"
             onClick={handleClear}
-            title={t('calculator.clearSession', { defaultValue: '清空对话' })}
+            title={t('taskList.clearSession', { defaultValue: '清空对话' })}
           >
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -764,7 +782,7 @@ export default function TaskListAISidebar({
             size="sm"
             className="h-7 w-7 p-0 shrink-0"
             onClick={onClose}
-            title={t('calculator.hideAI', { defaultValue: '关闭 AI' })}
+            title={t('common.hideAI', { defaultValue: '关闭 AI' })}
           >
             <X className="h-4 w-4" />
           </Button>
@@ -806,7 +824,7 @@ export default function TaskListAISidebar({
                         <DropdownMenuItem
                           key={item.id}
                           className="text-xs gap-2 cursor-pointer"
-                          onClick={() => handleQuickAction(item)}
+                          onClick={() => handleActionSelect(item)}
                           disabled={streaming || !aiAvailable}
                         >
                           <DynamicIcon name={item.icon} className="h-3 w-3 shrink-0" />
@@ -988,7 +1006,7 @@ export default function TaskListAISidebar({
                 size="icon"
                 className="h-8 w-8"
                 onClick={handleStop}
-                title={t('chat.stopGenerating', { defaultValue: '停止生成' })}
+                title={t('chat.stopGeneration', { defaultValue: '停止生成' })}
               >
                 <Square className="h-3.5 w-3.5" />
               </Button>
@@ -999,7 +1017,7 @@ export default function TaskListAISidebar({
                 className="h-8 w-8 bg-sky-600 hover:bg-sky-700"
                 onClick={() => void sendMessage(inputValue)}
                 disabled={!inputValue.trim() || !aiAvailable}
-                title={t('chat.send', { defaultValue: '发送' })}
+                title={t('chat.sendMessage', { defaultValue: '发送' })}
               >
                 <Send className="h-3.5 w-3.5" />
               </Button>
@@ -1025,7 +1043,7 @@ export default function TaskListAISidebar({
               onClick={() => {
                 setWebSearchEnabled((v) => {
                   const next = !v;
-                  host.storage.set(TASKLIST_AI_WEB_KEY, next);
+                  host.storage.set(aiWebKey, next);
                   return next;
                 });
               }}
@@ -1047,7 +1065,7 @@ export default function TaskListAISidebar({
               onClick={() => {
                 setDeepThinkEnabled((v) => {
                   const next = !v;
-                  host.storage.set(TASKLIST_AI_THINK_KEY, next);
+                  host.storage.set(aiThinkKey, next);
                   return next;
                 });
               }}
@@ -1059,7 +1077,7 @@ export default function TaskListAISidebar({
               }
             >
               <Brain className="h-3 w-3" />
-              <span className="hidden sm:inline">{t('chat.thinking', { defaultValue: '深度思考' })}</span>
+              <span className="hidden sm:inline">{t('chat.aiThinking', { defaultValue: '深度思考' })}</span>
             </Button>
           )}
         </div>
@@ -1068,7 +1086,7 @@ export default function TaskListAISidebar({
       <TaskListCommandPalette
         open={qaPaletteOpen}
         onClose={closePalette}
-        onSelectAction={handlePaletteSelect}
+        onSelectAction={handleActionSelect}
         storage={host.storage}
       />
     </div>

@@ -2,6 +2,7 @@
  * 日记示例数据 — 30天示例日记
  */
 import type { DiaryDocumentContent } from './types';
+import { toLocalDateStr } from './types';
 
 function genId(prefix: string, idx: number): string {
   return `${prefix}_demo_${idx}`;
@@ -31,7 +32,7 @@ export function createDemoDiaryContent(): DiaryDocumentContent {
     const s = sampleData[i];
     const d = new Date(today);
     d.setDate(d.getDate() + s.dayOffset);
-    const dateStr = d.toISOString().slice(0, 10);
+    const dateStr = toLocalDateStr(d);
     const journal = s.journalIdx === 0 ? workJournal : lifeJournal;
     entries.push({
       id: genId('de', i),

@@ -38,7 +38,7 @@ export function listSlice(a: number[], start: number, end: number): number[] {
 export function listConcat(parts: number[][]): number[] {
   const out: number[] = [];
   for (const p of parts) {
-    out.push(...p);
+    for (let i = 0; i < p.length; i++) out.push(p[i]!);
   }
   return clampList(out);
 }
@@ -120,20 +120,21 @@ export function listUnique(a: number[]): number[] {
   return out;
 }
 
-/** 尾部窗口；前 window-1 项为 NaN */
+/** 尾部窗口；前 window-1 项为 NaN（滑动窗口 O(n)） */
 export function rollMean(a: number[], window: number): number[] {
   const w = Math.floor(window);
   if (!(w >= 1) || !Number.isFinite(w)) return a.map(() => Number.NaN);
   const n = a.length;
   const out: number[] = [];
+  let windowSum = 0;
   for (let i = 0; i < n; i++) {
+    windowSum += a[i]!;
+    if (i >= w) windowSum -= a[i - w]!;
     if (i + 1 < w) {
       out.push(Number.NaN);
-      continue;
+    } else {
+      out.push(windowSum / w);
     }
-    let s = 0;
-    for (let j = i - w + 1; j <= i; j++) s += a[j]!;
-    out.push(s / w);
   }
   return out;
 }
@@ -143,14 +144,15 @@ export function rollSum(a: number[], window: number): number[] {
   if (!(w >= 1) || !Number.isFinite(w)) return a.map(() => Number.NaN);
   const n = a.length;
   const out: number[] = [];
+  let windowSum = 0;
   for (let i = 0; i < n; i++) {
+    windowSum += a[i]!;
+    if (i >= w) windowSum -= a[i - w]!;
     if (i + 1 < w) {
       out.push(Number.NaN);
-      continue;
+    } else {
+      out.push(windowSum);
     }
-    let s = 0;
-    for (let j = i - w + 1; j <= i; j++) s += a[j]!;
-    out.push(s);
   }
   return out;
 }
@@ -191,4 +193,10 @@ export function listArgSort(a: number[]): number[] {
   const idx = a.map((v, i) => ({ v, i }));
   idx.sort((x, y) => x.v - y.v || x.i - y.i);
   return idx.map((x) => x.i + 1);
+}
+
+/** 列表均值 */
+export function listMean(a: number[]): number {
+  if (a.length === 0) return Number.NaN;
+  return a.reduce((s, v) => s + v, 0) / a.length;
 }

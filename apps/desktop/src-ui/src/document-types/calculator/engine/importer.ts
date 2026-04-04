@@ -8,7 +8,6 @@ import {
   createLineFromExpression,
   DEFAULT_CALCULATOR_SETTINGS,
   generateLineId,
-  isNoteLine,
   normalizeCalculatorLine,
   type CalculatorDocumentContent,
   type CalculatorLineRole,
@@ -59,24 +58,27 @@ async function importCsvFile(file: File): Promise<ImportResult> {
   const text = await file.text();
   const lines = text.split('\n').filter(Boolean);
 
-  // 跳过表头
-  const dataLines = lines.slice(1);
+  // 智能检测表头：若第一行全是非数字文本（且不含数字表达式），视为表头跳过
+  let startIdx = 0;
+  if (lines.length > 1) {
+    const firstParts = parseCSVLine(lines[0]!);
+    const looksLikeHeader = firstParts.length > 0 && firstParts.every(cell => {
+      const t = cell.trim();
+      if (t === '') return true;
+      // 纯数字、数字表达式、百分比等 → 不是表头
+      return !/^[\d\s,.\-+*/%()eE]+$/.test(t) && isNaN(parseFloat(t));
+    });
+    if (looksLikeHeader) startIdx = 1;
+  }
+  const dataLines = lines.slice(startIdx);
 
   const sheet = createEmptySheet(file.name.replace(/\.csv$/i, ''));
+  const hb = DEFAULT_CALCULATOR_SETTINGS.hashBehavior;
   sheet.lines = dataLines.map((line, i) => {
     const parts = parseCSVLine(line);
     const expression = parts[1] || parts[0] || '';
 
-    return {
-      id: generateLineId(),
-      lineNumber: i + 1,
-      expression,
-      result: { type: 'number' as const, value: 0, displayValue: '' },
-      definedVariables: [],
-      dependencies: [],
-      lineRole: 'normal' as const,
-      isNote: isNoteLine(expression),
-    };
+    return createLineFromExpression(expression, i + 1, hb);
   });
 
   return {
@@ -297,6 +299,10 @@ async function importSoulver2File(file: File): Promise<ImportResult> {
 
   // 解析 XML 结构
   // <document><lines><line><expression>...</expression><result>...</result></line></lines></document>
+  const parseError = doc.querySelector('parsererror');
+  if (parseError) {
+    return { success: false, error: '无法解析 .soulver XML 文件：XML 格式无效' };
+  }
   const lineElements = doc.querySelectorAll('line');
 
   sheet.lines = Array.from(lineElements).map((lineEl, i) => {

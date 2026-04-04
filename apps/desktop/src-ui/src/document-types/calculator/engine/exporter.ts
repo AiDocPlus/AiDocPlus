@@ -65,7 +65,7 @@ export function exportToCSV(
     ]);
   }
 
-  return rows.map(row => row.join(',')).join('\n');
+  return '\uFEFF' + rows.map(row => row.join(',')).join('\n');
 }
 
 /**
@@ -184,7 +184,7 @@ export function exportToMarkdown(
     if (line.isNote) {
       lines.push(`| ${line.lineNumber} | *${escapeMarkdown(ex)}* | |`);
     } else {
-      lines.push(`| ${line.lineNumber} | \`${escapeMarkdown(ex)}\` | **${line.result.displayValue || '-'}** |`);
+      lines.push(`| ${line.lineNumber} | \`${escapeMarkdown(ex)}\` | **${escapeMarkdown(line.result.displayValue || '-')}** |`);
     }
   }
 
@@ -199,8 +199,8 @@ export function exportToMarkdown(
  * 转义 CSV 字段
  */
 function escapeCSVField(field: string): string {
-  if (field.includes(',') || field.includes('"') || field.includes('\n')) {
-    return `"${field.replace(/"/g, '""')}"`;
+  if (field.includes(',') || field.includes('"') || field.includes('\n') || field.includes('\r')) {
+    return `"${field.replace(/\r/g, '').replace(/"/g, '""')}"`;
   }
   return field;
 }
@@ -224,7 +224,7 @@ export function downloadExport(content: string, filename: string, mimeType: stri
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // ============================================================

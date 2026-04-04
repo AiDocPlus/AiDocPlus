@@ -48,17 +48,6 @@ export function DocTypeAIServiceMenu({
     );
   }
 
-  if (enabledServices.length === 1) {
-    return (
-      <span
-        className={cn('text-[10px] text-muted-foreground truncate max-w-[140px] px-1', className)}
-        title={label}
-      >
-        {label}
-      </span>
-    );
-  }
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

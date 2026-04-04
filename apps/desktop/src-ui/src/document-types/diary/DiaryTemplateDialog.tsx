@@ -5,15 +5,14 @@
  * 右侧：模板预览
  * 应用方式：覆盖当前 / 追加到末尾
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { FileText, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useTranslation } from '@/i18n';
 import type { DiaryTemplate } from './types';
 import { BUILTIN_TEMPLATES, getAllTemplates } from './diaryTemplates';
-
-const DIALOG_STYLE = { fontFamily: "'宋体', 'SimSun', serif", fontSize: '16px' };
+import { DIALOG_STYLE } from '../_shared/styles';
 
 interface DiaryTemplateDialogProps {
   open: boolean;
@@ -30,6 +29,14 @@ export default function DiaryTemplateDialog({
 
   const allTemplates = useMemo(() => getAllTemplates(customTemplates), [customTemplates]);
   const selected = allTemplates.find(tpl => tpl.id === selectedId);
+
+  // 打开对话框时重置选中到第一个有效模板
+  useEffect(() => {
+    if (open) {
+      const first = allTemplates[0];
+      if (first && first.id !== selectedId) setSelectedId(first.id);
+    }
+  }, [open, allTemplates, selectedId]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

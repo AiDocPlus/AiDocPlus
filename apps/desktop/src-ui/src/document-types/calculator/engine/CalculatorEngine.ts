@@ -36,6 +36,7 @@ import {
   normsinv as normsinvFn,
   normdist as normdistFn,
   normSdist as normSdistFn,
+  normspdf as normspdfFn,
   slope as slopeFn,
   intercept as interceptFn,
   rsq as rsqFn,
@@ -250,9 +251,12 @@ export class CalculatorEngine {
       const { expr: coreExpr, quotedParts } = stripDoubleQuotedDisplayLiterals(original);
 
       // 2. 尝试日期计算（today + 2 weeks, 1月1日 to 12月31日）
-      const dateResult = tryParseDateExpression(coreExpr, this.displaySettings.dateFormat);
+      const dateResult = tryParseDateExpression(coreExpr, this.displaySettings.dateFormat, this.numberLocale());
       if (dateResult) {
-        this.lineResults.set(lineNumber, dateResult.value as number);
+        this.lineResults.set(
+          lineNumber,
+          dateResult.value instanceof Date ? dateResult.value.getTime() : (dateResult.value as number),
+        );
         return {
           type: dateResult.type,
           value: dateResult.value,
@@ -320,8 +324,33 @@ export class CalculatorEngine {
       }
 
       // 7. 执行计算
-      const result = this.evaluateExpression(preprocessed);
-      this.lineResults.set(lineNumber, result);
+      const raw = this.evaluateInScope(preprocessed);
+
+      // 矩阵/数列结果（如 [1,2,3]）
+      if (isSequenceTensor(raw)) {
+        const n = sequenceElementCount(raw);
+        const scalarNum = mathToNumber(raw);
+        if (Number.isFinite(scalarNum)) {
+          this.lineResults.set(lineNumber, scalarNum);
+        } else {
+          this.lineResults.delete(lineNumber);
+        }
+        return {
+          type: 'matrix',
+          value: raw,
+          displayValue: this.appendQuotedDisplaySuffix(
+            n > 0 ? `数列（${n} 项）` : '数列',
+            quotedParts,
+          ),
+        };
+      }
+
+      const result = mathToNumber(raw);
+      if (Number.isFinite(result)) {
+        this.lineResults.set(lineNumber, result);
+      } else {
+        this.lineResults.delete(lineNumber);
+      }
 
       // 检测结果类型
       const resultType = this.detectResultType(result, original);
@@ -348,13 +377,16 @@ export class CalculatorEngine {
    * 检测结果类型
    */
   private detectResultType(_result: number, original: string): 'number' | 'percent' | 'currency' {
-    if (original.includes('%') || original.includes('percent') || original.includes('百分比')) {
-      return 'percent';
-    }
-    if (original.includes('$') || original.includes('¥') || original.includes('€') ||
-        original.includes('元') || original.includes('美元') || original.includes('欧元')) {
-      return 'currency';
-    }
+    const hasCurrency = original.includes('$') || original.includes('¥') || original.includes('€') ||
+        original.includes('£') || original.includes('₩') ||
+        original.includes('元') || original.includes('美元') || original.includes('欧元') ||
+        original.includes('日元') || original.includes('英镑') || original.includes('港元') || original.includes('港币') ||
+        original.includes('韩元') || original.includes('卢布') || original.includes('澳元');
+    const hasPercent = original.includes('%') || original.includes('percent') || original.includes('百分比');
+    // 含货币符号时优先视为货币（如 $50 - 20%），纯百分比标记（50%）才返回 percent
+    if (hasCurrency && hasPercent) return 'currency';
+    if (hasPercent) return 'percent';
+    if (hasCurrency) return 'currency';
     return 'number';
   }
 
@@ -390,13 +422,14 @@ export class CalculatorEngine {
     const { expr: coreExpr } = stripDoubleQuotedDisplayLiterals(original);
     const preprocessed = this.preprocessExpression(coreExpr, lineNumber);
     const definedVariables: string[] = [];
-    const vd = this.detectVariableDefinition(preprocessed);
+    // 对原始表达式（非预处理后）检测变量定义，以获取用户书写的原始变量名
+    const vd = this.detectVariableDefinition(coreExpr);
     if (vd) definedVariables.push(vd.name);
 
     const dependencies: string[] = [];
     if (
       /(?<![\u4e00-\u9fa5a-zA-Z0-9_])所有行(?![\u4e00-\u9fa5a-zA-Z0-9_])/.test(coreExpr) ||
-      /\ball lines\b/gi.test(coreExpr)
+      /\ball lines\b/i.test(coreExpr)
     ) {
       dependencies.push('__all_lines__');
     }
@@ -461,28 +494,39 @@ export class CalculatorEngine {
   private preprocessExpression(text: string, lineNumber: number): string {
     let expr = text.trim();
 
-    // 0. 中文变量名转换（最先执行）
+    // 0. 剥离货币符号（仅用于结果类型检测，不参与运算）
+    expr = expr.replace(/[$¥€£₩]/g, '');
+
+    // 0.5 剥离中文货币词（元、美元、欧元等），仅当不作为已定义变量名时
+    const currencyWords = ['美元', '欧元', '日元', '英镑', '港元', '港币', '韩元', '卢布', '澳元', '加元', '法郎'];
+    for (const cw of currencyWords) {
+      if (!this.variables.has(cw)) {
+        expr = expr.replace(new RegExp(cw, 'g'), '');
+      }
+    }
+
+    // 1. 中文变量名转换（最先执行）
     expr = this.transformVariableNames(expr);
 
-    // 1. 数字简写：25k → 25000, 1.5万 → 15000
+    // 2. 数字简写：25k → 25000, 1.5万 → 15000
     expr = this.transformNumberUnits(expr);
 
-    // 2. 百分比计算：$50 - 20% → $50 * (1 - 0.20)
+    // 3. 百分比计算：50 - 20% → 50 * (1 - 0.20)
     expr = this.transformPercentages(expr);
 
-    // 3. 行引用：所有行 / all lines / line 1 / 第1行 / 区间合计
+    // 4. 行引用：所有行 / all lines / line 1 / 第1行 / 区间合计
     expr = this.transformLineReferences(expr, lineNumber);
 
-    // 4. 单位转换：10km in miles
+    // 5. 单位转换：10km in miles
     expr = this.transformUnitConversions(expr);
 
-    // 5. 中文函数别名
+    // 6. 中文函数别名
     expr = this.transformChineseFunctions(expr);
 
-    // 6. 比例计算：10 : 20 = 50 : x
+    // 7. 比例计算：10 : 20 = 50 : x
     expr = this.transformProportions(expr);
 
-    // 7. 进制转换：0xFF to binary, 1010b to hex, 0o77 to decimal
+    // 8. 进制转换：0xFF to binary, 1010b to hex, 0o77 to decimal
     expr = this.transformBaseConversions(expr);
 
     return expr;
@@ -659,8 +703,8 @@ export class CalculatorEngine {
 
     // line 1 / Line 2（要求 line 前非字母，避免 airline 12 误匹配为 line 12）
     expr = expr.replace(/(?<![a-zA-Z])line\s+(\d+)/gi, (_, n) => `__line_${n}__`);
-    // 第1行 / 第3
-    expr = expr.replace(/第(\d+)(?:行)?/g, (_, n) => `__line_${n}__`);
+    // 第1行 / 第3（要求后面是运算符、标点或行尾，避免匹配"第3季度"等）
+    expr = expr.replace(/第(\d+)(?:行)?(?=[\s\+\-\*\/\(\)\[\],;:：，。）\】]|$)/g, (_, n) => `__line_${n}__`);
 
     // 上一行 / above / prev（Soulver 类「上一答案」引用）
     const prevLn = lineNumber - 1;
@@ -687,7 +731,9 @@ export class CalculatorEngine {
       // 使用 math.js 内置单位
       try {
         const result = math.evaluate(`${value} ${fromUnit} to ${toUnit}`);
-        return String(result);
+        const num = typeof result === 'number' ? result : mathToNumber(result);
+        if (Number.isFinite(num)) return String(num);
+        return expr;
       } catch {
         // 如果单位不识别，保持原样
         return expr;
@@ -727,7 +773,7 @@ export class CalculatorEngine {
    */
   private transformProportions(expr: string): string {
     // 10 : 20 = 50 : x → 50 * 20 / 10
-    const match = expr.match(/(\d+(?:\.\d+)?)\s*[:：]\s*(\d+(?:\.\d+)?)\s*=\s*(\d+(?:\.\d+)?)\s*[:：]\s*(?:x|\?)\s*/i);
+    const match = expr.match(/(\d+(?:\.\d+)?)\s*[:：]\s*(\d+(?:\.\d+)?)\s*=\s*(\d+(?:\.\d+)?)\s*[:：]\s*(?:x|y|X|Y|\?)\s*/i);
     if (match) {
       const [_, a, b, c] = match;
       return `(${c} * ${b} / ${a})`;
@@ -938,6 +984,7 @@ export class CalculatorEngine {
           ),
         normSdist: (z: unknown, cum?: unknown) =>
           normSdistFn(mathToNumber(z), cum !== undefined ? mathToNumber(cum) : 1),
+        normspdf: (z: unknown) => normspdfFn(mathToNumber(z)),
         slope: (knownY: unknown, knownX: unknown) =>
           slopeFn(mathToNumberArray(knownY), mathToNumberArray(knownX)),
         intercept: (knownY: unknown, knownX: unknown) =>
@@ -985,6 +1032,7 @@ export class CalculatorEngine {
         listQuantile: (a: unknown, p: unknown) =>
           listFn.listQuantile(listFn.clampList(mathToNumberArray(a)), mathToNumber(p)),
         listArgSort: (a: unknown) => listFn.listArgSort(listFn.clampList(mathToNumberArray(a))),
+        listMean: (a: unknown) => listFn.listMean(listFn.clampList(mathToNumberArray(a))),
       },
       { override: true, silent: true },
     );

@@ -3,41 +3,39 @@
  *
  * 基于 MarkdownEditor，提供：
  * - 内容同步到 DiaryDocumentContent
- * - 自动保存（5秒无操作）
+ * - 自动保存由父组件 DiaryDocWorkspace 负责
  * - AI 插入事件监听
  */
 import { useEffect, useRef, useCallback } from 'react';
 import { MarkdownEditor } from '@/components/editor/MarkdownEditor';
 import { useTranslation } from '@/i18n';
-import type { DocTypeHostAPI } from '@/doctype-sdk/types';
 
 interface DiaryEditorProps {
   entryId: string;
   content: string;
-  host: DocTypeHostAPI;
   onChange: (content: string) => void;
   placeholder?: string;
   textIndent?: boolean;
 }
 
 export default function DiaryEditor({
-  entryId, content, host: _host, onChange, placeholder, textIndent = false,
+  entryId, content, onChange, placeholder, textIndent = false,
 }: DiaryEditorProps) {
   const { t } = useTranslation();
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
-  // 监听 AI 插入事件
+  // 监听 AI 插入事件（仅处理当前 entryId 的插入）
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
-      if (detail?.text) {
+      if (detail?.text && detail?.targetId === entryId) {
         onChangeRef.current(detail.text);
       }
     };
     window.addEventListener('doctype-insert-text', handler);
     return () => window.removeEventListener('doctype-insert-text', handler);
-  }, []);
+  }, [entryId]);
 
   const handleChange = useCallback((val: string) => {
     onChangeRef.current(val);

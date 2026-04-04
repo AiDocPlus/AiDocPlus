@@ -8,7 +8,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { usePluginHost } from './PluginHostAPI';
+import { usePluginHost, useThinkingContent } from './PluginHostAPI';
 import { formatBackendError } from '@/lib/backendError';
 import { saveTextFileWithDialog } from '@/lib/tauriSaveTextFile';
 import { useSettingsStore, getAIInvokeParamsForService } from '@/stores/useSettingsStore';
@@ -32,6 +32,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useTranslation } from 'react-i18next';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { CollapsibleThinkingBlock } from '@/document-types/_shared/CollapsibleThinkingBlock';
 
 // ── 图标映射 ──
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -77,6 +78,7 @@ export function PluginAssistantPanel({
   aiContent,
 }: PluginAssistantPanelProps) {
   const host = usePluginHost();
+  const thinkingContent = useThinkingContent();
   const { t } = useTranslation();
 
   // 有效配置：外部 > 默认
@@ -128,6 +130,7 @@ export function PluginAssistantPanel({
     return cfg?.capabilities || { webSearch: false, thinking: false };
   })();
   const [enableWebSearch, setEnableWebSearch] = useState(false);
+  const [enableThinking, setEnableThinking] = useState(false);
 
   // 持久化消息
   useEffect(() => {
@@ -179,7 +182,10 @@ export function PluginAssistantPanel({
       await chatWithPluginAssistant(host, contextMsgs, (delta) => {
         accumulated += delta;
         setStreamingContent(accumulated);
-      }, abort.signal, selectedServiceId || undefined);
+      }, abort.signal, selectedServiceId || undefined, {
+        enableWebSearch: enableWebSearch && providerCaps.webSearch ? true : undefined,
+        enableThinking: enableThinking && providerCaps.thinking ? true : undefined,
+      });
 
       const assistantMsg: AssistantMessage = {
         id: genMsgId(), role: 'assistant', content: accumulated, timestamp: Date.now(),
@@ -341,7 +347,7 @@ export function PluginAssistantPanel({
           <Bot className="h-4 w-4 text-blue-500" />
           <span className="text-base font-medium truncate">{t('pluginAssistant.title', { defaultValue: '{{name}} AI', name: pluginName })}</span>
           {/* AI 服务选择器 */}
-          {enabledServices.length >= 2 && (
+          {enabledServices.length >= 1 && (
             <Popover>
               <PopoverTrigger asChild>
                 <button
@@ -482,15 +488,22 @@ export function PluginAssistantPanel({
         {streaming && (
           <div className="flex justify-start">
             <div className="max-w-[95%] rounded-lg px-2.5 py-1.5 text-base bg-muted/50 text-foreground">
+              {thinkingContent ? (
+                <CollapsibleThinkingBlock
+                  thinking={thinkingContent}
+                  isThinking={true}
+                  theme={host.ui.getTheme()}
+                />
+              ) : null}
               {streamingContent ? (
                 <div className="space-y-0.5">
                   {renderContent(streamingContent, '_streaming_')}
                 </div>
-              ) : (
+              ) : !thinkingContent ? (
                 <span className="flex items-center gap-1 text-muted-foreground text-base">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />{t('pluginAssistant.thinking', { defaultValue: '思考中...' })}
                 </span>
-              )}
+              ) : null}
             </div>
           </div>
         )}
@@ -525,8 +538,9 @@ export function PluginAssistantPanel({
 
           {/* 深度思考 */}
           <Button variant="ghost" size="sm"
-            className="h-7 px-1.5 text-sm gap-0.5 text-muted-foreground"
+            className={`h-7 px-1.5 text-sm gap-0.5 ${enableThinking && providerCaps.thinking ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}
             disabled={!providerCaps.thinking}
+            onClick={() => setEnableThinking(v => !v)}
             title={providerCaps.thinking ? t('pluginAssistant.deepThink', { defaultValue: '深度思考' }) : t('pluginAssistant.deepThinkUnavailable', { defaultValue: '当前模型不支持深度思考' })}>
             <Brain className="h-3 w-3" />
           </Button>

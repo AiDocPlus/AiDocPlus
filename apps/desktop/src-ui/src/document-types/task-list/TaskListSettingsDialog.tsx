@@ -153,11 +153,20 @@ export function TaskListSettingsDialog({
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 pt-2 border-t">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {t('common.cancel', { defaultValue: '取消' })}
+        <div className="flex items-center justify-between pt-2 border-t">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setLocal({ ...DEFAULT_TASKLIST_SETTINGS })}
+          >
+            {t('common.reset', { defaultValue: '重置' })}
           </Button>
-          <Button onClick={handleSave}>{t('common.save', { defaultValue: '保存' })}</Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              {t('common.cancel', { defaultValue: '取消' })}
+            </Button>
+            <Button onClick={handleSave}>{t('common.save', { defaultValue: '保存' })}</Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

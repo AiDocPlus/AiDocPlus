@@ -41,6 +41,7 @@ import {
   Settings,
   HelpCircle,
   Download,
+  Upload,
   FilePlus,
   CheckCircle2,
   RotateCcw,
@@ -54,8 +55,19 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ResizableHandle } from '@/components/ui/resizable-handle';
 import {
@@ -96,6 +108,7 @@ import {
   calculateStatistics,
   sortTasksForDisplay,
   normalizeTaskPriority,
+  pruneCompletedTasksByRetention,
   type TaskListDocumentContent,
   type TaskList,
   type TaskItem,
@@ -121,6 +134,9 @@ import {
 // 懒加载 AI 侧栏
 const TaskListAISidebar = lazy(() => import('./TaskListAISidebar'));
 const TaskListTemplateDialog = lazy(() => import('./TaskListTemplateDialog'));
+const TaskListImportDialog = lazy(() =>
+  import('./TaskListImportDialog').then((m) => ({ default: m.TaskListImportDialog })),
+);
 const VersionHistoryPanel = lazy(() =>
   import('@/components/version/VersionHistoryPanel').then((m) => ({ default: m.VersionHistoryPanel })),
 );
@@ -169,7 +185,7 @@ class TaskListWorkspaceErrorBoundary extends Component<
             size="sm"
             onClick={() => this.setState({ hasError: false })}
           >
-            {i18n.t('calculator.workspaceErrorRetry', { defaultValue: '重试' })}
+            {i18n.t('common.retry', { defaultValue: '重试' })}
           </Button>
         </div>
       );
@@ -246,6 +262,9 @@ function TaskRowBase({
     } else if (e.key === 'Escape') {
       setEditContent(task.content);
       setIsEditing(false);
+    } else if (e.key === 'Backspace' && !editContent.trim()) {
+      e.preventDefault();
+      onDelete();
     }
   };
 
@@ -313,9 +332,11 @@ function TaskRowBase({
               pr === 'medium' && 'bg-yellow-500',
               pr === 'low' && 'bg-green-500',
             )}
-            title={priorityConfig.label}
+            title={t(`taskList.priority${pr === 'high' ? 'High' : pr === 'medium' ? 'Medium' : 'Low'}`, {
+              defaultValue: priorityConfig.label,
+            })}
             aria-label={t('taskList.priorityPickerAria', {
-              label: priorityConfig.label,
+              label: t(`taskList.priority${pr === 'high' ? 'High' : pr === 'medium' ? 'Medium' : 'Low'}`),
               defaultValue: '优先级：{{label}}',
             })}
           />
@@ -410,7 +431,7 @@ function TaskRowBase({
       {/* 完成时间 */}
       {isCompleted && task.completedAt && (
         <span className="text-xs text-muted-foreground shrink-0">
-          {formatRelativeTime(task.completedAt)}
+          {formatRelativeTime(t, task.completedAt)}
         </span>
       )}
     </div>
@@ -449,6 +470,71 @@ function SortableTaskRow(props: TaskRowHandlersProps) {
 
 function StaticTaskRow(props: TaskRowHandlersProps) {
   return <TaskRowBase {...props} />;
+}
+
+/** 带右键上下文菜单的任务行 */
+function TaskRowWithContextMenu(props: TaskRowHandlersProps & {
+  onDuplicate: () => void;
+  onAddAbove: () => void;
+  onAddBelow: () => void;
+}) {
+  const { t } = useTranslation();
+  const pr = normalizeTaskPriority(props.task.priority);
+  const priorityDot = PRIORITY_CONFIG[pr];
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <StaticTaskRow {...props} />
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-48">
+        <ContextMenuItem onClick={props.onToggle}>
+          {props.isCompleted
+            ? t('taskList.markAsPending', { defaultValue: '恢复为待办' })
+            : t('taskList.markAsDone', { defaultValue: '标记完成' })}
+        </ContextMenuItem>
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <span className="flex items-center gap-1.5">
+              <span className={cn('w-2.5 h-2.5 rounded-full', priorityDot.dotColor)} />
+              {t('taskList.priority', { defaultValue: '优先级' })}
+            </span>
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent>
+            <ContextMenuItem onClick={() => props.onPriorityChange('high')}>
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500 mr-2" />
+              {t('taskList.priorityHigh', { defaultValue: '高' })}
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => props.onPriorityChange('medium')}>
+              <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 mr-2" />
+              {t('taskList.priorityMedium', { defaultValue: '中' })}
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => props.onPriorityChange('low')}>
+              <span className="w-2.5 h-2.5 rounded-full bg-green-500 mr-2" />
+              {t('taskList.priorityLow', { defaultValue: '低' })}
+            </ContextMenuItem>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={props.onDuplicate}>
+          {t('taskList.duplicateTask', { defaultValue: '复制任务' })}
+        </ContextMenuItem>
+        <ContextMenuItem onClick={props.onCopy}>
+          {t('taskList.copyText', { defaultValue: '复制文本' })}
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={props.onAddAbove}>
+          {t('taskList.addAbove', { defaultValue: '在上方添加' })}
+        </ContextMenuItem>
+        <ContextMenuItem onClick={props.onAddBelow}>
+          {t('taskList.addBelow', { defaultValue: '在下方添加' })}
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={props.onDelete} className="text-destructive">
+          {t('taskList.deleteTask', { defaultValue: '删除' })}
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  );
 }
 
 // ============================================================
@@ -607,17 +693,27 @@ function ListTabs({
 // 辅助函数
 // ============================================================
 
-function formatRelativeTime(isoString: string): string {
+function formatRelativeTime(t: (key: string, opts?: Record<string, unknown>) => string, isoString: string): string {
   const date = new Date(isoString);
   const now = new Date();
+
+  // 使用日历日比较（避免跨午夜时 Math.floor(ms/86400000) 偏差）
+  const d = (dt: Date) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+  const todayStr = d(now);
+  const dateStr = d(date);
+
+  if (date > now) return date.toLocaleString();
+  if (dateStr === todayStr) return t('taskList.timeToday', { defaultValue: '今天' });
+
+  // 昨天
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (dateStr === d(yesterday)) return t('taskList.timeYesterday', { defaultValue: '昨天' });
+
+  // 超过 7 天显示日期
   const diffMs = now.getTime() - date.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  // 时钟偏差或未来时间：直接显示本地日期时间
-  if (diffDays < 0) return date.toLocaleString();
-  if (diffDays === 0) return i18n.language.startsWith('zh') ? '今天' : 'today';
-  if (diffDays === 1) return i18n.language.startsWith('zh') ? '昨天' : 'yesterday';
-  if (diffDays < 7) return `${diffDays}${i18n.language.startsWith('zh') ? '天前' : ' days ago'}`;
+  if (diffDays < 7) return t('taskList.timeDaysAgo', { count: diffDays, defaultValue: `${diffDays} 天前` });
   return date.toLocaleDateString();
 }
 
@@ -644,6 +740,10 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
   // 撤销/重做历史
   const [past, setPast] = useState<HistoryState[]>([]);
   const [future, setFuture] = useState<HistoryState[]>([]);
+  const pastRef = useRef(past);
+  pastRef.current = past;
+  const futureRef = useRef(future);
+  futureRef.current = future;
 
   // AI 侧栏状态
   const [aiSidebarOpen, setAiSidebarOpen] = useState(true);
@@ -652,6 +752,7 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
   // 模板对话框状态
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
@@ -664,6 +765,8 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
   // Refs
   const taskDocRef = useRef(taskDoc);
   taskDocRef.current = taskDoc;
+  const hostRef = useRef(host);
+  hostRef.current = host;
 
   // 组件卸载时清理定时器
   useEffect(() => {
@@ -672,15 +775,17 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
 
   // 文档切换时重新加载（对齐 CalculatorWorkspace）
   useEffect(() => {
-    const d = host.doc.getDocument();
+    const h = hostRef.current;
+    const d = h.doc.getDocument();
     setTaskDoc(parseTaskListContent(d.content || ''));
     setPast([]);
     setFuture([]);
-    const pf = host.storage.get(taskListPriorityFilterStorageKey(doc.id));
+    const pf = h.storage.get(taskListPriorityFilterStorageKey(doc.id));
     setPriorityFilter(normalizePriorityFilterFromStorage(pf));
     setTaskSearch('');
     setSelectedTaskIds(new Set());
-  }, [doc.id, host]);
+    setImportDialogOpen(false);
+  }, [doc.id]);
 
   const setPriorityFilterPersist = useCallback(
     (v: 'all' | 'high') => {
@@ -722,6 +827,10 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
 
   const selectedCountRef = useRef(0);
   selectedCountRef.current = selectedTaskIds.size;
+  const selectedTaskIdsRef = useRef(selectedTaskIds);
+  selectedTaskIdsRef.current = selectedTaskIds;
+  const pushHistoryRef = useRef<() => void>(() => {});
+  const saveDocRef = useRef<(next: TaskListDocumentContent) => void>(() => {});
 
   // Escape：清除多选（不在输入框/对话框内抢占）
   useEffect(() => {
@@ -774,6 +883,7 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
     },
     [host],
   );
+  saveDocRef.current = saveDoc;
 
   const flushPendingAutoSaveTimer = useCallback(() => {
     if (saveTimerRef.current) {
@@ -841,7 +951,11 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
     return () => window.removeEventListener('keydown', onDocKeyDown);
   }, []);
 
-  // 推入历史
+  // 优先级筛选和搜索的 ref（供 Cmd+A 快捷键闭包使用）
+  const priorityFilterRef = useRef(priorityFilter);
+  priorityFilterRef.current = priorityFilter;
+  const taskSearchRef = useRef(taskSearch);
+  taskSearchRef.current = taskSearch;
   const pushHistory = useCallback(() => {
     setPast((prev) => {
       const next = [...prev, { doc: taskDocRef.current }];
@@ -850,11 +964,14 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
     });
     setFuture([]);
   }, []);
+  pushHistoryRef.current = pushHistory;
 
   const handleSettingsApply = useCallback(
     (settings: TaskListSettings) => {
       pushHistory();
-      saveDoc({ ...taskDocRef.current, settings });
+      const doc = taskDocRef.current;
+      // 立即按新保留天数清理过期已完成任务，而非等到下次加载
+      saveDoc(pruneCompletedTasksByRetention({ ...doc, settings }));
     },
     [pushHistory, saveDoc],
   );
@@ -886,21 +1003,25 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
 
   // 撤销
   const handleUndo = useCallback(() => {
-    if (past.length === 0) return;
-    const prev = past[past.length - 1];
+    const currentPast = pastRef.current;
+    if (currentPast.length === 0) return;
+    const prev = currentPast[currentPast.length - 1];
     setPast((p) => p.slice(0, -1));
     setFuture((f) => [{ doc: taskDocRef.current }, ...f]);
+    setTaskSearch('');
     saveDoc(prev.doc);
-  }, [past, saveDoc]);
+  }, [saveDoc]);
 
   // 重做
   const handleRedo = useCallback(() => {
-    if (future.length === 0) return;
-    const next = future[0];
+    const currentFuture = futureRef.current;
+    if (currentFuture.length === 0) return;
+    const next = currentFuture[0];
     setFuture((f) => f.slice(1));
     setPast((p) => [...p, { doc: taskDocRef.current }]);
+    setTaskSearch('');
     saveDoc(next.doc);
-  }, [future, saveDoc]);
+  }, [saveDoc]);
 
   // 切换列表
   const handleSelectList = useCallback(
@@ -952,6 +1073,9 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
     );
   }, [pushHistory, saveDoc]);
 
+  const handleAddTaskRef = useRef(handleAddTask);
+  handleAddTaskRef.current = handleAddTask;
+
   // 更新任务（withHistory：纳入撤销栈，用于正文/优先级编辑；始终基于 taskDocRef 避免闭包滞后）
   const handleUpdateTask = useCallback(
     (taskId: string, updates: Partial<TaskItem>, withHistory = false) => {
@@ -985,6 +1109,16 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
     },
     [pushHistory, handleUpdateTask],
   );
+
+  // 清空当前列表所有任务
+  const handleClearList = useCallback(() => {
+    const doc = taskDocRef.current;
+    const list = getActiveList(doc);
+    if (!list || list.tasks.length === 0) return;
+    pushHistory();
+    saveDoc(updateList(doc, list.id, { tasks: [] }));
+    setSelectedTaskIds(new Set());
+  }, [pushHistory, saveDoc]);
 
   // 删除任务
   const handleDeleteTask = useCallback(
@@ -1022,6 +1156,49 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
       }
     },
     [host.ui, t],
+  );
+
+  // 复制任务（在原任务后插入副本）
+  const handleDuplicateTask = useCallback(
+    (taskId: string) => {
+      const doc = taskDocRef.current;
+      const list = getActiveList(doc);
+      if (!list) return;
+      const task = list.tasks.find((tk) => tk.id === taskId);
+      if (!task) return;
+      pushHistory();
+      const copySuffix = t('taskList.copySuffix', { defaultValue: '副本' });
+      const dup: TaskItem = {
+        ...task,
+        id: generateTaskId(),
+        content: `${task.content} (${copySuffix})`,
+        status: 'pending',
+        completedAt: undefined,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      const idx = list.tasks.findIndex((tk) => tk.id === taskId);
+      const updatedTasks = [...list.tasks];
+      updatedTasks.splice(idx + 1, 0, dup);
+      saveDoc(updateList(doc, list.id, { tasks: updatedTasks }));
+    },
+    [pushHistory, saveDoc, t],
+  );
+
+  // 在指定任务位置插入新任务（index 处插入，上方 index=原位，下方 index+1）
+  const handleAddTaskAtIndex = useCallback(
+    (taskId: string, offset: number) => {
+      const doc = taskDocRef.current;
+      const list = getActiveList(doc);
+      if (!list) return;
+      pushHistory();
+      const idx = list.tasks.findIndex((tk) => tk.id === taskId);
+      const newTask = createEmptyTask(doc.settings.defaultPriority);
+      const updatedTasks = [...list.tasks];
+      updatedTasks.splice(idx + offset, 0, newTask);
+      saveDoc(updateList(doc, list.id, { tasks: updatedTasks }));
+    },
+    [pushHistory, saveDoc],
   );
 
   // 切换任务选择
@@ -1143,6 +1320,80 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
     [selectedTaskIds, pushHistory, saveDoc],
   );
 
+  const handleSetSelectedPriorityRef = useRef(handleSetSelectedPriority);
+  handleSetSelectedPriorityRef.current = handleSetSelectedPriority;
+
+  // ---- 全局快捷键：Enter 新建任务 / Cmd+A 全选 / Space 切换 / 1/2/3 优先级 ----
+  useEffect(() => {
+    const onWorkspaceKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
+      const el = e.target as HTMLElement | null;
+      if (!el?.closest?.('[data-tasklist-workspace="true"]')) return;
+      const tag = el.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (el.closest?.('[role="dialog"]')) return;
+      if (el.getAttribute('contenteditable') === 'true') return;
+
+      // Enter → 新建任务
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleAddTaskRef.current();
+        return;
+      }
+
+      // Cmd/Ctrl + A → 全选可见任务
+      if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
+        e.preventDefault();
+        const doc = taskDocRef.current;
+        const list = getActiveList(doc);
+        if (!list) return;
+        const pending = list.tasks.filter((tk) => tk.status === 'pending');
+        const completed = list.tasks.filter((tk) => tk.status === 'completed');
+        const pool = [
+          ...filterPendingForDisplay(pending, priorityFilterRef.current, taskSearchRef.current),
+          ...filterCompletedForDisplay(completed, taskSearchRef.current),
+        ];
+        setSelectedTaskIds((prev) => {
+          const ids = pool.map((tk) => tk.id);
+          return prev.size === ids.length && ids.every((id) => prev.has(id)) ? new Set() : new Set(ids);
+        });
+        return;
+      }
+
+      // Space → 切换已选任务完成状态
+      if (e.key === ' ' && selectedCountRef.current > 0) {
+        e.preventDefault();
+        const doc = taskDocRef.current;
+        const list = getActiveList(doc);
+        if (!list) return;
+        pushHistoryRef.current();
+        const now = new Date().toISOString();
+        const ids = selectedTaskIdsRef.current;
+        const updatedTasks = list.tasks.map((tk) => {
+          if (!ids.has(tk.id)) return tk;
+          if (tk.status === 'pending') {
+            return { ...tk, status: 'completed' as const, completedAt: now, updatedAt: now };
+          }
+          return { ...tk, status: 'pending' as const, completedAt: undefined, updatedAt: now };
+        });
+        saveDocRef.current(updateList(doc, list.id, { tasks: updatedTasks }));
+        setSelectedTaskIds(new Set());
+        return;
+      }
+
+      // 1/2/3 → 设置已选任务优先级
+      if ((e.key === '1' || e.key === '2' || e.key === '3') && selectedCountRef.current > 0) {
+        e.preventDefault();
+        const priorityMap: Record<string, TaskPriority> = { '1': 'high', '2': 'medium', '3': 'low' };
+        const priority = priorityMap[e.key];
+        if (priority) handleSetSelectedPriorityRef.current(priority);
+        return;
+      }
+    };
+    window.addEventListener('keydown', onWorkspaceKey);
+    return () => window.removeEventListener('keydown', onWorkspaceKey);
+  }, []);
+
   // 全选/取消全选待办（与当前筛选 + 搜索一致；保留已完成区的已选）
   const handleSelectAll = useCallback(() => {
     const list = getActiveList(taskDocRef.current);
@@ -1222,30 +1473,36 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
   // DnD 处理
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  const handleDragStart = (event: DragStartEvent) => {
+  const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(event.active.id as string);
-  };
+  }, []);
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
 
     if (!over || active.id === over.id) return;
+    // 搜索过滤激活时不执行拖拽排序，避免位置错乱（用户看到的是子集）
+    if (taskSearchRef.current.trim() || priorityFilterRef.current !== 'all') return;
     const doc = taskDocRef.current;
     const list = getActiveList(doc);
     if (!list) return;
-    const oldIndex = list.tasks.findIndex((t) => t.id === active.id);
-    const newIndex = list.tasks.findIndex((t) => t.id === over.id);
+
+    // 仅在 pending 子数组中做拖拽排序（completed 不在 SortableContext 中）
+    const pending = list.tasks.filter((t) => t.status === 'pending');
+    const completed = list.tasks.filter((t) => t.status === 'completed');
+    const oldIndex = pending.findIndex((t) => t.id === active.id);
+    const newIndex = pending.findIndex((t) => t.id === over.id);
 
     if (oldIndex !== -1 && newIndex !== -1) {
-      pushHistory();
-      const newTasks = arrayMove(list.tasks, oldIndex, newIndex).map((t, i) => ({
+      pushHistoryRef.current();
+      const reordered = arrayMove(pending, oldIndex, newIndex).map((t, i) => ({
         ...t,
         sortOrder: i,
       }));
-      saveDoc(updateList(doc, list.id, { tasks: newTasks }));
+      saveDocRef.current(updateList(doc, list.id, { tasks: [...reordered, ...completed] }));
     }
-  };
+  }, []);
 
   // 待办任务
   const pendingTasks = useMemo(
@@ -1253,12 +1510,13 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
     [activeList],
   );
 
-  const displayedPendingTasks = useMemo(
+  /** 待办 + 优先级筛选（不含搜索，用于搜索时显示总数分母） */
+  const pendingFiltered = useMemo(
     () => filterPendingForDisplay(pendingTasks, priorityFilter, ''),
     [pendingTasks, priorityFilter],
   );
 
-  /** 待办 + 搜索（用于展示与拖拽） */
+  /** 待办 + 搜索 + 优先级筛选（用于展示、拖拽与计数分子） */
   const pendingSearchFiltered = useMemo(
     () => filterPendingForDisplay(pendingTasks, priorityFilter, taskSearch),
     [pendingTasks, priorityFilter, taskSearch],
@@ -1335,6 +1593,15 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
             variant="ghost"
             size="sm"
             className={TB_ICON}
+            onClick={() => setImportDialogOpen(true)}
+            title={t('taskList.importTitle', { defaultValue: '导入任务' })}
+          >
+            <Upload className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={TB_ICON}
             onClick={() => setShowExportDialog(true)}
             title={t('taskList.export', { defaultValue: '导出' })}
           >
@@ -1400,12 +1667,21 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
                 {t('taskList.filterAll', { defaultValue: '全部' })}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setPriorityFilterPersist('high')}>
-                {t('taskList.filterHigh', { defaultValue: '仅高优先' })}
+                {t('taskList.filterHigh', { defaultValue: '高优先级' })}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleToggleShowCompletedSetting}>
                 {taskDoc.settings.showCompleted
                   ? t('taskList.hideCompleted', { defaultValue: '隐藏已完成' })
                   : t('taskList.showCompleted', { defaultValue: '显示已完成' })}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={handleClearList}
+                disabled={!activeList || activeList.tasks.length === 0}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                {t('taskList.clearAllTasks', { defaultValue: '清空当前列表' })}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -1511,12 +1787,12 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
                     {t('taskList.pending', { defaultValue: '待办' })} (
                     {(() => {
                       if (taskSearch.trim()) {
-                        return `${pendingSearchFiltered.length}/${displayedPendingTasks.length}`;
+                        return `${pendingSearchFiltered.length}/${pendingFiltered.length}`;
                       }
-                      if (priorityFilter === 'high' && pendingTasks.length !== displayedPendingTasks.length) {
-                        return `${displayedPendingTasks.length}/${pendingTasks.length}`;
+                      if (priorityFilter === 'high' && pendingTasks.length !== pendingFiltered.length) {
+                        return `${pendingFiltered.length}/${pendingTasks.length}`;
                       }
-                      return `${displayedPendingTasks.length}`;
+                      return `${pendingFiltered.length}`;
                     })()}
                     )
                   </span>
@@ -1612,7 +1888,7 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
                   )}
                 </div>
 
-                {displayedPendingTasks.length === 0 ? (
+                {pendingFiltered.length === 0 ? (
                   <div className="py-8 text-center text-muted-foreground text-sm">
                     {t('taskList.noPendingTasks', { defaultValue: '暂无待办任务' })}
                   </div>
@@ -1628,32 +1904,40 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
                         strategy={verticalListSortingStrategy}
                       >
                         {pendingSearchFiltered.map((task) => (
-                          <SortableTaskRow
+                          <TaskRowWithContextMenu
                             key={task.id}
                             task={task}
+                            isCompleted={false}
+                            isSelected={selectedTaskIds.has(task.id)}
                             onToggle={() => handleToggleTask(task.id)}
                             onContentChange={(content) => handleUpdateTask(task.id, { content }, true)}
                             onPriorityChange={(priority) => handleUpdateTask(task.id, { priority }, true)}
                             onDelete={() => handleDeleteTask(task.id)}
                             onCopy={() => void handleCopyTask(task.id)}
-                            isSelected={selectedTaskIds.has(task.id)}
                             onSelect={() => handleToggleSelect(task.id)}
+                            onDuplicate={() => handleDuplicateTask(task.id)}
+                            onAddAbove={() => handleAddTaskAtIndex(task.id, 0)}
+                            onAddBelow={() => handleAddTaskAtIndex(task.id, 1)}
                           />
                         ))}
                       </SortableContext>
                     ) : (
                       <div>
                         {pendingSearchFiltered.map((task) => (
-                          <StaticTaskRow
+                          <TaskRowWithContextMenu
                             key={task.id}
                             task={task}
+                            isCompleted={false}
+                            isSelected={selectedTaskIds.has(task.id)}
                             onToggle={() => handleToggleTask(task.id)}
                             onContentChange={(content) => handleUpdateTask(task.id, { content }, true)}
                             onPriorityChange={(priority) => handleUpdateTask(task.id, { priority }, true)}
                             onDelete={() => handleDeleteTask(task.id)}
                             onCopy={() => void handleCopyTask(task.id)}
-                            isSelected={selectedTaskIds.has(task.id)}
                             onSelect={() => handleToggleSelect(task.id)}
+                            onDuplicate={() => handleDuplicateTask(task.id)}
+                            onAddAbove={() => handleAddTaskAtIndex(task.id, 0)}
+                            onAddBelow={() => handleAddTaskAtIndex(task.id, 1)}
                           />
                         ))}
                       </div>
@@ -1772,17 +2056,20 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
                         </div>
                       ) : (
                         completedSearchFiltered.map((task) => (
-                          <StaticTaskRow
+                          <TaskRowWithContextMenu
                             key={task.id}
                             task={task}
+                            isCompleted
+                            isSelected={selectedTaskIds.has(task.id)}
                             onToggle={() => handleToggleTask(task.id)}
                             onContentChange={(content) => handleUpdateTask(task.id, { content }, true)}
                             onPriorityChange={(priority) => handleUpdateTask(task.id, { priority }, true)}
                             onDelete={() => handleDeleteTask(task.id)}
                             onCopy={() => void handleCopyTask(task.id)}
-                            isCompleted
-                            isSelected={selectedTaskIds.has(task.id)}
                             onSelect={() => handleToggleSelect(task.id)}
+                            onDuplicate={() => handleDuplicateTask(task.id)}
+                            onAddAbove={() => handleAddTaskAtIndex(task.id, 0)}
+                            onAddBelow={() => handleAddTaskAtIndex(task.id, 1)}
                           />
                         ))
                       )}
@@ -1808,6 +2095,16 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
       <div className={STATUS_BAR_CLASS}>
         {stats && (
           <>
+            <div className="flex items-center gap-1.5" title={t('taskList.completionRate', { defaultValue: '完成率' })}>
+              <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-primary transition-all duration-300"
+                  style={{ width: `${Math.round(stats.completionRate * 100)}%` }}
+                />
+              </div>
+              <span className="tabular-nums text-xs">{Math.round(stats.completionRate * 100)}%</span>
+            </div>
+            <span className="text-muted-foreground">|</span>
             <span>
               {t('taskList.pending', { defaultValue: '待办' })}: {stats.pending}
             </span>
@@ -1865,8 +2162,8 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
                   const doc = taskDocRef.current;
                   const list = getActiveList(doc);
                   if (!list) return;
-                  pushHistory();
-                  saveDoc(
+                  pushHistoryRef.current();
+                  saveDocRef.current(
                     updateList(doc, list.id, {
                       tasks: [...list.tasks, ...tasks],
                     }),
@@ -1885,13 +2182,33 @@ function TaskListWorkspaceMain({ document: doc, tabId, host }: DocTypeEditorProp
           open={templateDialogOpen}
           onOpenChange={setTemplateDialogOpen}
           onSelectTemplate={(newList) => {
-            pushHistory();
+            pushHistoryRef.current();
             const updated = addList(taskDocRef.current, newList);
             const withActive = {
               ...updated,
               activeListId: newList.id,
             };
-            saveDoc(withActive);
+            saveDocRef.current(withActive);
+          }}
+        />
+      </Suspense>
+
+      {/* 从文本导入对话框 */}
+      <Suspense fallback={null}>
+        <TaskListImportDialog
+          open={importDialogOpen}
+          onOpenChange={setImportDialogOpen}
+          defaultPriority="medium"
+          onImport={(tasks) => {
+            const d = taskDocRef.current;
+            const list = getActiveList(d);
+            if (!list) return;
+            pushHistoryRef.current();
+            saveDocRef.current(
+              updateList(d, list.id, {
+                tasks: [...list.tasks, ...tasks],
+              }),
+            );
           }}
         />
       </Suspense>

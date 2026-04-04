@@ -4,11 +4,11 @@
  * 第一行：左栏开关、日期导航、新建/关闭/全关、保存/全保、版本/仪表盘/导出/设置
  * 第二行：心情5按钮、天气下拉、标签下拉、模板下拉、收藏、专注、AI开关
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen,
   ChevronLeft, ChevronRight, CalendarDays, FilePlus, X, XCircle,
-  Save, SaveAll, History, BarChart3, FileDown, FileUp, Settings,
+  Save, SaveAll, BarChart3, FileDown, FileUp, Settings,
   Maximize2, Star, StarOff, Cloud, Tag, FileText, BookOpen, Smile,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -45,7 +45,6 @@ interface DiaryToolbarProps {
   onCloseAllTabs: () => void;
   onSave: () => void;
   onSaveAll: () => void;
-  onOpenVersionHistory: () => void;
   onOpenDashboard: () => void;
   onOpenExport: () => void;
   onOpenImport: () => void;
@@ -69,7 +68,7 @@ export default function DiaryToolbar({
   onPrevDay, onNextDay, onToday,
   onNewEntry, onCloseTab, onCloseAllTabs,
   onSave, onSaveAll,
-  onOpenVersionHistory, onOpenDashboard, onOpenExport, onOpenImport, onOpenSettings,
+  onOpenDashboard, onOpenExport, onOpenImport, onOpenSettings,
   onMoodChange, onWeatherChange, onTemperatureChange,
   onTagToggle, onTemplateApply, onToggleStarred,
   onJournalChange, onColorLabelChange,
@@ -79,6 +78,9 @@ export default function DiaryToolbar({
   const { t } = useTranslation();
   const allTags = allTagsProp || [];
   const [tempInput, setTempInput] = useState('');
+
+  // 切换条目时重置温度输入
+  useEffect(() => { setTempInput(''); }, [activeEntry?.id]);
 
   return (
     <div className="flex flex-col border-b flex-shrink-0 bg-card min-w-0">
@@ -92,11 +94,11 @@ export default function DiaryToolbar({
         <Button variant="ghost" size="icon" className="h-5 w-5" onClick={onPrevDay} title={t('diary.prevDay', { defaultValue: '上一天 (⌘[)' })}>
           <ChevronLeft className="h-3.5 w-3.5" />
         </Button>
-        <span className="text-sm font-medium truncate max-w-[180px]">{formatDateDisplay(selectedDate)}</span>
+        <span className="text-sm font-medium truncate max-w-[180px]">{formatDateDisplay(selectedDate, t)}</span>
         <Button variant="ghost" size="icon" className="h-5 w-5" onClick={onNextDay} title={t('diary.nextDay', { defaultValue: '下一天 (⌘])' })}>
           <ChevronRight className="h-3.5 w-3.5" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={onToday} title={t('diary.today', { defaultValue: '今天 (⌘T)' })}>
+        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={onToday} title={t('diary.todayShortcut', { defaultValue: '今天 (⌘T)' })}>
           <CalendarDays className="h-3.5 w-3.5" />
         </Button>
         <div className="w-px h-4 bg-border mx-0.5" />
@@ -117,11 +119,6 @@ export default function DiaryToolbar({
         <Button variant="outline" size="icon" className="h-5 w-5" onClick={onSaveAll} disabled={isSaving}
           title={t('editor.saveAll', { defaultValue: '全部保存 (⌘⇧S)' })}>
           <SaveAll className="h-3.5 w-3.5" />
-        </Button>
-        <div className="w-px h-4 bg-border mx-0.5" />
-        <Button variant="outline" size="icon" className="h-5 w-5" onClick={onOpenVersionHistory}
-          title={t('diary.versionHistory', { defaultValue: '版本历史' })} disabled={!activeEntry}>
-          <History className="h-3.5 w-3.5" />
         </Button>
         <Button variant="outline" size="icon" className="h-5 w-5" onClick={onOpenDashboard}
           title={t('diary.dashboard', { defaultValue: '仪表盘' })}>
@@ -155,7 +152,7 @@ export default function DiaryToolbar({
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="h-5 px-1.5 text-xs gap-0.5">
                 <BookOpen className="h-3 w-3" />
-                <span>{diary.journals.find(j => j.id === activeEntry.journalId)?.icon} {diary.journals.find(j => j.id === activeEntry.journalId)?.name || t('diary.unknownJournal', { defaultValue: '未知' })}</span>
+                <span>{(() => { const j = diary.journals.find(j => j.id === activeEntry.journalId); return j ? `${j.icon} ${j.name}` : t('diary.unknownJournal', { defaultValue: '未知' }); })()}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="bg-card">
@@ -170,6 +167,7 @@ export default function DiaryToolbar({
           </DropdownMenu>
           <div className="w-px h-4 bg-border mx-0.5" />
           {/* 心情下拉 */}
+          {diary.settings.showMood !== false && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="h-5 px-1.5 text-xs gap-0.5">
@@ -189,6 +187,9 @@ export default function DiaryToolbar({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          )}
+          {diary.settings.showWeather !== false && (
+          <>
           <div className="w-px h-4 bg-border mx-0.5" />
           {/* 天气下拉 */}
           <DropdownMenu>
@@ -213,15 +214,18 @@ export default function DiaryToolbar({
                 <>
                   <div className="px-2 py-1 border-t">
                     <div className="flex items-center gap-1 text-xs">
-                      <span className="text-muted-foreground">温度:</span>
+                      <span className="text-muted-foreground">{t('diary.temperature', { defaultValue: '温度:' })}</span>
                       <input
                         type="number"
                         className="w-12 px-1 py-0.5 text-xs border rounded bg-background"
                         value={tempInput || (activeEntry.weather.temperature ?? '')}
                         onChange={e => {
                           setTempInput(e.target.value);
+                        }}
+                        onBlur={e => {
                           const val = e.target.value === '' ? undefined : parseInt(e.target.value, 10);
-                          onTemperatureChange(val);
+                          const numVal = isNaN(val) ? undefined : val;
+                          onTemperatureChange(numVal);
                         }}
                         placeholder="°C"
                       />
@@ -232,6 +236,8 @@ export default function DiaryToolbar({
               )}
             </DropdownMenuContent>
           </DropdownMenu>
+          </>
+          )}
           <div className="w-px h-4 bg-border mx-0.5" />
           {/* 标签下拉 */}
           <DropdownMenu>

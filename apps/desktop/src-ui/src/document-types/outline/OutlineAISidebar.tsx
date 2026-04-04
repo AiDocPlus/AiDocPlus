@@ -38,13 +38,13 @@ import { useTranslation } from '@/i18n';
 import { useSettingsStore, getAIInvokeParamsForService } from '@/stores/useSettingsStore';
 import { getProviderConfig, type AIProvider } from '@aidocplus/shared-types';
 import { useShallow } from 'zustand/react/shallow';
-import * as LucideIcons from 'lucide-react';
 import { parseThinkTags } from '@/utils/thinkTagParser';
 import { formatBackendError } from '@/lib/backendError';
 import type { DocTypeHostAPI } from '@/doctype-sdk/types';
 import { resolveTheme } from '@/components/chat/ChatMessage';
 import { CollapsibleThinkingBlock } from '@/document-types/_shared/CollapsibleThinkingBlock';
 import { DocTypeAIServiceMenu } from '@/document-types/_shared/DocTypeAIServiceMenu';
+import { DynamicIcon } from '@/document-types/_shared/DynamicIcon';
 import { cn } from '@/lib/utils';
 import {
   AI_OPTION_BTN_BASE, AI_OPTION_ACTIVE, AI_OPTION_THINKING_ACTIVE, AI_OPTION_INACTIVE,
@@ -130,16 +130,6 @@ function getOrCreateActiveSession(storage: StorageLike): OutlineAISession {
   saveSessions(storage, [...sessions, newSess]);
   storage.set(ACTIVE_SESSION_KEY, newSess.id);
   return newSess;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 动态图标
-// ═══════════════════════════════════════════════════════════════════════════
-
-function DynamicIcon({ name, className }: { name: string; className?: string }) {
-  const IconComponent = (LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string; iconNode?: any }>>)[name];
-  if (!IconComponent) return <Sparkles className={className} />;
-  return <IconComponent className={className} />;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -665,13 +655,13 @@ export default function OutlineAISidebar({
               {categorizedActions.map(cat => (
                 <DropdownMenuSub key={cat.id}>
                   <DropdownMenuSubTrigger className="gap-2">
-                    <DynamicIcon name={cat.icon} className="h-4 w-4" />
+                    <DynamicIcon name={cat.icon} className="h-4 w-4" fallback={Sparkles} />
                     {isEn ? cat.labelEn : cat.label}
                   </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent className="w-48">
                     {cat.items.slice(0, 8).map(item => (
                       <DropdownMenuItem key={item.id} onClick={() => handleExecuteAction(item)} className="gap-2">
-                        <DynamicIcon name={item.icon} className="h-4 w-4" />
+                        <DynamicIcon name={item.icon} className="h-4 w-4" fallback={Sparkles} />
                         {isEn ? item.labelEn : item.label}
                       </DropdownMenuItem>
                     ))}
@@ -718,7 +708,7 @@ export default function OutlineAISidebar({
                   {recommendedActions.map(action => (
                     <Button key={action.id} variant="outline" size="sm" className="h-7 text-xs justify-start"
                       onClick={() => handleExecuteAction(action)} disabled={streaming || !aiAvailable}>
-                      <DynamicIcon name={action.icon} className="h-3.5 w-3.5 mr-1" />
+                      <DynamicIcon name={action.icon} className="h-3.5 w-3.5 mr-1" fallback={Sparkles} />
                       <span className="truncate">{isEn ? action.labelEn : action.label}</span>
                     </Button>
                   ))}

@@ -781,7 +781,7 @@ export function EmailAssistantPanel({
           </Popover>
 
           {/* AI 服务选择器 */}
-          {enabledServices.length >= 2 && (
+          {enabledServices.length >= 1 && (
             <Popover>
               <PopoverTrigger asChild>
                 <button type="button"

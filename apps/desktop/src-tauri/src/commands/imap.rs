@@ -70,6 +70,7 @@ pub struct ImapParams {
     pub email: String,
     pub password: Option<String>,
     pub accountId: Option<String>,
+    #[allow(dead_code)]
     pub encryption: Option<String>,
 }
 
@@ -440,7 +441,6 @@ pub async fn imap_get_status(
     params: ImapParams,
     mailboxes: Vec<String>,
 ) -> crate::error::Result<HashMap<String, u32>> {
-    use crate::error::AppError;
     let pwd = get_imap_password(&params)?;
     let mut session = connect_imap_tls(&params.host, params.port, &params.email, &pwd).await?;
 

@@ -4,6 +4,7 @@
  * 4种格式：自身JSON / Day One JSON / Markdown / 纯文本
  */
 import type { DiaryDocumentContent, DiaryEntry } from './types';
+import { genId, toLocalDateStr } from './types';
 
 // ═══════════════════════════════════════════════════════
 // 导入结果
@@ -26,10 +27,6 @@ export interface ImportResult {
   entries: ImportedEntry[];
   errors: string[];
   dateRange: { from: string; to: string } | null;
-}
-
-function genId(prefix: string): string {
-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -69,7 +66,7 @@ export function parseAidocplusJson(content: string): ImportResult {
     const entries: ImportedEntry[] = [];
     const rawEntries = json.entries || [];
     for (const e of rawEntries) {
-      if (!e.date) { errors.push(`跳过缺少日期的条目`); continue; }
+      if (!e.date || !/^\d{4}-\d{2}-\d{2}$/.test(e.date)) { errors.push(`跳过日期格式无效的条目: ${e.date || '(空)'}`); continue; }
       entries.push({
         date: e.date,
         time: e.time || '00:00',
@@ -108,7 +105,7 @@ export function parseDayOneJson(content: string): ImportResult {
       const creationDate = e.creationDate || e.creation_date;
       if (!creationDate) { errors.push(`跳过缺少 creationDate 的条目`); continue; }
       const d = new Date(creationDate);
-      const date = d.toISOString().slice(0, 10);
+      const date = toLocalDateStr(d);
       const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
       const text = e.text || e.richText || '';
       const tags = Array.isArray(e.tags) ? e.tags : [];
@@ -183,7 +180,7 @@ export function parseMarkdown(content: string): ImportResult {
 
   if (entries.length === 0 && content.trim()) {
     // 无法按日期分割，整体作为一条
-    const today = new Date().toISOString().slice(0, 10);
+    const today = toLocalDateStr(new Date());
     entries.push({
       date: today, time: '00:00', title: '导入的日记',
       content: content.trim(), tags: ['导入'], starred: false,
@@ -222,7 +219,7 @@ export function parsePlainText(content: string): ImportResult {
       });
     } else {
       // 无日期，用今天
-      const today = new Date().toISOString().slice(0, 10);
+      const today = toLocalDateStr(new Date());
       entries.push({
         date: today, time: '00:00', title: '',
         content: trimmed, tags: ['导入'], starred: false,
@@ -349,7 +346,7 @@ export function mergeImportedEntries(
         case 'overwrite':
           updated.entries = updated.entries.map(e =>
             e.id === existing.id
-              ? { ...e, content: imp.content, title: imp.title, updatedAt: now }
+              ? { ...e, content: imp.content, title: imp.title, mood: imp.mood, weather: imp.weather, tags: imp.tags, location: imp.location, time: imp.time, updatedAt: now }
               : e
           );
           overwritten++;
@@ -368,6 +365,8 @@ export function mergeImportedEntries(
       title: imp.title,
       content: imp.content,
       tags: imp.tags,
+      mood: imp.mood,
+      weather: imp.weather ? { type: imp.weather } : undefined,
       wordCount: imp.content.replace(/\s/g, '').length,
       createdAt: now,
       updatedAt: now,

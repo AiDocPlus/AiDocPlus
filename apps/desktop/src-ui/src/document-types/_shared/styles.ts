@@ -47,3 +47,7 @@ export const AI_OPTION_INACTIVE = 'text-muted-foreground';
 // ═══ 消息操作 ═══
 export const MSG_ACTION_BTN = 'text-[11px] text-primary hover:underline flex items-center gap-0.5';
 export const MSG_ACTION_AREA = 'flex gap-2 mt-2 pt-1.5 border-t border-border/50';
+
+// ═══ 弹窗字体 ═══
+/** 所有文档类型弹窗统一字体（宋体 16px） */
+export const DIALOG_STYLE = { fontFamily: "'宋体', 'SimSun', serif", fontSize: '16px' };

@@ -733,6 +733,7 @@ export const CALCULATOR_FUNCTION_CATEGORIES: CalculatorFunctionCategory[] = [
       { id: 'list_range', nameEn: 'listRange', nameZh: '整数范围', syntax: 'listRange(start, end, step?)', descriptionZh: '含端点步进序列；step 可负。', descriptionEn: 'Inclusive stepped range; step may be negative.', insertTemplate: 'listRange(1, 10)', caretHint: 'firstParenInside', tags: ['list', 'range'] },
       { id: 'list_quantile', nameEn: 'listQuantile', nameZh: '分位数', syntax: 'listQuantile(data, p)', descriptionZh: 'p∈[0,1]；基于 quantileSeq。', descriptionEn: 'Quantile; uses quantileSeq.', insertTemplate: 'listQuantile([], 0.5)', caretHint: 'firstParenInside', tags: ['list', 'quantile'] },
       { id: 'list_argsort', nameEn: 'listArgSort', nameZh: '排序索引', syntax: 'listArgSort(data)', descriptionZh: '升序排列对应的原始位置（1-based）。', descriptionEn: '1-based indices sorting order.', insertTemplate: 'listArgSort([])', caretHint: 'firstParenInside', tags: ['list', 'argsort', 'order'] },
+      { id: 'list_mean', nameEn: 'listMean', nameZh: '列表均值', syntax: 'listMean(data)', descriptionZh: '计算列表中所有元素的算术平均值。', descriptionEn: 'Arithmetic mean of all elements.', insertTemplate: 'listMean([])', caretHint: 'firstParenInside', tags: ['list', 'mean', 'average'] },
     ],
   },
 

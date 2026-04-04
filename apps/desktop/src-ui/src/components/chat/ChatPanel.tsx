@@ -650,8 +650,8 @@ export function ChatPanel({ tabId, onClose, simpleMode }: ChatPanelProps) {
       <div className="flex items-center justify-between px-4 py-2 border-b bg-background flex-shrink-0">
         <div className="flex items-center gap-2">
           <h2 className="font-semibold">{simpleMode ? t('chat.chatTitleShort', { defaultValue: '聊聊' }) : t('chat.aiAssistant', { defaultValue: 'AI' })}</h2>
-          {/* 文档级 AI 服务选择器（≥2 个已启用服务时显示） */}
-          {!simpleMode && currentDocument && enabledServices.length >= 2 && (
+          {/* 文档级 AI 服务选择器（≥1 个已启用服务时显示） */}
+          {!simpleMode && currentDocument && enabledServices.length >= 1 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
