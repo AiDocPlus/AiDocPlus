@@ -98,7 +98,7 @@ function mindMapDataToOutlineNode(
     : {
         id:
           (smNode.data?.id as string) ||
-          `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          crypto.randomUUID(),
         content: {
           type: 'doc',
           content: smNode.data?.text
@@ -123,7 +123,7 @@ function mindMapDataToOutlineNode(
 
   // 递归处理子节点
   if (smNode.children && smNode.children.length > 0) {
-    node.children = smNode.children.map((child: any) =>
+    node.children = smNode.children.map((child: SMNode) =>
       mindMapDataToOutlineNode(child, originalNodes)
     );
   }
@@ -177,7 +177,7 @@ export const MindMapView = forwardRef(function MindMapView(
 
         // 转换回大纲结构
         const newNodes =
-          newData.children?.map((child: any) =>
+          newData.children?.map((child: SMNode) =>
             mindMapDataToOutlineNode(child, allOriginalNodes)
           ) || [];
 

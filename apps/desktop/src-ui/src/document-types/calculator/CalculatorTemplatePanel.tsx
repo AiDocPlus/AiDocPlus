@@ -1362,7 +1362,8 @@ function TemplateEditDialog({ open, onOpenChange, template, onSave }: TemplateEd
 
   const handleSave = () => {
     const newTemplate: CalculatorTemplate = {
-      id: template?.id || `tmpl_custom_${Date.now()}`,
+      id: template?.id || `tmpl_custom_${crypto.randomUUID()}`,
+
       categoryId,
       name: name || t('calculator.newTemplateName', { defaultValue: '新模板' }),
       nameEn: nameEn || t('calculator.newTemplateNameEn', { defaultValue: 'New Template' }),
@@ -1595,7 +1596,7 @@ export function CalculatorTemplatePanel({
     const suffix = isEn ? ' (copy)' : ' (副本)';
     const newTemplate: CalculatorTemplate = {
       ...template,
-      id: `tmpl_custom_${Date.now()}`,
+      id: `tmpl_custom_${crypto.randomUUID()}`,
       name: `${template.name}${suffix}`,
       nameEn: `${template.nameEn}${suffix}`,
       isCustom: true,
@@ -1641,9 +1642,9 @@ export function CalculatorTemplatePanel({
 
         if (data.templates && Array.isArray(data.templates)) {
           setCustomTemplates(prev => {
-            const newTemplates = [...prev, ...data.templates.map((t: CalculatorTemplate, i: number) => ({
+            const newTemplates = [...prev, ...data.templates.map((t: CalculatorTemplate) => ({
               ...t,
-              id: `tmpl_imported_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}`,
+              id: `tmpl_imported_${crypto.randomUUID()}`,
               isCustom: true,
             }))];
             saveCustomTemplates(newTemplates);

@@ -22,6 +22,9 @@ import {
   Square,
   ScrollText,
   RotateCcw,
+  Copy,
+  RefreshCw,
+  Pencil,
 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { Button } from '@/components/ui/button';
@@ -179,6 +182,7 @@ export function CalculatorAISidebar({
   document: doc,
   host,
   activeSheet,
+  calcDoc,
   onClose,
   onInsertFormula,
 }: CalculatorAISidebarProps) {
@@ -219,6 +223,10 @@ export function CalculatorAISidebar({
 
   const [actionStore, setActionStore] = useState<CalculatorQuickActionStore>(() => loadQuickActions(host.storage));
   const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
+  const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const [contextScope, setContextScope] = useState<'segment' | 'sheet' | 'all'>('sheet');
   const [qaPaletteOpen, setQaPaletteOpen] = useState(false);
 
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
@@ -269,8 +277,24 @@ export function CalculatorAISidebar({
 
   // 使用分层上下文引擎构建智能上下文
   const buildContext = useCallback(() => {
-    return buildSmartContext(activeSheet, { isEn: i18n.language.startsWith('en') });
-  }, [activeSheet, i18n.language]);
+    let sheet = activeSheet;
+    if (contextScope === 'segment') {
+      // 仅当前段（从最近的 heading/subtotal 向上到上一个 heading）
+      const lines = activeSheet.lines;
+      let segStart = lines.length;
+      for (let i = lines.length - 1; i >= 0; i--) {
+        if (lines[i].lineRole === 'heading' || lines[i].lineRole === 'subtotal') {
+          if (i < lines.length - 1) { segStart = i + 1; break; }
+        }
+      }
+      sheet = { ...activeSheet, lines: lines.slice(segStart) };
+    } else if (contextScope === 'all') {
+      // 所有 Sheet（合并前 100 行）
+      const allLines = calcDoc.sheets.flatMap(s => s.lines).slice(0, 100);
+      sheet = { ...activeSheet, lines: allLines };
+    }
+    return buildSmartContext(sheet, { isEn: i18n.language.startsWith('en') });
+  }, [activeSheet, contextScope, calcDoc.sheets, i18n.language]);
 
   const extractAndInsertFormula = useCallback(
     (content: string) => {
@@ -497,6 +521,25 @@ ${extraRules}
     [activeSessionId],
   );
 
+  const handleRenameSession = useCallback((id: string) => {
+    const sess = sessions.find(s => s.id === id);
+    if (!sess) return;
+    setRenamingSessionId(id);
+    setRenameValue(sess.title);
+    setTimeout(() => renameInputRef.current?.select(), 50);
+  }, [sessions]);
+
+  const handleRenameSubmit = useCallback(() => {
+    if (!renamingSessionId || !renameValue.trim()) {
+      setRenamingSessionId(null);
+      return;
+    }
+    setSessions(prev => prev.map(s =>
+      s.id === renamingSessionId ? { ...s, title: renameValue.trim() } : s,
+    ));
+    setRenamingSessionId(null);
+  }, [renamingSessionId, renameValue]);
+
   const handleClear = useCallback(() => {
     const messages = sessions.find(s => s.id === activeSessionId)?.messages;
     if (messages && messages.length > 0) {
@@ -507,6 +550,33 @@ ${extraRules}
     }
     updateActiveSession((s) => ({ ...s, messages: [], updatedAt: Date.now() }));
   }, [updateActiveSession, sessions, activeSessionId, isEn]);
+
+  const handleDeleteMessage = useCallback((msgId: string) => {
+    updateActiveSession((s) => ({
+      ...s,
+      messages: s.messages.filter((m) => m.id !== msgId),
+      updatedAt: Date.now(),
+    }));
+  }, [updateActiveSession]);
+
+  const handleRegenerateMessage = useCallback((msgId: string) => {
+    const session = sessions.find(s => s.id === activeSessionId);
+    if (!session) return;
+    const msgIndex = session.messages.findIndex(m => m.id === msgId);
+    if (msgIndex < 0) return;
+    // 删除该消息及之后的所有消息，重新发送
+    const trimmedMessages = session.messages.slice(0, msgIndex);
+    updateActiveSession((s) => ({
+      ...s,
+      messages: trimmedMessages,
+      updatedAt: Date.now(),
+    }));
+    // 获取被删除消息之前的最后一条用户消息
+    const lastUserMsg = [...trimmedMessages].reverse().find(m => m.role === 'user');
+    if (lastUserMsg) {
+      setTimeout(() => sendMessageRef.current(lastUserMsg.content), 100);
+    }
+  }, [sessions, activeSessionId, updateActiveSession]);
 
   const contextHint = useMemo(() => {
     const err = activeSheet.lines.filter((l) => l.result.type === 'error').length;
@@ -575,13 +645,35 @@ ${extraRules}
                       sess.id === activeSessionId && 'bg-accent font-medium',
                     )}
                   >
-                    <button
-                      type="button"
-                      className="flex-1 text-left truncate"
-                      onClick={() => handleSwitchSession(sess.id)}
-                    >
-                      {sess.title} ({sess.messages.length})
-                    </button>
+                    {renamingSessionId === sess.id ? (
+                      <input
+                        ref={renameInputRef}
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onBlur={handleRenameSubmit}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleRenameSubmit(); if (e.key === 'Escape') setRenamingSessionId(null); }}
+                        className="flex-1 text-sm bg-transparent border-b border-primary outline-none min-w-0 px-0"
+                        autoFocus
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        className="flex-1 text-left truncate"
+                        onClick={() => handleSwitchSession(sess.id)}
+                      >
+                        {sess.title} ({sess.messages.length})
+                      </button>
+                    )}
+                    {renamingSessionId !== sess.id && (
+                      <button
+                        type="button"
+                        className="opacity-50 hover:opacity-100 p-0.5"
+                        title={t('calculator.renameSession', { defaultValue: '重命名' })}
+                        onClick={(e) => { e.stopPropagation(); handleRenameSession(sess.id); }}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                    )}
                     {sessions.length > 1 && (
                       <button
                         type="button"
@@ -610,6 +702,32 @@ ${extraRules}
           <span className="text-[10px] text-muted-foreground tabular-nums truncate max-w-[88px]" title={contextHint}>
             {contextHint}
           </span>
+          <div className="flex items-center gap-0.5 ml-1">
+            <button
+              type="button"
+              className={cn('text-[10px] px-1 py-0.5 rounded', contextScope === 'segment' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground')}
+              onClick={() => setContextScope('segment')}
+              title={t('calculator.contextSegment', { defaultValue: '当前段' })}
+            >
+              {t('calculator.contextSegmentShort', { defaultValue: '段' })}
+            </button>
+            <button
+              type="button"
+              className={cn('text-[10px] px-1 py-0.5 rounded', contextScope === 'sheet' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground')}
+              onClick={() => setContextScope('sheet')}
+              title={t('calculator.contextSheet', { defaultValue: '当前 Sheet' })}
+            >
+              {t('calculator.contextSheetShort', { defaultValue: 'Sheet' })}
+            </button>
+            <button
+              type="button"
+              className={cn('text-[10px] px-1 py-0.5 rounded', contextScope === 'all' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground')}
+              onClick={() => setContextScope('all')}
+              title={t('calculator.contextAll', { defaultValue: '全文档' })}
+            >
+              {t('calculator.contextAllShort', { defaultValue: '全部' })}
+            </button>
+          </div>
           <Popover
             open={promptOpen}
             onOpenChange={(open) => {
@@ -741,21 +859,49 @@ ${extraRules}
         )}
 
         {messages.map((msg) => (
-          <div key={msg.id} className={msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
+          <div key={msg.id} className={msg.role === 'user' ? 'flex justify-end' : 'flex justify-start group/msg'}>
             <div className={msg.role === 'user' ? 'max-w-[85%]' : 'max-w-[85%] w-full min-w-0'}>
               <DocTypeChatMessage
                 message={{ role: msg.role, content: msg.content }}
                 actions={
-                  msg.role === 'assistant' && onInsertFormula && msg.content.includes('```formula') ? (
+                  <div className="flex items-center gap-0.5 opacity-0 group-hover/msg:opacity-100 transition-opacity">
                     <button
                       type="button"
                       className={MSG_ACTION_BTN}
-                      onClick={() => extractAndInsertFormula(msg.content)}
+                      onClick={() => { navigator.clipboard.writeText(msg.content).catch(() => {}); }}
+                      title={t('calculator.copyMessage', { defaultValue: '复制' })}
                     >
-                      <Zap className="h-3 w-3" />
-                      {t('calculator.insertFormula', { defaultValue: '插入公式' })}
+                      <Copy className="h-3 w-3" />
                     </button>
-                  ) : undefined
+                    {msg.role === 'assistant' && onInsertFormula && msg.content.includes('```formula') && (
+                      <button
+                        type="button"
+                        className={MSG_ACTION_BTN}
+                        onClick={() => extractAndInsertFormula(msg.content)}
+                      >
+                        <Zap className="h-3 w-3" />
+                        {t('calculator.insertFormula', { defaultValue: '插入公式' })}
+                      </button>
+                    )}
+                    {msg.role === 'assistant' && !streaming && (
+                      <button
+                        type="button"
+                        className={MSG_ACTION_BTN}
+                        onClick={() => handleRegenerateMessage(msg.id)}
+                        title={t('calculator.regenerate', { defaultValue: '重新生成' })}
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className={MSG_ACTION_BTN}
+                      onClick={() => handleDeleteMessage(msg.id)}
+                      title={t('calculator.deleteMessage', { defaultValue: '删除' })}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
                 }
               />
             </div>

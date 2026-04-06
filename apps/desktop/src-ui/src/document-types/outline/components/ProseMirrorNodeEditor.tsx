@@ -13,224 +13,52 @@ import {
   type ForwardedRef,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useEditor, EditorContent, Extension } from '@tiptap/react';
+import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
-
 import Placeholder from '@tiptap/extension-placeholder';
-import { Mark, mergeAttributes, InputRule } from '@tiptap/core';
-import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { cn } from '@/lib/utils';
 
 import type { RichTextContent } from '../types';
+import { extractTagsFromContent } from '../types';
+
 import {
-  extractTagsFromContent,
-} from '../types';
+  TagMark,
+  MentionMark,
+  ColorHighlightMark,
+  PreventEnter,
+} from './ProseMirrorExtensions';
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// 自定义扩展：标签（#标签）
-// ═══════════════════════════════════════════════════════════════════════════════
-
-export const TagMark = Mark.create({
-  name: 'tag',
-
-  addAttributes() {
-    return {
-      name: {
-        default: null,
-        parseHTML: (element) => element.getAttribute('data-tag-name'),
-        renderHTML: (attributes) => {
-          if (!attributes.name) return {};
-          return {
-            'data-tag-name': attributes.name,
-            class: 'outline-tag hash',
-          };
-        },
-      },
-    };
-  },
-
-  parseHTML() {
-    return [
-      {
-        tag: 'span[data-tag-name]',
-      },
-    ];
-  },
-
-  renderHTML({ HTMLAttributes }) {
-    return [
-      'span',
-      mergeAttributes(HTMLAttributes),
-      0,
-    ];
-  },
-
-  addInputRules() {
-    return [
-      new InputRule({
-        find: /#([^\s#@$%^&*(){}[\]\\;:'",.<>/?!`~|+=]+)$/,
-        handler: ({ range, match, chain }) => {
-          const tagName = match[1];
-          if (tagName.length > 0) {
-            chain()
-              .focus()
-              .deleteRange(range)
-              .insertContent({
-                type: 'text',
-                text: `#${tagName}`,
-                marks: [{ type: 'tag', attrs: { name: tagName } }],
-              })
-              .run();
-          }
-        },
-      }),
-    ];
-  },
-});
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 自定义扩展：提及（@提及）
-// ═══════════════════════════════════════════════════════════════════════════════
-
-export const MentionMark = Mark.create({
-  name: 'mention',
-
-  addAttributes() {
-    return {
-      name: {
-        default: null,
-        parseHTML: (element) => element.getAttribute('data-mention-name'),
-        renderHTML: (attributes) => {
-          if (!attributes.name) return {};
-          return {
-            'data-mention-name': attributes.name,
-            class: 'outline-tag mention',
-          };
-        },
-      },
-    };
-  },
-
-  parseHTML() {
-    return [
-      {
-        tag: 'span[data-mention-name]',
-      },
-    ];
-  },
-
-  renderHTML({ HTMLAttributes }) {
-    return [
-      'span',
-      mergeAttributes(HTMLAttributes),
-      0,
-    ];
-  },
-
-  addInputRules() {
-    return [
-      new InputRule({
-        find: /@([^\s#@$%^&*(){}[\]\\;:'",.<>/?!`~|+=]+)$/,
-        handler: ({ range, match, chain }) => {
-          const mentionName = match[1];
-          if (mentionName.length > 0) {
-            chain()
-              .focus()
-              .deleteRange(range)
-              .insertContent({
-                type: 'text',
-                text: `@${mentionName}`,
-                marks: [{ type: 'mention', attrs: { name: mentionName } }],
-              })
-              .run();
-          }
-        },
-      }),
-    ];
-  },
-});
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 自定义扩展：颜色高亮（支持多种颜色）
-// ═══════════════════════════════════════════════════════════════════════════════
-
-export const ColorHighlightMark = Mark.create({
-  name: 'colorHighlight',
-
-  addAttributes() {
-    return {
-      color: {
-        default: '#fef3c7',
-        parseHTML: (element) => element.getAttribute('data-highlight-color'),
-        renderHTML: (attributes) => {
-          return {
-            'data-highlight-color': attributes.color,
-            style: `background-color: ${attributes.color}`,
-            class: 'outline-highlight',
-          };
-        },
-      },
-    };
-  },
-
-  parseHTML() {
-    return [
-      {
-        tag: 'span[data-highlight-color]',
-      },
-    ];
-  },
-
-  renderHTML({ HTMLAttributes }) {
-    return [
-      'span',
-      mergeAttributes(HTMLAttributes),
-      0,
-    ];
-  },
-});
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 阻止换行的扩展（Enter 键由父组件处理）
-// ═══════════════════════════════════════════════════════════════════════════════
-
-const PreventEnter = Extension.create({
-  name: 'preventEnter',
-
-  addProseMirrorPlugins() {
-    return [
-      new Plugin({
-        key: new PluginKey('preventEnter'),
-        handleKeyDown: (view: any, event: KeyboardEvent) => {
-          // 中文等 IME 组字/选词期间勿拦截 Enter、Tab，否则选词确认失败并出现 yyo… 类乱码
-          if (view.composing) return false;
-          if (event.isComposing || event.keyCode === 229) return false;
-          if (event.key === 'Enter') {
-            // 阻止默认换行，交给父组件处理
-            return true;
-          }
-          if (event.key === 'Tab') {
-            // 阻止默认 Tab，交给父组件处理
-            return true;
-          }
-          return false;
-        },
-      }),
-    ];
-  },
-});
+// 重新导出扩展，供外部直接从本文件引用（向后兼容）
+export type { TagMark as TagMarkType } from './ProseMirrorExtensions';
+export { TagMark, MentionMark, ColorHighlightMark } from './ProseMirrorExtensions';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 工具函数：TipTap JSON <-> RichTextContent 转换
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function tipTapToRichTextContent(doc: any): RichTextContent {
+interface TipTapDoc {
+  content?: TipTapNode[];
+}
+
+interface TipTapMark {
+  type: string;
+  attrs?: Record<string, unknown>;
+}
+
+interface TipTapNode {
+  type: string;
+  text?: string;
+  content?: TipTapNode[];
+  marks?: TipTapMark[];
+}
+
+function tipTapToRichTextContent(doc: TipTapDoc): RichTextContent {
   if (!doc || !doc.content) {
     return { type: 'doc', content: [] };
   }
 
-  const paragraphs = doc.content.map((node: any) => {
+  const paragraphs = doc.content.map((node) => {
     if (node.type !== 'paragraph') {
       return { type: 'paragraph' as const, content: [] };
     }
@@ -239,35 +67,37 @@ function tipTapToRichTextContent(doc: any): RichTextContent {
       return { type: 'paragraph' as const, content: [] };
     }
 
-    const content = node.content.map((child: any) => {
+    const content = node.content.map((child) => {
       if (child.type === 'text') {
-        const marks = child.marks?.map((mark: any) => {
+        const marks = child.marks?.map((mark) => {
           if (mark.type === 'tag') {
             return {
               type: 'tag' as const,
-              attrs: { name: mark.attrs?.name || '', type: 'hash' as const },
+              attrs: { name: (mark.attrs?.name as string) || '', type: 'hash' as const },
             };
           }
           if (mark.type === 'mention') {
             return {
               type: 'tag' as const,
-              attrs: { name: mark.attrs?.name || '', type: 'mention' as const },
+              attrs: { name: (mark.attrs?.name as string) || '', type: 'mention' as const },
             };
           }
           return {
             type: mark.type as 'bold' | 'italic' | 'underline' | 'strike' | 'highlight',
-            attrs: mark.attrs?.color ? { color: mark.attrs.color } : undefined,
+            attrs: mark.attrs?.color ? { color: mark.attrs.color as string } : undefined,
           };
         });
 
-        // 如果有 tag 类型的 mark，需要特殊处理
-        const textNode: any = {
+        const textNode: {
+          type: 'text';
+          text: string;
+          marks?: Array<{ type: string; attrs?: Record<string, unknown> }>;
+        } = {
           type: 'text' as const,
           text: child.text || '',
         };
         if (marks && marks.length > 0) {
-          // 过滤掉 tag 类型的 marks（在 RichTextContent 中 tags 是单独的字段）
-          const nonTagMarks = marks.filter((m: any) => m.type !== 'tag');
+          const nonTagMarks = marks.filter((m) => m.type !== 'tag');
           if (nonTagMarks.length > 0) {
             textNode.marks = nonTagMarks;
           }
@@ -277,7 +107,7 @@ function tipTapToRichTextContent(doc: any): RichTextContent {
       }
 
       return null;
-    }).filter(Boolean);
+    }).filter((x): x is NonNullable<typeof x> => x !== null);
 
     return { type: 'paragraph' as const, content };
   });
@@ -285,7 +115,7 @@ function tipTapToRichTextContent(doc: any): RichTextContent {
   return { type: 'doc', content: paragraphs };
 }
 
-function richTextContentToTipTap(content: RichTextContent): any {
+function richTextContentToTipTap(content: RichTextContent): TipTapDoc {
   if (!content.content || content.content.length === 0) {
     return {
       type: 'doc',
@@ -320,7 +150,7 @@ function richTextContentToTipTap(content: RichTextContent): any {
         };
       }
       return null;
-    }).filter(Boolean);
+    }).filter((x): x is NonNullable<typeof x> => x !== null);
 
     return { type: 'paragraph', content: contentNodes };
   });
@@ -328,14 +158,14 @@ function richTextContentToTipTap(content: RichTextContent): any {
   return { type: 'doc', content: paragraphs };
 }
 
-function extractPlainTextFromTipTap(doc: any): string {
+function extractPlainTextFromTipTap(doc: TipTapDoc): string {
   if (!doc || !doc.content) return '';
 
   return doc.content
-    .map((node: any) => {
+    .map((node) => {
       if (node.type !== 'paragraph' || !node.content) return '';
       return node.content
-        .map((child: any) => {
+        .map((child) => {
           if (child.type === 'text') return child.text || '';
           return '';
         })
@@ -456,11 +286,11 @@ export const ProseMirrorNodeEditor = forwardRef(function ProseMirrorNodeEditor(
           return false;
         },
       },
-      onUpdate: ({ editor }) => {
+      onUpdate: ({ editor: ed }) => {
         if (isInternalChange.current) return;
-        if (editor.view.composing || composingRef.current) return;
+        if (ed.view.composing || composingRef.current) return;
 
-        const doc = editor.getJSON();
+        const doc = ed.getJSON() as TipTapDoc;
         const newContent = tipTapToRichTextContent(doc);
         const plainText = extractPlainTextFromTipTap(doc);
         const { tags, mentions } = extractTagsFromContent(newContent);
@@ -486,7 +316,7 @@ export const ProseMirrorNodeEditor = forwardRef(function ProseMirrorNodeEditor(
         lastAppliedContentJsonRef.current = nextJson;
 
         isInternalChange.current = true;
-        editor.commands.setContent(JSON.parse(nextJson));
+        editor.commands.setContent(JSON.parse(nextJson) as TipTapDoc);
         isInternalChange.current = false;
       }
     }, [content, isActive, editor]);

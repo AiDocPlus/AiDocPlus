@@ -21,7 +21,6 @@ export class OutlineErrorBoundary extends React.Component<
   componentDidUpdate(prevProps: { resetKey?: string | number }) {
     if (prevProps.resetKey !== this.props.resetKey && this.state.hasError) {
       // 文档切换/重建时自动恢复
-      // eslint-disable-next-line react/no-did-update-set-state
       this.setState({ hasError: false });
     }
   }

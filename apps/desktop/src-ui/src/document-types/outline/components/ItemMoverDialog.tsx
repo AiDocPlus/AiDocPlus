@@ -4,7 +4,7 @@
  * 搜索节点 → 选中目标 → 移动到目标位置（目标内部 / 之后 / 之前）
  */
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Dialog,
@@ -79,31 +79,34 @@ export function ItemMoverDialog({
     );
   }, [allFlat, search]);
 
-  // 搜索变化时：如果当前选中的目标不在过滤结果中，清除选中
-  useEffect(() => {
-    if (selectedTargetId && !filtered.some(e => e.node.id === selectedTargetId)) {
-      setSelectedTargetId(null);
-    }
-  }, [filtered, selectedTargetId]);
-
   // 过滤掉自身及其后代
   const validTargets = useMemo(() => {
-    if (!sourceNodeId) return filtered;
-    const descendantIds = new Set<string>();
-    function collectDescendants(node: OutlineNode) {
-      descendantIds.add(node.id);
-      for (const child of node.children) collectDescendants(child);
+    let result = filtered;
+    if (sourceNodeId) {
+      const descendantIds = new Set<string>();
+      function collectDescendants(node: OutlineNode) {
+        descendantIds.add(node.id);
+        for (const child of node.children) collectDescendants(child);
+      }
+      const src = findNode(nodes, sourceNodeId);
+      if (src) collectDescendants(src);
+      result = filtered.filter(e => !descendantIds.has(e.node.id));
     }
-    const src = findNode(nodes, sourceNodeId);
-    if (src) collectDescendants(src);
-    return filtered.filter(e => !descendantIds.has(e.node.id));
+    return result;
   }, [filtered, nodes, sourceNodeId]);
 
+  // 过滤变化时，若选中目标不再有效则清除（推导值，不用 effect）
+  const effectiveTargetId = useMemo(() => {
+    if (!selectedTargetId) return null;
+    const validIds = new Set(validTargets.map(e => e.node.id));
+    return validIds.has(selectedTargetId) ? selectedTargetId : null;
+  }, [validTargets, selectedTargetId]);
+
   const handleMove = useCallback(() => {
-    if (!sourceNodeId || !selectedTargetId) return;
-    onMove(sourceNodeId, selectedTargetId, position);
+    if (!sourceNodeId || !effectiveTargetId) return;
+    onMove(sourceNodeId, effectiveTargetId, position);
     onClose();
-  }, [sourceNodeId, selectedTargetId, position, onMove, onClose]);
+  }, [sourceNodeId, effectiveTargetId, position, onMove, onClose]);
 
   // 重置状态
   const handleClose = useCallback(() => {
@@ -158,7 +161,7 @@ export function ItemMoverDialog({
                   key={entry.node.id}
                   type="button"
                   className={`w-full text-left px-3 py-1.5 text-sm hover:bg-accent/50 transition-colors flex items-center gap-2 ${
-                    selectedTargetId === entry.node.id ? 'bg-accent font-medium' : ''
+                    effectiveTargetId === entry.node.id ? 'bg-accent font-medium' : ''
                   }`}
                   style={{ paddingLeft: `${entry.depth * 16 + 12}px` }}
                   onClick={() => setSelectedTargetId(entry.node.id)}
@@ -171,7 +174,7 @@ export function ItemMoverDialog({
           </ScrollArea>
 
           {/* 位置选择 */}
-          {selectedTargetId && (
+          {effectiveTargetId && (
             <div className="flex items-center gap-2 text-xs">
               <span className="text-muted-foreground">
                 {t('outline.itemMover.position', { defaultValue: '放置位置' })}:

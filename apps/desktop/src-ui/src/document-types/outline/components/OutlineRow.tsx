@@ -163,10 +163,11 @@ export const OutlineRow = forwardRef(function OutlineRow(
 
     // 层级缩进（避免 inline style：使用 CSS 变量）
     const indentVars = useMemo(
-      () => ({
-        ['--outline-indent' as any]: `${depth * 24 + 8}px`,
-        ['--outline-guide-left' as any]: `${(depth - 1) * 24 + 16}px`,
-      }),
+      () =>
+        ({
+          '--outline-indent': `${depth * 24 + 8}px`,
+          '--outline-guide-left': `${(depth - 1) * 24 + 16}px`,
+        }) as React.CSSProperties,
       [depth]
     );
 

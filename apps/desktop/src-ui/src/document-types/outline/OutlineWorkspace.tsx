@@ -8,6 +8,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo, lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { DocTypeEditorProps } from '@/doctype-sdk/types';
+import { useAppStore } from '@/stores/useAppStore';
 
 // 导入大纲样式
 import './styles/outline.css';
@@ -104,7 +105,7 @@ interface WorkspaceState {
 export function OutlineWorkspace({
   documentId,
   document,
-  tabId: _tabId,
+  tabId,
   host,
 }: DocTypeEditorProps) {
   const { t } = useTranslation();
@@ -123,6 +124,9 @@ export function OutlineWorkspace({
 
   const [aiPanelWidth, setAiPanelWidth] = useState(readOutlineAiPanelWidth);
   const [mindMapLayout, setMindMapLayout] = useState<MindMapLayout>('logicalStructure');
+
+  // 保存状态：从 AppStore 读取当前 tab 是否脏
+  const tabIsDirty = useAppStore((s) => s.tabs.find((t) => t.id === tabId)?.isDirty ?? false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -345,14 +349,15 @@ export function OutlineWorkspace({
     }
   }, [saveDocument, syncInMemoryAndMarkDirty]);
 
-  // 获取当前大纲
+  // 获取当前大纲（outlines 为空时的稳定 fallback，避免每次渲染创建新对象）
+  const [fallbackOutline] = useState<Outline>(() => createEmptyOutline());
   const activeOutline = useMemo(() => {
     return (
       state.data.outlines.find((o) => o.id === state.data.activeOutlineId) ||
       state.data.outlines[0] ||
-      createEmptyOutline()
+      fallbackOutline
     );
-  }, [state.data.outlines, state.data.activeOutlineId]);
+  }, [state.data.outlines, state.data.activeOutlineId, fallbackOutline]);
 
   const activeNode = useMemo(() => {
     if (!state.activeNodeId) return null;
@@ -803,6 +808,7 @@ export function OutlineWorkspace({
                 breadcrumbs={breadcrumbs}
                 isFocusMode={state.isFocusMode}
                 onExitFocus={exitFocusMode}
+                onBreadcrumbClick={zoomToIndex}
               />
             )}
 
@@ -863,6 +869,9 @@ export function OutlineWorkspace({
               state.filterState.selectedMentions.size > 0 ||
               state.filterState.searchQuery !== ''
             }
+            saveStatus={tabIsDirty ? 'unsaved' : 'saved'}
+            showWordCount={state.data.settings.showWordCount}
+            showProgress={state.data.settings.showProgress}
           />
         </div>
 
@@ -917,6 +926,8 @@ export function OutlineWorkspace({
           onClose={() => setExportOpen(false)}
           outline={activeOutline}
           documentTitle={document.title || t('outline.title', { defaultValue: '大纲' })}
+          documentId={documentId}
+          projectId={document.projectId}
         />
 
         <ImportDialog

@@ -213,6 +213,79 @@ function escapeMarkdown(text: string): string {
 }
 
 /**
+ * 转义 HTML 特殊字符
+ */
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ============================================================
+// HTML 导出
+// ============================================================
+
+/**
+ * 导出为 HTML 格式（带内联样式，独立可用）
+ */
+export function exportToHTML(doc: CalculatorDocumentContent, sheetId?: string): string {
+  const sheet = sheetId
+    ? doc.sheets.find(s => s.id === sheetId)
+    : doc.sheets.find(s => s.id === doc.activeSheetId);
+
+  if (!sheet) return '';
+
+  const lines: string[] = [];
+  lines.push(`<!DOCTYPE html>`);
+  lines.push(`<html lang="zh">`);
+  lines.push(`<head><meta charset="UTF-8"><title>${escapeHtml(sheet.name)}</title>`);
+  lines.push(`<style>body{font-family:"Songti SC","SimSun",serif;font-size:14px;max-width:800px;margin:2em auto;padding:0 1em}`);
+  lines.push(`table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:6px 10px;text-align:left}`);
+  lines.push(`th{background:#f5f5f5;font-weight:600}tr:nth-child(even){background:#fafafa}`);
+  lines.push(`.note{color:#999;font-style:italic}.heading{font-weight:600;background:#f0f0f0}`);
+  lines.push(`.subtotal{background:#fffbeb;font-weight:600}.error{color:#dc2626}`);
+  lines.push(`.fn-def{color:#6366f1;font-style:italic}`);
+  lines.push(`h1{font-size:1.3em;border-bottom:2px solid #ddd;padding-bottom:4px}</style></head>`);
+  lines.push(`<body>`);
+  lines.push(`<h1>${escapeHtml(sheet.name)}</h1>`);
+  lines.push(`<table><thead><tr><th>#</th><th>Expression</th><th>Result</th></tr></thead><tbody>`);
+
+  for (const line of sheet.lines) {
+    const ex = expressionForExport(line.expression, doc);
+    let rowClass = '';
+    if (line.lineRole === 'heading') rowClass = 'heading';
+    else if (line.lineRole === 'subtotal') rowClass = 'subtotal';
+    else if (line.lineRole === 'comment') rowClass = 'note';
+    else if (line.lineRole === 'function_def') rowClass = 'fn-def';
+    else if (line.result.type === 'error') rowClass = 'error';
+
+    const exprCell = line.isNote
+      ? `<span class="${rowClass || 'note'}">${escapeHtml(ex)}</span>`
+      : `<code>${escapeHtml(ex)}</code>`;
+
+    const resultCell = line.isNote
+      ? ''
+      : line.result.type === 'error'
+        ? `<span class="error">${escapeHtml(line.result.error || 'Error')}</span>`
+        : escapeHtml(line.result.displayValue || '-');
+
+    lines.push(`<tr class="${rowClass}"><td>${line.lineNumber}</td><td>${exprCell}</td><td>${resultCell}</td></tr>`);
+  }
+
+  lines.push(`</tbody></table></body></html>`);
+  return lines.join('\n');
+}
+
+/**
+ * 导出所有 Sheet 为 HTML
+ */
+export function exportAllSheetsToHTML(doc: CalculatorDocumentContent): string {
+  const parts: string[] = [];
+  for (const sheet of doc.sheets) {
+    parts.push(exportToHTML(doc, sheet.id));
+  }
+  return parts.join('\n<hr/>\n');
+}
+
+/**
  * 下载导出文件
  */
 export function downloadExport(content: string, filename: string, mimeType: string): void {

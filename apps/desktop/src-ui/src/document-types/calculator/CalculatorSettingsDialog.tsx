@@ -280,6 +280,86 @@ export function CalculatorSettingsDialog({
           <p className="text-xs text-muted-foreground -mt-4">
             {t('calculator.liveUpdateHint', { defaultValue: '关闭后需要手动按 Enter 计算每行' })}
           </p>
+
+          <div className="border-t pt-4 space-y-4">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-sm">
+                {t('calculator.editorFontSize', { defaultValue: '编辑器字号' })}
+              </Label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min={12}
+                  max={20}
+                  step={1}
+                  value={localSettings.editorFontSize}
+                  onChange={(e) => updateSetting('editorFontSize', parseInt(e.target.value, 10))}
+                  className="flex-1 h-1.5 accent-primary"
+                />
+                <span className="text-sm tabular-nums w-8 text-right">{localSettings.editorFontSize}px</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm">
+                {t('calculator.lineHeight', { defaultValue: '行高' })}
+              </Label>
+              <Select
+                value={localSettings.lineHeight}
+                onValueChange={(v) => updateSetting('lineHeight', v as 'compact' | 'standard' | 'relaxed')}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="compact">{t('calculator.lineHeightCompact', { defaultValue: '紧凑' })}</SelectItem>
+                  <SelectItem value="standard">{t('calculator.lineHeightStandard', { defaultValue: '标准' })}</SelectItem>
+                  <SelectItem value="relaxed">{t('calculator.lineHeightRelaxed', { defaultValue: '宽松' })}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">
+                {t('calculator.stripedRows', { defaultValue: '奇偶行条纹' })}
+              </Label>
+              <Switch
+                checked={localSettings.stripedRows}
+                onCheckedChange={(checked) => updateSetting('stripedRows', checked)}
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">
+                {t('calculator.showLineNumbers', { defaultValue: '显示行号' })}
+              </Label>
+              <Switch
+                checked={localSettings.showLineNumbers}
+                onCheckedChange={(checked) => updateSetting('showLineNumbers', checked)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm">
+                {t('calculator.resultFormat', { defaultValue: '数字显示格式' })}
+              </Label>
+              <Select
+                value={localSettings.resultFormat || 'number'}
+                onValueChange={(v) => updateSetting('resultFormat', v as 'number' | 'accounting' | 'scientific' | 'percent' | 'currency')}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="number">{t('calculator.resultFormatNumber', { defaultValue: '普通数字' })}</SelectItem>
+                  <SelectItem value="accounting">{t('calculator.resultFormatAccounting', { defaultValue: '会计格式（负数用括号）' })}</SelectItem>
+                  <SelectItem value="scientific">{t('calculator.resultFormatScientific', { defaultValue: '科学计数法' })}</SelectItem>
+                  <SelectItem value="percent">{t('calculator.resultFormatPercent', { defaultValue: '百分比（×100 + %）' })}</SelectItem>
+                  <SelectItem value="currency">{t('calculator.resultFormatCurrency', { defaultValue: '货币格式' })}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
 
         <div className="flex justify-between pt-4 border-t">

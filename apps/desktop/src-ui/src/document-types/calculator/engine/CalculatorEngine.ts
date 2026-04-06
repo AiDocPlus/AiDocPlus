@@ -8,6 +8,8 @@ import {
   DEFAULT_CALCULATOR_SETTINGS,
   type CalcResult,
   type CalculatorSettings,
+  type ChartResultData,
+  type SensitivityResultData,
   isNoteLine as expressionIsCalculatorNoteLine,
 } from '../types';
 import { isCalculatorBuiltinWord } from '../calculatorBuiltinWords';
@@ -30,6 +32,10 @@ import {
   mirr as mirrFinancial,
   xnpv as xnpvFinancial,
   xirr as xirrFinancial,
+  compound,
+  discount,
+  roi,
+  annualizedReturn,
 } from './financialCalculator';
 import {
   normsdist as normsdistFn,
@@ -179,6 +185,7 @@ function stripDoubleQuotedDisplayLiterals(input: string): { expr: string; quoted
 function evaluateMathExpressionInScope(
   variables: Map<string, unknown>,
   lineResults: Map<number, number>,
+  foreignSheetVars: Map<string, unknown>,
   toInternalVarName: (name: string) => string,
   expr: string,
 ): unknown {
@@ -191,6 +198,10 @@ function evaluateMathExpressionInScope(
 
   lineResults.forEach((v, k) => {
     scope[`__line_${k}__`] = v;
+  });
+
+  foreignSheetVars.forEach((v, k) => {
+    scope[k] = v;
   });
 
   const compiled = math.compile(expr);
@@ -208,6 +219,10 @@ export class CalculatorEngine {
   private variableDefinitionLine: Map<string, number> = new Map();
   private lineResults: Map<number, number> = new Map();
   private displaySettings: CalculatorSettings = { ...DEFAULT_CALCULATOR_SETTINGS };
+  /** 用户自定义函数定义 */
+  private customFunctions: Map<string, { params: string[]; body: string }> = new Map();
+  /** 跨 Sheet 变量：key = __foreign__SheetName__varName */
+  private foreignSheetVars: Map<string, unknown> = new Map();
 
   constructor() {
     this.registerCustomFunctions();
@@ -226,6 +241,7 @@ export class CalculatorEngine {
     return evaluateMathExpressionInScope(
       this.variables,
       this.lineResults,
+      this.foreignSheetVars,
       (name) => this.toInternalVarName(name),
       expr,
     );
@@ -303,7 +319,15 @@ export class CalculatorEngine {
         };
       }
 
-      // 5. 金融函数字面量（整行 npv/irr/pmt 等，无 = 赋值时）
+      // 5. 图表函数：= chart(type, labels, values, {options})
+      const chartResult = this.tryParseChart(preprocessed, lineNumber);
+      if (chartResult) return chartResult;
+
+      // 5.5 敏感性分析：= sens(expression, variable, [start, step, end])
+      const sensResult = this.tryParseSensitivity(preprocessed, lineNumber);
+      if (sensResult) return sensResult;
+
+      // 5.6 金融函数字面量（整行 npv/irr/pmt 等，无 = 赋值时）
       const financialMatch = tryParseFinancial(preprocessed);
       if (financialMatch) {
         const result = executeFinancialFunction(financialMatch.fn, financialMatch.args);
@@ -325,6 +349,16 @@ export class CalculatorEngine {
 
       // 7. 执行计算
       const raw = this.evaluateInScope(preprocessed);
+
+      // 7.1 字符串结果（hex/oct/bin 等格式化输出）
+      if (typeof raw === 'string') {
+        this.lineResults.delete(lineNumber);
+        return {
+          type: 'string',
+          value: raw,
+          displayValue: this.appendQuotedDisplaySuffix(raw, quotedParts),
+        };
+      }
 
       // 矩阵/数列结果（如 [1,2,3]）
       if (isSequenceTensor(raw)) {
@@ -475,6 +509,67 @@ export class CalculatorEngine {
     this.variables.clear();
     this.variableDefinitionLine.clear();
     this.lineResults.clear();
+    this.customFunctions.clear();
+    this.foreignSheetVars.clear();
+  }
+
+  /**
+   * 注册自定义函数定义（fn 语法）
+   * 返回是否注册成功
+   */
+  registerUserFunction(name: string, params: string[], body: string): boolean {
+    if (!name || params.some(p => !p)) return false;
+    this.customFunctions.set(name, { params, body });
+    // 同时注册到 math.js，使表达式可以直接调用
+    try {
+      math.import({
+        [name]: (...fnArgs: unknown[]) => {
+          const scope: Record<string, unknown> = {};
+          for (let i = 0; i < params.length && i < fnArgs.length; i++) {
+            scope[params[i]] = fnArgs[i];
+            // 也注册内部变量名形式
+            if (/[\u4e00-\u9fa5]/.test(params[i])) {
+              scope[this.toInternalVarName(params[i])] = fnArgs[i];
+            }
+          }
+          // 注入当前变量上下文
+          this.variables.forEach((v, k) => {
+            const internalName = /[\u4e00-\u9fa5]/.test(k) ? this.toInternalVarName(k) : k;
+            scope[internalName] = v;
+          });
+          this.lineResults.forEach((v, k) => {
+            scope[`__line_${k}__`] = v;
+          });
+          const compiled = math.compile(body);
+          const result = compiled.evaluate(scope);
+          return result;
+        },
+      }, { override: true, silent: true });
+    } catch {
+      return false;
+    }
+    return true;
+  }
+
+  /** 获取所有用户自定义函数名 */
+  getUserFunctionNames(): string[] {
+    return Array.from(this.customFunctions.keys());
+  }
+
+  /**
+   * 注入前置 Sheet 的变量（跨 Sheet 引用）
+   */
+  setForeignSheetVars(sheetName: string, vars: Map<string, unknown>): void {
+    const encoded = this.toInternalVarName(sheetName);
+    for (const [k, v] of vars) {
+      const key = `__foreign_${encoded}__${k}`;
+      this.foreignSheetVars.set(key, v);
+    }
+  }
+
+  /** 清除跨 Sheet 变量 */
+  clearForeignSheetVars(): void {
+    this.foreignSheetVars.clear();
   }
 
   /**
@@ -507,6 +602,9 @@ export class CalculatorEngine {
 
     // 1. 中文变量名转换（最先执行）
     expr = this.transformVariableNames(expr);
+
+    // 1.5 跨 Sheet 引用：Sheet1!变量名 / Sheet1!$3
+    expr = this.transformCrossSheetReferences(expr);
 
     // 2. 数字简写：25k → 25000, 1.5万 → 15000
     expr = this.transformNumberUnits(expr);
@@ -605,6 +703,39 @@ export class CalculatorEngine {
       .map(c => `_u${c.charCodeAt(0)}_`)
       .join('');
     return `__v${encoded}__`;
+  }
+
+  /**
+   * 转换跨 Sheet 引用：Sheet1!变量名 / [年度预算]!总计
+   * 替换为内部变量 __foreign__SheetName__varName
+   */
+  private transformCrossSheetReferences(expr: string): string {
+    // [Sheet Name]!varName 或 [Sheet Name]!$3
+    const bracketRe = /\[([^\]]+)\]!\$?([a-zA-Z_\u4e00-\u9fa5][a-zA-Z0-9_\u4e00-\u9fa5]*)/g;
+    expr = expr.replace(bracketRe, (_, sheetName, ref) => {
+      const encoded = this.toInternalVarName(sheetName);
+      if (/^\$?\d+$/.test(ref)) {
+        // 行引用: $3 → __foreign__SheetName____line_3__
+        const ln = ref.replace(/^\$/, '');
+        return `__foreign_${encoded}____line_${ln}__`;
+      }
+      return `__foreign_${encoded}__${ref}`;
+    });
+
+    // SheetName!varName（无方括号，Sheet名不含空格/特殊字符）
+    const simpleRe = /\b([a-zA-Z_\u4e00-\u9fa5][a-zA-Z0-9_\u4e00-\u9fa5]*)!\$?([a-zA-Z_\u4e00-\u9fa5][a-zA-Z0-9_\u4e00-\u9fa5]*)/g;
+    expr = expr.replace(simpleRe, (match, sheetName, ref) => {
+      // 跳过内置函数名如 e!pi（不太可能但防御性检查）
+      if (isCalculatorBuiltinWord(sheetName)) return match;
+      const encoded = this.toInternalVarName(sheetName);
+      if (/^\$?\d+$/.test(ref)) {
+        const ln = ref.replace(/^\$/, '');
+        return `__foreign_${encoded}____line_${ln}__`;
+      }
+      return `__foreign_${encoded}__${ref}`;
+    });
+
+    return expr;
   }
 
   /**
@@ -877,6 +1008,265 @@ export class CalculatorEngine {
     return expressionIsCalculatorNoteLine(text);
   }
 
+  // ═══════════════════════════════════════════════════════════
+  // 图表解析
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * 尝试解析 chart(type, labelsVar, valuesVar, {options}) 语法。
+   * 支持变量引用（数组/列表变量）和内联数组字面量。
+   */
+  private tryParseChart(expr: string, _lineNumber: number): CalcResult | null {
+    // 匹配 chart( 或 = chart(
+    const match = expr.match(/^=?\s*chart\s*\(([\s\S]*)\)$/i);
+    if (!match) return null;
+
+    const argsStr = match[1].trim();
+    const { args } = this.parseFunctionArgs(argsStr);
+    if (args.length < 3) {
+      return { type: 'error', value: null, displayValue: '', error: 'chart() 需要至少 3 个参数: type, labels, values' };
+    }
+
+    const typeStr = String(args[0]).toLowerCase().trim();
+    const validTypes = ['bar', 'line', 'pie', 'scatter', 'area'];
+    if (!validTypes.includes(typeStr)) {
+      return { type: 'error', value: null, displayValue: '', error: `图表类型 "${typeStr}" 无效，支持: ${validTypes.join(', ')}` };
+    }
+
+    // 解析 labels（字符串数组或变量）
+    const labels = this.resolveChartLabels(args[1]);
+    if (!labels || labels.length === 0) {
+      return { type: 'error', value: null, displayValue: '', error: '标签数据为空' };
+    }
+
+    // 解析 values（数值数组或变量）
+    const datasets = this.resolveChartDatasets(args[2], labels);
+    if (!datasets || datasets.length === 0) {
+      return { type: 'error', value: null, displayValue: '', error: '数据集为空' };
+    }
+
+    // 解析选项（可选）
+    let title: string | undefined;
+    if (args.length >= 4) {
+      const opts = this.parseChartOptions(args[3]);
+      if (opts.title) title = opts.title;
+    }
+
+    const chartData: ChartResultData = {
+      chartType: typeStr as ChartResultData['chartType'],
+      labels,
+      datasets,
+      title,
+    };
+
+    return {
+      type: 'chart',
+      value: chartData,
+      displayValue: `[${typeStr} chart]`,
+    };
+  }
+
+  /** 简单函数参数解析（支持嵌套括号） */
+  private parseFunctionArgs(argsStr: string): { args: unknown[] } {
+    const args: unknown[] = [];
+    let depth = 0;
+    let current = '';
+    for (const ch of argsStr) {
+      if (ch === '(' || ch === '[' || ch === '{') {
+        depth++;
+        current += ch;
+      } else if (ch === ')' || ch === ']' || ch === '}') {
+        depth--;
+        current += ch;
+      } else if (ch === ',' && depth === 0) {
+        args.push(current.trim());
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    if (current.trim()) args.push(current.trim());
+    return { args };
+  }
+
+  /** 解析标签：字符串数组变量、内联数组、或逗号分隔字符串 */
+  private resolveChartLabels(arg: unknown): string[] | null {
+    // 尝试作为变量求值
+    if (typeof arg === 'string') {
+      // 内联数组: ["1月", "2月", "3月"]
+      const arrayMatch = arg.match(/^\[([\s\S]*)\]$/);
+      if (arrayMatch) {
+        const inner = arrayMatch[1];
+        // 尝试在作用域中求值
+        try {
+          const val = this.evaluateInScope(inner);
+          if (Array.isArray(val)) {
+            return val.map(v => String(v));
+          }
+          if (typeof val === 'object' && val !== null && typeof (val as { toArray?: () => unknown }).toArray === 'function') {
+            return (val as { toArray: () => unknown[] }).toArray().map(v => String(v));
+          }
+        } catch { /* fall through */ }
+
+        // 纯字符串数组
+        const items: string[] = [];
+        const re = /"([^"]*)"|'([^']*)'/g;
+        let m;
+        while ((m = re.exec(inner)) !== null) {
+          items.push(m[1] || m[2]);
+        }
+        if (items.length > 0) return items;
+      }
+
+      // 变量名
+      const varName = arg.trim();
+      const varVal = this.variables.get(varName);
+      if (varVal) {
+        if (Array.isArray(varVal)) {
+          return varVal.map(v => String(v));
+        }
+        if (typeof varVal === 'object' && varVal !== null && typeof (varVal as { toArray?: () => unknown }).toArray === 'function') {
+          return (varVal as { toArray: () => unknown[] }).toArray().map(v => String(v));
+        }
+        return null;
+      }
+
+      // 逗号分隔字符串
+      if (varName.includes(',') || varName.includes('，')) {
+        return varName.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+      }
+    }
+    return null;
+  }
+
+  /** 解析数据集：数值数组变量或内联数组 */
+  private resolveChartDatasets(arg: unknown, labels: string[]): ChartResultData['datasets'] {
+    if (typeof arg === 'string') {
+      const arrayMatch = arg.match(/^\[([\s\S]*)\]$/);
+      if (arrayMatch) {
+        const inner = arrayMatch[1];
+        try {
+          const val = this.evaluateInScope(inner);
+          const numArr = mathToNumberArray(val);
+          if (numArr.length > 0) {
+            return [{ name: 'Value', data: numArr }];
+          }
+        } catch { /* fall through */ }
+      }
+
+      // 变量名
+      const varName = arg.trim();
+      const varVal = this.variables.get(varName);
+      if (varVal) {
+        const numArr = mathToNumberArray(varVal);
+        if (numArr.length > 0) {
+          return [{ name: varName, data: numArr }];
+        }
+      }
+    }
+    // 生成与 labels 等长的零数组作为 fallback
+    return [{ name: 'Value', data: labels.map(() => 0) }];
+  }
+
+  /** 解析图表选项对象 */
+  private parseChartOptions(arg: unknown): { title?: string } {
+    if (typeof arg === 'string') {
+      // { title: "xxx" } 简单解析
+      const titleMatch = arg.match(/title\s*:\s*"([^"]*)"/);
+      if (titleMatch) return { title: titleMatch[1] };
+      const titleMatch2 = arg.match(/title\s*:\s*'([^']*)'/);
+      if (titleMatch2) return { title: titleMatch2[1] };
+    }
+    return {};
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 敏感性分析解析
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * 尝试解析 sens(expression, variable, [start, step, end]) 语法。
+   */
+  private tryParseSensitivity(expr: string, _lineNumber: number): CalcResult | null {
+    const match = expr.match(/^=?\s*sens\s*\(([\s\S]*)\)$/i);
+    if (!match) return null;
+
+    const argsStr = match[1].trim();
+    const { args } = this.parseFunctionArgs(argsStr);
+    if (args.length < 3) {
+      return { type: 'error', value: null, displayValue: '', error: 'sens() 需要 3 个参数: expression, variable, [start, step, end]' };
+    }
+
+    const targetExpr = String(args[0]).trim();
+    const varName = String(args[1]).trim();
+
+    // 解析范围 [start, step, end]
+    let startVal: number;
+    let stepVal: number;
+    let endVal: number;
+    const rangeArg = String(args[2]).trim();
+
+    const arrayMatch = rangeArg.match(/^\[([\s\S]*)\]$/);
+    if (arrayMatch) {
+      const inner = arrayMatch[1].split(',').map(s => s.trim());
+      if (inner.length < 3) {
+        return { type: 'error', value: null, displayValue: '', error: '范围格式: [起始值, 步长, 结束值]' };
+      }
+      startVal = mathToNumber(this.evaluateInScope(inner[0]));
+      stepVal = mathToNumber(this.evaluateInScope(inner[1]));
+      endVal = mathToNumber(this.evaluateInScope(inner[2]));
+    } else {
+      // 简单格式: sens(expr, var, start, step, end)
+      if (args.length < 5) {
+        return { type: 'error', value: null, displayValue: '', error: '范围格式: [起始值, 步长, 结束值]' };
+      }
+      startVal = mathToNumber(this.evaluateInScope(String(args[2])));
+      stepVal = mathToNumber(this.evaluateInScope(String(args[3])));
+      endVal = mathToNumber(this.evaluateInScope(String(args[4])));
+    }
+
+    if (!Number.isFinite(startVal) || !Number.isFinite(stepVal) || !Number.isFinite(endVal)) {
+      return { type: 'error', value: null, displayValue: '', error: '范围值必须为有效数字' };
+    }
+    if (stepVal === 0) {
+      return { type: 'error', value: null, displayValue: '', error: '步长不能为零' };
+    }
+
+    // 保存原变量值
+    const originalVar = this.variables.get(varName);
+
+    const pairs: { inputValue: number; outputValue: number }[] = [];
+    for (let v = startVal; (stepVal > 0 ? v <= endVal + 1e-10 : v >= endVal - 1e-10); v += stepVal) {
+      this.variables.set(varName, v);
+      try {
+        const result = mathToNumber(this.evaluateInScope(targetExpr));
+        pairs.push({ inputValue: v, outputValue: Number.isFinite(result) ? result : Number.NaN });
+      } catch {
+        pairs.push({ inputValue: v, outputValue: Number.NaN });
+      }
+      if (pairs.length >= 50) break; // 防止无限循环
+    }
+
+    // 恢复原变量值
+    if (originalVar !== undefined) {
+      this.variables.set(varName, originalVar);
+    } else {
+      this.variables.delete(varName);
+    }
+
+    const sensData: SensitivityResultData = {
+      variableName: varName,
+      pairs,
+      expression: targetExpr,
+    };
+
+    return {
+      type: 'sensitivity',
+      value: sensData,
+      displayValue: `[sensitivity: ${varName}]`,
+    };
+  }
+
   /**
    * 注册自定义函数（金融函数需参与含变量/表达式的求值，不能仅靠字面量 tryParseFinancial）
    */
@@ -973,6 +1363,22 @@ export class CalculatorEngine {
             mathToNumberArray(dates),
             guess !== undefined ? mathToNumber(guess) : 0.1,
           ),
+        compound: (principal: unknown, rate: unknown, periods: unknown) =>
+          compound(
+            mathToNumber(principal),
+            mathToNumber(rate),
+            mathToNumber(periods),
+          ),
+        discount: (futureValue: unknown, rate: unknown, periods: unknown) =>
+          discount(
+            mathToNumber(futureValue),
+            mathToNumber(rate),
+            mathToNumber(periods),
+          ),
+        roi: (gain: unknown, cost: unknown) =>
+          roi(mathToNumber(gain), mathToNumber(cost)),
+        annualizedReturn: (totalReturn: unknown, days: unknown) =>
+          annualizedReturn(mathToNumber(totalReturn), mathToNumber(days)),
         normsdist: (z: unknown) => normsdistFn(mathToNumber(z)),
         normsinv: (p: unknown) => normsinvFn(mathToNumber(p)),
         normdist: (x: unknown, mean: unknown, sd: unknown, cum: unknown) =>
@@ -1033,6 +1439,86 @@ export class CalculatorEngine {
           listFn.listQuantile(listFn.clampList(mathToNumberArray(a)), mathToNumber(p)),
         listArgSort: (a: unknown) => listFn.listArgSort(listFn.clampList(mathToNumberArray(a))),
         listMean: (a: unknown) => listFn.listMean(listFn.clampList(mathToNumberArray(a))),
+        // ---- 工程函数 ----
+        hex: (n: unknown) => {
+          const num = mathToNumber(n);
+          if (!Number.isFinite(num) || num < 0) return Number.NaN;
+          return `0x${Math.floor(num).toString(16).toUpperCase()}`;
+        },
+        oct: (n: unknown) => {
+          const num = mathToNumber(n);
+          if (!Number.isFinite(num) || num < 0) return Number.NaN;
+          return `0o${Math.floor(num).toString(8)}`;
+        },
+        bin: (n: unknown) => {
+          const num = mathToNumber(n);
+          if (!Number.isFinite(num) || num < 0) return Number.NaN;
+          return `0b${Math.floor(num).toString(2)}`;
+        },
+        bitAnd: (a: unknown, b: unknown) => Math.floor(mathToNumber(a)) & Math.floor(mathToNumber(b)),
+        bitOr: (a: unknown, b: unknown) => Math.floor(mathToNumber(a)) | Math.floor(mathToNumber(b)),
+        bitXor: (a: unknown, b: unknown) => Math.floor(mathToNumber(a)) ^ Math.floor(mathToNumber(b)),
+        bitNot: (a: unknown) => ~Math.floor(mathToNumber(a)),
+        bitShiftLeft: (a: unknown, b: unknown) => Math.floor(mathToNumber(a)) << Math.floor(mathToNumber(b)),
+        bitShiftRight: (a: unknown, b: unknown) => Math.floor(mathToNumber(a)) >> Math.floor(mathToNumber(b)),
+        toRad: (deg: unknown) => mathToNumber(deg) * Math.PI / 180,
+        toDeg: (rad: unknown) => mathToNumber(rad) * 180 / Math.PI,
+        // ---- 高级统计 ----
+        percentile: (a: unknown, p: unknown) => {
+          const arr = mathToNumberArray(a).sort((x, y) => x - y);
+          const pct = mathToNumber(p) / 100;
+          if (arr.length === 0) return Number.NaN;
+          if (pct <= 0) return arr[0];
+          if (pct >= 1) return arr[arr.length - 1];
+          const idx = (arr.length - 1) * pct;
+          const lo = Math.floor(idx);
+          const hi = Math.ceil(idx);
+          if (lo === hi) return arr[lo];
+          return arr[lo] + (arr[hi] - arr[lo]) * (idx - lo);
+        },
+        mode: (a: unknown) => {
+          const arr = mathToNumberArray(a);
+          if (arr.length === 0) return Number.NaN;
+          const freq = new Map<number, number>();
+          for (const v of arr) freq.set(v, (freq.get(v) || 0) + 1);
+          let maxFreq = 0;
+          let modeVal = arr[0];
+          for (const [v, f] of freq) {
+            if (f > maxFreq) { maxFreq = f; modeVal = v; }
+          }
+          return modeVal;
+        },
+        geomean: (a: unknown) => {
+          const arr = mathToNumberArray(a);
+          if (arr.length === 0) return Number.NaN;
+          if (arr.some(v => v <= 0)) return Number.NaN;
+          return Math.exp(arr.reduce((s, v) => s + Math.log(v), 0) / arr.length);
+        },
+        harmean: (a: unknown) => {
+          const arr = mathToNumberArray(a);
+          if (arr.length === 0) return Number.NaN;
+          if (arr.some(v => v === 0)) return Number.NaN;
+          return arr.length / arr.reduce((s, v) => s + 1 / v, 0);
+        },
+        skew: (a: unknown) => {
+          const arr = mathToNumberArray(a);
+          if (arr.length < 3) return 0;
+          const n = arr.length;
+          const mean = arr.reduce((s, v) => s + v, 0) / n;
+          const std = Math.sqrt(arr.reduce((s, v) => s + (v - mean) ** 2, 0) / n);
+          if (std === 0) return 0;
+          return (n / ((n - 1) * (n - 2))) * arr.reduce((s, v) => s + ((v - mean) / std) ** 3, 0);
+        },
+        kurt: (a: unknown) => {
+          const arr = mathToNumberArray(a);
+          if (arr.length < 4) return 0;
+          const n = arr.length;
+          const mean = arr.reduce((s, v) => s + v, 0) / n;
+          const std = Math.sqrt(arr.reduce((s, v) => s + (v - mean) ** 2, 0) / n);
+          if (std === 0) return 0;
+          const m4 = arr.reduce((s, v) => s + ((v - mean) / std) ** 4, 0) / n;
+          return m4 - 3;
+        },
       },
       { override: true, silent: true },
     );

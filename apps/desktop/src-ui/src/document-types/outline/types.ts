@@ -133,6 +133,7 @@ export interface OutlineStats {
   maxDepth: number;
   totalTags: number;
   totalMentions: number;
+  totalWords: number;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -711,11 +712,32 @@ export function getOutlineStats(
   let totalNodes = 0;
   let completedNodes = 0;
   let maxDepth = 0;
+  let totalWords = 0;
+
+  function countWords(text: string): number {
+    if (!text.trim()) return 0;
+    // 中文每字算一词，英文按空格分词
+    const chineseChars = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
+    const nonChineseText = text.replace(/[\u4e00-\u9fa5]/g, ' ');
+    const englishWords = nonChineseText.trim().split(/\s+/).filter(Boolean).length;
+    return chineseChars + englishWords;
+  }
+
+  function countNodeWords(nodes: OutlineNode[]): number {
+    let words = 0;
+    for (const node of nodes) {
+      words += countWords(node.plainText);
+      if (node.notePlainText) words += countWords(node.notePlainText);
+      words += countNodeWords(node.children);
+    }
+    return words;
+  }
 
   for (const outline of data.outlines) {
     totalNodes += countNodes(outline.nodes);
     completedNodes += countCompleted(outline.nodes);
     maxDepth = Math.max(maxDepth, getMaxDepth(outline.nodes));
+    totalWords += countNodeWords(outline.nodes);
   }
 
   const index = buildTagIndex(
@@ -729,6 +751,7 @@ export function getOutlineStats(
     maxDepth,
     totalTags: index.allTags.length,
     totalMentions: index.allMentions.length,
+    totalWords,
   };
 }
 

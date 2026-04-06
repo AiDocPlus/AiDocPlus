@@ -5,6 +5,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { escapeRegex } from './searchUtils';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -281,73 +282,6 @@ export function SearchPanel({
       </Button>
     </div>
   );
-}
-
-/**
- * 转义正则表达式特殊字符
- */
-function escapeRegex(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
- * 高亮搜索结果文本
- */
-export function highlightSearchMatches(
-  text: string,
-  query: string,
-  caseSensitive = false,
-  useRegex = false
-): Array<{ text: string; isMatch: boolean }> {
-  if (!query.trim()) {
-    return [{ text, isMatch: false }];
-  }
-
-  const flags = caseSensitive ? 'g' : 'gi';
-  let regex: RegExp;
-
-  try {
-    if (useRegex) {
-      regex = new RegExp(query, flags);
-    } else {
-      regex = new RegExp(escapeRegex(query), flags);
-    }
-  } catch {
-    return [{ text, isMatch: false }];
-  }
-
-  const result: Array<{ text: string; isMatch: boolean }> = [];
-  let lastIndex = 0;
-
-  for (const match of text.matchAll(regex)) {
-    if (match.index !== undefined) {
-      // 添加非匹配文本
-      if (match.index > lastIndex) {
-        result.push({
-          text: text.slice(lastIndex, match.index),
-          isMatch: false,
-        });
-      }
-
-      // 添加匹配文本
-      result.push({
-        text: match[0],
-        isMatch: true,
-      });
-
-      lastIndex = match.index + match[0].length;
-    }
-  }
-
-  // 添加剩余文本
-  if (lastIndex < text.length) {
-    result.push({
-      text: text.slice(lastIndex),
-      isMatch: false,
-    });
-  }
-
-  return result;
 }
 
 export default SearchPanel;

@@ -15,7 +15,8 @@ export { TagCloud } from './TagCloud';
 export { MindMapView, type MindMapViewRef } from './MindMapView';
 
 // 新增组件
-export { SearchPanel, highlightSearchMatches, type SearchMatch } from './SearchPanel';
+export { SearchPanel, type SearchMatch } from './SearchPanel';
+export { highlightSearchMatches } from './searchUtils';
 export { ExportDialog, type ExportFormat } from './ExportDialog';
 export { ImportDialog } from './ImportDialog';
 export { ProseMirrorNodeEditor, type ProseMirrorNodeEditorRef } from './ProseMirrorNodeEditor';

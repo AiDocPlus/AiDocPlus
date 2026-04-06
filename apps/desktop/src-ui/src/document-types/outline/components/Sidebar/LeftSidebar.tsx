@@ -18,6 +18,7 @@ interface LeftSidebarProps {
   breadcrumbs: { label: string; nodeId: string }[];
   isFocusMode: boolean;
   onExitFocus: () => void;
+  onBreadcrumbClick?: (index: number) => void;
 }
 
 export function LeftSidebar({
@@ -28,6 +29,7 @@ export function LeftSidebar({
   breadcrumbs,
   isFocusMode,
   onExitFocus,
+  onBreadcrumbClick,
 }: LeftSidebarProps) {
   const { t } = useTranslation();
 
@@ -62,9 +64,7 @@ export function LeftSidebar({
                   ) : (
                     <button
                       className="text-muted-foreground hover:text-primary truncate max-w-[120px]"
-                      onClick={() => {
-                        // 回到该层级
-                      }}
+                      onClick={() => onBreadcrumbClick?.(index)}
                     >
                       {crumb.label}
                     </button>

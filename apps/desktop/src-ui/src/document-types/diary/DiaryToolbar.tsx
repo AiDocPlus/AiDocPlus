@@ -10,6 +10,7 @@ import {
   ChevronLeft, ChevronRight, CalendarDays, FilePlus, X, XCircle,
   Save, SaveAll, BarChart3, FileDown, FileUp, Settings,
   Maximize2, Star, StarOff, Cloud, Tag, FileText, BookOpen, Smile,
+  Undo2, Redo2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -45,6 +46,10 @@ interface DiaryToolbarProps {
   onCloseAllTabs: () => void;
   onSave: () => void;
   onSaveAll: () => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
   onOpenDashboard: () => void;
   onOpenExport: () => void;
   onOpenImport: () => void;
@@ -68,6 +73,7 @@ export default function DiaryToolbar({
   onPrevDay, onNextDay, onToday,
   onNewEntry, onCloseTab, onCloseAllTabs,
   onSave, onSaveAll,
+  onUndo, onRedo, canUndo, canRedo,
   onOpenDashboard, onOpenExport, onOpenImport, onOpenSettings,
   onMoodChange, onWeatherChange, onTemperatureChange,
   onTagToggle, onTemplateApply, onToggleStarred,
@@ -112,6 +118,18 @@ export default function DiaryToolbar({
           <XCircle className="h-3.5 w-3.5" />
         </Button>
         <div className="w-px h-4 bg-border mx-0.5" />
+        {onUndo && (
+          <Button variant="outline" size="icon" className="h-5 w-5" onClick={onUndo} disabled={!canUndo}
+            title={t('editor.undo', { defaultValue: '撤销 (⌘Z)' })}>
+            <Undo2 className="h-3.5 w-3.5" />
+          </Button>
+        )}
+        {onRedo && (
+          <Button variant="outline" size="icon" className="h-5 w-5" onClick={onRedo} disabled={!canRedo}
+            title={t('editor.redo', { defaultValue: '重做 (⌘⇧Z)' })}>
+            <Redo2 className="h-3.5 w-3.5" />
+          </Button>
+        )}
         <Button variant={isSaving ? 'secondary' : 'outline'} size="icon" className="h-5 w-5" onClick={onSave} disabled={isSaving}
           title={t('editor.saveCurrent', { defaultValue: '保存 (⌘S)' })}>
           <Save className="h-3.5 w-3.5" />

@@ -1,7 +1,7 @@
 /**
  * 导出对话框
  *
- * 支持导出大纲为多种格式：Markdown、OPML、JSON
+ * 支持导出大纲为多种格式：Markdown、OPML、JSON、HTML、DOCX、PDF
  */
 
 import { useState, useCallback, useMemo } from 'react';
@@ -21,6 +21,8 @@ import {
   FileText,
   FileCode,
   FileJson,
+  FileDown,
+  FileType,
   Download,
   Check,
 } from 'lucide-react';
@@ -31,7 +33,7 @@ import type { Outline, OutlineNode } from '../types';
 import { outlineToMarkdown } from '../converters/markdownConverter';
 import { outlineToOPML } from '../converters/opmlConverter';
 
-export type ExportFormat = 'markdown' | 'opml' | 'json' | 'html';
+export type ExportFormat = 'markdown' | 'opml' | 'json' | 'html' | 'docx' | 'pdf';
 
 interface ExportOptions {
   format: ExportFormat;
@@ -46,6 +48,8 @@ interface ExportDialogProps {
   onClose: () => void;
   outline: Outline;
   documentTitle: string;
+  documentId?: string;
+  projectId?: string;
 }
 
 export function ExportDialog({
@@ -53,6 +57,8 @@ export function ExportDialog({
   onClose,
   outline,
   documentTitle,
+  documentId,
+  projectId,
 }: ExportDialogProps) {
   const { t } = useTranslation();
   const [isExporting, setIsExporting] = useState(false);
@@ -101,6 +107,22 @@ export function ExportDialog({
         }),
         icon: FileText,
       },
+      {
+        value: 'docx',
+        label: t('outline.export.docx', { defaultValue: 'Word (.docx)' }),
+        description: t('outline.export.docxDesc', {
+          defaultValue: '公文排版 DOCX 文档',
+        }),
+        icon: FileType,
+      },
+      {
+        value: 'pdf',
+        label: t('outline.export.pdf', { defaultValue: 'PDF' }),
+        description: t('outline.export.pdfDesc', {
+          defaultValue: '可打印 PDF 文档',
+        }),
+        icon: FileDown,
+      },
     ],
     [t]
   );
@@ -148,51 +170,6 @@ export function ExportDialog({
       return lines.join('\n');
     },
     [options]
-  );
-
-  // 导出为 OPML
-  const exportToOPML = useCallback(
-    (nodes: OutlineNode[]): string => {
-      function nodeToOutline(node: OutlineNode): string {
-        const text = node.plainText
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;');
-
-        const children = node.children.map(nodeToOutline).join('\n    ');
-
-        let attrs = `text="${text}"`;
-        if (options.includeCompletionStatus && node.completed) {
-          attrs += ' _status="completed"';
-        }
-        if (options.includeNotes && node.notePlainText) {
-          attrs += ` _note="${node.notePlainText.replace(/"/g, '&quot;')}"`;
-        }
-        if (options.includeTags && node.tags.length > 0) {
-          attrs += ` _tags="${node.tags.join(',')}"`;
-        }
-
-        if (children) {
-          return `<outline ${attrs}>\n    ${children}\n  </outline>`;
-        }
-        return `<outline ${attrs}/>`;
-      }
-
-      const outlines = nodes.map(nodeToOutline).join('\n  ');
-
-      return `<?xml version="1.0" encoding="UTF-8"?>
-<opml version="2.0">
-  <head>
-    <title>${documentTitle}</title>
-    <dateCreated>${new Date().toISOString()}</dateCreated>
-  </head>
-  <body>
-  ${outlines}
-  </body>
-</opml>`;
-    },
-    [documentTitle, options]
   );
 
   // 导出为 JSON
@@ -370,6 +347,43 @@ export function ExportDialog({
           defaultExt = 'html';
           filterName = 'HTML';
           break;
+        case 'docx':
+        case 'pdf': {
+          // DOCX/PDF: 通过 Rust 后端 export_document_native 导出
+          const md = outlineToMarkdown(
+            { ...outline, title: documentTitle },
+            {
+              includeCompleted: options.includeCompletionStatus,
+              includeNotes: options.includeNotes,
+              numberedLists: options.numberedLists,
+            }
+          );
+          const ext = options.format;
+          const nativePath = await save({
+            defaultPath: `${documentTitle}.${ext}`,
+            filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
+          });
+          if (!nativePath) { setIsExporting(false); return; }
+
+          const result = await invoke<string>('export_document_native', {
+            documentId: documentId || '',
+            projectId: projectId || '',
+            format: ext,
+            outputPath: nativePath,
+            contentOverride: md,
+          });
+
+          if (ext === 'pdf') {
+            await invoke('open_pdf_preview', {
+              htmlPath: result,
+              title: `PDF 预览 - ${documentTitle}`,
+            });
+          }
+          setExportSuccess(true);
+          setTimeout(() => onClose(), 1000);
+          setIsExporting(false);
+          return;
+        }
       }
 
       const filePath = await save({
@@ -394,16 +408,7 @@ export function ExportDialog({
     } finally {
       setIsExporting(false);
     }
-  }, [
-    options,
-    outline,
-    documentTitle,
-    exportToMarkdown,
-    exportToOPML,
-    exportToJSON,
-    exportToHTML,
-    onClose,
-  ]);
+  }, [options, outline, documentTitle, exportToJSON, exportToHTML, onClose, documentId, projectId]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

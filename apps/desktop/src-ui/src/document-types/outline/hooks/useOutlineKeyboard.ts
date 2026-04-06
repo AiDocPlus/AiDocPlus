@@ -96,7 +96,9 @@ export function useOutlineKeyboard(config: OutlineKeyboardConfig): OutlineShortc
   const { t } = useTranslation();
 
   const configRef = useRef(config);
-  configRef.current = config;
+  useEffect(() => {
+    configRef.current = config;
+  });
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {

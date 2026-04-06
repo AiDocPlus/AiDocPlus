@@ -30,9 +30,13 @@ const CALCULATOR_AI_SYSTEM_BASE_ZH = `你是一个专业的数学计算助手。
 
 本计算器**不支持**：
 - Excel 专有函数（如 VLOOKUP、IFERROR、INDEX、MATCH）— 请用等价数学表达式替代
-- 自定义函数定义
 - 复杂编程逻辑（循环、条件分支）
 - 矩阵运算（基础向量的点积除外）
+
+本计算器**支持**：
+- 自定义函数定义：\`fn 函数名(参数) = 表达式\`
+- 行内图表：\`chart(line/bar/pie/scatter/area, 标签, 数据, {title})\`
+- 敏感性分析：\`sens(表达式, 变量, [起始, 步长, 结束])\`
 
 ## 常见错误与修正
 
@@ -95,9 +99,13 @@ This calculator supports:
 
 This calculator **does not** support:
 - Excel-specific functions (e.g. VLOOKUP, IFERROR, INDEX, MATCH) — use equivalent math expressions
-- Custom function definitions
 - Complex programming logic (loops, conditional branching)
 - Matrix operations (except basic vector dot products)
+
+This calculator **supports**:
+- Custom function definitions: \`fn name(params) = expression\`
+- Inline charts: \`chart(line/bar/pie/scatter/area, labels, data, {title})\`
+- Sensitivity analysis: \`sens(expression, variable, [start, step, end])\`
 
 ## Common Errors & Corrections
 

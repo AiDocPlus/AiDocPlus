@@ -17,6 +17,8 @@ export interface ComputeSheetLinesOptions {
   extractSemantics: ExtractSemanticsFn;
   formatSubtotalDisplay: (sum: number) => string;
   nowIso: () => string;
+  /** 注册用户自定义函数（fn 语法） */
+  registerUserFunction?: (name: string, params: string[], body: string) => boolean;
 }
 
 /**
@@ -74,7 +76,7 @@ export function computeSheetLinesSequential(
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i]!;
     const lineRole = resolveLineRole(raw, hashBehavior);
-    const isNote = lineRole === 'heading' || lineRole === 'comment';
+    const isNote = lineRole === 'heading' || lineRole === 'comment' || lineRole === 'function_def';
     const lineNumber = i + 1;
 
     if (lineRole === 'heading' || lineRole === 'comment') {
@@ -95,6 +97,31 @@ export function computeSheetLinesSequential(
       if (lineRole === 'heading') {
         sectionBoundaryIndex = i;
       }
+      continue;
+    }
+
+    if (lineRole === 'function_def') {
+      // 解析 fn 函数名(参数) = 表达式
+      const fnMatch = raw.expression.match(/^fn\s+([a-zA-Z_\u4e00-\u9fa5][a-zA-Z0-9_\u4e00-\u9fa5]*)\s*\(([^)]*)\)\s*=\s*(.+)$/i);
+      const fnName = fnMatch?.[1]?.trim();
+      const fnParams = fnMatch?.[2]?.split(',').map(s => s.trim()).filter(Boolean) ?? [];
+      const fnBody = fnMatch?.[3]?.trim() ?? '';
+      const registered = fnName && fnBody && options.registerUserFunction?.(fnName, fnParams, fnBody);
+      built.push({
+        ...raw,
+        lineNumber,
+        lineRole,
+        isNote: true,
+        result: {
+          type: 'string',
+          value: raw.expression,
+          displayValue: registered ? `fn ${fnName}(${fnParams.join(', ')})` : '',
+        },
+        definedVariables: [],
+        dependencies: [],
+        computedAt: nowIso(),
+        fnDef: fnName && fnBody ? { name: fnName, params: fnParams, body: fnBody } : undefined,
+      });
       continue;
     }
 

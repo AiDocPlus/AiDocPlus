@@ -186,7 +186,7 @@ export default function OutlineAISidebar({
   const activeSession = useMemo(() =>
     sessions.find(s => s.id === activeSessionId) || (sessions.length > 0 ? sessions[0] : null),
   [sessions, activeSessionId]);
-  const messages = activeSession?.messages || [];
+  const messages = useMemo(() => activeSession?.messages || [], [activeSession]);
   const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
 
   // ── 对话状态 ──
@@ -439,7 +439,7 @@ export default function OutlineAISidebar({
       return;
     }
 
-    let finalPrompt = prompt
+    const finalPrompt = prompt
       .replace(/\{\{outlineContent\}\}/g, smartContextText.slice(-8000))
       .replace(/\{\{title\}\}/g, doc.title || t('outline.title', { defaultValue: '大纲' }))
       .replace(/\{\{activeNode\}\}/g, layeredContext.critical.activeNodeContent || '')
@@ -447,7 +447,7 @@ export default function OutlineAISidebar({
       .replace(/\{\{textInput\}\}/g, '');
 
     sendMessage(finalPrompt);
-  }, [doc.title, doc.id, getOutlineMarkdown, smartContextText, t, layeredContext, sendMessage]);
+  }, [doc.title, getOutlineMarkdown, smartContextText, t, layeredContext, sendMessage]);
 
   const handleExecuteAction = useCallback((item: OutlineQuickActionItem) => {
     setActionStore(prev => {

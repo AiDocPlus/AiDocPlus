@@ -4,7 +4,7 @@
  * 三栏布局：左栏（日历+条目列表）| 中栏（工具栏+编辑器+状态栏）| 右栏（AI助手占位）
  * 数据源：单文档 JSON（DiaryDocumentContent）
  */
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo, lazy, Suspense, Component, type ReactNode, type ErrorInfo } from 'react';
 import type { DocTypeEditorProps } from '@/doctype-sdk/types';
 import { useTranslation } from '@/i18n';
 import { cn } from '@/lib/utils';
@@ -20,17 +20,18 @@ import DiaryTimelineView from './DiaryTimelineView';
 import DiaryToolbar from './DiaryToolbar';
 import DiaryEditor from './DiaryEditor';
 import DiaryContextMenu from './DiaryContextMenu';
-import DiarySettingsDialog from './DiarySettingsDialog';
-import DiaryAISidebar from './DiaryAISidebar';
-import DiaryDashboard from './DiaryDashboard';
-import DiaryExportDialog from './DiaryExportDialog';
-import DiaryOnThisDay from './DiaryOnThisDay';
-import DiaryImportDialog from './DiaryImportDialog';
-import DiaryTemplateDialog from './DiaryTemplateDialog';
-import DiaryDailyPrompt from './DiaryDailyPrompt';
-import DiaryTrashPanel from './DiaryTrashPanel';
-import DiarySearchDialog from './DiarySearchDialog';
 import DiaryStatusBar from './DiaryStatusBar';
+// 懒加载重型弹窗/侧栏组件
+const DiarySettingsDialog = lazy(() => import('./DiarySettingsDialog'));
+const DiaryAISidebar = lazy(() => import('./DiaryAISidebar'));
+const DiaryDashboard = lazy(() => import('./DiaryDashboard'));
+const DiaryExportDialog = lazy(() => import('./DiaryExportDialog'));
+const DiaryOnThisDay = lazy(() => import('./DiaryOnThisDay'));
+const DiaryImportDialog = lazy(() => import('./DiaryImportDialog'));
+const DiaryTemplateDialog = lazy(() => import('./DiaryTemplateDialog'));
+const DiaryDailyPrompt = lazy(() => import('./DiaryDailyPrompt'));
+const DiaryTrashPanel = lazy(() => import('./DiaryTrashPanel'));
+const DiarySearchDialog = lazy(() => import('./DiarySearchDialog'));
 import NovelEditorSettings, { loadAppearance, getAppearanceStyle, getEditorInnerStyle, type EditorAppearance } from '../novel/NovelEditorSettings';
 import {
   parseDiaryContent, createEmptyDiaryContent, createEntry,
@@ -41,13 +42,68 @@ import {
   getTotalWordCount, getTodayWordCount, calculateStreak,
   getEntryWordCount, applyFilter, EMPTY_FILTER,
   MOOD_EMOJI,
-  type DiaryDocumentContent, type DiaryMood, type DiaryWeatherType, type DiaryFilterState,
+  type DiaryDocumentContent, type DiaryEntry, type DiaryMood, type DiaryWeatherType, type DiaryFilterState,
 } from './types';
 import { getTemplateById } from './diaryTemplates';
 import { createDemoDiaryContent } from './diaryDemoData';
 import { DEFAULT_LEFT_WIDTH, DEFAULT_RIGHT_WIDTH, CONTENT_SAVE_DEBOUNCE_MS, META_SAVE_DEBOUNCE_MS, SAVE_STATUS_DISPLAY_MS } from './constants';
 
-export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTypeEditorProps) {
+class DiaryWorkspaceErrorBoundary extends Component<
+  { children: ReactNode; docId: string },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode; docId: string }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true };
+  }
+
+  override componentDidCatch(error: Error, info: ErrorInfo): void {
+    console.error('[DiaryDocWorkspace]', error, info.componentStack);
+  }
+
+  override componentDidUpdate(prevProps: { docId: string }): void {
+    if (prevProps.docId !== this.props.docId && this.state.hasError) {
+      this.setState({ hasError: false });
+    }
+  }
+
+  override render() {
+    if (this.state.hasError) {
+      return (
+        <div
+          className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center text-muted-foreground bg-card"
+          data-diary-error-boundary="true"
+        >
+          <p className="text-sm max-w-md">
+            日记工作区出现异常。可尝试重试；若仍失败请切换文档后重新打开。
+          </p>
+          <button
+            type="button"
+            className="px-3 py-1.5 text-sm border rounded-md hover:bg-accent transition-colors"
+            onClick={() => this.setState({ hasError: false })}
+          >
+            重试
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function DiaryDocWorkspace(props: DocTypeEditorProps) {
+  return (
+    <DiaryWorkspaceErrorBoundary docId={props.document.id}>
+      <DiaryDocWorkspaceMain {...props} />
+    </DiaryWorkspaceErrorBoundary>
+  );
+}
+
+function DiaryDocWorkspaceMain({ document: doc, host, tabId }: DocTypeEditorProps) {
   const { t } = useTranslation();
   const { closeTab, closeAllTabs } = useAppStore(useShallow(s => ({
     closeTab: s.closeTab, closeAllTabs: s.closeAllTabs,
@@ -67,6 +123,15 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // ── 撤销/重做历史 ──
+  const MAX_UNDO_HISTORY = 50;
+  const [undoPast, setUndoPast] = useState<DiaryDocumentContent[]>([]);
+  const [undoFuture, setUndoFuture] = useState<DiaryDocumentContent[]>([]);
+  const undoPastRef = useRef(undoPast);
+  undoPastRef.current = undoPast;
+  const undoFutureRef = useRef(undoFuture);
+  undoFutureRef.current = undoFuture;
 
   // ── 日历状态 ──
   const [calendarDate, setCalendarDate] = useState(new Date());
@@ -186,6 +251,50 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
     scheduleSave(META_SAVE_DEBOUNCE_MS);
   }, [host.doc, scheduleSave]);
 
+  // ── 撤销/重做回调 ──
+  const pushUndoHistory = useCallback(() => {
+    setUndoPast(prev => [...prev, diaryRef.current].slice(-MAX_UNDO_HISTORY));
+    setUndoFuture([]);
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    const p = undoPastRef.current;
+    if (p.length === 0) return;
+    const prev = p[p.length - 1];
+    setUndoPast(pp => pp.slice(0, -1));
+    setUndoFuture(f => [diaryRef.current, ...f].slice(0, MAX_UNDO_HISTORY));
+    setDiary(prev);
+    diaryRef.current = prev;
+    host.doc.updateInMemory({ content: JSON.stringify(prev) });
+    host.doc.markDirty();
+    scheduleSave(META_SAVE_DEBOUNCE_MS);
+    const currentId = activeEntryIdRef.current;
+    if (currentId) {
+      const entry = prev.entries.find(e => e.id === currentId);
+      if (entry) setEntryContent(entry.content);
+      else { setActiveEntryId(null); setEntryContent(''); }
+    }
+  }, [host.doc, scheduleSave]);
+
+  const handleRedo = useCallback(() => {
+    const f = undoFutureRef.current;
+    if (f.length === 0) return;
+    const next = f[0];
+    setUndoFuture(ff => ff.slice(1));
+    setUndoPast(p => [...p, diaryRef.current].slice(-MAX_UNDO_HISTORY));
+    setDiary(next);
+    diaryRef.current = next;
+    host.doc.updateInMemory({ content: JSON.stringify(next) });
+    host.doc.markDirty();
+    scheduleSave(META_SAVE_DEBOUNCE_MS);
+    const currentId = activeEntryIdRef.current;
+    if (currentId) {
+      const entry = next.entries.find(e => e.id === currentId);
+      if (entry) setEntryContent(entry.content);
+      else { setActiveEntryId(null); setEntryContent(''); }
+    }
+  }, [host.doc, scheduleSave]);
+
   // ── 组件卸载时清理所有 timer ──
   useEffect(() => {
     return () => {
@@ -195,21 +304,32 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
   }, []);
 
   const handleSave = useCallback(() => {
-    setIsSaving(true);
-    setSaveStatus('saving');
     // 使用 ref 获取最新内容，避免闭包过期
     const currentContent = entryContentRef.current;
     const currentEntryId = activeEntryIdRef.current;
+    let needSync = false;
     if (currentEntryId) {
-      let updated = updateEntryContent(diaryRef.current, currentEntryId, currentContent);
-      updated = updateDiaryMetadata(updated);
-      setDiary(updated);
-      diaryRef.current = updated;
-      host.doc.updateInMemory({ content: JSON.stringify(updated) });
+      const entry = diaryRef.current.entries.find(e => e.id === currentEntryId);
+      if (entry && entry.content !== currentContent) {
+        let updated = updateEntryContent(diaryRef.current, currentEntryId, currentContent);
+        updated = updateDiaryMetadata(updated);
+        setDiary(updated);
+        diaryRef.current = updated;
+        host.doc.updateInMemory({ content: JSON.stringify(updated) });
+        needSync = true;
+      }
     }
+    // 若无变化且文档未脏，跳过磁盘写入
+    if (!needSync && !dirtyMarkedRef.current) {
+      setSaveStatus('saved');
+      return;
+    }
+    setIsSaving(true);
+    setSaveStatus('saving');
     host.doc.save().then(() => {
       setIsSaving(false);
       setSaveStatus('saved');
+      dirtyMarkedRef.current = false;
     }).catch(() => {
       setIsSaving(false);
       setSaveStatus('unsaved');
@@ -294,6 +414,7 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
 
   // ── 新建条目 ──
   const handleNewEntry = useCallback(() => {
+    pushUndoHistory();
     // 使用 ref 获取最新值
     const currentId = activeEntryIdRef.current;
     const currentContent = entryContentRef.current;
@@ -308,7 +429,7 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
     saveDiary(updated);
     setActiveEntryId(newEntry.id);
     setEntryContent(newEntry.content);
-  }, [saveDiary]);
+  }, [saveDiary, pushUndoHistory]);
 
   // ── 写作计时器 ──
   // 追踪用户在当前条目上的写作时间，停止输入后暂停
@@ -316,9 +437,9 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
   const writingSecondsRef = useRef(0);
   const [writingTime, setWritingTime] = useState(0);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const IDLE_TIMEOUT = 5000; // 5秒无输入暂停计时
+  const IDLE_TIMEOUT = 30_000; // 30秒无输入暂停计时
 
-  // 切换条目或日期时重置计时器
+  // 切换条目或日期时重置计时器，先同步最后计时值再清零
   useEffect(() => {
     if (writingTimerRef.current) { clearInterval(writingTimerRef.current); writingTimerRef.current = null; }
     if (idleTimerRef.current) { clearTimeout(idleTimerRef.current); idleTimerRef.current = null; }
@@ -330,8 +451,7 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
     if (writingTimerRef.current) return; // 已在运行
     writingTimerRef.current = setInterval(() => {
       writingSecondsRef.current++;
-      // 每10秒更新一次 UI
-      if (writingSecondsRef.current % 10 === 0) setWritingTime(writingSecondsRef.current);
+      setWritingTime(writingSecondsRef.current); // 每秒更新 UI
     }, 1000);
   }, []);
 
@@ -478,8 +598,9 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
 
   const handleMoveToJournal = useCallback((journalId: string) => {
     if (!activeEntryId) return;
+    pushUndoHistory();
     saveDiary(moveEntryToJournal(diaryRef.current, activeEntryId, journalId));
-  }, [activeEntryId, saveDiary]);
+  }, [activeEntryId, saveDiary, pushUndoHistory]);
 
   // ── Phase 2: 右键菜单回调 ──
   const handleCtxToggleStarred = useCallback((entryId: string) => {
@@ -487,21 +608,24 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
   }, [saveDiary]);
 
   const handleCtxDuplicate = useCallback((entryId: string) => {
+    pushUndoHistory();
     saveDiary(duplicateEntry(diaryRef.current, entryId));
-  }, [saveDiary]);
+  }, [saveDiary, pushUndoHistory]);
 
   const handleCtxDelete = useCallback((entryId: string) => {
+    pushUndoHistory();
     const updated = softDeleteEntry(diaryRef.current, entryId);
     saveDiary(updated);
     if (activeEntryIdRef.current === entryId) {
       setActiveEntryId(null);
       setEntryContent('');
     }
-  }, [saveDiary]);
+  }, [saveDiary, pushUndoHistory]);
 
   const handleCtxMoveToJournal = useCallback((entryId: string, journalId: string) => {
+    pushUndoHistory();
     saveDiary(moveEntryToJournal(diaryRef.current, entryId, journalId));
-  }, [saveDiary]);
+  }, [saveDiary, pushUndoHistory]);
 
   const handleCtxSetMood = useCallback((entryId: string, mood: DiaryMood | undefined) => {
     saveDiary(updateEntryMeta(diaryRef.current, entryId, { mood }));
@@ -562,6 +686,12 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
         setSearchOpen(true);
         return;
       }
+      // ⌘Z / ⌘⇧Z: 撤销/重做（全局拦截，不分输入框）
+      if ((e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        if (e.shiftKey) handleRedo(); else handleUndo();
+        return;
+      }
       // 在输入框中时仅拦截保存（⌘S）
       const tag = (e.target as HTMLElement)?.tagName;
       const isEditing = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable;
@@ -592,14 +722,22 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [focusMode, searchOpen, handleNewEntry, handleSave, handleSaveAll, handlePrevDay, handleNextDay, handleToday, handleFocus]);
+  }, [focusMode, searchOpen, handleNewEntry, handleSave, handleSaveAll, handlePrevDay, handleNextDay, handleToday, handleFocus, handleUndo, handleRedo]);
 
   // ── 统计数据 ──
   const activeEntryCount = useMemo(() => diary.entries.filter(e => !e.deletedAt).length, [diary.entries]);
   const totalWords = useMemo(() => getTotalWordCount(diary), [diary]);
   const todayWords = useMemo(() => getTodayWordCount(diary), [diary]);
   const streak = useMemo(() => calculateStreak(diary), [diary]);
-  const today = getTodayDateStr();
+  // 跨午夜自动刷新：每分钟检查日期是否变化
+  const [today, setToday] = useState(getTodayDateStr());
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = getTodayDateStr();
+      if (now !== today) setToday(now);
+    }, 60_000);
+    return () => clearInterval(timer);
+  }, [today]);
   const onThisDay = useMemo(() => getEntriesOnThisDay(diary, today), [diary, today]);
   const chapterWords = useMemo(() => activeEntry ? getEntryWordCount(activeEntry) : 0, [activeEntry]);
   const paragraphCount = useMemo(() => activeEntry ? (entryContent.split(/\n\s*\n/).filter(p => p.trim()).length) : 0, [activeEntry, entryContent]);
@@ -611,6 +749,7 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
   );
 
   return (
+    <Suspense fallback={null}>
     <div className="flex h-full w-full overflow-hidden" style={{ fontFamily: "'宋体', 'SimSun', serif", fontSize: '16px' }}>
       {/* ═══ 左栏：日历+条目列表 ═══ */}
       {!leftCollapsed && (
@@ -741,6 +880,10 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
             onCloseAllTabs={() => closeAllTabs()}
             onSave={handleSave}
             onSaveAll={handleSaveAll}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            canUndo={undoPast.length > 0}
+            canRedo={undoFuture.length > 0}
             onOpenDashboard={() => setDashboardOpen(true)}
             onOpenExport={() => setExportOpen(true)}
             onOpenImport={() => setImportOpen(true)}
@@ -985,5 +1128,6 @@ export default function DiaryDocWorkspace({ document: doc, host, tabId }: DocTyp
         </>
       )}
     </div>
+    </Suspense>
   );
 }

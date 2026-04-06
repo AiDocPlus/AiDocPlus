@@ -586,3 +586,50 @@
 .dark .search-highlight {
   background-color: hsl(45 93% 47% / 0.3);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   字体大小设置
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.outline-editor.font-14 {
+  font-size: 14px;
+}
+
+.outline-editor.font-16 {
+  font-size: 16px;
+}
+
+.outline-editor.font-18 {
+  font-size: 18px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   行间距设置
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.outline-editor.compact .outline-row {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.outline-editor.compact .prose-mirror-node-editor {
+  line-height: 1.4;
+}
+
+.outline-editor.normal .outline-row {
+  padding-top: 0.125rem;
+  padding-bottom: 0.125rem;
+}
+
+.outline-editor.normal .prose-mirror-node-editor {
+  line-height: 1.6;
+}
+
+.outline-editor.loose .outline-row {
+  padding-top: 0.375rem;
+  padding-bottom: 0.375rem;
+}
+
+.outline-editor.loose .prose-mirror-node-editor {
+  line-height: 1.8;
+}

@@ -11,19 +11,16 @@ import {
   useMemo,
   lazy,
   Suspense,
-  Component,
-  type ErrorInfo,
-  type ReactNode,
 } from 'react';
 import type { DocTypeEditorProps } from '@/doctype-sdk/types';
 import { useTranslation } from 'react-i18next';
-import i18n from '@/i18n';
 import {
   Calculator, Trash2, Download, Upload, HelpCircle, Zap,
-  Plus, Edit2, MoreHorizontal, Copy, Trash, Undo2, Redo2,
+  Copy, Trash, Undo2, Redo2,
   Settings, Variable, FileCode2, Clipboard, Scissors,
   Save, SaveAll, History, FilePlus, FileText, Star, Sigma,
   PanelRightClose, PanelRightOpen, ListTree, ChevronDown, RefreshCw,
+  Search, X, ChevronUp, ArrowDown, Maximize2, Minimize2, BarChart3, ArrowLeftRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -57,6 +54,8 @@ import {
   getActiveSheet,
   syncCalculatorLineMeta,
   inferLineRole,
+  generateSheetId,
+  generateLineId,
 } from './types';
 import { computeSheetLinesSequential } from './calculatorCompute';
 import { CalculatorEngine, createCalculatorEngine } from './engine/CalculatorEngine';
@@ -77,8 +76,10 @@ import {
   type CalculatorTemplate,
 } from './CalculatorTemplatePanel';
 import { useResizableResultColumn } from './CalculatorResizer';
+import { SheetTabs, CalculatorWorkspaceErrorBoundary } from './CalculatorSheetTabs';
 import { CalculatorExportDialog } from './CalculatorExportDialog';
 import { CalculatorSettingsDialog } from './CalculatorSettingsDialog';
+import { CalculatorDashboard } from './CalculatorDashboard';
 import {
   Dialog,
   DialogContent,
@@ -104,201 +105,6 @@ import { STATUS_BAR_CLASS, TOOLBAR_ICON } from '../_shared/styles';
 /** 主工具栏图标按钮（与长篇小说等文档一致：仅图标 + title） */
 const CALC_TB_ICON = 'h-7 w-7 shrink-0 p-0';
 
-// ============================================================
-// Sheet 标签栏组件
-// ============================================================
-
-interface SheetTabsProps {
-  sheets: CalculatorSheet[];
-  activeSheetId: string;
-  onSelectSheet: (id: string) => void;
-  onAddSheet: () => void;
-  onRenameSheet: (id: string, name: string) => void;
-  onDeleteSheet: (id: string) => void;
-  onDuplicateSheet: (id: string) => void;
-}
-
-function SheetTabs({
-  sheets,
-  activeSheetId,
-  onSelectSheet,
-  onAddSheet,
-  onRenameSheet,
-  onDeleteSheet,
-  onDuplicateSheet,
-}: SheetTabsProps) {
-  const { t } = useTranslation();
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const handleStartEdit = (sheet: CalculatorSheet) => {
-    setEditingId(sheet.id);
-    setEditName(sheet.name);
-    setTimeout(() => inputRef.current?.focus(), 0);
-  };
-
-  const handleSaveEdit = () => {
-    if (editingId && editName.trim()) {
-      onRenameSheet(editingId, editName.trim());
-    }
-    setEditingId(null);
-    setEditName('');
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSaveEdit();
-    } else if (e.key === 'Escape') {
-      setEditingId(null);
-      setEditName('');
-    }
-  };
-
-  const handleTabDoubleClick = (e: React.MouseEvent, sheet: CalculatorSheet) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (sheet.id !== activeSheetId) {
-      onSelectSheet(sheet.id);
-    }
-    handleStartEdit(sheet);
-  };
-
-  return (
-    <div className="flex items-center gap-1 px-2 py-1 bg-muted/30 border-b overflow-x-auto scrollbar-hide">
-      {sheets.map((sheet) => (
-        <div
-          key={sheet.id}
-          className={cn(
-            'group flex items-center gap-1 px-3 py-1.5 rounded-t text-sm cursor-pointer transition-colors select-none',
-            sheet.id === activeSheetId
-              ? 'bg-sky-600 text-white border border-sky-700 border-b-transparent shadow-sm dark:bg-sky-700 dark:border-sky-800'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent',
-          )}
-          onClick={() => sheet.id !== activeSheetId && onSelectSheet(sheet.id)}
-          onDoubleClick={(e) => handleTabDoubleClick(e, sheet)}
-        >
-          {editingId === sheet.id ? (
-            <Input
-              ref={inputRef}
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              onBlur={handleSaveEdit}
-              onKeyDown={handleKeyDown}
-              className="h-6 w-24 text-sm px-1"
-              onClick={(e) => e.stopPropagation()}
-              onDoubleClick={(e) => e.stopPropagation()}
-            />
-          ) : (
-            <>
-              <span className="truncate max-w-[100px]">{sheet.name}</span>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className={cn(
-                      'opacity-0 group-hover:opacity-100 p-0.5 rounded transition-opacity',
-                      sheet.id === activeSheetId
-                        ? 'hover:bg-white/20 text-white'
-                        : 'hover:bg-muted',
-                    )}
-                    onClick={(e) => e.stopPropagation()}
-                    title={t('calculator.sheetMenu', { defaultValue: '工作表菜单' })}
-                    aria-label={t('calculator.sheetMenu', { defaultValue: '工作表菜单' })}
-                  >
-                    <MoreHorizontal className="h-3 w-3" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-36">
-                  <DropdownMenuItem onClick={() => handleStartEdit(sheet)}>
-                    <Edit2 className="h-4 w-4 mr-2" />
-                    {t('calculator.renameSheet', { defaultValue: '重命名' })}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onDuplicateSheet(sheet.id)}>
-                    <Copy className="h-4 w-4 mr-2" />
-                    {t('calculator.duplicateSheet', { defaultValue: '复制' })}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => onDeleteSheet(sheet.id)}
-                    disabled={sheets.length <= 1}
-                    className="text-red-500 focus:text-red-500"
-                  >
-                    <Trash className="h-4 w-4 mr-2" />
-                    {t('calculator.deleteSheet', { defaultValue: '删除' })}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </>
-          )}
-        </div>
-      ))}
-
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-        onClick={onAddSheet}
-      >
-        <Plus className="h-4 w-4" />
-      </Button>
-    </div>
-  );
-}
-
-// ============================================================
-// 错误边界：避免单点渲染异常拖死整个标签页
-// ============================================================
-
-class CalculatorWorkspaceErrorBoundary extends Component<
-  { children: ReactNode; docId: string },
-  { hasError: boolean }
-> {
-  constructor(props: { children: ReactNode; docId: string }) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError(): { hasError: boolean } {
-    return { hasError: true };
-  }
-
-  override componentDidCatch(error: Error, info: ErrorInfo): void {
-    console.error('[CalculatorWorkspace]', error, info.componentStack);
-  }
-
-  override componentDidUpdate(prevProps: { docId: string }): void {
-    if (prevProps.docId !== this.props.docId && this.state.hasError) {
-      this.setState({ hasError: false });
-    }
-  }
-
-  override render() {
-    if (this.state.hasError) {
-      return (
-        <div
-          className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center text-muted-foreground bg-card"
-          data-calculator-error-boundary="true"
-        >
-          <p className="text-sm max-w-md">
-            {i18n.t('calculator.workspaceErrorBoundary', {
-              defaultValue: '计算工作区出现异常。可尝试重试；若仍失败请切换文档后重新打开或检查文档内容。',
-            })}
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => this.setState({ hasError: false })}
-          >
-            {i18n.t('calculator.workspaceErrorRetry', { defaultValue: '重试' })}
-          </Button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
 
 // ============================================================
 // 主组件
@@ -347,6 +153,12 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
   // 当前行选择状态
   const [activeLineIndex, setActiveLineIndex] = useState<number | null>(null);
 
+  // 多选状态
+  const [selectedLineIndices, setSelectedLineIndices] = useState<Set<number>>(new Set());
+
+  // 专注模式
+  const [focusMode, setFocusMode] = useState(false);
+
   // 行剪贴板（用于复制/粘贴）
   const [lineClipboard, setLineClipboard] = useState<CalculatorLine | null>(null);
 
@@ -365,8 +177,93 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
   // 帮助
   const [helpOpen, setHelpOpen] = useState(false);
 
+  // 批量删除确认
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+
+  // 仪表盘
+  const [dashboardOpen, setDashboardOpen] = useState(false);
+
   const lineEditorRef = useRef<CalculatorLineEditorHandle | null>(null);
   const [functionMenuSearch, setFunctionMenuSearch] = useState('');
+
+  // 搜索
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [replaceOpen, setReplaceOpen] = useState(false);
+  const [replaceQuery, setReplaceQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const replaceInputRef = useRef<HTMLInputElement>(null);
+  const searchQueryRef = useRef(searchQuery);
+  searchQueryRef.current = searchQuery;
+
+  // 搜索匹配：跨所有 Sheet 查找，返回 { sheetIndex, lineIndex }[]
+  const searchMatches = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [] as { sheetIndex: number; lineIndex: number }[];
+    const results: { sheetIndex: number; lineIndex: number }[] = [];
+    for (let si = 0; si < calcDoc.sheets.length; si++) {
+      const sheet = calcDoc.sheets[si];
+      for (let li = 0; li < sheet.lines.length; li++) {
+        const line = sheet.lines[li];
+        const expr = (line.expression || '').toLowerCase();
+        const res = (line.result?.displayValue || '').toLowerCase();
+        if (expr.includes(q) || res.includes(q)) {
+          results.push({ sheetIndex: si, lineIndex: li });
+        }
+      }
+    }
+    return results;
+  }, [searchQuery, calcDoc.sheets]);
+
+  const [activeMatchIndex, setActiveMatchIndex] = useState(0);
+
+  // 获取当前激活的 Sheet
+  const activeSheet = useMemo(() => getActiveSheet(calcDoc), [calcDoc]);
+
+  // 当前 Sheet 的匹配行索引集合
+  const highlightedLines = useMemo(() => {
+    const activeSheetIndex = calcDoc.sheets.findIndex(s => s.id === calcDoc.activeSheetId);
+    if (!searchQuery.trim()) return new Set<number>();
+    return new Set(
+      searchMatches
+        .filter(m => m.sheetIndex === activeSheetIndex)
+        .map(m => m.lineIndex),
+    );
+  }, [searchMatches, calcDoc.sheets, calcDoc.activeSheetId]);
+
+  // 当前 Sheet 内的匹配列表 + 当前高亮行索引
+  const currentSheetMatches = useMemo(() => {
+    const activeSheetIndex = calcDoc.sheets.findIndex(s => s.id === calcDoc.activeSheetId);
+    return searchMatches.filter(m => m.sheetIndex === activeSheetIndex);
+  }, [searchMatches, calcDoc.sheets, calcDoc.activeSheetId]);
+
+  const currentHighlightLineIndex = useMemo(() => {
+    if (currentSheetMatches.length === 0) return null;
+    const idx = activeMatchIndex % currentSheetMatches.length;
+    return currentSheetMatches[idx]?.lineIndex ?? null;
+  }, [activeMatchIndex, currentSheetMatches]);
+
+  // 搜索导航
+  const handleSearchNavigate = useCallback((direction: 'next' | 'prev') => {
+    if (searchMatches.length === 0) return;
+    const totalMatches = searchMatches.length;
+    const prevIdx = activeMatchIndex;
+    const nextIdx = direction === 'next'
+      ? (prevIdx + 1) % totalMatches
+      : (prevIdx - 1 + totalMatches) % totalMatches;
+    const match = searchMatches[nextIdx];
+    if (!match) return;
+    setActiveMatchIndex(nextIdx);
+    // 跨 Sheet：切换到匹配行所在 Sheet
+    const currentSheetIndex = calcDoc.sheets.findIndex(s => s.id === calcDoc.activeSheetId);
+    if (match.sheetIndex !== currentSheetIndex) {
+      const targetSheet = calcDoc.sheets[match.sheetIndex];
+      if (targetSheet) {
+        setCalcDoc(switchSheet(calcDoc, targetSheet.id));
+      }
+    }
+    setActiveLineIndex(match.lineIndex);
+  }, [searchMatches, activeMatchIndex, calcDoc]);
 
   // 初始化计算引擎
   useEffect(() => {
@@ -383,9 +280,6 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
     setFuture([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc.id]);
-
-  // 获取当前激活的 Sheet
-  const activeSheet = useMemo(() => getActiveSheet(calcDoc), [calcDoc]);
 
   /** 兼容引擎曾写入的纯数字映射、磁盘中的 null 项等 */
   const normalizedSheetVariables = useMemo((): Record<string, CalculatorVariable> => {
@@ -407,6 +301,41 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => host.doc.save(), 3000);
   }, [host.doc]);
+
+  // 查找替换
+  const handleReplace = useCallback(() => {
+    if (!searchQuery.trim() || currentSheetMatches.length === 0 || !activeSheet) return;
+    const match = currentSheetMatches[activeMatchIndex % currentSheetMatches.length];
+    if (!match) return;
+    const line = activeSheet.lines[match.lineIndex];
+    if (!line) return;
+
+    const newExpression = line.expression.replace(
+      new RegExp(searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
+      replaceQuery,
+    );
+    if (newExpression === line.expression) return;
+
+    const newLines = [...activeSheet.lines];
+    newLines[match.lineIndex] = { ...line, expression: newExpression };
+
+    const updated = updateSheet(calcDoc, activeSheet.id, { lines: newLines });
+    saveDoc(updated);
+    // 跳到下一个匹配
+    setActiveMatchIndex(prev => Math.min(prev + 1, searchMatches.length - 1));
+  }, [searchQuery, replaceQuery, currentSheetMatches, activeMatchIndex, activeSheet, calcDoc, saveDoc, searchMatches.length]);
+
+  const handleReplaceAll = useCallback(() => {
+    if (!searchQuery.trim() || !activeSheet) return;
+    const re = new RegExp(searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    const newLines = activeSheet.lines.map(line => {
+      if (!line.expression.toLowerCase().includes(searchQuery.toLowerCase())) return line;
+      return { ...line, expression: line.expression.replace(re, replaceQuery) };
+    });
+
+    const updated = updateSheet(calcDoc, activeSheet.id, { lines: newLines });
+    saveDoc(updated);
+  }, [searchQuery, replaceQuery, activeSheet, calcDoc, saveDoc]);
 
   const flushPendingAutoSaveTimer = useCallback(() => {
     if (saveTimerRef.current) {
@@ -464,6 +393,79 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
   handleExplicitSaveRef.current = handleExplicitSave;
   handleSaveAllRef.current = handleSaveAll;
 
+  // 多选点击处理
+  const lastClickedLineIndexRef = useRef<number | null>(null);
+  const handleLineClick = useCallback((index: number, modifiers: { cmdKey: boolean; shiftKey: boolean }) => {
+    if (modifiers.shiftKey && lastClickedLineIndexRef.current !== null) {
+      const start = Math.min(lastClickedLineIndexRef.current, index);
+      const end = Math.max(lastClickedLineIndexRef.current, index);
+      setSelectedLineIndices(prev => {
+        const next = new Set(prev);
+        for (let i = start; i <= end; i++) next.add(i);
+        return next;
+      });
+    } else if (modifiers.cmdKey) {
+      setSelectedLineIndices(prev => {
+        const next = new Set(prev);
+        if (next.has(index)) next.delete(index);
+        else next.add(index);
+        return next;
+      });
+    } else {
+      setSelectedLineIndices(new Set());
+    }
+    lastClickedLineIndexRef.current = index;
+  }, []);
+
+  // 批量操作
+  const handleBulkDeleteRequest = useCallback(() => {
+    if (selectedLineIndices.size === 0) return;
+    setBulkDeleteConfirmOpen(true);
+  }, [selectedLineIndices]);
+
+  const handleBulkDeleteConfirm = useCallback(() => {
+    setBulkDeleteConfirmOpen(false);
+    if (selectedLineIndices.size === 0) return;
+    const activeSheet = getActiveSheet(calcDoc);
+    if (!activeSheet) return;
+    const newLines = activeSheet.lines.filter((_, i) => !selectedLineIndices.has(i));
+    const updated = updateSheet(calcDoc, activeSheet.id, { lines: newLines });
+    saveDoc(updated);
+    setSelectedLineIndices(new Set());
+    setActiveLineIndex(null);
+  }, [selectedLineIndices, calcDoc, saveDoc]);
+
+  const handleBulkComment = useCallback(() => {
+    if (selectedLineIndices.size === 0) return;
+    const activeSheet = getActiveSheet(calcDoc);
+    if (!activeSheet) return;
+    const newLines = activeSheet.lines.map((line, i) => {
+      if (!selectedLineIndices.has(i)) return line;
+      const isComment = line.lineRole === 'comment' || line.expression.startsWith('//') || line.expression.startsWith('#');
+      let expr = line.expression;
+      if (isComment) {
+        expr = expr.replace(/^\/\/\s*/, '').replace(/^#\s*/, '');
+      } else {
+        expr = '// ' + expr;
+      }
+      return { ...line, expression: expr };
+    });
+    const updated = updateSheet(calcDoc, activeSheet.id, { lines: newLines });
+    saveDoc(updated);
+  }, [selectedLineIndices, calcDoc, saveDoc]);
+
+  const handleBulkCopy = useCallback(() => {
+    if (selectedLineIndices.size === 0) return;
+    const activeSheet = getActiveSheet(calcDoc);
+    if (!activeSheet) return;
+    const expressions = [...selectedLineIndices]
+      .sort((a, b) => a - b)
+      .map(i => activeSheet.lines[i]?.expression || '')
+      .filter(Boolean)
+      .join('\n');
+    navigator.clipboard.writeText(expressions).catch(() => {});
+  }, [selectedLineIndices, calcDoc]);
+
   useEffect(() => {
     const onDocKeyDown = (e: KeyboardEvent) => {
       if (e.defaultPrevented) return;
@@ -479,6 +481,26 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
     };
     window.addEventListener('keydown', onDocKeyDown);
     return () => window.removeEventListener('keydown', onDocKeyDown);
+  }, []);
+
+  // ⌘/Ctrl + F：聚焦搜索
+  useEffect(() => {
+    const onFind = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
+      if (!(e.metaKey || e.ctrlKey) || e.key !== 'f') return;
+      const el = e.target as HTMLElement | null;
+      if (!el?.closest?.('[data-calculator-workspace="true"]')) return;
+      if (el.tagName === 'TEXTAREA') return;
+      if (el.tagName === 'INPUT' && el !== searchInputRef.current) return;
+      e.preventDefault();
+      setSearchOpen(true);
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }, 50);
+    };
+    window.addEventListener('keydown', onFind);
+    return () => window.removeEventListener('keydown', onFind);
   }, []);
 
   const templatesForMenu = useMemo(() => {
@@ -529,14 +551,31 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
   const canUndo = past.length > 0;
   const canRedo = future.length > 0;
 
-  // 计算所有行（含 Soulver 式标题分段与小计）
-  const computeAllLines = useCallback((lines: CalculatorLine[], _sheetId: string, settings?: CalculatorSettings): CalculatorLine[] => {
+  // 计算所有行（含 Soulver 式标题分段与小计，支持跨 Sheet 引用）
+  const computeAllLines = useCallback((lines: CalculatorLine[], sheetId: string, settings?: CalculatorSettings): CalculatorLine[] => {
     const engine = engineRef.current;
     if (!engine) return lines;
 
     const s = settings ?? calcDocRef.current.settings;
     engine.setDisplaySettings(s);
     engine.clearVariables();
+
+    // 注入前置 Sheet 的变量（跨 Sheet 引用支持）
+    const doc = calcDocRef.current;
+    const sheetIndex = doc.sheets.findIndex(sh => sh.id === sheetId);
+    if (sheetIndex > 0) {
+      for (let i = 0; i < sheetIndex; i++) {
+        const prevSheet = doc.sheets[i];
+        if (!prevSheet) continue;
+        const varsMap = new Map<string, unknown>();
+        for (const [name, variable] of Object.entries(prevSheet.variables)) {
+          if (variable.type === 'number' && typeof variable.value === 'number') {
+            varsMap.set(name, variable.value);
+          }
+        }
+        engine.setForeignSheetVars(prevSheet.name, varsMap);
+      }
+    }
 
     const formatSubtotalDisplay = (sum: number) => {
       const decimals = s.decimalPlaces;
@@ -554,6 +593,7 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
       extractSemantics: (expression, lineNumber) => engine.extractLineSemantics(expression, lineNumber),
       formatSubtotalDisplay,
       nowIso: () => new Date().toISOString(),
+      registerUserFunction: (name, params, body) => engine.registerUserFunction(name, params, body),
     });
   }, [i18n]);
 
@@ -583,14 +623,13 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
     const sheet = calcDoc.sheets.find(s => s.id === sheetId);
     if (!sheet) return;
 
-    const base = Date.now();
     const newSheet: CalculatorSheet = {
       ...sheet,
-      id: `sheet-${Date.now()}`,
+      id: generateSheetId(),
       name: `${sheet.name}${t('calculator.copySuffix', { defaultValue: ' (copy)' })}`,
-      lines: sheet.lines.map((l, i) => ({
+      lines: sheet.lines.map((l) => ({
         ...l,
-        id: `line-${base}-${i}-${Math.random().toString(36).slice(2, 9)}`,
+        id: generateLineId(),
       })),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -915,7 +954,7 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
     // 创建新行（重置 ID 和行号）
     const newLine: CalculatorLine = {
       ...lineClipboard,
-      id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      id: generateLineId(),
     };
 
     const newLines = [
@@ -994,12 +1033,25 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
           e.preventDefault();
           handleInsertSubtotalLineRef.current();
         }
+      } else if (e.key === 'Escape') {
+        if (focusMode) {
+          e.preventDefault();
+          setFocusMode(false);
+        } else if (selectedLineIndices.size > 0) {
+          e.preventDefault();
+          setSelectedLineIndices(new Set());
+        }
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a' && !inEditor && inWorkspace) {
+        if (activeSheet) {
+          e.preventDefault();
+          setSelectedLineIndices(new Set(activeSheet.lines.map((_, i) => i)));
+        }
       }
     };
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [activeLineIndex, lineClipboard]);
+  }, [activeLineIndex, lineClipboard, focusMode, selectedLineIndices.size, activeSheet]);
 
   // 检查是否可以执行行操作
   const canDeleteLine = activeLineIndex !== null && activeLineIndex >= 0 && activeSheet && activeSheet.lines.length > 0;
@@ -1205,7 +1257,7 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
       {/* 中栏：与长篇小说相同 — 工具栏 + Sheet + 主编辑 + 状态栏 */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
       {/* 工具栏 */}
-      <div className="flex items-center gap-1 px-2 py-1 border-b flex-shrink-0 bg-card overflow-x-auto scrollbar-hide min-w-0">
+      {!focusMode && <div className="flex items-center gap-1 px-2 py-1 border-b flex-shrink-0 bg-card overflow-x-auto scrollbar-hide min-w-0">
         <Calculator className={cn(TOOLBAR_ICON, 'text-primary shrink-0')} />
         <span className="text-sm font-medium truncate">{doc.title}</span>
 
@@ -1659,6 +1711,138 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
           </DropdownMenu>
         )}
 
+        {/* 搜索栏 */}
+        <div className="flex items-center gap-1">
+          {!searchOpen && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => { setSearchOpen(true); setTimeout(() => searchInputRef.current?.focus(), 50); }}
+              title={`${mod}F`}
+            >
+              <Search className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          <div className={cn(
+            'flex items-center gap-1 min-w-0 rounded-md border bg-muted/25 transition-all',
+            searchOpen ? 'px-1.5 border-primary/30 max-w-[18rem]' : 'w-0 overflow-hidden opacity-0 border-transparent max-w-0 px-0',
+          )}>
+            {searchOpen && (
+              <>
+                <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" aria-hidden />
+                <Input
+                  ref={searchInputRef}
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setActiveMatchIndex(0);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      e.stopPropagation();
+                      setSearchQuery('');
+                      setSearchOpen(false);
+                      setActiveMatchIndex(0);
+                      e.currentTarget.blur();
+                    } else if (e.key === 'Enter') {
+                      e.stopPropagation();
+                      handleSearchNavigate(e.shiftKey ? 'prev' : 'next');
+                    }
+                  }}
+                  className="h-7 text-xs border-0 bg-transparent shadow-none focus-visible:ring-0 px-0 min-w-0 flex-1"
+                  placeholder={t('calculator.searchPlaceholder', { defaultValue: '搜索表达式…' })}
+                  aria-label={t('calculator.searchPlaceholder', { defaultValue: '搜索表达式…' })}
+                />
+                {searchMatches.length > 0 && (
+                  <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap shrink-0">
+                    {(activeMatchIndex % searchMatches.length) + 1}/{searchMatches.length}
+                  </span>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 shrink-0"
+                  onClick={() => handleSearchNavigate('prev')}
+                  disabled={searchMatches.length === 0}
+                >
+                  <ChevronUp className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 shrink-0"
+                  onClick={() => handleSearchNavigate('next')}
+                  disabled={searchMatches.length === 0}
+                >
+                  <ArrowDown className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 shrink-0"
+                  title={t('calculator.replaceToggle', { defaultValue: '替换' })}
+                  onClick={() => setReplaceOpen(prev => !prev)}
+                >
+                  <ArrowLeftRight className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 shrink-0"
+                  onClick={() => { setSearchQuery(''); setSearchOpen(false); setReplaceOpen(false); setActiveMatchIndex(0); }}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </>
+            )}
+          </div>
+          {/* 替换栏 */}
+          {replaceOpen && searchOpen && (
+            <div className="flex items-center gap-1 px-1.5 border-b border-border/50 max-w-[18rem]">
+              <Input
+                ref={replaceInputRef}
+                value={replaceQuery}
+                onChange={(e) => setReplaceQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    e.stopPropagation();
+                    setReplaceOpen(false);
+                    e.currentTarget.blur();
+                  } else if (e.key === 'Enter' && !e.shiftKey) {
+                    e.stopPropagation();
+                    handleReplace();
+                  } else if (e.key === 'Enter' && e.shiftKey) {
+                    e.stopPropagation();
+                    handleReplaceAll();
+                  }
+                }}
+                className="h-7 text-xs border-0 bg-transparent shadow-none focus-visible:ring-0 px-0 min-w-0 flex-1"
+                placeholder={t('calculator.replacePlaceholder', { defaultValue: '替换为…' })}
+                aria-label={t('calculator.replacePlaceholder', { defaultValue: '替换为…' })}
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 text-[10px] px-1.5 shrink-0"
+                onClick={handleReplace}
+                disabled={searchMatches.length === 0 || !replaceQuery}
+              >
+                {t('calculator.replace', { defaultValue: '替换' })}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 text-[10px] px-1.5 shrink-0"
+                onClick={handleReplaceAll}
+                disabled={searchMatches.length === 0 || !replaceQuery}
+              >
+                {t('calculator.replaceAll', { defaultValue: '全部' })}
+              </Button>
+            </div>
+          )}
+        </div>
+
         <div className="flex-1" />
 
         <DropdownMenu>
@@ -1718,11 +1902,35 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
           variant="ghost"
           size="icon"
           className={CALC_TB_ICON}
+          onClick={() => setDashboardOpen(true)}
+          title={t('calculator.dashboard', { defaultValue: '统计面板' })}
+          aria-label={t('calculator.dashboard', { defaultValue: '统计面板' })}
+        >
+          <BarChart3 className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={CALC_TB_ICON}
           onClick={() => setHelpOpen(true)}
           title={t('calculator.help', { defaultValue: '帮助' })}
           aria-label={t('calculator.help', { defaultValue: '帮助' })}
         >
           <HelpCircle className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          type="button"
+          variant={focusMode ? 'default' : 'ghost'}
+          size="icon"
+          className={CALC_TB_ICON}
+          onClick={() => { setFocusMode(f => !f); setSelectedLineIndices(new Set()); }}
+          title={focusMode
+            ? t('calculator.exitFocus', { defaultValue: '退出专注模式 (Esc)' })
+            : t('calculator.enterFocus', { defaultValue: '专注模式' })
+          }
+          aria-label={t('calculator.focusMode', { defaultValue: '专注模式' })}
+        >
+          {focusMode ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
         </Button>
         <Button
           type="button"
@@ -1747,10 +1955,10 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
             <PanelRightClose className="h-3.5 w-3.5" />
           )}
         </Button>
-      </div>
+      </div>}
 
       {/* Sheet 标签栏 */}
-      <SheetTabs
+      {!focusMode && <SheetTabs
         sheets={calcDoc.sheets}
         activeSheetId={calcDoc.activeSheetId}
         onSelectSheet={handleSelectSheet}
@@ -1758,7 +1966,7 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
         onRenameSheet={handleRenameSheet}
         onDeleteSheet={handleDeleteSheet}
         onDuplicateSheet={handleDuplicateSheet}
-      />
+      />}
 
       {/* 主编辑区 */}
       <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
@@ -1777,12 +1985,37 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
             minResultWidth={resultColMinWidth}
             maxResultWidth={resultColMaxWidth}
             hashBehavior={calcDoc.settings.hashBehavior}
+            highlightedLines={highlightedLines}
+            currentHighlightIndex={currentHighlightLineIndex}
+            selectedLineIndices={selectedLineIndices}
+            onLineClick={handleLineClick}
           />
         )}
+        {/* 批量操作浮动条 */}
+        {selectedLineIndices.size >= 2 && (
+          <div className="flex items-center gap-2 px-3 py-1.5 border-t bg-blue-50 dark:bg-blue-950/30 shrink-0">
+            <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+              {t('calculator.selectedCount', { defaultValue: `已选 ${selectedLineIndices.size} 行` })}
+            </span>
+            <Button variant="outline" size="sm" className="h-6 text-xs px-2" onClick={handleBulkComment}>
+              {t('calculator.toggleComment', { defaultValue: '注释/取消' })}
+            </Button>
+            <Button variant="outline" size="sm" className="h-6 text-xs px-2" onClick={handleBulkCopy}>
+              <Copy className="h-3 w-3 mr-1" />
+              {t('calculator.copyExpressions', { defaultValue: '复制表达式' })}
+            </Button>
+            <Button variant="outline" size="sm" className="h-6 text-xs px-2 text-red-600 dark:text-red-400 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/50" onClick={handleBulkDeleteRequest}>
+              <Trash className="h-3 w-3 mr-1" />
+              {t('calculator.deleteSelected', { defaultValue: '删除' })}
+            </Button>
+            <div className="flex-1" />
+            <Button variant="ghost" size="sm" className="h-6 text-xs px-1.5" onClick={() => setSelectedLineIndices(new Set())}>
+              {t('calculator.clearSelection', { defaultValue: '取消选择' })}
+            </Button>
+          </div>
+        )}
       </div>
-
-      {/* 分段数值统计（可折叠） */}
-      {activeSheet && activeSheet.lines.length > 0 && (
+      {!focusMode && activeSheet && activeSheet.lines.length > 0 && (
         <Collapsible defaultOpen className="border-t border-border/60 bg-muted/15 shrink-0">
           <div className="flex items-center gap-2 px-3 py-1">
             <CollapsibleTrigger asChild>
@@ -1819,7 +2052,14 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
       )}
 
       {/* 状态栏 */}
-      <div className={STATUS_BAR_CLASS}>
+      {!focusMode && <div className={STATUS_BAR_CLASS}>
+        <span>
+          {isSaving ? (
+            <span className="text-amber-500">{t('calculator.saving', { defaultValue: '保存中...' })}</span>
+          ) : (
+            <span className="text-green-500/70">{t('calculator.saved', { defaultValue: '已保存' })}</span>
+          )}
+        </span>
         <span>
           {t('calculator.lineCount', {
             defaultValue: `行数: ${stats.totalLines}`,
@@ -1841,6 +2081,16 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
           </span>
         )}
         <div className="flex-1" />
+        {sectionFloatStats.values.length > 0 && (
+          <span className="text-muted-foreground tabular-nums">
+            {t('calculator.sectionStats', {
+              defaultValue: '段: {{count}} 合计: {{sum}} 均值: {{avg}}',
+              count: sectionFloatStats.values.length,
+              sum: sectionFloatStats.values.reduce((a, b) => a + b, 0).toLocaleString(undefined, { maximumFractionDigits: 2 }),
+              avg: (sectionFloatStats.values.reduce((a, b) => a + b, 0) / sectionFloatStats.values.length).toLocaleString(undefined, { maximumFractionDigits: 2 }),
+            })}
+          </span>
+        )}
         <span className="text-muted-foreground">
           {calcDoc.sheets.length} {t('calculator.sheets', { defaultValue: '个空间' })}
         </span>
@@ -1850,11 +2100,11 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
             ? t('calculator.liveMode', { defaultValue: '实时计算' })
             : t('calculator.manualComputeMode', { defaultValue: '按 Enter 计算' })}
         </span>
-      </div>
+      </div>}
       </div>
 
       {/* 右栏：AI（与长篇小说 — ResizableHandle + 固定宽度容器） */}
-      {!rightCollapsed && activeSheet && (
+      {!focusMode && !rightCollapsed && activeSheet && (
         <>
           <ResizableHandle
             direction="horizontal"
@@ -1885,6 +2135,27 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
         settings={calcDoc.settings}
         onSettingsChange={handleCalculatorSettingsChange}
       />
+
+      <Dialog open={bulkDeleteConfirmOpen} onOpenChange={setBulkDeleteConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('calculator.bulkDeleteTitle', { defaultValue: '删除选中行' })}</DialogTitle>
+            <DialogDescription>
+              {t('calculator.bulkDeleteMessage', {
+                defaultValue: `确定删除选中的 ${selectedLineIndices.size} 行？此操作可通过撤销恢复。`,
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setBulkDeleteConfirmOpen(false)}>
+              {t('common.cancel', { defaultValue: '取消' })}
+            </Button>
+            <Button variant="destructive" onClick={handleBulkDeleteConfirm}>
+              {t('common.delete', { defaultValue: '删除' })}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={importConfirmOpen} onOpenChange={(o) => { setImportConfirmOpen(o); if (!o) setPendingImportContent(null); }}>
         <DialogContent>
@@ -2051,6 +2322,13 @@ function CalculatorWorkspaceMain({ document: doc, documentId, tabId, host }: Doc
         calcDoc={calcDoc}
         defaultTitle={doc.title || t('calculator.import', { defaultValue: '计算文档' })}
       />
+      {dashboardOpen && (
+        <CalculatorDashboard
+          open={dashboardOpen}
+          onOpenChange={setDashboardOpen}
+          calcDoc={calcDoc}
+        />
+      )}
     </div>
   );
 }

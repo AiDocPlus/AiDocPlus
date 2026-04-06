@@ -80,28 +80,26 @@ export function OutlineCommandPalette({
   );
 
   const storageRef = useRef(storage);
-  storageRef.current = storage;
+  useEffect(() => {
+    storageRef.current = storage;
+  });
 
   useEffect(() => {
     if (open) {
-      setActionStore(loadQuickActions(storageRef.current ?? simpleStorage));
+      setTimeout(() => {
+        setActionStore(loadQuickActions(storageRef.current ?? simpleStorage));
+        setSearchQuery('');
+        setSelectedIndex(0);
+        inputRef.current?.focus();
+      }, 0);
     }
   }, [open]);
 
   const isEn = i18n.language === 'en';
 
-  // 自动聚焦输入框
-  useEffect(() => {
-    if (open) {
-      setTimeout(() => inputRef.current?.focus(), 0);
-      setSearchQuery('');
-      setSelectedIndex(0);
-    }
-  }, [open]);
-
   // 过滤操作
   const filteredItems = useMemo(() => {
-    let items = [...actionStore.items.filter(i => !i.hidden), ...extraItems.filter(i => !i.hidden)];
+    let items = [...actionStore.items.filter((i) => !i.hidden), ...extraItems.filter((i) => !i.hidden)];
 
     // 过滤掉需要活动节点但当前没有的操作
     if (!hasActiveNode) {
@@ -141,11 +139,11 @@ export function OutlineCommandPalette({
     }
 
     return items;
-  }, [actionStore, searchQuery, activeTab, hasActiveNode]);
+  }, [actionStore, searchQuery, activeTab, hasActiveNode, extraItems]);
 
-  // 重置选中索引
+  // 重置选中索引（过滤条件变化时）
   useEffect(() => {
-    setSelectedIndex(0);
+    setTimeout(() => setSelectedIndex(0), 0);
   }, [filteredItems.length, searchQuery, activeTab]);
 
   // 滚动到选中项
@@ -157,6 +155,19 @@ export function OutlineCommandPalette({
       }
     }
   }, [selectedIndex]);
+
+  // 选择操作（必须在 handleKeyDown 之前声明，避免前向引用错误）
+  const handleSelectItem = useCallback(
+    (item: OutlineQuickActionItem) => {
+      if (onSelectExtraItem?.(item)) {
+        onClose();
+        return;
+      }
+      onSelectAction(item);
+      onClose();
+    },
+    [onSelectAction, onClose, onSelectExtraItem],
+  );
 
   // 键盘导航
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -186,20 +197,8 @@ export function OutlineCommandPalette({
         else setActiveTab('all');
         break;
     }
-  }, [filteredItems, selectedIndex, onClose, activeTab]);
+  }, [filteredItems, selectedIndex, onClose, activeTab, handleSelectItem]);
 
-  // 选择操作
-  const handleSelectItem = useCallback(
-    (item: OutlineQuickActionItem) => {
-      if (onSelectExtraItem?.(item)) {
-        onClose();
-        return;
-      }
-      onSelectAction(item);
-      onClose();
-    },
-    [onSelectAction, onClose, onSelectExtraItem],
-  );
 
   // 切换收藏
   const handleToggleFavorite = useCallback(

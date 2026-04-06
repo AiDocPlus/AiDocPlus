@@ -11,16 +11,11 @@ import {
   useMemo,
   lazy,
   Suspense,
-  Component,
-  type ErrorInfo,
-  type ReactNode,
 } from 'react';
 import type { DocTypeEditorProps } from '@/doctype-sdk/types';
 import { useTranslation } from 'react-i18next';
-import i18n from '@/i18n';
 import {
   CheckSquare,
-  Square,
   Undo2,
   Redo2,
   ArrowUpDown,
@@ -32,9 +27,6 @@ import {
   ChevronDown,
   Trash2,
   Copy,
-  ListTodo,
-  GripVertical,
-  Check,
   Save,
   SaveAll,
   History,
@@ -50,7 +42,6 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,16 +49,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
-  ContextMenuTrigger,
-} from '@/components/ui/context-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ResizableHandle } from '@/components/ui/resizable-handle';
 import {
@@ -85,17 +66,13 @@ import {
   DragOverlay,
   type DragEndEvent,
   type DragStartEvent,
-  type DraggableAttributes,
-  type DraggableSyntheticListeners,
 } from '@dnd-kit/core';
 import {
   arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-  useSortable,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 
 import {
   parseTaskListContent,
@@ -115,11 +92,12 @@ import {
   type TaskPriority,
   type TaskStatus,
   type TaskListSettings,
-  PRIORITY_CONFIG,
   generateListId,
   generateTaskId,
 } from './types';
 import { TOOLBAR_ICON, STATUS_BAR_CLASS } from '../_shared/styles';
+import { TaskRowWithContextMenu } from './TaskListTaskRow';
+import { ListTabs, TaskListWorkspaceErrorBoundary } from './TaskListTabs';
 import { TaskListExportDialog } from './TaskListExportDialog';
 import { TaskListSettingsDialog } from './TaskListSettingsDialog';
 import { TaskListHelpDialog } from './TaskListHelpDialog';
@@ -144,56 +122,6 @@ const VersionHistoryPanel = lazy(() =>
 /** 主工具栏图标按钮 */
 const TB_ICON = 'h-7 w-7 shrink-0 p-0';
 
-class TaskListWorkspaceErrorBoundary extends Component<
-  { children: ReactNode; docId: string },
-  { hasError: boolean }
-> {
-  constructor(props: { children: ReactNode; docId: string }) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError(): { hasError: boolean } {
-    return { hasError: true };
-  }
-
-  override componentDidCatch(error: Error, info: ErrorInfo): void {
-    console.error('[TaskListWorkspace]', error, info.componentStack);
-  }
-
-  override componentDidUpdate(prevProps: { docId: string }): void {
-    if (prevProps.docId !== this.props.docId && this.state.hasError) {
-      this.setState({ hasError: false });
-    }
-  }
-
-  override render() {
-    if (this.state.hasError) {
-      return (
-        <div
-          className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center text-muted-foreground bg-card"
-          data-tasklist-error-boundary="true"
-        >
-          <p className="text-sm max-w-md">
-            {i18n.t('taskList.workspaceErrorBoundary', {
-              defaultValue: '任务清单工作区出现异常。可尝试重试；若仍失败请切换文档后重新打开。',
-            })}
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => this.setState({ hasError: false })}
-          >
-            {i18n.t('common.retry', { defaultValue: '重试' })}
-          </Button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
 // ============================================================
 // 历史记录（撤销/重做）
 // ============================================================
@@ -203,519 +131,6 @@ interface HistoryState {
 }
 
 const MAX_HISTORY = 50;
-
-// ============================================================
-// 可排序任务行组件
-// ============================================================
-
-interface TaskRowBaseProps {
-  task: TaskItem;
-  onToggle: () => void;
-  onContentChange: (content: string) => void;
-  onPriorityChange: (priority: TaskPriority) => void;
-  onDelete: () => void;
-  onCopy: () => void;
-  isSelected?: boolean;
-  onSelect?: () => void;
-  isCompleted?: boolean;
-  /** 待办区：拖拽 */
-  sortable?: {
-    setNodeRef: (node: HTMLElement | null) => void;
-    style: React.CSSProperties;
-    attributes: DraggableAttributes;
-    listeners: DraggableSyntheticListeners;
-    isDragging: boolean;
-  };
-}
-
-function TaskRowBase({
-  task,
-  onToggle,
-  onContentChange,
-  onPriorityChange,
-  onDelete,
-  onCopy,
-  isSelected = false,
-  onSelect,
-  isCompleted = false,
-  sortable,
-}: TaskRowBaseProps) {
-  const { t } = useTranslation();
-  const [isEditing, setIsEditing] = useState(false);
-  const [editContent, setEditContent] = useState(task.content);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    setEditContent(task.content);
-  }, [task.content]);
-
-  const handleSave = () => {
-    if (editContent !== task.content) {
-      onContentChange(editContent);
-    }
-    setIsEditing(false);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      handleSave();
-    } else if (e.key === 'Escape') {
-      setEditContent(task.content);
-      setIsEditing(false);
-    } else if (e.key === 'Backspace' && !editContent.trim()) {
-      e.preventDefault();
-      onDelete();
-    }
-  };
-
-  const pr = normalizeTaskPriority(task.priority);
-  const priorityConfig = PRIORITY_CONFIG[pr];
-
-  return (
-    <div
-      ref={sortable?.setNodeRef}
-      style={sortable?.style}
-      className={cn(
-        'group flex items-start gap-2 px-2 py-2 border-b border-border/40 hover:bg-muted/30 transition-colors',
-        isCompleted && 'opacity-60',
-        sortable?.isDragging && 'bg-muted/50 shadow-lg',
-      )}
-    >
-      {/* 拖拽手柄（仅待办 Sortable 区） */}
-      {sortable ? (
-        <button
-          type="button"
-          {...sortable.attributes}
-          {...sortable.listeners}
-          className="shrink-0 p-1 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <GripVertical className="h-4 w-4 text-muted-foreground" />
-        </button>
-      ) : (
-        <div className="w-7 shrink-0" aria-hidden />
-      )}
-
-      {/* 多选（与下方「完成」圆形复选框区分：方形图标） */}
-      {onSelect && (
-        <button
-          type="button"
-          aria-pressed={isSelected ? true : false}
-          className={cn(
-            'shrink-0 mt-0.5 p-0.5 rounded-md transition-colors',
-            isSelected
-              ? 'text-primary bg-primary/12'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted/60',
-          )}
-          onClick={onSelect}
-          title={
-            isSelected
-              ? t('taskList.deselectRow', { defaultValue: '取消选中' })
-              : t('taskList.selectRow', { defaultValue: '选中' })
-          }
-        >
-          {isSelected ? (
-            <CheckSquare className="h-5 w-5 stroke-[2.5]" />
-          ) : (
-            <Square className="h-5 w-5 stroke-[2]" />
-          )}
-        </button>
-      )}
-
-      {/* 优先级指示器 */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className={cn(
-              'shrink-0 w-5 h-5 rounded-full mt-0.5',
-              pr === 'high' && 'bg-red-500',
-              pr === 'medium' && 'bg-yellow-500',
-              pr === 'low' && 'bg-green-500',
-            )}
-            title={t(`taskList.priority${pr === 'high' ? 'High' : pr === 'medium' ? 'Medium' : 'Low'}`, {
-              defaultValue: priorityConfig.label,
-            })}
-            aria-label={t('taskList.priorityPickerAria', {
-              label: t(`taskList.priority${pr === 'high' ? 'High' : pr === 'medium' ? 'Medium' : 'Low'}`),
-              defaultValue: '优先级：{{label}}',
-            })}
-          />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-24">
-          <DropdownMenuItem onClick={() => onPriorityChange('high')}>
-            <span className="w-3 h-3 rounded-full bg-red-500 mr-2" />
-            {t('taskList.priorityHigh', { defaultValue: '高' })}
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => onPriorityChange('medium')}>
-            <span className="w-3 h-3 rounded-full bg-yellow-500 mr-2" />
-            {t('taskList.priorityMedium', { defaultValue: '中' })}
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => onPriorityChange('low')}>
-            <span className="w-3 h-3 rounded-full bg-green-500 mr-2" />
-            {t('taskList.priorityLow', { defaultValue: '低' })}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      {/* 完成（圆形描边，与多选方形图标区分） */}
-      <button
-        type="button"
-        className={cn(
-          'shrink-0 w-5 h-5 rounded-full border-2 mt-0.5 flex items-center justify-center transition-colors',
-          isCompleted
-            ? 'bg-primary border-primary text-primary-foreground'
-            : 'border-muted-foreground/40 hover:border-primary/55 bg-background',
-        )}
-        onClick={onToggle}
-        title={
-          isCompleted
-            ? t('taskList.markAsPending', { defaultValue: '恢复为待办' })
-            : t('taskList.markAsDone', { defaultValue: '标记完成' })
-        }
-      >
-        {isCompleted && <Check className="h-3 w-3 stroke-[3]" />}
-      </button>
-
-      {/* 内容区 */}
-      <div className="flex-1 min-w-0">
-        {isEditing ? (
-          <Textarea
-            ref={textareaRef}
-            value={editContent}
-            onChange={(e) => setEditContent(e.target.value)}
-            onBlur={handleSave}
-            onKeyDown={handleKeyDown}
-            className="min-h-[60px] text-sm resize-none"
-            placeholder={t('taskList.contentPlaceholder', { defaultValue: '输入任务内容...' })}
-            autoFocus
-          />
-        ) : (
-          <div
-            className={cn(
-              'text-sm whitespace-pre-wrap cursor-text min-h-[24px] py-1',
-              isCompleted && 'line-through text-muted-foreground',
-            )}
-            onClick={() => setIsEditing(true)}
-          >
-            {task.content || (
-              <span className="text-muted-foreground/50 italic">
-                {t('taskList.emptyContent', { defaultValue: '点击编辑...' })}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* 操作按钮 */}
-      <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 shrink-0 transition-opacity">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 w-6 p-0"
-          onClick={onCopy}
-          title={t('taskList.copy', { defaultValue: '复制' })}
-        >
-          <Copy className="h-3 w-3" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-          onClick={onDelete}
-          title={t('taskList.delete', { defaultValue: '删除' })}
-        >
-          <Trash2 className="h-3 w-3" />
-        </Button>
-      </div>
-
-      {/* 完成时间 */}
-      {isCompleted && task.completedAt && (
-        <span className="text-xs text-muted-foreground shrink-0">
-          {formatRelativeTime(t, task.completedAt)}
-        </span>
-      )}
-    </div>
-  );
-}
-
-type TaskRowHandlersProps = Omit<TaskRowBaseProps, 'sortable'>;
-
-function SortableTaskRow(props: TaskRowHandlersProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: props.task.id });
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-  return (
-    <TaskRowBase
-      {...props}
-      sortable={{
-        setNodeRef,
-        style,
-        attributes,
-        listeners,
-        isDragging,
-      }}
-    />
-  );
-}
-
-function StaticTaskRow(props: TaskRowHandlersProps) {
-  return <TaskRowBase {...props} />;
-}
-
-/** 带右键上下文菜单的任务行 */
-function TaskRowWithContextMenu(props: TaskRowHandlersProps & {
-  onDuplicate: () => void;
-  onAddAbove: () => void;
-  onAddBelow: () => void;
-}) {
-  const { t } = useTranslation();
-  const pr = normalizeTaskPriority(props.task.priority);
-  const priorityDot = PRIORITY_CONFIG[pr];
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <StaticTaskRow {...props} />
-      </ContextMenuTrigger>
-      <ContextMenuContent className="w-48">
-        <ContextMenuItem onClick={props.onToggle}>
-          {props.isCompleted
-            ? t('taskList.markAsPending', { defaultValue: '恢复为待办' })
-            : t('taskList.markAsDone', { defaultValue: '标记完成' })}
-        </ContextMenuItem>
-        <ContextMenuSub>
-          <ContextMenuSubTrigger>
-            <span className="flex items-center gap-1.5">
-              <span className={cn('w-2.5 h-2.5 rounded-full', priorityDot.dotColor)} />
-              {t('taskList.priority', { defaultValue: '优先级' })}
-            </span>
-          </ContextMenuSubTrigger>
-          <ContextMenuSubContent>
-            <ContextMenuItem onClick={() => props.onPriorityChange('high')}>
-              <span className="w-2.5 h-2.5 rounded-full bg-red-500 mr-2" />
-              {t('taskList.priorityHigh', { defaultValue: '高' })}
-            </ContextMenuItem>
-            <ContextMenuItem onClick={() => props.onPriorityChange('medium')}>
-              <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 mr-2" />
-              {t('taskList.priorityMedium', { defaultValue: '中' })}
-            </ContextMenuItem>
-            <ContextMenuItem onClick={() => props.onPriorityChange('low')}>
-              <span className="w-2.5 h-2.5 rounded-full bg-green-500 mr-2" />
-              {t('taskList.priorityLow', { defaultValue: '低' })}
-            </ContextMenuItem>
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-        <ContextMenuSeparator />
-        <ContextMenuItem onClick={props.onDuplicate}>
-          {t('taskList.duplicateTask', { defaultValue: '复制任务' })}
-        </ContextMenuItem>
-        <ContextMenuItem onClick={props.onCopy}>
-          {t('taskList.copyText', { defaultValue: '复制文本' })}
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem onClick={props.onAddAbove}>
-          {t('taskList.addAbove', { defaultValue: '在上方添加' })}
-        </ContextMenuItem>
-        <ContextMenuItem onClick={props.onAddBelow}>
-          {t('taskList.addBelow', { defaultValue: '在下方添加' })}
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem onClick={props.onDelete} className="text-destructive">
-          {t('taskList.deleteTask', { defaultValue: '删除' })}
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
-  );
-}
-
-// ============================================================
-// 列表标签栏组件
-// ============================================================
-
-interface ListTabsProps {
-  lists: TaskList[];
-  activeListId: string;
-  onSelectList: (id: string) => void;
-  onAddList: () => void;
-  onRenameList: (id: string, name: string) => void;
-  onDeleteList: (id: string) => void;
-  onDuplicateList: (id: string) => void;
-}
-
-function ListTabs({
-  lists,
-  activeListId,
-  onSelectList,
-  onAddList,
-  onRenameList,
-  onDeleteList,
-  onDuplicateList,
-}: ListTabsProps) {
-  const { t } = useTranslation();
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const handleStartEdit = (list: TaskList) => {
-    setEditingId(list.id);
-    setEditName(list.name);
-    setTimeout(() => inputRef.current?.focus(), 0);
-  };
-
-  const handleSaveEdit = () => {
-    if (editingId && editName.trim()) {
-      onRenameList(editingId, editName.trim());
-    }
-    setEditingId(null);
-    setEditName('');
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSaveEdit();
-    } else if (e.key === 'Escape') {
-      setEditingId(null);
-      setEditName('');
-    }
-  };
-
-  const handleTabDoubleClick = (e: React.MouseEvent, list: TaskList) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (list.id !== activeListId) {
-      onSelectList(list.id);
-    }
-    handleStartEdit(list);
-  };
-
-  return (
-    <div className="flex items-center gap-1 px-2 py-1 border-b bg-muted/30 overflow-x-auto scrollbar-hide">
-      {lists.map((list) => {
-        const isActive = list.id === activeListId;
-        return (
-        <div
-          key={list.id}
-          className={cn(
-            'group flex items-center gap-1 px-2.5 py-1 rounded text-sm cursor-pointer transition-colors shrink-0 select-none',
-            isActive
-              ? 'bg-red-100 dark:bg-red-950/55 text-red-950 dark:text-red-50 font-medium border border-red-300/80 dark:border-red-800/80 shadow-sm'
-              : 'hover:bg-muted text-muted-foreground',
-          )}
-          onClick={() => !isActive && onSelectList(list.id)}
-          onDoubleClick={(e) => handleTabDoubleClick(e, list)}
-        >
-          {editingId === list.id ? (
-            <Input
-              ref={inputRef}
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              onBlur={handleSaveEdit}
-              onKeyDown={handleKeyDown}
-              className="h-6 min-w-[140px] max-w-[220px] w-auto text-sm px-1"
-              autoFocus
-              onClick={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
-            />
-          ) : (
-            <>
-              <ListTodo className="h-3.5 w-3.5 shrink-0 opacity-90" />
-              <span className="truncate max-w-[100px]">{list.name}</span>
-              <span
-                className={cn(
-                  'text-xs ml-1 tabular-nums',
-                  isActive
-                    ? 'text-red-800/85 dark:text-red-200/90'
-                    : 'text-muted-foreground/60',
-                )}
-              >
-                ({list.tasks.filter((t) => t.status === 'pending').length})
-              </span>
-            </>
-          )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-muted-foreground/10 rounded transition-opacity"
-                onClick={(e) => e.stopPropagation()}
-                aria-label={t('common.moreOptions', { defaultValue: '更多操作' })}
-              >
-                <ChevronDown className="h-3 w-3" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-36">
-              <DropdownMenuItem
-                onClick={() => {
-                  // 延后到菜单关闭后再进入编辑，避免焦点/失焦与闭包状态打架（对齐计算器侧常见处理）
-                  setTimeout(() => handleStartEdit(list), 0);
-                }}
-              >
-                {t('common.rename', { defaultValue: '重命名' })}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDuplicateList(list.id)}>
-                {t('taskList.duplicateList', { defaultValue: '复制列表' })}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-destructive"
-                onClick={() => onDeleteList(list.id)}
-                disabled={lists.length <= 1}
-              >
-                {t('common.delete', { defaultValue: '删除' })}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-        );
-      })}
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-7 w-7 p-0 shrink-0"
-        onClick={onAddList}
-        title={t('taskList.addList', { defaultValue: '新建列表' })}
-      >
-        <Plus className="h-4 w-4" />
-      </Button>
-    </div>
-  );
-}
-
-// ============================================================
-// 辅助函数
-// ============================================================
-
-function formatRelativeTime(t: (key: string, opts?: Record<string, unknown>) => string, isoString: string): string {
-  const date = new Date(isoString);
-  const now = new Date();
-
-  // 使用日历日比较（避免跨午夜时 Math.floor(ms/86400000) 偏差）
-  const d = (dt: Date) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
-  const todayStr = d(now);
-  const dateStr = d(date);
-
-  if (date > now) return date.toLocaleString();
-  if (dateStr === todayStr) return t('taskList.timeToday', { defaultValue: '今天' });
-
-  // 昨天
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (dateStr === d(yesterday)) return t('taskList.timeYesterday', { defaultValue: '昨天' });
-
-  // 超过 7 天显示日期
-  const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  if (diffDays < 7) return t('taskList.timeDaysAgo', { count: diffDays, defaultValue: `${diffDays} 天前` });
-  return date.toLocaleDateString();
-}
 
 // ============================================================
 // 主组件

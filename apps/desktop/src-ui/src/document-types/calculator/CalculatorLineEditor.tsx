@@ -25,8 +25,9 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  DragOverlay,
 } from '@dnd-kit/core';
-import type { DragEndEvent } from '@dnd-kit/core';
+import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import {
   arrayMove,
   SortableContext,
@@ -45,8 +46,9 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { cn } from '@/lib/utils';
-import { syncCalculatorLineMeta, type CalculatorLine, type CalcResult, type CalculatorHashBehavior } from './types';
+import { syncCalculatorLineMeta, generateLineId, type CalculatorLine, type CalcResult, type CalculatorHashBehavior, type ChartResultData, type SensitivityResultData, type NumberDisplayFormat, formatNumberByFormat } from './types';
 import { CalculatorResizer } from './CalculatorResizer';
+import { CalculatorChartRenderer } from './CalculatorChartRenderer';
 import type { CalculatorCaretHint } from './calculatorFunctionCatalog';
 import { isCalculatorBuiltinWord } from './calculatorBuiltinWords';
 import { normalizeCalculatorInput } from './calculatorInputNormalize';
@@ -127,6 +129,7 @@ function tokenizeExpression(
     'rollMean', 'rollSum',
     'quantileSeq', 'prod', 'atan2',
     'xirr', 'xnpv',
+    'chart', 'sens', 'fn',
     '合计', '求和', '平均', '均值', '最小值', '最大值', '标准差', '方差', '绝对值', '平方根', '开方',
   ]);
   const builtInConstants = new Set(['e', 'pi', 'PI', 'i']);
@@ -254,6 +257,51 @@ function getTokenClass(type: HighlightToken['type'], isActive: boolean): string 
 }
 
 // ============================================================
+// 敏感性分析结果表格
+// ============================================================
+
+function SensitivityTable({ data }: { data: SensitivityResultData }) {
+  return (
+    <div className="border border-border/40 rounded-md overflow-hidden">
+      {data.expression && (
+        <div className="px-2 py-1 text-[10px] text-muted-foreground bg-muted/30 border-b border-border/30 font-mono">
+          {data.expression}
+        </div>
+      )}
+      <div className="max-h-48 overflow-y-auto">
+        <table className="w-full text-xs font-mono">
+          <thead>
+            <tr className="bg-muted/20">
+              <th className="px-3 py-1 text-left text-muted-foreground border-b border-border/30">
+                {data.variableName}
+              </th>
+              <th className="px-3 py-1 text-right text-muted-foreground border-b border-border/30">
+                Result
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.pairs.map((pair, i) => (
+              <tr
+                key={i}
+                className="border-b border-border/20 last:border-b-0 hover:bg-muted/10"
+              >
+                <td className="px-3 py-0.5 text-foreground">
+                  {Number.isFinite(pair.inputValue) ? pair.inputValue.toLocaleString() : '—'}
+                </td>
+                <td className="px-3 py-0.5 text-right text-foreground font-medium">
+                  {Number.isFinite(pair.outputValue) ? pair.outputValue.toLocaleString() : 'Error'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // 可排序行组件
 // ============================================================
 
@@ -287,6 +335,13 @@ interface SortableLineRowProps {
   resultWidth: number;
   actionsRef: MutableRefObject<CalculatorLineRowActionsRef>;
   liveUpdate?: boolean;
+  /** 搜索匹配高亮 */
+  isHighlighted?: boolean;
+  isCurrentHighlight?: boolean;
+  /** 多选状态 */
+  isSelected?: boolean;
+  /** 行点击回调 */
+  onLineClick?: (index: number, modifiers: { cmdKey: boolean; shiftKey: boolean }) => void;
 }
 
 function sortableLineRowPropsEqual(a: SortableLineRowProps, b: SortableLineRowProps): boolean {
@@ -321,6 +376,10 @@ const SortableLineRow = memo(function SortableLineRow({
   resultWidth,
   actionsRef,
   liveUpdate = true,
+  isHighlighted,
+  isCurrentHighlight,
+  isSelected,
+  onLineClick,
 }: SortableLineRowProps) {
   const { t, i18n } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -546,9 +605,14 @@ const SortableLineRow = memo(function SortableLineRow({
     if (!result.displayValue) {
       return <span className="text-muted-foreground/30">—</span>;
     }
+    // 行级数字格式化
+    let displayText = result.displayValue;
+    if (line.displayFormat && result.type === 'number' && typeof result.value === 'number' && Number.isFinite(result.value)) {
+      displayText = formatNumberByFormat(result.value, line.displayFormat, 2, navigator.language || 'zh-CN');
+    }
     return (
       <span className="text-foreground font-medium">
-        → {result.displayValue}
+        → {displayText}
       </span>
     );
   };
@@ -579,6 +643,9 @@ const SortableLineRow = memo(function SortableLineRow({
             'group flex items-stretch border-b border-border/50 transition-colors',
             roleStripeClass,
             isActive && 'bg-primary/[0.07] ring-1 ring-primary/25 ring-inset',
+            isSelected && !isActive && 'bg-blue-50/80 dark:bg-blue-950/25 border-l-[3px] border-l-blue-500/60',
+            isHighlighted && !isActive && !isSelected && 'bg-yellow-100/50 dark:bg-yellow-900/20',
+            isCurrentHighlight && !isActive && !isSelected && 'bg-yellow-200/60 dark:bg-yellow-800/30',
             isDragging && 'opacity-50 shadow-lg'
           )}
           onClick={() => textareaRef.current?.focus()}
@@ -593,7 +660,17 @@ const SortableLineRow = memo(function SortableLineRow({
           </div>
 
           {/* 行号 */}
-          <div className="w-10 flex-shrink-0 flex items-center justify-center text-xs text-muted-foreground/50 font-mono border-r border-border/30 bg-muted/20">
+          <div
+            className={cn(
+              'w-10 flex-shrink-0 flex items-center justify-center text-xs font-mono border-r border-border/30 bg-muted/20 cursor-pointer select-none',
+              isSelected ? 'text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/30' : 'text-muted-foreground/50',
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              onLineClick?.(lineIndex, { cmdKey: e.metaKey || e.ctrlKey, shiftKey: e.shiftKey });
+            }}
+          >
+            {isSelected && <span className="text-blue-500 dark:text-blue-400 mr-0.5">✓</span>}
             {lineNumber}
           </div>
 
@@ -694,14 +771,24 @@ const SortableLineRow = memo(function SortableLineRow({
           </div>
 
           {/* 结果区 */}
-          <div
-            className="flex-shrink-0 flex items-center px-3 border-l border-border/30 bg-muted/5"
-            style={{ width: resultWidth, minWidth: resultWidth }}
-          >
-            <span className="font-mono text-sm truncate">
-              {renderResult(line.result)}
-            </span>
-          </div>
+          {line.result.type === 'chart' && line.result.value ? (
+            <div className="flex-1 min-w-0 px-3 py-1">
+              <CalculatorChartRenderer data={line.result.value as ChartResultData} />
+            </div>
+          ) : line.result.type === 'sensitivity' && line.result.value ? (
+            <div className="flex-1 min-w-0 px-3 py-1">
+              <SensitivityTable data={line.result.value as SensitivityResultData} />
+            </div>
+          ) : (
+            <div
+              className="flex-shrink-0 flex items-center px-3 border-l border-border/30 bg-muted/5"
+              style={{ width: resultWidth, minWidth: resultWidth }}
+            >
+              <span className="font-mono text-sm truncate">
+                {renderResult(line.result)}
+              </span>
+            </div>
+          )}
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent className="w-52">
@@ -760,6 +847,14 @@ interface CalculatorLineEditorProps {
   onResultWidthChange: (width: number) => void;
   minResultWidth?: number;
   maxResultWidth?: number;
+  /** 搜索匹配的行索引集合（高亮显示） */
+  highlightedLines?: Set<number>;
+  /** 搜索导航中当前高亮行索引 */
+  currentHighlightIndex?: number | null;
+  /** 多选行索引集合 */
+  selectedLineIndices?: Set<number>;
+  /** 行点击回调（支持 Cmd/Shift 多选） */
+  onLineClick?: (index: number, modifiers: { cmdKey: boolean; shiftKey: boolean }) => void;
 }
 
 export type CalculatorLineEditorHandle = {
@@ -787,6 +882,10 @@ export const CalculatorLineEditor = forwardRef(function CalculatorLineEditor(
     onResultWidthChange,
     minResultWidth,
     maxResultWidth,
+    highlightedLines,
+    currentHighlightIndex,
+    selectedLineIndices,
+    onLineClick,
   }: CalculatorLineEditorProps,
   ref: ForwardedRef<CalculatorLineEditorHandle>
 ) {
@@ -845,6 +944,16 @@ export const CalculatorLineEditor = forwardRef(function CalculatorLineEditor(
       onChange(newLines);
     }
   }, [lines, onChange, hashBehavior]);
+
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const activeDragLine = useMemo(() => {
+    if (!activeDragId) return null;
+    return lines.find(l => l.id === activeDragId) ?? null;
+  }, [activeDragId, lines]);
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveDragId(event.active.id as string);
+  }, []);
 
   const handleLineChange = useCallback((index: number, value: string) => {
     const newLines = [...lines];
@@ -934,7 +1043,7 @@ export const CalculatorLineEditor = forwardRef(function CalculatorLineEditor(
     const lineToDuplicate = lines[index];
     const newLine: CalculatorLine = {
       ...lineToDuplicate,
-      id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      id: generateLineId(),
     };
     const newLines = [...lines.slice(0, index + 1), newLine, ...lines.slice(index + 1)].map((line, i) =>
       syncCalculatorLineMeta({ ...line, lineNumber: i + 1 }, hashBehavior),
@@ -971,7 +1080,7 @@ export const CalculatorLineEditor = forwardRef(function CalculatorLineEditor(
   const handleInsertLineAbove = useCallback((index: number) => {
     const newLine: CalculatorLine = syncCalculatorLineMeta(
       {
-        id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        id: generateLineId(),
         lineNumber: 0,
         expression: '',
         result: { type: 'number', value: 0, displayValue: '' },
@@ -993,7 +1102,7 @@ export const CalculatorLineEditor = forwardRef(function CalculatorLineEditor(
   const handleInsertLineBelow = useCallback((index: number) => {
     const newLine: CalculatorLine = syncCalculatorLineMeta(
       {
-        id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        id: generateLineId(),
         lineNumber: 0,
         expression: '',
         result: { type: 'number', value: 0, displayValue: '' },
@@ -1079,7 +1188,7 @@ export const CalculatorLineEditor = forwardRef(function CalculatorLineEditor(
   const handleAddLine = useCallback(() => {
     const newLine: CalculatorLine = syncCalculatorLineMeta(
       {
-        id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        id: generateLineId(),
         lineNumber: lines.length + 1,
         expression: '',
         result: { type: 'number', value: 0, displayValue: '' },
@@ -1123,7 +1232,8 @@ export const CalculatorLineEditor = forwardRef(function CalculatorLineEditor(
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
+        onDragStart={handleDragStart}
+        onDragEnd={(e) => { handleDragEnd(e); setActiveDragId(null); }}
       >
         <SortableContext
           items={lines.map(l => l.id)}
@@ -1176,12 +1286,31 @@ export const CalculatorLineEditor = forwardRef(function CalculatorLineEditor(
                     resultWidth={resultWidth}
                     actionsRef={rowActionsRef}
                     liveUpdate={liveUpdate}
+                    isHighlighted={highlightedLines?.has(index)}
+                    isCurrentHighlight={currentHighlightIndex === index}
+                    isSelected={selectedLineIndices?.has(index)}
+                    onLineClick={onLineClick}
                   />
                 ))}
               </>
             )}
           </div>
         </SortableContext>
+        <DragOverlay>
+          {activeDragLine && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-card border rounded-md shadow-lg max-w-[320px]">
+              <span className="text-xs text-muted-foreground font-mono">
+                {activeDragLine.expression.slice(0, 60)}
+                {activeDragLine.expression.length > 60 ? '…' : ''}
+              </span>
+              {activeDragLine.result?.displayValue && (
+                <span className="text-xs text-foreground font-medium ml-auto shrink-0">
+                  → {activeDragLine.result.displayValue}
+                </span>
+              )}
+            </div>
+          )}
+        </DragOverlay>
       </DndContext>
 
       {/* 添加行按钮 */}

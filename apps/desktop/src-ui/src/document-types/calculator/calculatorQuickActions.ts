@@ -109,6 +109,15 @@ export const DEFAULT_ITEMS: CalculatorQuickActionItem[] = [
   { id: 'fin_commission', categoryId: 'financial', label: '阶梯提成', labelEn: 'Tier Commission', icon: 'CircleDollarSign', order: 15, builtin: true,
     keywords: ['提成', '阶梯', 'commission'],
     prompt: '帮我写两段阶梯提成：销售额分段，低档用 min(销售额,上限)*低率，超额用 max(0,销售额-上限)*高率；总佣金为两段之和。\n用 ```formula 输出。' },
+  { id: 'fin_compound_sip', categoryId: 'financial', label: '定投复利', labelEn: 'SIP Compound', icon: 'CalendarClock', order: 16, builtin: true,
+    keywords: ['定投', '月投', 'SIP', '基金定投', '定期投入'],
+    prompt: '帮我设计定投（SIP）复利计算：\n每月定投金额 = {{monthlyAmount}}\n年化收益率 = {{annualRate}}%\n定投年数 = {{years}}\n\n请计算：\n1. 总投入金额\n2. 期末总金额（月复利累加）\n3. 总收益\n4. 收益率\n\n公式要点：每月终值 = 月投入 * ((1+月利率)^总月数 - 1) / 月利率\n用 ```formula 输出多行可执行表达式。' },
+  { id: 'fin_prepay', categoryId: 'financial', label: '提前还款', labelEn: 'Prepayment Analysis', icon: 'CalendarCheck', order: 17, builtin: true,
+    keywords: ['提前还款', '提前还贷', 'prepay', '缩短年限'],
+    prompt: '帮我设计提前还款分析：\n贷款本金 = {{principal}}\n年利率 = {{rate}}%\n剩余年限 = {{remainingYears}}\n已还年数 = {{paidYears}}\n提前还款额 = {{prepayAmount}}\n\n请计算：\n1. 原月供（pmt）与剩余利息总额\n2. 提前还款后两种方案对比：\n   a) 月供不变、缩短年限\n   b) 年限不变、减少月供\n3. 两种方案各节省多少利息\n\n使用 pmt、nper 等函数。\n用 ```formula 输出多行可执行表达式。' },
+  { id: 'fin_amort', categoryId: 'financial', label: '还款计划表', labelEn: 'Amortization Table', icon: 'Table', order: 18, builtin: true,
+    keywords: ['还款计划', '摊销表', 'amortization', '还款明细'],
+    prompt: '帮我生成还款计划表（等额本息）的前几期数据：\n贷款本金 = {{principal}}\n年利率 = {{rate}}%\n贷款年限 = {{years}}\n\n请输出每期的：\n1. 期数\n2. 月供（pmt 计算）\n3. 本金部分\n4. 利息部分\n5. 剩余本金\n\n用变量赋值行 + 计算行，展示前 3~6 期的逐行数据。核心公式：当期利息=剩余本金*月利率，当期本金=月供-当期利息。\n用 ```formula 输出。' },
 
   // ━━ 日期时间 (datetime) ━━
   { id: 'date_diff', categoryId: 'datetime', label: '日期差计算', labelEn: 'Date Difference', icon: 'Calendar', order: 0, builtin: true,
@@ -293,6 +302,23 @@ export const DEFAULT_ITEMS: CalculatorQuickActionItem[] = [
     keywords: ['取整', 'qz', 'round'],
     prompt: '帮我设计取整表达式：\n数值 = {{number}}\n小数位数 = {{decimals}}\n\n请计算以下三种取整方式：\n1. 四舍五入：round(number, decimals)\n2. 向上取整：ceil(number)\n3. 向下取整：floor(number)' },
 
+  // ━━ 专业计算 (professional) — 续 ━━
+  { id: 'pro_income_tax', categoryId: 'professional', label: '个税阶梯计算', labelEn: 'Income Tax Brackets', icon: 'Receipt', order: 5, builtin: true,
+    keywords: ['个税', '所得税', '个人所得税', '阶梯', '税额'],
+    prompt: '帮我设计个人所得税阶梯计算（中国综合所得，7级超额累进）：\n税前月薪 = {{salary}}\n五险一金 = {{socialInsurance}}\n专项附加扣除 = {{specialDeductions}}\n\n请计算：\n1. 应纳税所得额 = 税前月薪 - 五险一金 - 5000（起征点）- 专项附加扣除\n2. 各级税额分段计算（3% → 10% → 20% → 25% → 30% → 35% → 45%）\n3. 本月应缴个税总额\n\n每段用 min(应纳税所得额, 该段上限) * 该段税率，再用 max(0, 超出部分) 进入下一档。\n用 ```formula 输出多行可执行表达式。' },
+  { id: 'pro_base_convert', categoryId: 'professional', label: '进制转换', labelEn: 'Base Conversion', icon: 'Binary', order: 6, builtin: true,
+    keywords: ['进制', '二进制', '八进制', '十六进制', 'binary', 'hex', 'octal'],
+    prompt: '帮我设计进制转换：\n数值 = {{number}}\n源进制 = {{fromBase}}（2/8/10/16）\n目标进制 = {{toBase}}（2/8/10/16）\n\n请计算转换结果，并展示以下常用对照：\n1. 十进制 → 二进制\n2. 十进制 → 八进制\n3. 十进制 → 十六进制\n4. 二进制 → 十进制\n\n说明：本计算器不内置进制转换函数，请用算术方法（除基取余或按权展开）分步计算。\n用 ```formula 输出。' },
+  { id: 'pro_sensitivity', categoryId: 'professional', label: '敏感性分析', labelEn: 'Sensitivity Analysis', icon: 'GitCompare', order: 7, builtin: true,
+    keywords: ['敏感性', 'sens', '参数影响', '假设分析'],
+    prompt: '帮我设计敏感性分析：\n先定义关键变量和表达式（如月供 = pmt(年利率/12, 30*12, -1000000)），再用 sens(表达式, 变量名, [起始值, 步长, 结束值]) 分析参数变化对结果的影响。\n\n语法：= sens(目标表达式, 要变化的变量名, [起始, 步长, 结束])\n\n示例：\n年利率 = 3.5%\n月供 = pmt(年利率/12, 30*12, -1000000)\n= sens(月供, 年利率, [3%, 0.5%, 6%])\n\n请根据我描述的场景设计完整的敏感性分析模板。\n用 ```formula 输出。' },
+  { id: 'pro_amort_schedule', categoryId: 'professional', label: '还款计划表(含图表)', labelEn: 'Amort Schedule+Chart', icon: 'LineChart', order: 8, builtin: true,
+    keywords: ['还款计划', '摊销表', 'amortization', '还款图表', '本金利息'],
+    prompt: '帮我生成含图表的还款计划表：\n贷款本金 = {{principal}}\n年利率 = {{rate}}%\n贷款年限 = {{years}}\n\n请输出：\n1. 变量定义行（本金、利率、月利率、月供 pmt）\n2. 用列表函数构造期数、本金部分、利息部分、剩余本金的数组\n3. 用 chart(line, ...) 绘制月供中本金/利息占比变化趋势图\n\n使用 listFill、列表运算等构造数据，再用 chart 函数可视化。\n用 ```formula 输出多行可执行表达式。' },
+  { id: 'pro_investment_compare', categoryId: 'professional', label: '投资方案对比', labelEn: 'Investment Compare', icon: 'BarChart3', order: 9, builtin: true,
+    keywords: ['投资对比', '方案对比', '收益比较', 'investment', 'compare'],
+    prompt: '帮我设计多投资方案对比分析：\n方案A: 投入 = {{amountA}}, 年化收益 = {{rateA}}%, 持有年数 = {{yearsA}}\n方案B: 投入 = {{amountB}}, 年化收益 = {{rateB}}%, 持有年数 = {{yearsB}}\n\n请计算：\n1. 各方案终值（复利）\n2. 各方案总收益\n3. 年化收益率对比\n4. 用 chart(bar, ...) 或 chart(line, ...) 绘制对比图\n\n用变量赋值行组织数据，chart 函数可视化结果。\n用 ```formula 输出多行可执行表达式。' },
+
   // ━━ 公式助手 (helper) ━━
   { id: 'help_explain', categoryId: 'helper', label: '解释公式', labelEn: 'Explain Formula', icon: 'HelpCircle', order: 0, builtin: true,
     keywords: ['解释', 'js', 'explain'],
@@ -346,8 +372,8 @@ function mergeWithDefaults(stored: CalculatorQuickActionStore): CalculatorQuickA
       cats.push({ ...dc });
     } else {
       // 版本迁移：补齐缺失字段
-      if (!(existing as Record<string, unknown>).labelEn && dc.labelEn) {
-        (existing as Record<string, unknown>).labelEn = dc.labelEn;
+      if (!(existing as unknown as Record<string, unknown>).labelEn && dc.labelEn) {
+        (existing as unknown as Record<string, unknown>).labelEn = dc.labelEn;
       }
     }
   }

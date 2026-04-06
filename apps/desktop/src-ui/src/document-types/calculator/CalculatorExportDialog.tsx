@@ -1,11 +1,13 @@
 /**
  * CalculatorExportDialog — 计算结果导出对话框
- * 支持 CSV、TXT、JSON、Markdown 四种格式导出
+ * 支持 CSV、TXT、JSON、Markdown、HTML、PDF、DOCX 格式导出
  */
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { invoke } from '@tauri-apps/api/core';
+import { save } from '@tauri-apps/plugin-dialog';
 import {
-  Download, FileSpreadsheet, FileText, FileJson, FileCode2
+  Download, FileSpreadsheet, FileText, FileJson, FileCode2, FileDown, FileType
 } from 'lucide-react';
 import {
   Dialog,
@@ -31,9 +33,10 @@ import {
   exportToTXT,
   exportToJSON,
   exportToMarkdown,
+  exportToHTML,
 } from './engine/exporter';
 
-type ExportFormat = 'csv' | 'txt' | 'json' | 'md';
+type ExportFormat = 'csv' | 'txt' | 'json' | 'md' | 'html' | 'pdf' | 'docx';
 
 interface FormatOption {
   value: ExportFormat;
@@ -45,6 +48,9 @@ const FORMAT_OPTIONS: FormatOption[] = [
   { value: 'txt', icon: FileText },
   { value: 'json', icon: FileJson },
   { value: 'md', icon: FileCode2 },
+  { value: 'html', icon: FileDown },
+  { value: 'pdf', icon: FileType },
+  { value: 'docx', icon: FileType },
 ];
 
 interface CalculatorExportDialogProps {
@@ -52,6 +58,16 @@ interface CalculatorExportDialogProps {
   onOpenChange: (open: boolean) => void;
   calcDoc: CalculatorDocumentContent;
   defaultTitle?: string;
+}
+
+function getExtension(fmt: ExportFormat): string {
+  switch (fmt) {
+    case 'md': return 'md';
+    case 'pdf': return 'pdf';
+    case 'docx': return 'docx';
+    case 'html': return 'html';
+    default: return fmt;
+  }
 }
 
 export function CalculatorExportDialog({
@@ -95,7 +111,7 @@ export function CalculatorExportDialog({
     [t],
   );
 
-  // 生成预览内容
+  // 生成预览内容（PDF/DOCX 无法预览，显示 Markdown 预览）
   const previewContent = useMemo(() => {
     if (!calcDoc) return '';
 
@@ -108,25 +124,76 @@ export function CalculatorExportDialog({
         return exportToJSON(calcDoc);
       case 'md':
         return exportToMarkdown(calcDoc, undefined, mdColumnLabels);
+      case 'html':
+        return exportToHTML(calcDoc);
+      case 'pdf':
+      case 'docx':
+        // PDF/DOCX 显示 Markdown 预览（实际通过 Pandoc 转换）
+        return t('calculator.exportPandocPreview', {
+          defaultValue: format === 'pdf'
+            ? 'PDF 格式将基于 Markdown 内容通过 Pandoc 生成。\n\n预览（Markdown 源）：\n\n'
+            : 'DOCX 格式将基于 Markdown 内容通过 Pandoc 生成。\n\n预览（Markdown 源）：\n\n',
+        }) + exportToMarkdown(calcDoc, undefined, mdColumnLabels);
       default:
         return '';
     }
-  }, [calcDoc, format, csvColumnLabels, mdColumnLabels]);
+  }, [calcDoc, format, csvColumnLabels, mdColumnLabels, t]);
+
+  // 通过 Pandoc 导出 PDF/DOCX
+  const exportViaPandoc = useCallback(async (fmt: 'pdf' | 'docx', title: string) => {
+    const md = exportToMarkdown(calcDoc, undefined, mdColumnLabels);
+    const ext = fmt === 'pdf' ? 'pdf' : 'docx';
+    const fullFilename = `${title}.${ext}`;
+
+    // 打开保存路径对话框
+    const filePath = await save({
+      defaultPath: fullFilename,
+      filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
+    });
+    if (!filePath) return false;
+
+    try {
+      await invoke('pandoc_export', {
+        markdown: md,
+        outputPath: filePath,
+        format: fmt,
+        extraArgs: fmt === 'pdf'
+          ? ['--pdf-engine=xelatex', '-V', 'mainfont=Songti SC', '-V', 'CJKmainfont=Songti SC']
+          : [],
+        title,
+      });
+      return true;
+    } catch (e) {
+      console.error('[CalculatorExportDialog] Pandoc error:', e);
+      throw e;
+    }
+  }, [calcDoc, mdColumnLabels]);
 
   const handleExport = useCallback(async () => {
-    const extension = format === 'md' ? 'md' : format;
-    const fullFilename = `${filename || defaultTitle}.${extension}`;
+    const ext = getExtension(format);
+    const fullFilename = `${filename || defaultTitle}.${ext}`;
     setExporting(true);
     setExportError('');
     try {
+      // PDF/DOCX 通过 Pandoc
+      if (format === 'pdf' || format === 'docx') {
+        await exportViaPandoc(format, filename || defaultTitle);
+        onOpenChange(false);
+        return;
+      }
+
+      const content = previewContent;
       const filters =
-        extension === 'md'
+        format === 'md'
           ? [{ name: 'Markdown', extensions: ['md', 'markdown'] }]
-          : [{ name: extension.toUpperCase(), extensions: [extension] }];
+          : format === 'html'
+            ? [{ name: 'HTML', extensions: ['html', 'htm'] }]
+            : [{ name: ext.toUpperCase(), extensions: [ext] }];
+
       const path = await saveTextFileWithDialog({
         defaultPath: fullFilename,
         filters,
-        content: previewContent,
+        content,
       });
       if (path) onOpenChange(false);
     } catch (e) {
@@ -135,7 +202,7 @@ export function CalculatorExportDialog({
     } finally {
       setExporting(false);
     }
-  }, [format, filename, defaultTitle, previewContent, onOpenChange]);
+  }, [format, filename, defaultTitle, previewContent, onOpenChange, exportViaPandoc]);
 
   const getFormatLabel = (fmt: ExportFormat): string => {
     switch (fmt) {
@@ -147,6 +214,12 @@ export function CalculatorExportDialog({
         return t('calculator.exportJSON', { defaultValue: 'JSON Data' });
       case 'md':
         return t('calculator.exportMarkdown', { defaultValue: 'Markdown' });
+      case 'html':
+        return t('calculator.exportHTML', { defaultValue: 'HTML' });
+      case 'pdf':
+        return t('calculator.exportPDF', { defaultValue: 'PDF' });
+      case 'docx':
+        return t('calculator.exportDOCX', { defaultValue: 'DOCX' });
       default:
         return (fmt as string).toUpperCase();
     }
@@ -195,6 +268,13 @@ export function CalculatorExportDialog({
                 ))}
               </SelectContent>
             </Select>
+            {(format === 'pdf' || format === 'docx') && (
+              <p className="text-xs text-muted-foreground">
+                {t('calculator.exportPandocHint', {
+                  defaultValue: '需要安装 Pandoc。PDF 导出需要 XeLaTeX。',
+                })}
+              </p>
+            )}
           </div>
 
           {/* 预览 */}
@@ -232,7 +312,7 @@ export function CalculatorExportDialog({
           <Button size="sm" onClick={() => void handleExport()} disabled={exporting}>
             <Download className="h-3 w-3 mr-1" />
             {exporting
-              ? t('calculator.exporting', { defaultValue: '导出中…' })
+              ? t('calculator.exporting', { defaultValue: '导出中...' })
               : t('calculator.export', { defaultValue: 'Export' })}
           </Button>
         </div>

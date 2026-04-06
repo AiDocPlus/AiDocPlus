@@ -17,6 +17,8 @@ export type CalcResultType =
   | 'matrix'      // 矩阵
   | 'complex'     // 复数
   | 'string'      // 字符串（备注）
+  | 'chart'       // 图表
+  | 'sensitivity' // 敏感性分析
   | 'error';      // 错误
 
 /** 计算结果 */
@@ -33,17 +35,55 @@ export interface CalcResult {
   error?: string;
 }
 
+/** 图表类型 */
+export type ChartType = 'bar' | 'line' | 'pie' | 'scatter' | 'area';
+
+/** 图表数据集 */
+export interface ChartDataset {
+  /** 数据集名称 */
+  name: string;
+  /** 数据值 */
+  data: number[];
+  /** 可选颜色 */
+  color?: string;
+}
+
+/** 图表结果（行内可视化） */
+export interface ChartResultData {
+  /** 图表类型 */
+  chartType: ChartType;
+  /** 标签（X 轴） */
+  labels: string[];
+  /** 数据集 */
+  datasets: ChartDataset[];
+  /** 图表标题 */
+  title?: string;
+}
+
+/** 敏感性分析结果 */
+export interface SensitivityResultData {
+  /** 变量名 */
+  variableName: string;
+  /** 值-结果对 */
+  pairs: { inputValue: number; outputValue: number }[];
+  /** 表达式描述 */
+  expression?: string;
+}
+
 // ============================================================
 // 单行数据
 // ============================================================
 
 /** 行语义角色（Soulver 风格：标题分段、小计、注释） */
-export type CalculatorLineRole = 'normal' | 'heading' | 'comment' | 'subtotal';
+export type CalculatorLineRole = 'normal' | 'heading' | 'comment' | 'subtotal' | 'function_def';
+
+/** 数字显示格式 */
+export type NumberDisplayFormat = 'number' | 'accounting' | 'scientific' | 'percent' | 'currency';
 
 /** `#` 行解释：legacy 与 // 同为注释；soulver 时 # 为标题并参与分段小计 */
 export type CalculatorHashBehavior = 'legacy' | 'soulver';
 
-const LINE_ROLES = new Set<CalculatorLineRole>(['normal', 'heading', 'comment', 'subtotal']);
+const LINE_ROLES = new Set<CalculatorLineRole>(['normal', 'heading', 'comment', 'subtotal', 'function_def']);
 
 function isStoredLineRole(raw: unknown): raw is CalculatorLineRole {
   return typeof raw === 'string' && LINE_ROLES.has(raw as CalculatorLineRole);
@@ -68,12 +108,16 @@ export function inferLineRole(
   if (start.startsWith('#')) {
     return hashBehavior === 'soulver' ? 'heading' : 'comment';
   }
+  // fn 函数定义：fn 函数名(参数) = 表达式
+  if (/^fn\s+[a-zA-Z_\u4e00-\u9fa5][a-zA-Z0-9_\u4e00-\u9fa5]*\s*\(/i.test(start)) {
+    return 'function_def';
+  }
   return 'normal';
 }
 
-/** 标题/注释：不调用数学求值 */
+/** 标题/注释/fn定义：不调用标准数学求值 */
 export function lineRoleSkipsEngineEvaluate(role: CalculatorLineRole): boolean {
-  return role === 'heading' || role === 'comment' || role === 'subtotal';
+  return role === 'heading' || role === 'comment' || role === 'subtotal' || role === 'function_def';
 }
 
 /** 根据表达式与 # 行为刷新行的 lineRole / isNote（编辑时调用） */
@@ -82,7 +126,7 @@ export function syncCalculatorLineMeta(
   hashBehavior: CalculatorHashBehavior,
 ): CalculatorLine {
   const lineRole = inferLineRole(line.expression, hashBehavior);
-  const isNote = lineRole === 'heading' || lineRole === 'comment';
+  const isNote = lineRole === 'heading' || lineRole === 'comment' || lineRole === 'function_def';
   return { ...line, lineRole, isNote };
 }
 
@@ -110,6 +154,10 @@ export interface CalculatorLine {
   isNote: boolean;
   /** 最后计算时间 */
   computedAt?: string;
+  /** 自定义函数定义（仅 function_def 行） */
+  fnDef?: { name: string; params: string[]; body: string };
+  /** 行级数字格式覆盖（不设置则使用文档默认） */
+  displayFormat?: NumberDisplayFormat;
 }
 
 // ============================================================
@@ -192,6 +240,8 @@ const CALC_RESULT_TYPES = new Set<CalcResultType>([
   'matrix',
   'complex',
   'string',
+  'chart',
+  'sensitivity',
   'error',
 ]);
 
@@ -245,7 +295,7 @@ export function normalizeCalculatorLine(
   const lineRole: CalculatorLineRole = isStoredLineRole(r.lineRole)
     ? (r.lineRole as CalculatorLineRole)
     : inferLineRole(expression, hashBehavior);
-  const isNote = lineRole === 'heading' || lineRole === 'comment';
+  const isNote = lineRole === 'heading' || lineRole === 'comment' || lineRole === 'function_def';
   let result = normalizeCalcResult(r.result);
   if (isNote && result.type !== 'string') {
     result = {
@@ -261,6 +311,12 @@ export function normalizeCalculatorLine(
       ? Math.floor(r.lineNumber)
       : lineIndexOneBased;
   const computedAt = typeof r.computedAt === 'string' ? r.computedAt : undefined;
+  const fnDef = (r.fnDef && typeof r.fnDef === 'object')
+    ? r.fnDef as CalculatorLine['fnDef']
+    : undefined;
+  const displayFormat = typeof r.displayFormat === 'string'
+    ? r.displayFormat as NumberDisplayFormat
+    : undefined;
   return {
     id,
     lineNumber,
@@ -271,6 +327,8 @@ export function normalizeCalculatorLine(
     lineRole,
     isNote,
     computedAt,
+    fnDef,
+    displayFormat,
   };
 }
 
@@ -338,6 +396,16 @@ export interface CalculatorSettings {
   liveUpdate: boolean;
   /** 小数位数 */
   decimalPlaces: number;
+  /** 编辑器字号（px） */
+  editorFontSize: number;
+  /** 行高模式 */
+  lineHeight: 'compact' | 'standard' | 'relaxed';
+  /** 奇偶行条纹 */
+  stripedRows: boolean;
+  /** 显示行号 */
+  showLineNumbers: boolean;
+  /** 默认数字显示格式 */
+  resultFormat: NumberDisplayFormat;
 }
 
 /** 计算空间（Sheet） */
@@ -391,11 +459,16 @@ export const DEFAULT_CALCULATOR_SETTINGS: CalculatorSettings = {
   hashBehavior: 'legacy',
   liveUpdate: true,
   decimalPlaces: 2,
+  editorFontSize: 14,
+  lineHeight: 'standard',
+  stripedRows: true,
+  showLineNumbers: true,
+  resultFormat: 'number' as NumberDisplayFormat,
 };
 
 /** 生成唯一 Sheet ID */
 export function generateSheetId(): string {
-  return `sheet-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  return `sheet-${crypto.randomUUID()}`;
 }
 
 /** 创建空 Sheet */
@@ -601,7 +674,60 @@ export function extractCalculatorPlainText(content: string): string {
 
 /** 生成唯一 ID */
 export function generateLineId(): string {
-  return `line-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `line-${crypto.randomUUID()}`;
+}
+
+/**
+ * 根据格式类型格式化数值
+ */
+export function formatNumberByFormat(
+  value: number,
+  format: NumberDisplayFormat,
+  decimals: number,
+  locale: string,
+  currency: string = 'CNY',
+): string {
+  if (!Number.isFinite(value)) return '--';
+
+  switch (format) {
+    case 'accounting': {
+      const nf = new Intl.NumberFormat(locale, {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      });
+      if (value < 0) {
+        return `(${nf.format(Math.abs(value))})`;
+      }
+      return nf.format(value);
+    }
+    case 'scientific': {
+      return value.toExponential(Math.max(0, decimals - 1));
+    }
+    case 'percent': {
+      const nf = new Intl.NumberFormat(locale, {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      });
+      return nf.format(value * 100) + '%';
+    }
+    case 'currency': {
+      return new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency,
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      }).format(value);
+    }
+    default: {
+      if (Number.isInteger(value)) {
+        return value.toLocaleString(locale);
+      }
+      return value.toLocaleString(locale, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: decimals,
+      });
+    }
+  }
 }
 
 /** 检测是否为备注行 */
@@ -620,7 +746,7 @@ export function createLineFromExpression(
   hashBehavior: CalculatorHashBehavior = 'legacy',
 ): CalculatorLine {
   const lineRole = inferLineRole(expression, hashBehavior);
-  const isNote = lineRole === 'heading' || lineRole === 'comment';
+  const isNote = lineRole === 'heading' || lineRole === 'comment' || lineRole === 'function_def';
   return {
     id: generateLineId(),
     lineNumber,
