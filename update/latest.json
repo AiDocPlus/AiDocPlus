@@ -13,7 +13,7 @@
     },
     "darwin-aarch64": {
       "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.15/AiDocPlus.app.tar.gz",
-      "signature": ""
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRXQyYTlYUFlYQ2JhTU9Jb3VsSzM2QTVycXVTeTBDVFJkbXh3NUdvZGk1S0lzMzdOZHRZUXVSR3N5SlNuMUxpZEFqeDhNcUc5UWh2OU50MEh3Y0Z3UGdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc1NDQzNjQ5CWZpbGU6QWlEb2NQbHVzLmFwcC50YXIuZ3oKTVNkbGRmSUV3TEoxbHZNVDJjQUQ4WmYxaGx6NDdGR3dmTHlyRVBhRGVjNE5oZ1Z0WkpsRkxJYUpvcXl5NXVMeEhFT0lUa2kyUGMvUlF1TmhMRHZvQXc9PQo="
     }
   }
 }
