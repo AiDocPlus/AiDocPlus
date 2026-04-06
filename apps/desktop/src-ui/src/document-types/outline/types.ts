@@ -11,6 +11,89 @@ export type { OutlineHeadingLevel } from './outlineHeadingLevel';
 export { normalizeOutlineHeadingLevel, outlineHeadingEditorClass } from './outlineHeadingLevel';
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// 高亮颜色系统
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface HighlightColor {
+  name: string;
+  value: string;
+}
+
+/**
+ * 36 种预设高亮颜色（6 行 x 6 列）
+ * 供工具栏和浮动菜单共用
+ */
+export const HIGHLIGHT_COLORS: HighlightColor[] = [
+  // 暖黄
+  { name: 'lightYellow', value: '#fef9c3' },
+  { name: 'yellow', value: '#fef3c7' },
+  { name: 'amber', value: '#fef08a' },
+  { name: 'peach', value: '#fed7aa' },
+  { name: 'apricot', value: '#ffedd5' },
+  { name: 'lightOrange', value: '#fff7ed' },
+  // 绿系
+  { name: 'mint', value: '#d1fae5' },
+  { name: 'lightGreen', value: '#dcfce7' },
+  { name: 'green', value: '#bbf7d0' },
+  { name: 'olive', value: '#d9f99d' },
+  { name: 'sage', value: '#ecfccb' },
+  { name: 'lime', value: '#fef9c3' },
+  // 蓝系
+  { name: 'skyBlue', value: '#e0f2fe' },
+  { name: 'lightBlue', value: '#dbeafe' },
+  { name: 'blue', value: '#bfdbfe' },
+  { name: 'cobalt', value: '#93c5fd' },
+  { name: 'lavender', value: '#ddd6fe' },
+  { name: 'haze', value: '#c7d2fe' },
+  // 紫粉
+  { name: 'lightPurple', value: '#f3e8ff' },
+  { name: 'lilac', value: '#e9d5ff' },
+  { name: 'wisteria', value: '#d8b4fe' },
+  { name: 'pink', value: '#fce7f3' },
+  { name: 'rose', value: '#fecdd3' },
+  { name: 'lightRed', value: '#ffe4e6' },
+  // 红橙
+  { name: 'coral', value: '#fed7aa' },
+  { name: 'tomato', value: '#fecaca' },
+  { name: 'salmon', value: '#fda4af' },
+  { name: 'clay', value: '#fdba74' },
+  { name: 'sienna', value: '#f87171' },
+  { name: 'brick', value: '#ef4444' },
+  // 中性
+  { name: 'lightGray', value: '#f3f4f6' },
+  { name: 'silver', value: '#e5e7eb' },
+  { name: 'warmGray', value: '#f5f5f4' },
+  { name: 'cream', value: '#fefce8' },
+  { name: 'ivory', value: '#fffbeb' },
+  { name: 'tan', value: '#fef2f2' },
+];
+
+/** 自定义颜色缓存 key */
+const CUSTOM_COLORS_KEY = 'outline-custom-highlight-colors';
+const MAX_CUSTOM_COLORS = 8;
+
+/** 读取自定义颜色 */
+export function loadCustomColors(): string[] {
+  try {
+    const raw = localStorage.getItem(CUSTOM_COLORS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((c: unknown): c is string => typeof c === 'string');
+  } catch {
+    return [];
+  }
+}
+
+/** 保存自定义颜色 */
+export function saveCustomColor(color: string): void {
+  const existing = loadCustomColors();
+  const filtered = existing.filter((c) => c !== color);
+  const updated = [color, ...filtered].slice(0, MAX_CUSTOM_COLORS);
+  localStorage.setItem(CUSTOM_COLORS_KEY, JSON.stringify(updated));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // 基础类型定义
 // ═══════════════════════════════════════════════════════════════════════════════
 

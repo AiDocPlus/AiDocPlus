@@ -4165,6 +4165,7 @@
       "headingN": "Heading {{n}}",
       "highlight": "Highlight",
       "clearHighlight": "Clear highlight",
+      "customColor": "Custom color",
       "clearFormat": "Clear inline formatting",
       "toggleExpandBranch": "Expand/collapse current branch"
     },

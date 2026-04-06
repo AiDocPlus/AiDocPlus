@@ -288,6 +288,7 @@ export const OutlineRow = forwardRef(function OutlineRow(
           isDragOverTarget && 'ring-1 ring-primary/40 bg-primary/5',
           !isSelected && !isSearchMatch && 'hover:bg-muted/50',
           isActive && 'active bg-muted/30',
+          node.completed && 'completed',
           isDragging && 'dragging opacity-50'
         )}
         data-depth={depth}
@@ -382,16 +383,31 @@ export const OutlineRow = forwardRef(function OutlineRow(
         {/* 内容区 */}
         <div className="flex-1 min-w-0 outline-node-content">
           {/* 富文本编辑器 */}
+          {node.colorHighlight ? (
+            <div className="inline-block rounded-sm" style={{ backgroundColor: node.colorHighlight }}>
+              <ProseMirrorNodeEditor
+            ref={registerEditor}
+            content={node.content}
+            isActive={isActive}
+            completed={node.completed}
+            onChange={handleContentChange}
+            onFocus={onActivate}
+            onKeyDown={handleEditorKeyDown}
+            className={outlineHeadingEditorClass(node.headingLevel ?? 0)}
+          />
+            </div>
+          ) : (
           <ProseMirrorNodeEditor
             ref={registerEditor}
             content={node.content}
             isActive={isActive}
-            completed={false}
+            completed={node.completed}
             onChange={handleContentChange}
             onFocus={onActivate}
             onKeyDown={handleEditorKeyDown}
-            className={cn(outlineHeadingEditorClass(node.headingLevel ?? 0))}
+            className={outlineHeadingEditorClass(node.headingLevel ?? 0)}
           />
+          )}
 
           {/* 备注显示 */}
           {showNote && !isEditingNote && (

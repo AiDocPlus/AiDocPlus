@@ -15,32 +15,20 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import type { OutlineHeadingLevel, OutlineNode } from '../types';
+import { HighlightColorPicker } from './HighlightColorPicker';
 import {
   Bold,
   Italic,
   Underline,
   Strikethrough,
   Heading1,
-  Type,
   Highlighter,
   MessageSquareText,
-  ImageIcon,
-  Smile,
-  Table2,
   Link2,
   Download,
   Trash2,
   Eraser,
 } from 'lucide-react';
-
-const HIGHLIGHT_SWATCHES = [
-  { name: 'yellow', value: '#fef3c7', labelKey: 'outline.nodeMenu.swatchYellow' },
-  { name: 'green', value: '#d1fae5', labelKey: 'outline.nodeMenu.swatchGreen' },
-  { name: 'blue', value: '#dbeafe', labelKey: 'outline.nodeMenu.swatchBlue' },
-  { name: 'purple', value: '#e9d5ff', labelKey: 'outline.nodeMenu.swatchPurple' },
-  { name: 'pink', value: '#fce7f3', labelKey: 'outline.nodeMenu.swatchPink' },
-  { name: 'red', value: '#fee2e2', labelKey: 'outline.nodeMenu.swatchRed' },
-];
 
 export interface OutlineNodeMenuActions {
   onHeading: (level: OutlineHeadingLevel) => void;
@@ -173,38 +161,15 @@ export function NodeFloatingMenu({ node, actions, trigger, showExport }: NodeFlo
           </div>
         </div>
 
-        <DropdownMenuItem disabled className="gap-2 py-2 opacity-60">
-          <Type className="h-4 w-4 shrink-0" />
-          {t('outline.nodeMenu.fontColorSoon', { defaultValue: '字体颜色（即将支持）' })}
-        </DropdownMenuItem>
-
         <DropdownMenuSub>
           <DropdownMenuSubTrigger className="gap-2 px-2 py-2 rounded-none">
             <Highlighter className="h-4 w-4 shrink-0 text-amber-500" />
             <span>{t('outline.nodeMenu.highlighter', { defaultValue: '荧光笔' })}</span>
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="p-0">
-            <div className="max-h-[min(calc(100vh-2rem),24rem)] overflow-y-auto overflow-x-hidden p-2 overscroll-contain">
-              <button
-                type="button"
-                className="mb-2 flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
-                onClick={() => actions.onHighlight(null)}
-              >
-                {t('outline.toolbar.clearHighlight', { defaultValue: '清除高亮' })}
-              </button>
-              <div className="grid grid-cols-3 gap-1.5">
-                {HIGHLIGHT_SWATCHES.map((s) => (
-                  <button
-                    key={s.name}
-                    type="button"
-                    className="h-8 w-full rounded border border-border/60 hover:ring-2 hover:ring-primary/30"
-                    style={{ backgroundColor: s.value }}
-                    title={t(s.labelKey, { defaultValue: s.name })}
-                    onClick={() => actions.onHighlight(s.value)}
-                  />
-                ))}
-              </div>
-            </div>
+          <DropdownMenuSubContent className="p-0 min-w-[14rem]" onMouseDown={(e) => e.preventDefault()}>
+            <HighlightColorPicker
+              onSelect={(color) => actions.onHighlight(color)}
+            />
           </DropdownMenuSubContent>
         </DropdownMenuSub>
 
@@ -220,18 +185,6 @@ export function NodeFloatingMenu({ node, actions, trigger, showExport }: NodeFlo
         <DropdownMenuItem className="gap-2 py-2" onClick={() => actions.onEditNote()}>
           <MessageSquareText className="h-4 w-4 shrink-0" />
           {t('outline.nodeMenu.editNote', { defaultValue: '编辑描述' })}
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled className="gap-2 py-2 opacity-50">
-          <ImageIcon className="h-4 w-4 shrink-0" />
-          {t('outline.nodeMenu.addImage', { defaultValue: '添加图片' })}
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled className="gap-2 py-2 opacity-50">
-          <Smile className="h-4 w-4 shrink-0" />
-          {t('outline.nodeMenu.addIcon', { defaultValue: '添加图标' })}
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled className="gap-2 py-2 opacity-50">
-          <Table2 className="h-4 w-4 shrink-0" />
-          {t('outline.nodeMenu.addTable', { defaultValue: '添加表格' })}
         </DropdownMenuItem>
         <DropdownMenuItem className="gap-2 py-2" onClick={() => actions.onCopyLink()}>
           <Link2 className="h-4 w-4 shrink-0" />

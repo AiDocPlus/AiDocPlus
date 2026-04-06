@@ -169,6 +169,16 @@ export function OutlineWorkspace({
 
   // 防抖保存
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // 立即保存（Cmd+S 快捷键用）
+  const saveNow = useCallback(() => {
+    const h = hostRef.current;
+    const nextContent = serializeOutlineContent(state.data);
+    const currentContent = h.doc.getDocument().content || '';
+    if (currentContent === nextContent) return;
+    void h.doc.save();
+  }, []);
 
   const syncInMemoryAndMarkDirty = useCallback((newData: OutlineDocumentContent) => {
     const h = hostRef.current;
@@ -185,18 +195,30 @@ export function OutlineWorkspace({
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
+      setIsSaving(true);
       saveTimeoutRef.current = setTimeout(() => {
         const h = hostRef.current;
         const nextContent = serializeOutlineContent(newData);
         const currentContent = h.doc.getDocument().content || '';
-        if (currentContent === nextContent) return;
+        if (currentContent === nextContent) {
+          setIsSaving(false);
+          return;
+        }
         if (newData.settings.autoSave) {
           void h.doc.save();
         }
+        setIsSaving(false);
       }, 500);
     },
     []
   );
+
+  // Cmd+S 快捷键保存
+  useEffect(() => {
+    const onSave = () => { saveNow(); };
+    window.addEventListener('save-active-tab', onSave);
+    return () => window.removeEventListener('save-active-tab', onSave);
+  }, [saveNow]);
 
   // 外部内容变化时（如版本恢复/多端修改）同步到工作区状态
   useEffect(() => {
@@ -762,8 +784,14 @@ export function OutlineWorkspace({
             onOutdent={() => editorRef.current?.outdent()}
             onClone={() => editorRef.current?.cloneNode()}
             onOpenSearch={() => editorRef.current?.openSearch()}
-            onExpandAll={() => editorRef.current?.expandAll()}
-            onCollapseAll={() => editorRef.current?.collapseAll()}
+            hasCollapsedNodes={(activeOutline.collapsedNodeIds?.length ?? 0) > 0}
+            onToggleExpandAll={() => {
+              if ((activeOutline.collapsedNodeIds?.length ?? 0) > 0) {
+                editorRef.current?.expandAll();
+              } else {
+                editorRef.current?.collapseAll();
+              }
+            }}
             onToggleExpandActive={() => editorRef.current?.toggleExpand()}
             onFormatBold={() => editorRef.current?.toggleBold()}
             onFormatItalic={() => editorRef.current?.toggleItalic()}
@@ -869,7 +897,7 @@ export function OutlineWorkspace({
               state.filterState.selectedMentions.size > 0 ||
               state.filterState.searchQuery !== ''
             }
-            saveStatus={tabIsDirty ? 'unsaved' : 'saved'}
+            saveStatus={isSaving ? 'saving' : tabIsDirty ? 'unsaved' : 'saved'}
             showWordCount={state.data.settings.showWordCount}
             showProgress={state.data.settings.showProgress}
           />

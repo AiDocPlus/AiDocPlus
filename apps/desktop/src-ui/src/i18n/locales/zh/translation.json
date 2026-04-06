@@ -4231,6 +4231,7 @@
       "headingN": "标题 {{n}}",
       "highlight": "高亮",
       "clearHighlight": "清除高亮",
+      "customColor": "自定义颜色",
       "clearFormat": "清除内联格式",
       "toggleExpandBranch": "展开/折叠当前分支"
     },

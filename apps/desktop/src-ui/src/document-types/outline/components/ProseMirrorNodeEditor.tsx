@@ -200,6 +200,7 @@ interface ProseMirrorNodeEditorProps {
   onBlur?: () => void;
   onKeyDown?: (event: KeyboardEvent) => boolean;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -217,6 +218,7 @@ export const ProseMirrorNodeEditor = forwardRef(function ProseMirrorNodeEditor(
     onBlur,
     onKeyDown,
     className,
+    style,
   }: ProseMirrorNodeEditorProps,
   ref: ForwardedRef<ProseMirrorNodeEditorRef>
 ) {
@@ -331,11 +333,7 @@ export const ProseMirrorNodeEditor = forwardRef(function ProseMirrorNodeEditor(
       toggleUnderline: () => editor?.chain().focus().toggleUnderline().run(),
       toggleStrike: () => editor?.chain().focus().toggleStrike().run(),
       setHighlight: (color: string | null) => {
-        if (color) {
-          editor?.chain().focus().setMark('colorHighlight', { color }).run();
-        } else {
-          editor?.chain().focus().unsetMark('colorHighlight').run();
-        }
+        // 高亮由 node.colorHighlight + 容器 div 控制，此处保留空实现以兼容接口
       },
       clearFormat: () => {
         editor?.chain()
@@ -354,7 +352,7 @@ export const ProseMirrorNodeEditor = forwardRef(function ProseMirrorNodeEditor(
     }, [isActive, editor]);
 
     return (
-      <div ref={containerRef} className="w-full min-w-0">
+      <div ref={containerRef} className="w-full min-w-0" style={style}>
         <EditorContent editor={editor} />
       </div>
     );

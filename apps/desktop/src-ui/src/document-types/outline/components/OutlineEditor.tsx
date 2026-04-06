@@ -242,8 +242,6 @@ export const OutlineEditor = forwardRef(function OutlineEditor(
     );
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [searchCaseSensitive] = useState(false);
-    const [searchUseRegex] = useState(false);
     const scrollRef = useRef<HTMLDivElement | null>(null);
 
     // 拖拽状态
@@ -612,10 +610,9 @@ export const OutlineEditor = forwardRef(function OutlineEditor(
 
     const handleNodeMenuHighlight = useCallback(
       (nodeId: string, color: string | null) => {
-        runEditorOnNode(nodeId, (ed) => ed.setHighlight(color));
         nodeOps.setColorHighlight(nodeId, color);
       },
-      [runEditorOnNode, nodeOps]
+      [nodeOps]
     );
 
     const handleCopyNodeLink = useCallback(
@@ -892,10 +889,9 @@ export const OutlineEditor = forwardRef(function OutlineEditor(
       (color: string | null) => {
         const id = activeNodeIdRef.current;
         if (!id) return;
-        runEditorOnNode(id, (e) => e.setHighlight(color));
         nodeOpsRef.current.setColorHighlight(id, color);
       },
-      [runEditorOnNode]
+      []
     );
 
     const setHeadingLevel = useCallback(
@@ -1344,8 +1340,6 @@ export const OutlineEditor = forwardRef(function OutlineEditor(
                               lineSpacing={settings.lineSpacing}
                               enableDragAndDrop
                               searchQuery={searchQuery}
-                              searchCaseSensitive={searchCaseSensitive}
-                              searchUseRegex={searchUseRegex}
                               onRegisterEditor={registerNodeEditor}
                               onContentChange={(content) => handleContentChange(node.id, content)}
                               onNoteChange={(note) => handleNoteChange(node.id, note)}
@@ -1431,8 +1425,6 @@ export const OutlineEditor = forwardRef(function OutlineEditor(
                         lineSpacing={settings.lineSpacing}
                         enableDragAndDrop
                         searchQuery={searchQuery}
-                        searchCaseSensitive={searchCaseSensitive}
-                        searchUseRegex={searchUseRegex}
                         onRegisterEditor={registerNodeEditor}
                         onContentChange={(content) => handleContentChange(node.id, content)}
                         onNoteChange={(note) => handleNoteChange(node.id, note)}

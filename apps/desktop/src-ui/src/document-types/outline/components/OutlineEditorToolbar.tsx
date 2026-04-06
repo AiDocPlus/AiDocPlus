@@ -23,8 +23,7 @@ import {
   Outdent,
   CopyPlus,
   Search,
-  ChevronsDown,
-  ChevronsUp,
+  ChevronsDownUp,
   CornerDownRight,
   Bold,
   Italic,
@@ -37,17 +36,9 @@ import {
   UnfoldVertical,
 } from 'lucide-react';
 import type { OutlineHeadingLevel } from '../types';
+import { HighlightColorPicker } from './HighlightColorPicker';
 
 const EDIT_TB_ICON = 'h-7 w-7 shrink-0 p-0';
-
-const HIGHLIGHT_COLORS = [
-  { name: 'yellow', value: '#fef3c7', labelKey: 'outline.nodeMenu.swatchYellow' as const },
-  { name: 'green', value: '#d1fae5', labelKey: 'outline.nodeMenu.swatchGreen' as const },
-  { name: 'blue', value: '#dbeafe', labelKey: 'outline.nodeMenu.swatchBlue' as const },
-  { name: 'purple', value: '#e9d5ff', labelKey: 'outline.nodeMenu.swatchPurple' as const },
-  { name: 'pink', value: '#fce7f3', labelKey: 'outline.nodeMenu.swatchPink' as const },
-  { name: 'red', value: '#fee2e2', labelKey: 'outline.nodeMenu.swatchRed' as const },
-];
 
 // GroupLabel removed — toolbar icons are self-explanatory with tooltips
 
@@ -71,8 +62,10 @@ export interface OutlineEditorToolbarProps {
   onOutdent: () => void;
   onClone: () => void;
   onOpenSearch: () => void;
-  onExpandAll: () => void;
-  onCollapseAll: () => void;
+  /** 是否有折叠节点（控制智能切换按钮图标） */
+  hasCollapsedNodes: boolean;
+  /** 智能切换：全部展开 / 全部折叠 */
+  onToggleExpandAll: () => void;
   onToggleExpandActive: () => void;
 
   onFormatBold: () => void;
@@ -101,8 +94,8 @@ export function OutlineEditorToolbar({
   onOutdent,
   onClone,
   onOpenSearch,
-  onExpandAll,
-  onCollapseAll,
+  hasCollapsedNodes,
+  onToggleExpandAll,
   onToggleExpandActive,
   onFormatBold,
   onFormatItalic,
@@ -347,46 +340,22 @@ export function OutlineEditorToolbar({
             variant="ghost"
             size="icon"
             className={EDIT_TB_ICON}
-            disabled={!fmt}
+            disabled={!hasActiveNode}
             title={t('outline.toolbar.highlight', { defaultValue: '高亮' })}
             aria-label={t('outline.toolbar.highlight', { defaultValue: '高亮' })}
+            onMouseDown={(e) => e.preventDefault()}
           >
             <Highlighter className="h-3.5 w-3.5" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-auto p-2">
-          <div className="mb-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="w-full"
-              disabled={!fmt}
-              onClick={() => {
-                onFormatHighlight(null);
-                setHighlightOpen(false);
-              }}
-            >
-              {t('outline.toolbar.clearHighlight', { defaultValue: '清除高亮' })}
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {HIGHLIGHT_COLORS.map((c) => (
-              <button
-                key={c.name}
-                type="button"
-                disabled={!fmt}
-                onClick={() => {
-                  onFormatHighlight(c.value);
-                  setHighlightOpen(false);
-                }}
-                className="h-7 w-7 shrink-0 rounded border hover:scale-105 transition-transform disabled:opacity-40"
-                style={{ backgroundColor: c.value }}
-                title={t(c.labelKey, { defaultValue: c.name })}
-                aria-label={t(c.labelKey, { defaultValue: c.name })}
-              />
-            ))}
-          </div>
+        <PopoverContent align="start" className="w-auto p-0" onMouseDown={(e) => e.preventDefault()}>
+          <HighlightColorPicker
+            disabled={!hasActiveNode}
+            onSelect={(color) => {
+              onFormatHighlight(color);
+              setHighlightOpen(false);
+            }}
+          />
         </PopoverContent>
       </Popover>
 
@@ -410,22 +379,19 @@ export function OutlineEditorToolbar({
         variant="ghost"
         size="icon"
         className={EDIT_TB_ICON}
-        onClick={onExpandAll}
-        title={t('outline.toolbar.expandAll', { defaultValue: '全部展开' })}
-        aria-label={t('outline.toolbar.expandAll', { defaultValue: '全部展开' })}
+        onClick={onToggleExpandAll}
+        title={
+          hasCollapsedNodes
+            ? t('outline.toolbar.expandAll', { defaultValue: '全部展开' })
+            : t('outline.toolbar.collapseAll', { defaultValue: '全部折叠' })
+        }
+        aria-label={
+          hasCollapsedNodes
+            ? t('outline.toolbar.expandAll', { defaultValue: '全部展开' })
+            : t('outline.toolbar.collapseAll', { defaultValue: '全部折叠' })
+        }
       >
-        <ChevronsDown className="h-3.5 w-3.5" />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className={EDIT_TB_ICON}
-        onClick={onCollapseAll}
-        title={t('outline.toolbar.collapseAll', { defaultValue: '全部折叠' })}
-        aria-label={t('outline.toolbar.collapseAll', { defaultValue: '全部折叠' })}
-      >
-        <ChevronsUp className="h-3.5 w-3.5" />
+        <ChevronsDownUp className="h-3.5 w-3.5" />
       </Button>
     </div>
   );
