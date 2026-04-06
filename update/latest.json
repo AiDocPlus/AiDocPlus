@@ -1,19 +1,19 @@
 {
-  "version": "0.3.14",
-  "notes": "## AiDocPlus v0.3.14\n\n### \u4e0b\u8f7d\n- **Windows (x64)**: .exe \u5b89\u88c5\u7a0b\u5e8f\uff08NSIS\uff09\n- **macOS (Apple Silicon)**: .dmg \u5b89\u88c5\u5305\n\n### \u66f4\u65b0\u8bf4\u660e\n\u8bf7\u67e5\u770b CHANGELOG.md \u83b7\u53d6\u8be6\u7ec6\u66f4\u65b0\u5185\u5bb9\u3002",
-  "pub_date": "2026-04-02T06:12:59.641Z",
+  "version": "0.3.15",
+  "notes": "## AiDocPlus v0.3.15\n\n### 大纲文档增强\n- 36 色荧光笔高亮 + 自定义颜色选择器\n- 全部展开/折叠合并为智能切换按钮\n- 工具栏聚焦修复（无需双击）\n- Cmd+S 快捷键保存支持\n- 清理冗余代码\n\n### 下载\n- **Windows (x64)**: .exe 安装程序（NSIS）\n- **macOS (Apple Silicon)**: .dmg 安装包\n\n### 更新说明\n请查看 CHANGELOG.md 获取详细更新内容。",
+  "pub_date": "2026-04-06T00:00:00.000Z",
   "platforms": {
     "windows-x86_64": {
-      "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.14/AiDocPlus_0.3.14_x64-setup.exe",
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRW1hWUh1UWtiS1N3R2pBR0lzQmxjVlgvNnl3WVRnTDloOXhqbU1MMDY1d0dETzBUbGFvWFpOYnBDNnJwNEhidklSNEpNbVVVaDJxL2NINjhVVXBtdXdjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc1MTEwMzc3CWZpbGU6QWlEb2NQbHVzXzAuMy4xNF94NjQtc2V0dXAuZXhlClpjTldhakdiNUlzTlFQU1ZYL2p2VC8wYjdSQk1xRlIrRnEzdWY1blp1WFZXUm5ac3NYUVVSb20zVEk2ZUlNVkR0bTBrdEFQRmlzWnZiTGlXQStnV0JBPT0K"
+      "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.15/AiDocPlus_0.3.15_x64-setup.exe",
+      "signature": ""
     },
     "windows-x86_64-nsis": {
-      "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.14/AiDocPlus_0.3.14_x64-setup.exe",
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRW1hWUh1UWtiS1N3R2pBR0lzQmxjVlgvNnl3WVRnTDloOXhqbU1MMDY1d0dETzBUbGFvWFpOYnBDNnJwNEhidklSNEpNbVVVaDJxL2NINjhVVXBtdXdjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc1MTEwMzc3CWZpbGU6QWlEb2NQbHVzXzAuMy4xNF94NjQtc2V0dXAuZXhlClpjTldhakdiNUlzTlFQU1ZYL2p2VC8wYjdSQk1xRlIrRnEzdWY1blp1WFZXUm5ac3NYUVVSb20zVEk2ZUlNVkR0bTBrdEFQRmlzWnZiTGlXQStnV0JBPT0K"
+      "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.15/AiDocPlus_0.3.15_x64-setup.exe",
+      "signature": ""
     },
     "darwin-aarch64": {
-      "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.14/AiDocPlus.app.tar.gz",
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRW9iYSszd2MyK1phMXhlMjAzVUROTDlEamJCR2VXc1BKaVFidmYxcnhyaWhPQ2dlWDJsWGlxUnhmR2tQUXR3TExWbjhQTlJQZmZ0c3dtWTYydjVFeVFRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc1MTA5NjQyCWZpbGU6QWlEb2NQbHVzLmFwcC50YXIuZ3oKaG5qVXp4M1orajJYUEs4M2F4VFBZUUJWNzRVYmZ5RXV6UGYwQXg0QTBwUmE1Vm04N2FqemRWckhWSWVNd3hMb25najF3VWFGb1dzN0N2dmw5WFF1Q3c9PQo="
+      "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.15/AiDocPlus.app.tar.gz",
+      "signature": ""
     }
   }
 }
