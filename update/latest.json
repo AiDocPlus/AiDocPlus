@@ -5,11 +5,11 @@
   "platforms": {
     "windows-x86_64": {
       "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.15/AiDocPlus_0.3.15_x64-setup.exe",
-      "signature": ""
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRXBueFNYMnR0eUpkVDJNRkZ4N1NWc1RJQUJ2MnFqL1NHcm15UWpnUWY4RXY5a0h5ZFBYaWhUS2xvL1BmdTFBMW5CY25WbHdETlRicmxWbHdIWFlvQ0FzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc1NDQ0NTYzCWZpbGU6QWlEb2NQbHVzXzAuMy4xNV94NjQtc2V0dXAuZXhlCkNtUGIrM0tOeFo0NnVEZGJOSFRlTVJ2azNIcHBMd09vaDZYbzhQZytGWXdCcUdGSlpodW8rWmRsYUJjRG5jbFNBRTk4RjkwWTBnVTV5M2pwK2pmUUJnPT0K"
     },
     "windows-x86_64-nsis": {
       "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.15/AiDocPlus_0.3.15_x64-setup.exe",
-      "signature": ""
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdHVyTEcxOEFmRXBueFNYMnR0eUpkVDJNRkZ4N1NWc1RJQUJ2MnFqL1NHcm15UWpnUWY4RXY5a0h5ZFBYaWhUS2xvL1BmdTFBMW5CY25WbHdETlRicmxWbHdIWFlvQ0FzPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc1NDQ0NTYzCWZpbGU6QWlEb2NQbHVzXzAuMy4xNV94NjQtc2V0dXAuZXhlCkNtUGIrM0tOeFo0NnVEZGJOSFRlTVJ2azNIcHBMd09vaDZYbzhQZytGWXdCcUdGSlpodW8rWmRsYUJjRG5jbFNBRTk4RjkwWTBnVTV5M2pwK2pmUUJnPT0K"
     },
     "darwin-aarch64": {
       "url": "https://gitee.com/aidocplus/aidocplus/releases/download/v0.3.15/AiDocPlus.app.tar.gz",
