@@ -1358,7 +1358,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ documents, isLoading: false });
       return document;
     } catch (error) {
-      set({ isLoading: false, error: String(error) });
+      set({ isLoading: false, error: formatBackendError(error) });
       throw error;
     }
   },
@@ -1443,7 +1443,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ docTemplateCategories });
       return docTemplateCategories;
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : String(error) });
+      set({ error: formatBackendError(error) });
       throw error;
     }
   },
@@ -1456,7 +1456,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ docTemplateCategories });
       return docTemplateCategories;
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : String(error) });
+      set({ error: formatBackendError(error) });
       throw error;
     }
   },
@@ -1467,7 +1467,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ docTemplateCategories });
       return docTemplateCategories;
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : String(error) });
+      set({ error: formatBackendError(error) });
       throw error;
     }
   },
@@ -1478,7 +1478,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ docTemplateCategories });
       return docTemplateCategories;
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : String(error) });
+      set({ error: formatBackendError(error) });
       throw error;
     }
   },
@@ -1699,7 +1699,7 @@ export const useAppStore = create<AppState>((set, get) => ({
               }
             }
 
-            const allDocuments = get().documents;
+            let allDocuments = get().documents;
 
             const restoredTabs: EditorTab[] = [];
 
@@ -1730,8 +1730,10 @@ export const useAppStore = create<AppState>((set, get) => ({
                   documentId: activeDocument.id,
                 });
                 freshDoc._contentLoaded = true;
-                const idx = allDocuments.findIndex(d => d.id === freshDoc.id);
-                if (idx >= 0) allDocuments[idx] = freshDoc;
+                const updatedIdx = allDocuments.findIndex(d => d.id === freshDoc.id);
+                if (updatedIdx >= 0) {
+                  allDocuments = allDocuments.map((d, i) => i === updatedIdx ? freshDoc : d);
+                }
                 activeDocument = freshDoc;
               } catch (e) {
                 console.warn('[Workspace] Failed to load active document content:', e);

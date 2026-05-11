@@ -99,21 +99,18 @@ interface OutlineAISession {
   updatedAt: number;
 }
 
-const SESSIONS_KEY = '_outline_ai_sessions';
-const ACTIVE_SESSION_KEY = '_outline_ai_active_session';
-
 function genSessionId(): string {
   return `osess_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 }
 
 type StorageLike = { get<T>(key: string): T | null; set(key: string, value: unknown): void };
 
-function loadSessions(storage: StorageLike): OutlineAISession[] {
-  return storage.get<OutlineAISession[]>(SESSIONS_KEY) || [];
+function loadSessions(storage: StorageLike, dk: string): OutlineAISession[] {
+  return storage.get<OutlineAISession[]>(`${dk}_ai_sessions`) || [];
 }
 
-function saveSessions(storage: StorageLike, sessions: OutlineAISession[]) {
-  storage.set(SESSIONS_KEY, sessions);
+function saveSessions(storage: StorageLike, sessions: OutlineAISession[], dk: string) {
+  storage.set(`${dk}_ai_sessions`, sessions);
 }
 
 function createSession(): OutlineAISession {
@@ -121,14 +118,14 @@ function createSession(): OutlineAISession {
   return { id: genSessionId(), title: '新对话', messages: [], createdAt: now, updatedAt: now };
 }
 
-function getOrCreateActiveSession(storage: StorageLike): OutlineAISession {
-  const sessions = loadSessions(storage);
-  const activeId = storage.get<string>(ACTIVE_SESSION_KEY) || '';
+function getOrCreateActiveSession(storage: StorageLike, dk: string): OutlineAISession {
+  const sessions = loadSessions(storage, dk);
+  const activeId = storage.get<string>(`${dk}_ai_active_session`) || '';
   const active = sessions.find(s => s.id === activeId);
   if (active) return active;
   const newSess = createSession();
-  saveSessions(storage, [...sessions, newSess]);
-  storage.set(ACTIVE_SESSION_KEY, newSess.id);
+  saveSessions(storage, [...sessions, newSess], dk);
+  storage.set(`${dk}_ai_active_session`, newSess.id);
   return newSess;
 }
 
@@ -162,6 +159,7 @@ export default function OutlineAISidebar({
 }: OutlineAISidebarProps) {
   const { t, i18n } = useTranslation();
   const isEn = i18n.language === 'en';
+  const dk = useMemo(() => `outline_${doc.id}_`, [doc.id]);
 
   // ── AI 服务 ──
   const { services } = useSettingsStore(useShallow(s => ({
@@ -169,7 +167,7 @@ export default function OutlineAISidebar({
   })));
   const enabledServices = useMemo(() => services.filter(sv => sv.enabled), [services]);
   const [selectedServiceId, setSelectedServiceId] = useState<string>(() =>
-    host.storage.get<string>('_outline_ai_service_id') || ''
+    host.storage.get<string>(`${dk}_ai_service_id`) || ''
   );
   const effectiveServiceId = selectedServiceId || undefined;
   const aiParams = getAIInvokeParamsForService(effectiveServiceId);
@@ -181,8 +179,8 @@ export default function OutlineAISidebar({
   }, [aiParams.provider]);
 
   // ── 会话管理 ──
-  const [sessions, setSessions] = useState<OutlineAISession[]>(() => loadSessions(host.storage));
-  const [activeSessionId, setActiveSessionId] = useState<string>(() => getOrCreateActiveSession(host.storage).id);
+  const [sessions, setSessions] = useState<OutlineAISession[]>(() => loadSessions(host.storage, dk));
+  const [activeSessionId, setActiveSessionId] = useState<string>(() => getOrCreateActiveSession(host.storage, dk).id);
   const activeSession = useMemo(() =>
     sessions.find(s => s.id === activeSessionId) || (sessions.length > 0 ? sessions[0] : null),
   [sessions, activeSessionId]);
@@ -212,7 +210,7 @@ export default function OutlineAISidebar({
   // ── 系统提示词编辑 ──
   const [promptOpen, setPromptOpen] = useState(false);
   const [customPrompt, setCustomPrompt] = useState<string>(() =>
-    host.storage.get<string>('_outline_ai_prompt') || ''
+    host.storage.get<string>(`${dk}_ai_prompt`) || ''
   );
   const [promptDraft, setPromptDraft] = useState(customPrompt);
 
@@ -264,29 +262,29 @@ export default function OutlineAISidebar({
   // ── 持久化会话 ──
   const persistSessions = useCallback((updated: OutlineAISession[]) => {
     setSessions(updated);
-    saveSessions(host.storage, updated);
-  }, [host.storage]);
+    saveSessions(host.storage, updated, dk);
+  }, [host.storage, dk]);
 
   const updateActiveSession = useCallback((updater: (s: OutlineAISession) => OutlineAISession) => {
     setSessions(prev => {
       const updated = prev.map(s => s.id === activeSessionId ? updater(s) : s);
-      saveSessions(host.storage, updated);
+      saveSessions(host.storage, updated, dk);
       return updated;
     });
-  }, [activeSessionId, host.storage]);
+  }, [activeSessionId, host.storage, dk]);
 
   // ── 新建/切换/删除会话 ──
   const handleNewSession = useCallback(() => {
     const newSess = createSession();
     persistSessions([...sessions, newSess]);
     setActiveSessionId(newSess.id);
-    host.storage.set(ACTIVE_SESSION_KEY, newSess.id);
+    host.storage.set(`${dk}_ai_active_session`, newSess.id);
     setSessionMenuOpen(false);
   }, [sessions, persistSessions, host.storage]);
 
   const handleSwitchSession = useCallback((id: string) => {
     setActiveSessionId(id);
-    host.storage.set(ACTIVE_SESSION_KEY, id);
+    host.storage.set(`${dk}_ai_active_session`, id);
     setSessionMenuOpen(false);
   }, [host.storage]);
 
@@ -296,12 +294,12 @@ export default function OutlineAISidebar({
       const newSess = createSession();
       persistSessions([newSess]);
       setActiveSessionId(newSess.id);
-      host.storage.set(ACTIVE_SESSION_KEY, newSess.id);
+      host.storage.set(`${dk}_ai_active_session`, newSess.id);
     } else {
       persistSessions(updated);
       if (id === activeSessionId) {
         setActiveSessionId(updated[updated.length - 1].id);
-        host.storage.set(ACTIVE_SESSION_KEY, updated[updated.length - 1].id);
+        host.storage.set(`${dk}_ai_active_session`, updated[updated.length - 1].id);
       }
     }
   }, [sessions, activeSessionId, persistSessions, host.storage]);
@@ -603,7 +601,7 @@ export default function OutlineAISidebar({
                 <div className="flex gap-2 justify-end">
                   <Button size="sm" className="h-7 text-xs" onClick={() => {
                     setCustomPrompt(promptDraft);
-                    host.storage.set('_outline_ai_prompt', promptDraft);
+                    host.storage.set(`${dk}_ai_prompt`, promptDraft);
                     setPromptOpen(false);
                   }}>{t('common.save', { defaultValue: '保存' })}</Button>
                 </div>
@@ -823,7 +821,7 @@ export default function OutlineAISidebar({
             value={aiParams.serviceId ?? ''}
             onChange={id => {
               setSelectedServiceId(id);
-              host.storage.set('_outline_ai_service_id', id);
+              host.storage.set(`${dk}_ai_service_id`, id);
             }}
             disabled={streaming}
           />

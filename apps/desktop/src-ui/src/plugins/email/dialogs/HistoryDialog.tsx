@@ -6,6 +6,7 @@ import {
 import { ChevronDown, ChevronUp, Trash2, RotateCcw } from 'lucide-react';
 import { useEmailContext } from '../EmailContext';
 import type { EmailStorageData } from '../types';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 const DIALOG_STYLE = { fontFamily: '宋体', fontSize: '16px' };
 
@@ -106,7 +107,7 @@ export function HistoryDialog({ open, onOpenChange, onResend }: HistoryDialogPro
                       </div>
                       {item.body && (
                         <div className="border rounded bg-background p-2 max-h-[200px] overflow-y-auto">
-                          <div className="prose prose-sm dark:prose-invert max-w-none text-xs" dangerouslySetInnerHTML={{ __html: item.body }} />
+                          <div className="prose prose-sm dark:prose-invert max-w-none text-xs" dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.body) }} />
                         </div>
                       )}
                       {onResend && (

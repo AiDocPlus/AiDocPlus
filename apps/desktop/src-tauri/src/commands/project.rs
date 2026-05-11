@@ -2,7 +2,6 @@ use crate::config::AppState;
 use crate::error::{AppError, Result};
 use crate::project::{Project, ProjectSettings};
 use crate::security;
-use dirs;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{Read, Write};
@@ -202,21 +201,19 @@ pub fn export_project_zip(
 ) -> Result<String> {
     security::validate_id(&projectId, "projectId")?;
 
-    // 安全校验：输出路径必须在用户主目录或临时目录下
+    // 安全校验：输出路径必须在允许的目录下（home、temp、data_root）
     let out_path = Path::new(&outputPath);
-    let home = dirs::home_dir().unwrap_or_default();
-    let home_canonical = home.canonicalize().unwrap_or(home);
-    let temp_canonical = std::env::temp_dir().canonicalize().unwrap_or(std::env::temp_dir());
-    let out_resolved = if out_path.parent().map_or(false, |p| p.exists()) {
-        out_path.parent().unwrap().canonicalize().unwrap_or_else(|_| out_path.to_path_buf())
-    } else {
+    let validate_target = if out_path.exists() {
         out_path.to_path_buf()
+    } else {
+        let parent = out_path.parent()
+            .ok_or_else(|| AppError::SecurityError("输出路径无效：无法获取父目录".to_string()))?;
+        if !parent.exists() {
+            return Err(AppError::SecurityError("目标目录不存在".to_string()));
+        }
+        parent.to_path_buf()
     };
-    if !out_resolved.starts_with(&home_canonical) && !out_resolved.starts_with(&temp_canonical) {
-        return Err(AppError::SecurityError(
-            "安全限制：只能导出到用户主目录或临时目录下".to_string(),
-        ));
-    }
+    crate::security::validate_path_allowed(&validate_target, "输出路径")?;
 
     let project_meta_path = state.get_project_path(&projectId);
     let project_dir = state.config().projects_dir.join(&projectId);
@@ -309,6 +306,8 @@ pub fn import_project_zip(
     state: State<'_, AppState>,
     zipPath: String,
 ) -> Result<Project> {
+    // 安全校验： ZIP 来源路径必须在允许目录内
+    crate::security::validate_path_allowed(Path::new(&zipPath), "ZIP 文件路径")?;
     let zip_file = fs::File::open(&zipPath)
         .map_err(|e| AppError::ImportFailed(format!("打开 ZIP 文件失败: {}", e)))?;
     let mut archive = zip::ZipArchive::new(zip_file)
@@ -372,16 +371,22 @@ pub fn import_project_zip(
 
         let target_path = if name.starts_with("documents/") || name.starts_with("versions/") {
             let joined = project_dir.join(&name);
-            // 路径遍历防护：确保解压目标在 project_dir 内
+            // 路径遍历防护：先创建父目录，再通过已存在的父目录 canonicalize 防止 TOCTOU
             let canonical_project = project_dir.canonicalize().unwrap_or_else(|_| project_dir.clone());
-            if let Some(parent) = joined.parent() {
-                let _ = fs::create_dir_all(parent);
-            }
-            let canonical_target = joined.canonicalize().unwrap_or_else(|_| joined.clone());
+            let parent = joined.parent()
+                .ok_or_else(|| AppError::SecurityError(format!("ZIP 条目路径无效: {}", name)))?;
+            fs::create_dir_all(parent)
+                .map_err(|e| AppError::SecurityError(format!("ZIP 创建目录失败: {}", e)))?;
+            // 对已存在的父目录做 canonicalize，再拼接文件名
+            let canonical_parent = parent.canonicalize()
+                .map_err(|_| AppError::SecurityError(format!("ZIP 路径遍历攻击: {}", name)))?;
+            let file_name = joined.file_name()
+                .ok_or_else(|| AppError::SecurityError(format!("ZIP 条目路径无效: {}", name)))?;
+            let canonical_target = canonical_parent.join(file_name);
             if !canonical_target.starts_with(&canonical_project) {
                 return Err(AppError::SecurityError(format!("ZIP 路径遍历攻击: {}", name)));
             }
-            joined
+            canonical_target
         } else {
             continue; // 跳过未知文件
         };
@@ -389,11 +394,6 @@ pub fn import_project_zip(
         // 单文件大小限制 (50 MB)
         if file.size() > 50 * 1024 * 1024 {
             return Err(AppError::SecurityError(format!("ZIP 内文件过大: {} ({} 字节)", name, file.size())));
-        }
-
-        // 确保父目录存在
-        if let Some(parent) = target_path.parent() {
-            fs::create_dir_all(parent)?;
         }
 
         let mut content = String::new();

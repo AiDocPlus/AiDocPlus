@@ -6,6 +6,7 @@ import { useMailStore } from '../store/useMailStore';
 import { saveAccounts, saveSignatures } from '../lib/storage';
 import type { EmailAccount, EncryptionType } from '../types/account';
 import type { EmailSignature } from '../types/email';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 const S = {
   root: { display: 'flex', height: '100%', fontFamily: '宋体, SimSun, serif', fontSize: 16 },
@@ -504,7 +505,7 @@ export function SettingsView() {
                       <div style={{ border: '1px solid #e2e8f0', borderRadius: 4, padding: 12, marginBottom: 12, background: '#fafafa' }}>
                         <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 4 }}>预览：</div>
                         <div style={{ fontSize: 14, fontFamily: '宋体, SimSun, serif' }}
-                          dangerouslySetInnerHTML={{ __html: editingSig.content.replace(/\n/g, '<br/>') }} />
+                          dangerouslySetInnerHTML={{ __html: sanitizeHtml(editingSig.content.replace(/\n/g, '<br/>')) }} />
                       </div>
                     )}
                     <div style={{ display: 'flex', gap: 8 }}>

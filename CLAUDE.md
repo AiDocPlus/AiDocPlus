@@ -18,7 +18,7 @@ AI 编程助手指南，供 Claude / Windsurf 等工具在此仓库工作时参�
 | 构建 | Vite 8 + Turborepo + pnpm                                          |
 | 国际化 | i18next                                                            |
 
-当前版本：**0.3.13**
+当前版本：**0.3.16**
 
 ---
 

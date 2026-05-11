@@ -109,6 +109,9 @@ function DiaryDocWorkspaceMain({ document: doc, host, tabId }: DocTypeEditorProp
     closeTab: s.closeTab, closeAllTabs: s.closeAllTabs,
   })));
 
+  // ── 按文档隔离的 storage key 前缀 ──
+  const dk = useMemo(() => `diary_${doc.id}_`, [doc.id]);
+
   // ── 布局状态 ──
   const [leftWidth, setLeftWidth] = useState(DEFAULT_LEFT_WIDTH);
   const [rightWidth, setRightWidth] = useState(DEFAULT_RIGHT_WIDTH);
@@ -153,12 +156,12 @@ function DiaryDocWorkspaceMain({ document: doc, host, tabId }: DocTypeEditorProp
   // ── 左栏视图模式（持久化） ──
   type LeftViewMode = 'list' | 'timeline';
   const [leftViewMode, setLeftViewModeRaw] = useState<LeftViewMode>(() => {
-    const saved = host.storage.get<string>('_diary_left_view_mode');
+    const saved = host.storage.get<string>(`${dk}_left_view_mode`);
     return (saved === 'timeline') ? 'timeline' : 'list';
   });
   const setLeftViewMode = useCallback((mode: LeftViewMode) => {
     setLeftViewModeRaw(mode);
-    host.storage.set('_diary_left_view_mode', mode);
+    host.storage.set(`${dk}_left_view_mode`, mode);
   }, [host.storage]);
 
   // ── 右键菜单状态 ──
@@ -189,8 +192,8 @@ function DiaryDocWorkspaceMain({ document: doc, host, tabId }: DocTypeEditorProp
     const d = getDiary();
     setDiary(d);
     // 恢复上次编辑的条目
-    const lastEntryId = host.storage.get<string>('_diary_last_entry_id');
-    const lastDate = host.storage.get<string>('_diary_last_date');
+    const lastEntryId = host.storage.get<string>(`${dk}_last_entry_id`);
+    const lastDate = host.storage.get<string>(`${dk}_last_date`);
     if (lastEntryId && d.entries.find(e => e.id === lastEntryId && !e.deletedAt)) {
       const entry = d.entries.find(e => e.id === lastEntryId && !e.deletedAt)!;
       setActiveEntryId(lastEntryId);
@@ -367,8 +370,8 @@ function DiaryDocWorkspaceMain({ document: doc, host, tabId }: DocTypeEditorProp
     setActiveEntryId(entryId);
     setEntryContent(entry.content || '');
     setSelectedDate(entry.date);
-    host.storage.set('_diary_last_entry_id', entryId);
-    host.storage.set('_diary_last_date', entry.date);
+    host.storage.set(`${dk}_last_entry_id`, entryId);
+    host.storage.set(`${dk}_last_date`, entry.date);
 
     const [y, m] = entry.date.split('-').map(Number);
     if (calendarDate.getFullYear() !== y || calendarDate.getMonth() + 1 !== m) {
@@ -398,14 +401,14 @@ function DiaryDocWorkspaceMain({ document: doc, host, tabId }: DocTypeEditorProp
     }
 
     setSelectedDate(dateStr);
-    host.storage.set('_diary_last_date', dateStr);
+    host.storage.set(`${dk}_last_date`, dateStr);
     const [y, m] = dateStr.split('-').map(Number);
     setCalendarDate(new Date(y, m - 1, 1));
     const entries = diaryRef.current.entries.filter(e => e.date === dateStr && !e.deletedAt).sort((a, b) => a.createdAt - b.createdAt);
     if (entries.length > 0) {
       setActiveEntryId(entries[0].id);
       setEntryContent(entries[0].content || '');
-      host.storage.set('_diary_last_entry_id', entries[0].id);
+      host.storage.set(`${dk}_last_entry_id`, entries[0].id);
     } else {
       setActiveEntryId(null);
       setEntryContent('');

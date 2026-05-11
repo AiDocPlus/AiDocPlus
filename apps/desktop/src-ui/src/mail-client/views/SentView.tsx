@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { useMailStore } from '../store/useMailStore';
 import type { SendHistoryEntry } from '../types/email';
 import { saveSendHistory } from '../lib/storage';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 const S = {
   root: { display: 'flex', flexDirection: 'column' as const, height: '100%', fontFamily: '宋体, SimSun, serif', fontSize: 16 },
@@ -143,7 +144,7 @@ export function SentView() {
               <button style={{ ...S.btn(), marginTop: 8 }} onClick={() => setSelected(null)}>关闭</button>
             </div>
             <div style={S.detailBody}
-              dangerouslySetInnerHTML={{ __html: selected.body || '（无正文）' }} />
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(selected.body || '（无正文）') }} />
           </div>
         )}
       </div>

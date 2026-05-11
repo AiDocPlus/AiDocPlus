@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { GlobalErrorBoundary } from './components/ErrorBoundary'
 import { initApiBridge } from './api/ApiBridge'
 
 // 全局禁用拼写检查和自动纠正
@@ -38,11 +39,18 @@ new MutationObserver((mutations) => {
   }
 }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['contenteditable'] });
 
+// 全局未处理 Promise rejection 捕获（防止静默失败）
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('[Global] 未处理的 Promise rejection:', event.reason);
+});
+
 // 初始化 API Bridge（监听后端 API Server 就绪事件）
 initApiBridge();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <GlobalErrorBoundary>
+      <App />
+    </GlobalErrorBoundary>
   </StrictMode>,
 )

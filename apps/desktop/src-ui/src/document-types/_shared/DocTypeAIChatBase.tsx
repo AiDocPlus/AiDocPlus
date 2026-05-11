@@ -111,7 +111,7 @@ export default function DocTypeAIChatBase({
   const enabledServices = useMemo(() => services.filter(s => s.enabled), [services]);
 
   const [sidebarServiceId, setSidebarServiceId] = useState<string>(() =>
-    host.storage.get<string>('_doc_ai_service_id') || '',
+    host.storage.get<string>(`_doc_ai_service_${doc.id}`) || '',
   );
 
   // AI 选项开关（支持默认值）
@@ -125,12 +125,12 @@ export default function DocTypeAIChatBase({
   }, [doc.id, defaultWebSearch, defaultThinking]);
 
   useEffect(() => {
-    setSidebarServiceId(host.storage.get<string>('_doc_ai_service_id') || '');
+    setSidebarServiceId(host.storage.get<string>(`_doc_ai_service_${doc.id}`) || '');
   }, [doc.id, host.storage]);
 
   const handleSidebarServiceChange = useCallback((id: string) => {
     setSidebarServiceId(id);
-    host.storage.set('_doc_ai_service_id', id);
+    host.storage.set(`_doc_ai_service_${doc.id}`, id);
   }, [host.storage]);
 
   const endRef = useRef<HTMLDivElement>(null);

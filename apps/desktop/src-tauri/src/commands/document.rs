@@ -68,6 +68,7 @@ pub fn save_document(
     security::validate_id(&documentId, "documentId")?;
     security::validate_title(&title)?;
     security::validate_content_size(&content)?;
+    security::validate_content_size(&authorNotes)?;
     security::validate_content_size(&aiGeneratedContent)?;
     if let Some(ref cc) = composedContent {
         security::validate_content_size(cc)?;
@@ -158,17 +159,11 @@ pub fn rename_document(
 ) -> Result<Document> {
     security::validate_id(&projectId, "projectId")?;
     security::validate_id(&documentId, "documentId")?;
-    security::validate_title(&newTitle)?;
+    let trimmed_title = security::validate_title(&newTitle)?;
     let doc_path = state.get_document_path(&projectId, &documentId);
 
     if !doc_path.exists() {
         return Err(AppError::DocumentNotFound(format!("文档未找到: {}", documentId)));
-    }
-
-    // Validate new title
-    let trimmed_title = newTitle.trim();
-    if trimmed_title.is_empty() {
-        return Err(AppError::ValidationError("文档标题不能为空".to_string()));
     }
 
     // Load existing document
@@ -271,6 +266,7 @@ pub fn create_version(
     security::validate_id(&projectId, "projectId")?;
     security::validate_id(&documentId, "documentId")?;
     security::validate_content_size(&content)?;
+    security::validate_content_size(&authorNotes)?;
     security::validate_content_size(&aiGeneratedContent)?;
     if let Some(ref cc) = composedContent {
         security::validate_content_size(cc)?;
@@ -480,56 +476,28 @@ pub fn write_binary_file(path: String, data: Vec<u8>) -> Result<()> {
 
     let file_path = Path::new(&path);
 
-    // 获取允许的目录列表
-    let mut allowed_dirs: Vec<std::path::PathBuf> = Vec::new();
-
-    if let Some(home) = dirs::home_dir() {
-        // 应用数据目录
-        allowed_dirs.push(crate::config::current_data_root());
-        // 常用用户目录（桌面、下载、文档）
-        allowed_dirs.push(home.join("Desktop"));
-        allowed_dirs.push(home.join("Downloads"));
-        allowed_dirs.push(home.join("Documents"));
-        // 用户主目录（兜底）
-        allowed_dirs.push(home.clone());
-    }
-
-    // 系统标准目录
-    if let Some(d) = dirs::desktop_dir() { allowed_dirs.push(d); }
-    if let Some(d) = dirs::download_dir() { allowed_dirs.push(d); }
-    if let Some(d) = dirs::document_dir() { allowed_dirs.push(d); }
-    if let Some(d) = dirs::picture_dir() { allowed_dirs.push(d); }
-
-    // 临时目录
-    allowed_dirs.push(std::env::temp_dir());
-
-    // TOCTOU 安全修复：先验证父目录路径，验证通过后再创建目录和写入
-    // 步骤 1：获取父目录（必须存在或可创建）
+    // 获取父目录（必须存在或可创建）
     let parent = file_path.parent()
         .ok_or_else(|| AppError::ValidationError("路径无效: 无法获取父目录".to_string()))?;
 
-    // 步骤 2：如果父目录已存在，先 canonicalize 并验证
-    // 如果父目录不存在，先创建再验证（确保验证的是实际路径）
-    let canonical_parent = if parent.exists() {
-        parent.canonicalize()
-            .map_err(|e| AppError::ValidationError(format!("路径无效: {}", e)))?
-    } else {
-        // 父目录不存在：先创建，再验证 canonicalize 后的路径
+    // 如果父目录不存在，先创建（validate_path_allowed 需要路径已存在才能 canonicalize）
+    if !parent.exists() {
         std::fs::create_dir_all(parent).context("创建目录失败")?;
-        parent.canonicalize()
-            .map_err(|e| AppError::ValidationError(format!("路径无效: {}", e)))?
-    };
-
-    // 步骤 3：验证路径在允许的目录内
-    let is_allowed = allowed_dirs.iter().any(|dir| {
-        dir.canonicalize().map(|d| canonical_parent.starts_with(&d)).unwrap_or(false)
-    });
-
-    if !is_allowed {
-        return Err(AppError::SecurityError("路径不在允许的目录内".to_string()));
     }
 
-    // 步骤 4：验证通过后再写入
+    // 使用集中的路径安全校验（home、temp_dir、data_root 均已覆盖）
+    crate::security::validate_path_allowed(parent, "写入文件路径")?;
+
+    // 文件大小限制（防止磁盘耗尽）
+    if data.len() > crate::security::MAX_DOCUMENT_SIZE {
+        return Err(AppError::ValidationError(format!(
+            "写入数据过大（{:.1} MB），最大允许 {} MB",
+            data.len() as f64 / 1024.0 / 1024.0,
+            crate::security::MAX_DOCUMENT_SIZE / 1024 / 1024
+        )));
+    }
+
+    // 验证通过后写入
     std::fs::write(file_path, &data).context("写入文件失败")?;
     Ok(())
 }
@@ -593,13 +561,12 @@ pub fn update_document_tags(
 
     let mut document = Document::load(&doc_path)?;
 
-    // 去重、去空、trim
+    // 去空、trim、保序去重（保留用户传入的标签顺序）
+    let mut seen = std::collections::HashSet::new();
     let clean_tags: Vec<String> = tags
         .into_iter()
         .map(|t| t.trim().to_string())
-        .filter(|t| !t.is_empty())
-        .collect::<std::collections::HashSet<_>>()
-        .into_iter()
+        .filter(|t| !t.is_empty() && seen.insert(t.clone()))
         .collect();
 
     document.metadata.tags = clean_tags;
@@ -727,7 +694,10 @@ pub fn copy_document(
     let mut new_doc = src_doc;
     new_doc.id = new_id.clone();
     new_doc.project_id = toProjectId.clone();
-    new_doc.title = format!("{} (副本)", new_doc.title);
+    let suffix = " (副本)";
+    let max_base = crate::security::MAX_TITLE_LENGTH.saturating_sub(suffix.chars().count());
+    let base: String = new_doc.title.chars().take(max_base).collect();
+    new_doc.title = format!("{}{}", base, suffix);
     new_doc.metadata.created_at = now;
     new_doc.metadata.updated_at = now;
     new_doc.versions = Vec::new(); // 不复制版本历史

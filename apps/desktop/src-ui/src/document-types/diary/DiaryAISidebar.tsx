@@ -74,9 +74,6 @@ interface DiaryAISession {
   updatedAt: number;
 }
 
-const SESSIONS_KEY = '_diary_ai_sessions';
-const ACTIVE_SESSION_KEY = '_diary_ai_active_session';
-
 function genSessionId(): string {
   return genId('dsess');
 }
@@ -166,12 +163,12 @@ const DiaryMessageItem = memo(function DiaryMessageItem({
   );
 });
 
-function loadSessions(storage: StorageLike): DiaryAISession[] {
-  return storage.get<DiaryAISession[]>(SESSIONS_KEY) || [];
+function loadSessions(storage: StorageLike, dk: string): DiaryAISession[] {
+  return storage.get<DiaryAISession[]>(`${dk}_ai_sessions`) || [];
 }
 
-function saveSessions(storage: StorageLike, sessions: DiaryAISession[]) {
-  storage.set(SESSIONS_KEY, sessions);
+function saveSessions(storage: StorageLike, sessions: DiaryAISession[], dk: string) {
+  storage.set(`${dk}_ai_sessions`, sessions);
 }
 
 function createSession(): DiaryAISession {
@@ -179,14 +176,14 @@ function createSession(): DiaryAISession {
   return { id: genSessionId(), title: '新对话', messages: [], createdAt: now, updatedAt: now };
 }
 
-function getOrCreateActiveSession(storage: StorageLike): DiaryAISession {
-  const sessions = loadSessions(storage);
-  const activeId = storage.get<string>(ACTIVE_SESSION_KEY) || '';
+function getOrCreateActiveSession(storage: StorageLike, dk: string): DiaryAISession {
+  const sessions = loadSessions(storage, dk);
+  const activeId = storage.get<string>(`${dk}_ai_active_session`) || '';
   const active = sessions.find(s => s.id === activeId);
   if (active) return active;
   const newSess = createSession();
-  saveSessions(storage, [...sessions, newSess]);
-  storage.set(ACTIVE_SESSION_KEY, newSess.id);
+  saveSessions(storage, [...sessions, newSess], dk);
+  storage.set(`${dk}_ai_active_session`, newSess.id);
   return newSess;
 }
 
@@ -209,6 +206,7 @@ export default function DiaryAISidebar({
   host, diary, activeEntry, onInsertToDoc,
 }: DiaryAISidebarProps) {
   const { t } = useTranslation();
+  const dk = useMemo(() => `diary_${host.documentId}_`, [host.documentId]);
 
   // ── AI 服务 ──
   const { services } = useSettingsStore(useShallow(s => ({
@@ -216,7 +214,7 @@ export default function DiaryAISidebar({
   })));
   const enabledServices = useMemo(() => services.filter(sv => sv.enabled), [services]);
   const [selectedServiceId, setSelectedServiceId] = useState<string>(() =>
-    host.storage.get<string>('_diary_ai_service_id') || ''
+    host.storage.get<string>(`${dk}_ai_service_id`) || ''
   );
   const effectiveServiceId = selectedServiceId || undefined;
   const aiParams = getAIInvokeParamsForService(effectiveServiceId);
@@ -228,8 +226,8 @@ export default function DiaryAISidebar({
   }, [aiParams.provider]);
 
   // ── 会话管理 ──
-  const [sessions, setSessions] = useState<DiaryAISession[]>(() => loadSessions(host.storage));
-  const [activeSessionId, setActiveSessionId] = useState<string>(() => getOrCreateActiveSession(host.storage).id);
+  const [sessions, setSessions] = useState<DiaryAISession[]>(() => loadSessions(host.storage, dk));
+  const [activeSessionId, setActiveSessionId] = useState<string>(() => getOrCreateActiveSession(host.storage, dk).id);
   const activeSession = useMemo(() =>
     sessions.find(s => s.id === activeSessionId) || (sessions.length > 0 ? sessions[0] : null),
   [sessions, activeSessionId]);
@@ -258,7 +256,7 @@ export default function DiaryAISidebar({
   const [promptOpen, setPromptOpen] = useState(false);
   const defaultPrompt = useMemo(() => buildDiarySystemPrompt(diary, activeEntry, contextMode), [diary, activeEntry, contextMode]);
   const [customPrompt, setCustomPrompt] = useState<string>(() =>
-    host.storage.get<string>('_diary_ai_prompt') || ''
+    host.storage.get<string>(`${dk}_ai_prompt`) || ''
   );
   const [promptDraft, setPromptDraft] = useState(customPrompt || defaultPrompt);
 
@@ -269,23 +267,23 @@ export default function DiaryAISidebar({
   // ── 持久化 ──
   const persistSessions = useCallback((updated: DiaryAISession[]) => {
     setSessions(updated);
-    saveSessions(host.storage, updated);
-  }, [host.storage]);
+    saveSessions(host.storage, updated, dk);
+  }, [host.storage, dk]);
 
   const updateActiveSession = useCallback((updater: (s: DiaryAISession) => DiaryAISession) => {
     setSessions(prev => {
       const updated = prev.map(s => s.id === activeSessionId ? updater(s) : s);
-      saveSessions(host.storage, updated);
+      saveSessions(host.storage, updated, dk);
       return updated;
     });
-  }, [activeSessionId, host.storage]);
+  }, [activeSessionId, host.storage, dk]);
 
   // ── 新建/切换/删除会话 ──
   const handleNewSession = useCallback(() => {
     const newSess = createSession();
     persistSessions([...sessions, newSess]);
     setActiveSessionId(newSess.id);
-    host.storage.set(ACTIVE_SESSION_KEY, newSess.id);
+    host.storage.set(`${dk}_ai_active_session`, newSess.id);
     setSessionMenuOpen(false);
   }, [sessions, persistSessions, host.storage]);
 
@@ -293,7 +291,7 @@ export default function DiaryAISidebar({
     // 切换会话时中断正在进行的流式请求，避免消息写入错误的会话
     abortRef.current?.abort();
     setActiveSessionId(id);
-    host.storage.set(ACTIVE_SESSION_KEY, id);
+    host.storage.set(`${dk}_ai_active_session`, id);
     setSessionMenuOpen(false);
   }, [host.storage]);
 
@@ -303,12 +301,12 @@ export default function DiaryAISidebar({
       const newSess = createSession();
       persistSessions([newSess]);
       setActiveSessionId(newSess.id);
-      host.storage.set(ACTIVE_SESSION_KEY, newSess.id);
+      host.storage.set(`${dk}_ai_active_session`, newSess.id);
     } else {
       persistSessions(updated);
       if (id === activeSessionId) {
         setActiveSessionId(updated[updated.length - 1].id);
-        host.storage.set(ACTIVE_SESSION_KEY, updated[updated.length - 1].id);
+        host.storage.set(`${dk}_ai_active_session`, updated[updated.length - 1].id);
       }
     }
   }, [sessions, activeSessionId, persistSessions, host.storage]);
@@ -546,7 +544,7 @@ export default function DiaryAISidebar({
                 <div className="flex gap-2 justify-end">
                   <Button size="sm" className="h-7 text-xs" onClick={() => {
                     setCustomPrompt(promptDraft);
-                    host.storage.set('_diary_ai_prompt', promptDraft);
+                    host.storage.set(`${dk}_ai_prompt`, promptDraft);
                     setPromptOpen(false);
                   }}>{t('diary.aiSave', { defaultValue: '保存' })}</Button>
                 </div>
@@ -691,7 +689,7 @@ export default function DiaryAISidebar({
             value={aiParams.serviceId ?? ''}
             onChange={(id) => {
               setSelectedServiceId(id);
-              host.storage.set('_diary_ai_service_id', id);
+              host.storage.set(`${dk}_ai_service_id`, id);
             }}
             disabled={streaming}
           />

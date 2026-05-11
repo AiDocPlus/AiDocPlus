@@ -8,6 +8,7 @@ import { Trash2, Search, Archive, Pencil, Download, Upload, Paperclip } from 'lu
 import { saveTextFileWithDialog } from '@/lib/tauriSaveTextFile';
 import { useEmailContext } from '../EmailContext';
 import type { EmailDraft, EmailAccount, EmailStorageData } from '../types';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 const DIALOG_STYLE = { fontFamily: '宋体', fontSize: '16px' };
 
@@ -386,7 +387,7 @@ export function DraftsDialog({ open, onOpenChange, onLoadDraft, onDeleteDraft, o
                   <div className="border rounded bg-background p-3 max-h-[250px] overflow-y-auto">
                     {previewDraft.emailFormat === 'html' ? (
                       <div className="prose prose-sm dark:prose-invert max-w-none text-xs"
-                        dangerouslySetInnerHTML={{ __html: previewDraft.emailBody }} />
+                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewDraft.emailBody) }} />
                     ) : (
                       <pre className="text-xs whitespace-pre-wrap break-words font-mono">{previewDraft.emailBody}</pre>
                     )}

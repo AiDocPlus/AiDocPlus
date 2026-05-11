@@ -5,6 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useMailStore } from '../store/useMailStore';
 import { saveDrafts, saveSendHistory } from '../lib/storage';
 import type { AttachmentItem, EmailDraft } from '../types/email';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 interface ComposeState {
   to: string;
@@ -381,7 +382,7 @@ export function ComposeView() {
         {/* 签名预览 */}
         {activeSig && (
           <div style={S.sigPreview}
-            dangerouslySetInnerHTML={{ __html: `--<br/>${activeSig.content.replace(/\n/g, '<br/>')}` }} />
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(`--<br/>${activeSig.content.replace(/\n/g, '<br/>')}`) }} />
         )}
 
         {/* 附件 */}

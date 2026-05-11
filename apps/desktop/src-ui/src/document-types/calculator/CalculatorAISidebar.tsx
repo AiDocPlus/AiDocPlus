@@ -79,8 +79,8 @@ import { getCalculatorSystemPrompt } from './calculatorAiPromptShared';
 import { buildSmartContext } from './calculatorContext';
 import { CalculatorCommandPalette } from './CalculatorCommandPalette';
 
-const CALC_SERVICE_STORAGE_KEY = '_calc_assistant_service_id';
-const CALC_CUSTOM_SYSTEM_KEY = '_calc_assistant_custom_system';
+const CALC_SERVICE_STORAGE_KEY = (docId: string) => `calc_${docId}_assistant_service_id`;
+const CALC_CUSTOM_SYSTEM_KEY = (docId: string) => `calc_${docId}_assistant_custom_system`;
 
 function resolveTheme(): 'light' | 'dark' {
   const t = useSettingsStore.getState().ui?.theme;
@@ -195,7 +195,7 @@ export function CalculatorAISidebar({
   const aiServices = useSettingsStore((s) => s.ai.services);
   const enabledServices = useMemo(() => aiServices.filter((x) => x.enabled), [aiServices]);
   const [selectedServiceId, setSelectedServiceId] = useState<string>(() =>
-    host.storage.get<string>(CALC_SERVICE_STORAGE_KEY) || '',
+    host.storage.get<string>(CALC_SERVICE_STORAGE_KEY(doc.id)) || '',
   );
   const aiParams = getAIInvokeParamsForService(selectedServiceId || undefined);
   const aiAvailable = !!(aiParams.provider && aiParams.apiKey && aiParams.model);
@@ -211,8 +211,8 @@ export function CalculatorAISidebar({
   const [webSearchEnabled, setWebSearchEnabled] = useState(true);
   const [deepThinkEnabled, setDeepThinkEnabled] = useState(true);
   const [promptOpen, setPromptOpen] = useState(false);
-  const [customSystemPrompt, setCustomSystemPrompt] = useState(() => host.storage.get<string>(CALC_CUSTOM_SYSTEM_KEY) || '');
-  const [promptDraft, setPromptDraft] = useState(() => host.storage.get<string>(CALC_CUSTOM_SYSTEM_KEY) || '');
+  const [customSystemPrompt, setCustomSystemPrompt] = useState(() => host.storage.get<string>(CALC_CUSTOM_SYSTEM_KEY(doc.id)) || '');
+  const [promptDraft, setPromptDraft] = useState(() => host.storage.get<string>(CALC_CUSTOM_SYSTEM_KEY(doc.id)) || '');
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -774,7 +774,7 @@ ${extraRules}
                     onClick={() => {
                       const next = promptDraft.trim();
                       setCustomSystemPrompt(next);
-                      host.storage.set(CALC_CUSTOM_SYSTEM_KEY, next);
+                      host.storage.set(CALC_CUSTOM_SYSTEM_KEY(doc.id), next);
                       setPromptOpen(false);
                     }}
                   >
@@ -986,7 +986,7 @@ ${extraRules}
             value={selectedServiceId}
             onChange={(id) => {
               setSelectedServiceId(id);
-              host.storage.set(CALC_SERVICE_STORAGE_KEY, id);
+              host.storage.set(CALC_SERVICE_STORAGE_KEY(doc.id), id);
             }}
             disabled={streaming}
           />

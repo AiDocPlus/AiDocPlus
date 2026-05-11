@@ -44,27 +44,19 @@ pub fn export_document_native(
         return Err(AppError::SecurityError("安全限制：导出格式参数包含非法字符".to_string()));
     }
 
-    // 安全校验：输出路径必须在用户主目录或临时目录下
+    // 安全校验：输出路径必须在允许的目录下（home、temp、data_root）
     let out_path = std::path::Path::new(&outputPath);
-    let home = dirs::home_dir().unwrap_or_default();
-    let home_canonical = home.canonicalize().unwrap_or(home);
-    let temp_canonical = std::env::temp_dir().canonicalize().unwrap_or(std::env::temp_dir());
-    let out_resolved = if out_path.exists() {
-        out_path.canonicalize().unwrap_or_else(|_| out_path.to_path_buf())
-    } else if let Some(parent) = out_path.parent() {
-        if parent.exists() {
-            parent.canonicalize().unwrap_or_else(|_| parent.to_path_buf())
-        } else {
+    let validate_target = if out_path.exists() {
+        out_path.to_path_buf()
+    } else {
+        let parent = out_path.parent()
+            .ok_or_else(|| AppError::SecurityError("输出路径无效：无法获取父目录".to_string()))?;
+        if !parent.exists() {
             return Err(AppError::SecurityError("目标目录不存在".to_string()));
         }
-    } else {
-        out_path.to_path_buf()
+        parent.to_path_buf()
     };
-    if !out_resolved.starts_with(&home_canonical) && !out_resolved.starts_with(&temp_canonical) {
-        return Err(AppError::SecurityError(
-            "安全限制：只能导出到用户主目录或临时目录下".to_string(),
-        ));
-    }
+    crate::security::validate_path_allowed(&validate_target, "输出路径")?;
 
     let doc_path = state.get_document_path(&projectId, &documentId);
 

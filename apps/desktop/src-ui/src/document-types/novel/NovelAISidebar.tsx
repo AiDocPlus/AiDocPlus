@@ -78,27 +78,24 @@ interface NovelAISession {
   updatedAt: number;
 }
 
-const SESSIONS_KEY = '_novel_assistant_sessions';
-const ACTIVE_SESSION_KEY = '_novel_assistant_active';
-
 function genSessionId(): string {
   return `nsess_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 }
 
-function loadSessions(storage: StorageLike): NovelAISession[] {
-  return storage.get<NovelAISession[]>(SESSIONS_KEY) || [];
+function loadSessions(storage: StorageLike, dk: string): NovelAISession[] {
+  return storage.get<NovelAISession[]>(`${dk}_assistant_sessions`) || [];
 }
 
-function saveSessions(storage: StorageLike, sessions: NovelAISession[]) {
-  storage.set(SESSIONS_KEY, sessions);
+function saveSessions(storage: StorageLike, sessions: NovelAISession[], dk: string) {
+  storage.set(`${dk}_assistant_sessions`, sessions);
 }
 
-function getActiveSessionId(storage: StorageLike): string {
-  return storage.get<string>(ACTIVE_SESSION_KEY) || '';
+function getActiveSessionId(storage: StorageLike, dk: string): string {
+  return storage.get<string>(`${dk}_assistant_active`) || '';
 }
 
-function setActiveSessionIdStorage(storage: StorageLike, id: string) {
-  storage.set(ACTIVE_SESSION_KEY, id);
+function setActiveSessionIdStorage(storage: StorageLike, id: string, dk: string) {
+  storage.set(`${dk}_assistant_active`, id);
 }
 
 function createSession(): NovelAISession {
@@ -106,14 +103,14 @@ function createSession(): NovelAISession {
   return { id: genSessionId(), title: '新对话', messages: [], createdAt: now, updatedAt: now };
 }
 
-function getOrCreateActiveSession(storage: StorageLike): NovelAISession {
-  const sessions = loadSessions(storage);
-  const activeId = getActiveSessionId(storage);
+function getOrCreateActiveSession(storage: StorageLike, dk: string): NovelAISession {
+  const sessions = loadSessions(storage, dk);
+  const activeId = getActiveSessionId(storage, dk);
   const active = sessions.find(s => s.id === activeId);
   if (active) return active;
   const newSess = createSession();
-  saveSessions(storage, [...sessions, newSess]);
-  setActiveSessionIdStorage(storage, newSess.id);
+  saveSessions(storage, [...sessions, newSess], dk);
+  setActiveSessionIdStorage(storage, newSess.id, dk);
   return newSess;
 }
 
@@ -134,12 +131,13 @@ export default function NovelAISidebar({
   host, novel, activeChapterId, activeSceneId, onInsertToDoc, onInsertAtCursor,
 }: NovelAISidebarProps) {
   const { t } = useTranslation();
+  const dk = useMemo(() => `novel_${host.documentId}_`, [host.documentId]);
 
   // ── AI 服务选择 ──
   const settingsStore = useSettingsStore();
   const enabledServices = settingsStore.ai.services.filter(s => s.enabled);
   const [selectedServiceId, setSelectedServiceId] = useState<string>(() => {
-    return host.storage.get<string>('_novel_assistant_service_id') || '';
+    return host.storage.get<string>(`${dk}_assistant_service_id`) || '';
   });
   const aiParams = getAIInvokeParamsForService(selectedServiceId || undefined);
   const aiAvailable = !!(aiParams.provider && aiParams.apiKey && aiParams.model);
@@ -150,9 +148,9 @@ export default function NovelAISidebar({
   })();
 
   // ── 会话管理 ──
-  const [sessions, setSessions] = useState<NovelAISession[]>(() => loadSessions(host.storage));
+  const [sessions, setSessions] = useState<NovelAISession[]>(() => loadSessions(host.storage, dk));
   const [activeSessionId, setActiveId] = useState<string>(() => {
-    const session = getOrCreateActiveSession(host.storage);
+    const session = getOrCreateActiveSession(host.storage, dk);
     return session.id;
   });
   const activeSession = useMemo(() => {
@@ -184,7 +182,7 @@ export default function NovelAISidebar({
   const [promptOpen, setPromptOpen] = useState(false);
   const defaultPrompt = useMemo(() => buildSmartSystemPrompt(novel, activeChapterId), [novel, activeChapterId]);
   const [customPrompt, setCustomPrompt] = useState<string>(() => {
-    return host.storage.get<string>('_novel_assistant_prompt') || '';
+    return host.storage.get<string>(`${dk}_assistant_prompt`) || '';
   });
   const [promptDraft, setPromptDraft] = useState(customPrompt || defaultPrompt);
 
@@ -205,7 +203,7 @@ export default function NovelAISidebar({
 
   // ── Token 预算 ──
   const [tokenBudget, setTokenBudget] = useState<TokenBudgetLevel>(() => {
-    return (host.storage.get<string>('_novel_token_budget') as TokenBudgetLevel) || DEFAULT_TOKEN_BUDGET;
+    return (host.storage.get<string>(`${dk}_token_budget`) as TokenBudgetLevel) || DEFAULT_TOKEN_BUDGET;
   });
   const tokenInfo = useMemo(() =>
     getContextTokenInfo(novel, activeChapterId, contextMode, tokenBudget, customPrompt || undefined, activeSceneId),
@@ -214,31 +212,31 @@ export default function NovelAISidebar({
   // ── 持久化 ──
   const persistSessions = useCallback((updated: NovelAISession[]) => {
     setSessions(updated);
-    saveSessions(host.storage, updated);
-  }, [host.storage]);
+    saveSessions(host.storage, updated, dk);
+  }, [host.storage, dk]);
 
   const updateActiveSession = useCallback((updater: (s: NovelAISession) => NovelAISession) => {
     setSessions(prev => {
       const updated = prev.map(s => s.id === activeSessionId ? updater(s) : s);
-      saveSessions(host.storage, updated);
+      saveSessions(host.storage, updated, dk);
       return updated;
     });
-  }, [activeSessionId, host.storage]);
+  }, [activeSessionId, host.storage, dk]);
 
   // ── 新建/切换/删除会话 ──
   const handleNewSession = useCallback(() => {
     const newSess = createSession();
     persistSessions([...sessions, newSess]);
     setActiveId(newSess.id);
-    setActiveSessionIdStorage(host.storage, newSess.id);
+    setActiveSessionIdStorage(host.storage, newSess.id, dk);
     setSessionMenuOpen(false);
-  }, [sessions, persistSessions, host.storage]);
+  }, [sessions, persistSessions, host.storage, dk]);
 
   const handleSwitchSession = useCallback((id: string) => {
     setActiveId(id);
-    setActiveSessionIdStorage(host.storage, id);
+    setActiveSessionIdStorage(host.storage, id, dk);
     setSessionMenuOpen(false);
-  }, [host.storage]);
+  }, [host.storage, dk]);
 
   const handleDeleteSession = useCallback((id: string) => {
     const updated = sessions.filter(s => s.id !== id);
@@ -246,15 +244,15 @@ export default function NovelAISidebar({
       const newSess = createSession();
       persistSessions([newSess]);
       setActiveId(newSess.id);
-      setActiveSessionIdStorage(host.storage, newSess.id);
+      setActiveSessionIdStorage(host.storage, newSess.id, dk);
     } else {
       persistSessions(updated);
       if (id === activeSessionId) {
         setActiveId(updated[updated.length - 1].id);
-        setActiveSessionIdStorage(host.storage, updated[updated.length - 1].id);
+        setActiveSessionIdStorage(host.storage, updated[updated.length - 1].id, dk);
       }
     }
-  }, [sessions, activeSessionId, persistSessions, host.storage]);
+  }, [sessions, activeSessionId, persistSessions, host.storage, dk]);
 
   // ── 发送消息 ──
   const sendMessage = useCallback(async (text: string) => {
@@ -497,7 +495,7 @@ export default function NovelAISidebar({
                 <div className="flex gap-2 justify-end">
                   <Button size="sm" className="h-7 text-xs" onClick={() => {
                     setCustomPrompt(promptDraft);
-                    host.storage.set('_novel_assistant_prompt', promptDraft);
+                    host.storage.set(`${dk}_assistant_prompt`, promptDraft);
                     setPromptOpen(false);
                   }}>保存</Button>
                 </div>
@@ -690,7 +688,7 @@ export default function NovelAISidebar({
             onChange={e => {
               const v = e.target.value as TokenBudgetLevel;
               setTokenBudget(v);
-              host.storage.set('_novel_token_budget', v);
+              host.storage.set(`${dk}_token_budget`, v);
             }}
             title="Token 预算">
             {Object.keys(TOKEN_BUDGETS).map(k => (
@@ -711,7 +709,7 @@ export default function NovelAISidebar({
             value={aiParams.serviceId ?? ''}
             onChange={(id) => {
               setSelectedServiceId(id);
-              host.storage.set('_novel_assistant_service_id', id);
+              host.storage.set(`${dk}_assistant_service_id`, id);
             }}
             disabled={streaming}
           />

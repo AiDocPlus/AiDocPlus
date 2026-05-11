@@ -963,7 +963,7 @@ async fn handle_file(action: &str, params: &Value) -> HandlerResult {
         let allowed_root = crate::config::current_data_root();
         
         let resolved = if p.starts_with("~/") {
-            home.join(p.strip_prefix("~/").unwrap())
+            home.join(p.strip_prefix("~/").expect("starts_with(\"~/\") 已验证"))
         } else if p.starts_with('/') {
             std::path::PathBuf::from(p)
         } else {

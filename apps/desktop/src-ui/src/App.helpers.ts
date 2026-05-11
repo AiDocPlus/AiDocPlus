@@ -105,7 +105,7 @@ export function migrateAiKeysToKeyring(): void {
         migratedIds.includes(s.id) ? { ...s, apiKey: '__KEYRING__' } : s
       );
       useSettingsStore.getState().updateAISettings({ services: updatedServices });
-      console.log(`[Security] 已将 ${migratedIds.length} 个 AI API Key 迁移到系统密钥链`);
+      console.info(`[Security] 已将 ${migratedIds.length} 个 AI API Key 迁移到系统密钥链`);
     })
     .catch((e) => {
       console.warn('[Security] API Key 迁移到密钥链失败（将在下次启动重试）:', e);

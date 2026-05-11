@@ -112,18 +112,19 @@ impl Database {
     }
 
     /// 获取 versions 数据库连接（加锁）
+    /// 使用 unwrap_or_else 恢复 poisoned mutex，避免因其他线程 panic 导致整个程序崩溃
     pub fn versions(&self) -> std::sync::MutexGuard<'_, Connection> {
-        self.versions_conn.lock().unwrap()
+        self.versions_conn.lock().unwrap_or_else(|e| e.into_inner())
     }
 
     /// 获取 conversations 数据库连接（加锁）
     pub fn conversations(&self) -> std::sync::MutexGuard<'_, Connection> {
-        self.conversations_conn.lock().unwrap()
+        self.conversations_conn.lock().unwrap_or_else(|e| e.into_inner())
     }
 
     /// 获取 search 数据库连接（加锁）
     pub fn search(&self) -> std::sync::MutexGuard<'_, Connection> {
-        self.search_conn.lock().unwrap()
+        self.search_conn.lock().unwrap_or_else(|e| e.into_inner())
     }
 
     /// 从文档 JSON 文件迁移版本数据到 SQLite

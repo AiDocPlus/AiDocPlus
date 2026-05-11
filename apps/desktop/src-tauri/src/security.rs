@@ -185,40 +185,6 @@ pub fn validate_content_size(content: &str) -> crate::error::Result<()> {
     Ok(())
 }
 
-// ── 路径安全 ──
-
-/// 校验路径是否在允许的根目录下（防止路径遍历）
-#[allow(dead_code)]
-pub fn validate_path_under_root(path: &Path, root: &Path) -> crate::error::Result<PathBuf> {
-    use crate::error::{AppError, ResultExt};
-    // 先规范化
-    let canonical = if path.exists() {
-        path.canonicalize()
-            .context_as("路径无效", AppError::SecurityError)?
-    } else if let Some(parent) = path.parent() {
-        // 文件尚不存在，校验父目录
-        if !parent.exists() {
-            std::fs::create_dir_all(parent)
-                .context("创建目录失败")?;
-        }
-        let canonical_parent = parent.canonicalize()
-            .context_as("父目录无效", AppError::SecurityError)?;
-        canonical_parent.join(path.file_name().unwrap_or_default())
-    } else {
-        return Err(AppError::SecurityError("路径无效".to_string()));
-    };
-
-    let canonical_root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
-
-    if !canonical.starts_with(&canonical_root) {
-        return Err(AppError::SecurityError(format!(
-            "安全限制：路径 {:?} 不在允许的目录 {:?} 下",
-            canonical.display(),
-            canonical_root.display()
-        )));
-    }
-    Ok(canonical)
-}
 
 /// 清理文件名中的危险字符（用于导出等场景）
 pub fn sanitize_filename(name: &str) -> String {

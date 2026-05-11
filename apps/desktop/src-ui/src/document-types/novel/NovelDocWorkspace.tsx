@@ -73,6 +73,7 @@ const CHAPTER_TEMPLATES: { key: string; label: string; outline: string; content:
 ];
 
 export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTypeEditorProps) {
+  const dk = useMemo(() => `novel_${doc.id}_`, [doc.id]);
   const { t } = useTranslation();
   const { closeTab, closeAllTabs, saveDocument } = useAppStore(useShallow(s => ({
     closeTab: s.closeTab, closeAllTabs: s.closeAllTabs,
@@ -95,7 +96,7 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
   const [splitContent, setSplitContent] = useState('');
   const [splitChapterId, setSplitChapterId] = useState<string | null>(null);
   const [typewriterMode, setTypewriterMode] = useState<boolean>(() => {
-    return host.storage.get<boolean>('_novel_typewriter_mode') ?? false;
+    return host.storage.get<boolean>(`${dk}_typewriter_mode`) ?? false;
   });
 
   // ── 保存状态指示 ── 'saved' | 'saving' | 'unsaved'
@@ -540,7 +541,7 @@ export default function NovelDocWorkspace({ document: doc, host, tabId }: DocTyp
   const handleToggleTypewriter = useCallback(() => {
     setTypewriterMode(prev => {
       const next = !prev;
-      host.storage.set('_novel_typewriter_mode', next);
+      host.storage.set(`${dk}_typewriter_mode`, next);
       return next;
     });
   }, [host.storage]);

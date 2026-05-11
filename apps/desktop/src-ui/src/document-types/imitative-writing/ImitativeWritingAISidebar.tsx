@@ -81,23 +81,16 @@ interface ImitativeAISession {
 
 type StorageLike = DocTypeHostAPI['storage'];
 
-const SESSIONS_KEY = '_imitative_ai_sessions';
-const ACTIVE_SESSION_KEY = '_imitative_ai_active';
-const SERVICE_KEY = '_imitative_ai_service_id';
-const PROMPT_KEY = '_imitative_ai_prompt';
-const FAVORITES_KEY = '_imitative_ai_favorites';
-const RECENT_KEY = '_imitative_ai_recent';
-
 function genSessionId(): string {
   return `isess_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 }
 
-function loadSessions(storage: StorageLike): ImitativeAISession[] {
-  return storage.get<ImitativeAISession[]>(SESSIONS_KEY) || [];
+function loadSessions(storage: StorageLike, dk: string): ImitativeAISession[] {
+  return storage.get<ImitativeAISession[]>(`${dk}_ai_sessions`) || [];
 }
 
-function saveSessions(storage: StorageLike, sessions: ImitativeAISession[]) {
-  storage.set(SESSIONS_KEY, sessions);
+function saveSessions(storage: StorageLike, sessions: ImitativeAISession[], dk: string) {
+  storage.set(`${dk}_ai_sessions`, sessions);
 }
 
 function createSession(): ImitativeAISession {
@@ -105,14 +98,14 @@ function createSession(): ImitativeAISession {
   return { id: genSessionId(), title: '新对话', messages: [], createdAt: now, updatedAt: now };
 }
 
-function getOrCreateActiveSession(storage: StorageLike): ImitativeAISession {
-  const sessions = loadSessions(storage);
-  const activeId = storage.get<string>(ACTIVE_SESSION_KEY) || '';
+function getOrCreateActiveSession(storage: StorageLike, dk: string): ImitativeAISession {
+  const sessions = loadSessions(storage, dk);
+  const activeId = storage.get<string>(`${dk}_ai_active`) || '';
   const active = sessions.find(s => s.id === activeId);
   if (active) return active;
   const newSess = createSession();
-  saveSessions(storage, [...sessions, newSess]);
-  storage.set(ACTIVE_SESSION_KEY, newSess.id);
+  saveSessions(storage, [...sessions, newSess], dk);
+  storage.set(`${dk}_ai_active`, newSess.id);
   return newSess;
 }
 
@@ -137,12 +130,13 @@ export function ImitativeWritingAISidebar({
   onPatchDoc,
 }: ImitativeWritingAISidebarProps) {
   const { t } = useTranslation();
+  const dk = useMemo(() => `imitative_${host.documentId}_`, [host.documentId]);
 
   // ── AI 服务 ──
   const { services } = useSettingsStore(useShallow(s => ({ services: s.ai.services })));
   const enabledServices = useMemo(() => services.filter(sv => sv.enabled), [services]);
   const [selectedServiceId, setSelectedServiceId] = useState<string>(() =>
-    host.storage.get<string>(SERVICE_KEY) || ''
+    host.storage.get<string>(`${dk}_ai_service_id`) || ''
   );
   const effectiveServiceId = selectedServiceId || undefined;
   const aiParams = getAIInvokeParamsForService(effectiveServiceId);
@@ -163,9 +157,9 @@ export function ImitativeWritingAISidebar({
   const [enableThinking, setEnableThinking] = useState(true);
 
   // ── 会话管理 ──
-  const [sessions, setSessions] = useState<ImitativeAISession[]>(() => loadSessions(host.storage));
+  const [sessions, setSessions] = useState<ImitativeAISession[]>(() => loadSessions(host.storage, dk));
   const [activeSessionId, setActiveSessionId] = useState<string>(() =>
-    getOrCreateActiveSession(host.storage).id
+    getOrCreateActiveSession(host.storage, dk).id
   );
   const activeSession = useMemo(() =>
     sessions.find(s => s.id === activeSessionId) || (sessions.length > 0 ? sessions[0] : null),
@@ -192,7 +186,7 @@ export function ImitativeWritingAISidebar({
     buildImitativeSystemPrompt(docContent, contextMode),
   [docContent, contextMode]);
   const [customPrompt, setCustomPrompt] = useState<string>(() =>
-    host.storage.get<string>(PROMPT_KEY) || ''
+    host.storage.get<string>(`${dk}_ai_prompt`) || ''
   );
   const [promptDraft, setPromptDraft] = useState(customPrompt || '');
   const [promptOpen, setPromptOpen] = useState(false);
@@ -201,10 +195,10 @@ export function ImitativeWritingAISidebar({
   // ── 命令面板 ──
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [favorites, setFavorites] = useState<string[]>(() =>
-    host.storage.get<string[]>(FAVORITES_KEY) || []
+    host.storage.get<string[]>(`${dk}_ai_favorites`) || []
   );
   const [recentUsed, setRecentUsed] = useState<string[]>(() =>
-    host.storage.get<string[]>(RECENT_KEY) || []
+    host.storage.get<string[]>(`${dk}_ai_recent`) || []
   );
 
   // ── 动态建议 ──
@@ -245,28 +239,28 @@ export function ImitativeWritingAISidebar({
   // ── 持久化 ──
   const persistSessions = useCallback((updated: ImitativeAISession[]) => {
     setSessions(updated);
-    saveSessions(host.storage, updated);
-  }, [host.storage]);
+    saveSessions(host.storage, updated, dk);
+  }, [host.storage, dk]);
 
   const updateActiveSession = useCallback((updater: (s: ImitativeAISession) => ImitativeAISession) => {
     setSessions(prev => {
       const updated = prev.map(s => s.id === activeSessionId ? updater(s) : s);
-      saveSessions(host.storage, updated);
+      saveSessions(host.storage, updated, dk);
       return updated;
     });
-  }, [activeSessionId, host.storage]);
+  }, [activeSessionId, host.storage, dk]);
 
   // ── 会话操作 ──
   const handleNewSession = useCallback(() => {
     const newSess = createSession();
     persistSessions([...sessions, newSess]);
     setActiveSessionId(newSess.id);
-    host.storage.set(ACTIVE_SESSION_KEY, newSess.id);
+    host.storage.set(`${dk}_ai_active`, newSess.id);
   }, [sessions, persistSessions, host.storage]);
 
   const handleSwitchSession = useCallback((id: string) => {
     setActiveSessionId(id);
-    host.storage.set(ACTIVE_SESSION_KEY, id);
+    host.storage.set(`${dk}_ai_active`, id);
   }, [host.storage]);
 
   const handleDeleteSession = useCallback((id: string) => {
@@ -275,12 +269,12 @@ export function ImitativeWritingAISidebar({
       const newSess = createSession();
       persistSessions([newSess]);
       setActiveSessionId(newSess.id);
-      host.storage.set(ACTIVE_SESSION_KEY, newSess.id);
+      host.storage.set(`${dk}_ai_active`, newSess.id);
     } else {
       persistSessions(updated);
       if (id === activeSessionId) {
         setActiveSessionId(updated[updated.length - 1].id);
-        host.storage.set(ACTIVE_SESSION_KEY, updated[updated.length - 1].id);
+        host.storage.set(`${dk}_ai_active`, updated[updated.length - 1].id);
       }
     }
   }, [sessions, activeSessionId, persistSessions, host.storage]);
@@ -372,7 +366,7 @@ export function ImitativeWritingAISidebar({
     // 记录最近使用
     const newRecent = [action.id, ...recentUsed.filter(id => id !== action.id)].slice(0, 20);
     setRecentUsed(newRecent);
-    host.storage.set(RECENT_KEY, newRecent);
+    host.storage.set(`${dk}_ai_recent`, newRecent);
 
     setActiveTab('chat');
     sendMessageRef.current(prompt);
@@ -384,7 +378,7 @@ export function ImitativeWritingAISidebar({
       const next = prev.includes(actionId)
         ? prev.filter(id => id !== actionId)
         : [...prev, actionId];
-      host.storage.set(FAVORITES_KEY, next);
+      host.storage.set(`${dk}_ai_favorites`, next);
       return next;
     });
   }, [host.storage]);
@@ -448,7 +442,7 @@ export function ImitativeWritingAISidebar({
   // ── 提示词 Popover ──
   const handlePromptSave = useCallback(() => {
     setCustomPrompt(promptDraft);
-    host.storage.set(PROMPT_KEY, promptDraft);
+    host.storage.set(`${dk}_ai_prompt`, promptDraft);
     setPromptOpen(false);
   }, [promptDraft, host.storage]);
 
@@ -584,7 +578,7 @@ export function ImitativeWritingAISidebar({
                   <div className="flex gap-1 justify-end">
                     <Button size="sm" className="h-6 text-xs" onClick={handlePromptSave}>保存</Button>
                     <Button variant="ghost" size="sm" className="h-6 text-xs"
-                      onClick={() => { setCustomPrompt(''); host.storage.set(PROMPT_KEY, ''); setPromptOpen(false); }}>
+                      onClick={() => { setCustomPrompt(''); host.storage.set(`${dk}_ai_prompt`, ''); setPromptOpen(false); }}>
                       清除
                     </Button>
                   </div>
@@ -790,7 +784,7 @@ export function ImitativeWritingAISidebar({
                 value={aiParams.serviceId ?? ''}
                 onChange={(id) => {
                   setSelectedServiceId(id);
-                  host.storage.set(SERVICE_KEY, id);
+                  host.storage.set(`${dk}_ai_service_id`, id);
                 }}
                 disabled={streaming}
               />

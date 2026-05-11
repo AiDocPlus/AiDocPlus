@@ -2,6 +2,21 @@
 
 所有重要变更记录在此文件中。
 
+## [0.3.16] — 2026-05-11
+
+### 安全
+- **XSS 防护** — 所有邮件正文 HTML 渲染添加 DOMPurify 消毒，防止恶意脚本注入
+- **Mutex 安全恢复** — database.rs 连接锁使用 `unwrap_or_else` 恢复 poisoned mutex，避免程序崩溃
+
+### 稳定性
+- **全局 ErrorBoundary** — 新增 React 错误边界，捕获组件渲染异常防止白屏
+- **全局 Promise rejection 捕获** — 未处理的 Promise 错误不再静默丢失
+- **Rust 测试修复** — tools.rs 中 2 个 async 测试补充 `.await`，94 个 Rust 测试全部通过
+
+### 改进
+- **防御性编程** — main.rs devtools 使用 `if let` 替代 `unwrap()`
+- **代码规范** — 生产代码 `console.log` → `console.info`
+
 ## [0.3.13] — 2026-04-02
 
 ### 修复

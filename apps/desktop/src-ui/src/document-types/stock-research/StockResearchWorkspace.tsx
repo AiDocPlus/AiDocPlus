@@ -198,6 +198,7 @@ function generateMarkdownReport(r: StockResearchDocumentContent, t: (key: string
 
 export default function StockResearchWorkspace({ document: doc, host, tabId }: DocTypeEditorProps) {
   const { t } = useTranslation();
+  const dk = useMemo(() => `stock_${doc.id}_`, [doc.id]);
   const { closeTab, closeAllTabs } = useAppStore(useShallow(s => ({
     closeTab: s.closeTab, closeAllTabs: s.closeAllTabs,
   })));
@@ -257,7 +258,7 @@ export default function StockResearchWorkspace({ document: doc, host, tabId }: D
     const r = getResearch();
     setResearch(r);
     // 恢复上次编辑的笔记
-    const lastNoteId = host.storage.get<string>('_stock_last_note_id');
+    const lastNoteId = host.storage.get<string>(`${dk}last_note_id`);
     if (lastNoteId) {
       const note = r.notes.find(n => n.id === lastNoteId);
       if (note) {
@@ -359,7 +360,7 @@ export default function StockResearchWorkspace({ document: doc, host, tabId }: D
     if (noteId) {
       const note = research.notes.find(n => n.id === noteId);
       setNoteContent(note?.content || '');
-      host.storage.set('_stock_last_note_id', noteId);
+      host.storage.set(`${dk}last_note_id`, noteId);
     } else {
       setNoteContent('');
     }

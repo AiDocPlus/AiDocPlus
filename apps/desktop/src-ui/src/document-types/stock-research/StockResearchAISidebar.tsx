@@ -151,7 +151,7 @@ export default function StockResearchAISidebar({
   })));
   const enabledServices = useMemo(() => services.filter(sv => sv.enabled), [services]);
   const [selectedServiceId, setSelectedServiceId] = useState<string>(() =>
-    host.storage.get<string>('_stock_ai_service_id') || ''
+    host.storage.get<string>(`stock_${host.documentId}_ai_service_id`) || ''
   );
   const effectiveServiceId = selectedServiceId || undefined;
   const aiParams = getAIInvokeParamsForService(effectiveServiceId);
@@ -161,14 +161,14 @@ export default function StockResearchAISidebar({
   const [promptOpen, setPromptOpen] = useState(false);
   const defaultPrompt = useMemo(() => buildSystemPrompt(research, i18n.language), [research, i18n.language]);
   const [customPrompt, setCustomPrompt] = useState<string>(() =>
-    host.storage.get<string>('_stock_ai_prompt') || ''
+    host.storage.get<string>(`stock_${host.documentId}_ai_prompt`) || ''
   );
   const [promptDraft, setPromptDraft] = useState(customPrompt || defaultPrompt);
 
   // ── 一键研究 Prompt 编辑 ──
   const [oneClickPromptOpen, setOneClickPromptOpen] = useState(false);
   const [customOneClickPrompt, setCustomOneClickPrompt] = useState<string>(() =>
-    host.storage.get<string>('_stock_one_click_prompt') || ''
+    host.storage.get<string>(`stock_${host.documentId}_one_click_prompt`) || ''
   );
   const [oneClickPromptDraft, setOneClickPromptDraft] = useState(customOneClickPrompt || DEFAULT_ONE_CLICK_PROMPT);
 
@@ -437,7 +437,7 @@ export default function StockResearchAISidebar({
                 <div className="flex gap-2 justify-end">
                   <Button size="sm" className="h-7 text-xs" onClick={() => {
                     setCustomOneClickPrompt(oneClickPromptDraft);
-                    host.storage.set('_stock_one_click_prompt', oneClickPromptDraft);
+                    host.storage.set(`stock_${host.documentId}_one_click_prompt`, oneClickPromptDraft);
                     setOneClickPromptOpen(false);
                   }}>{t('stockResearch.savePrompt', { defaultValue: '保存' })}</Button>
                 </div>
@@ -466,7 +466,7 @@ export default function StockResearchAISidebar({
                 <div className="flex gap-2 justify-end">
                   <Button size="sm" className="h-7 text-xs" onClick={() => {
                     setCustomPrompt(promptDraft);
-                    host.storage.set('_stock_ai_prompt', promptDraft);
+                    host.storage.set(`stock_${host.documentId}_ai_prompt`, promptDraft);
                     setPromptOpen(false);
                   }}>{t('stockResearch.savePrompt', { defaultValue: '保存' })}</Button>
                 </div>
@@ -599,7 +599,7 @@ export default function StockResearchAISidebar({
         value={aiParams.serviceId ?? ''}
         onChange={(id) => {
           setSelectedServiceId(id);
-          host.storage.set('_stock_ai_service_id', id);
+          host.storage.set(`stock_${host.documentId}_ai_service_id`, id);
         }}
         className="min-w-0 flex-1"
       />

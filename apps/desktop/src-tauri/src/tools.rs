@@ -868,8 +868,8 @@ mod tests {
         assert!(parsed["error"].as_str().is_some());
     }
 
-    #[test]
-    fn execute_tool_routes_to_read() {
+    #[tokio::test]
+    async fn execute_tool_routes_to_read() {
         let tc = ToolCall {
             id: "call_1".into(),
             call_type: Some("function".into()),
@@ -878,15 +878,15 @@ mod tests {
                 arguments: r#"{"document_id":"doc1"}"#.into(),
             },
         };
-        let result = execute_tool(&tc, &sample_docs());
+        let result = execute_tool(&tc, &sample_docs()).await;
         assert_eq!(result.tool_call_id, "call_1");
         assert_eq!(result.role, "tool");
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
         assert_eq!(parsed["title"], "项目说明");
     }
 
-    #[test]
-    fn execute_tool_unknown_returns_error() {
+    #[tokio::test]
+    async fn execute_tool_unknown_returns_error() {
         let tc = ToolCall {
             id: "call_2".into(),
             call_type: None,
@@ -895,7 +895,7 @@ mod tests {
                 arguments: "{}".into(),
             },
         };
-        let result = execute_tool(&tc, &[]);
+        let result = execute_tool(&tc, &[]).await;
         assert!(result.content.contains("未知工具"));
     }
 

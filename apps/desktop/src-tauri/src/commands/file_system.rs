@@ -1,7 +1,7 @@
 use crate::error::{AppError, Result, ResultExt};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FileSystemEntry {
@@ -12,49 +12,13 @@ pub struct FileSystemEntry {
     pub children: Option<Vec<FileSystemEntry>>,
 }
 
-/// 验证路径是否在允许的基础目录内，防止路径遍历攻击
-fn validate_path_in_allowed_dir(path: &Path, allowed_dirs: &[PathBuf]) -> Result<PathBuf> {
-    // 规范化路径（解析 ..、. 和符号链接）
-    let canonical = path.canonicalize()
-        .map_err(|e| AppError::ValidationError(format!("路径无效或不存在: {}", e)))?;
-
-    // 检查路径是否在任一允许的目录内
-    for allowed_dir in allowed_dirs {
-        if let Ok(allowed_canonical) = allowed_dir.canonicalize() {
-            if canonical.starts_with(&allowed_canonical) {
-                return Ok(canonical);
-            }
-        }
-    }
-
-    Err(AppError::SecurityError("路径遍历尝试被检测到：路径不在允许的目录内".to_string()))
-}
-
-/// 获取允许的目录列表（应用数据目录 + 用户主目录）
-fn get_allowed_directories() -> Vec<PathBuf> {
-    let mut dirs = Vec::new();
-
-    // 应用数据目录
-    dirs.push(crate::config::current_data_root());
-
-    // 用户主目录（用于导入文件）
-    if let Some(home) = dirs::home_dir() {
-        dirs.push(home);
-    }
-
-    // 临时目录
-    dirs.push(std::env::temp_dir());
-
-    dirs
-}
 
 #[tauri::command]
 pub fn read_directory(path: String) -> Result<FileSystemEntry> {
     let path_obj = Path::new(&path);
 
     // 读取操作也需要路径验证（安全限制）
-    let allowed_dirs = get_allowed_directories();
-    validate_path_in_allowed_dir(path_obj, &allowed_dirs)
+    crate::security::validate_path_allowed(path_obj, "读取目录")
         .context("读取目录失败")?;
 
     if !path_obj.exists() {
@@ -117,9 +81,8 @@ pub fn read_directory(path: String) -> Result<FileSystemEntry> {
 #[tauri::command]
 pub fn read_file(path: String) -> Result<String> {
     // 读取操作也需要路径验证（安全限制）
-    let allowed_dirs = get_allowed_directories();
     let path_obj = Path::new(&path);
-    validate_path_in_allowed_dir(path_obj, &allowed_dirs)
+    crate::security::validate_path_allowed(path_obj, "读取文件")
         .context("读取文件失败")?;
 
     if !path_obj.exists() {
@@ -132,8 +95,7 @@ pub fn read_file(path: String) -> Result<String> {
 pub fn write_file(path: String, content: String) -> Result<()> {
     let path = Path::new(&path);
     // 写操作需要严格的路径验证
-    let allowed_dirs = get_allowed_directories();
-    validate_path_in_allowed_dir(path, &allowed_dirs)
+    crate::security::validate_path_allowed(path, "写入文件路径")
         .context("写入文件失败")?;
 
     if let Some(parent) = path.parent() {
@@ -146,8 +108,7 @@ pub fn write_file(path: String, content: String) -> Result<()> {
 pub fn delete_file(path: String) -> Result<()> {
     let path = Path::new(&path);
     // 删除操作需要严格的路径验证
-    let allowed_dirs = get_allowed_directories();
-    validate_path_in_allowed_dir(path, &allowed_dirs)
+    crate::security::validate_path_allowed(path, "删除文件路径")
         .context("删除文件失败")?;
 
     Ok(fs::remove_file(path)?)
@@ -159,12 +120,11 @@ pub fn delete_file(path: String) -> Result<()> {
 pub fn read_file_base64(path: String) -> Result<String> {
     use base64::{engine::general_purpose::STANDARD, Engine};
 
+    let file_path = Path::new(&path);
     // 安全验证：限制在允许的目录下
-    let allowed_dirs = get_allowed_directories();
-    validate_path_in_allowed_dir(Path::new(&path), &allowed_dirs)
+    crate::security::validate_path_allowed(file_path, "读取文件")
         .context("读取文件失败：路径不在允许的目录下")?;
 
-    let file_path = Path::new(&path);
     if !file_path.exists() {
         return Err(AppError::Internal(format!("文件不存在: {}", path)));
     }
@@ -205,12 +165,10 @@ pub fn read_file_base64(path: String) -> Result<String> {
 /// 读取文本文件内容（自动检测编码，支持 UTF-8/GBK/GB2312 等）
 #[tauri::command]
 pub fn read_text_file(path: String) -> Result<String> {
-    // 安全验证：限制在允许的目录下
-    let allowed_dirs = get_allowed_directories();
-    validate_path_in_allowed_dir(Path::new(&path), &allowed_dirs)
-        .context("读取文件失败：路径不在允许的目录下")?;
-
     let file_path = Path::new(&path);
+    // 安全验证：限制在允许的目录下
+    crate::security::validate_path_allowed(file_path, "读取文本文件")
+        .context("读取文件失败：路径不在允许的目录下")?;
     if !file_path.exists() {
         return Err(AppError::Internal(format!("文件不存在: {}", path)));
     }
@@ -251,8 +209,7 @@ pub fn read_text_file(path: String) -> Result<String> {
 pub fn create_directory(path: String) -> Result<()> {
     let path = Path::new(&path);
     // 创建目录操作需要严格的路径验证
-    let allowed_dirs = get_allowed_directories();
-    validate_path_in_allowed_dir(path, &allowed_dirs)
+    crate::security::validate_path_allowed(path, "创建目录")
         .context("创建目录失败")?;
 
     Ok(fs::create_dir_all(path)?)
@@ -263,9 +220,12 @@ pub fn create_directory(path: String) -> Result<()> {
 pub fn get_file_metadata(path: String) -> Result<serde_json::Value> {
     let file_path = Path::new(&path);
     if !file_path.exists() {
-        return Err(AppError::Internal(format!("File not found: {}", path)));
+        return Err(AppError::Internal(format!("文件不存在: {}", path)));
     }
-    let metadata = fs::metadata(file_path).context("Failed to read metadata")?;
+    // 安全校验：路径必须在允许的目录内（文件已存在，canonicalize 可正常执行）
+    crate::security::validate_path_allowed(file_path, "文件路径")
+        .context("获取文件信息失败：路径不在允许的目录下")?;
+    let metadata = fs::metadata(file_path).context("获取文件信息失败")?;
     Ok(serde_json::json!({
         "size": metadata.len(),
         "isFile": metadata.is_file(),
@@ -284,10 +244,9 @@ pub fn get_home_dir() -> Result<String> {
 /// 获取文档在磁盘上的文件路径（跨平台安全拼接）
 #[tauri::command]
 pub fn get_document_file_path(project_id: String, document_id: String) -> Result<String> {
-    let home = dirs::home_dir()
-        .ok_or_else(|| AppError::Internal("无法获取用户主目录".to_string()))?;
-    let doc_path = home
-        .join("AiDocPlus")
+    crate::security::validate_id(&project_id, "projectId")?;
+    crate::security::validate_id(&document_id, "documentId")?;
+    let doc_path = crate::config::current_data_root()
         .join("Projects")
         .join(&project_id)
         .join("documents")
@@ -313,6 +272,10 @@ pub fn show_in_folder(path: String) -> Result<()> {
     } else {
         return Err(AppError::Internal(format!("路径不存在: {}", path)));
     };
+
+    // 安全校验：目标路径必须在允许的目录内
+    crate::security::validate_path_allowed(&target, "显示文件路径")
+        .context("路径不在允许的目录内")?;
 
     #[cfg(target_os = "macos")]
     {

@@ -196,7 +196,7 @@ export default function TaskListAISidebar({
   const aiServices = useSettingsStore((s) => s.ai.services);
   const enabledServices = useMemo(() => aiServices.filter((x) => x.enabled), [aiServices]);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(() =>
-    host.storage.get<string>(TASKLIST_AI_SERVICE_STORAGE_KEY),
+    host.storage.get<string>(TASKLIST_AI_SERVICE_STORAGE_KEY(document.id)),
   );
   const [webSearchEnabled, setWebSearchEnabled] = useState(
     () => host.storage.get<boolean>(aiWebKey) ?? true,
@@ -1031,7 +1031,7 @@ export default function TaskListAISidebar({
             value={selectedServiceId ?? ''}
             onChange={(id) => {
               setSelectedServiceId(id);
-              host.storage.set(TASKLIST_AI_SERVICE_STORAGE_KEY, id);
+              host.storage.set(TASKLIST_AI_SERVICE_STORAGE_KEY(document.id), id);
             }}
             disabled={streaming}
           />
@@ -1077,7 +1077,7 @@ export default function TaskListAISidebar({
               }
             >
               <Brain className="h-3 w-3" />
-              <span className="hidden sm:inline">{t('chat.aiThinking', { defaultValue: '深度思考' })}</span>
+              <span className="hidden sm:inline">{t('chat.deepThink', { defaultValue: '深度思考' })}</span>
             </Button>
           )}
         </div>
